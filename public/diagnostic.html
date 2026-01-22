@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Diagnóstico - Sistema CREESER</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #14b8a6 0%, #047857 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #047857;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #14b8a6;
+            border-bottom: 2px solid #14b8a6;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        @media (max-width: 600px) {
+            .button-group {
+                grid-template-columns: 1fr;
+            }
+        }
+        button {
+            padding: 12px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        .btn-primary {
+            background: #14b8a6;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #0d9488;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(20, 184, 166, 0.3);
+        }
+        .btn-secondary {
+            background: #60a5fa;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #3b82f6;
+        }
+        .btn-danger {
+            background: #dc2626;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #b91c1c;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        .status.success { background: #dcfce7; color: #166534; border-left: 4px solid #22c55e; }
+        .status.warning { background: #fef3c7; color: #92400e; border-left: 4px solid #fbbf24; }
+        .status.error { background: #fee2e2; color: #991b1b; border-left: 4px solid #ef4444; }
+        .info-box {
+            background: #f3f4f6;
+            border-left: 4px solid #14b8a6;
+            padding: 12px;
+            margin-bottom: 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
+        }
+        .info-box strong {
+            color: #047857;
+        }
+        .output {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+            line-height: 1.5;
+        }
+        .step { margin: 20px 0; }
+        .step-number {
+            display: inline-block;
+            background: #14b8a6;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .step-title {
+            display: inline-block;
+            font-weight: 600;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>🔍 Diagnóstico de Autenticação</h1>
+            <p class="subtitle">Teste completo do fluxo de login → dashboard</p>
+
+            <div id="status" class="status warning">
+                ⏳ Aguardando ação...
+            </div>
+
+            <div class="step">
+                <span class="step-number">1</span>
+                <span class="step-title">Preparar Ambiente</span>
+                <div class="button-group">
+                    <button class="btn-primary" onclick="limparStorage()">🗑️ Limpar localStorage</button>
+                    <button class="btn-secondary" onclick="verificarStorage()">🔍 Verificar Storage</button>
+                </div>
+            </div>
+
+            <div class="step">
+                <span class="step-number">2</span>
+                <span class="step-title">Simular Login</span>
+                <div class="button-group">
+                    <button class="btn-primary" onclick="simularLoginAluno()">👨‍🎓 Login Aluno</button>
+                    <button class="btn-primary" onclick="simularLoginProfessor()">👨‍🏫 Login Professor</button>
+                </div>
+            </div>
+
+            <div class="step">
+                <span class="step-number">3</span>
+                <span class="step-title">Testar Redirecionamento</span>
+                <div class="button-group">
+                    <button class="btn-secondary" onclick="irParaDashboard()">📊 Ir para /dashboard</button>
+                    <button class="btn-danger" onclick="irParaDashboardEAD()">📚 Ir para /dashboard_ead</button>
+                </div>
+            </div>
+
+            <div class="step">
+                <span class="step-number">4</span>
+                <span class="step-title">Output & Diagnóstico</span>
+                <div id="output" class="output">Sistema pronto. Clique em um botão acima para começar.</div>
+            </div>
+
+            <div class="info-box">
+                <strong>ℹ️ Como usar:</strong> Siga os passos acima para testar o fluxo de autenticação. 
+                O sistema irá mostrar tudo que está acontecendo no console.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const outputDiv = document.getElementById('output');
+        const statusDiv = document.getElementById('status');
+        let actionLog = [];
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString('pt-BR');
+            const line = `[${timestamp}] ${message}`;
+            actionLog.push(line);
+            outputDiv.textContent = actionLog.join('\n');
+            outputDiv.scrollTop = outputDiv.scrollHeight;
+            console.log(line);
+        }
+
+        function setStatus(message, type = 'warning') {
+            statusDiv.className = 'status ' + type;
+            statusDiv.textContent = message;
+        }
+
+        function verificarStorage() {
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            log('VERIFICANDO localStorage');
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+            const usuario = localStorage.getItem('usuario');
+            const usuarioEad = localStorage.getItem('usuario_ead');
+            const token = localStorage.getItem('token');
+            const tokenEad = localStorage.getItem('token_ead');
+
+            if (usuario) {
+                try {
+                    const obj = JSON.parse(usuario);
+                    log(`✅ usuario: ${obj.email} (${obj.tipo})`);
+                } catch(e) {
+                    log(`❌ usuario: erro ao parsear`);
+                }
+            } else {
+                log('❌ usuario: VAZIO');
+            }
+
+            log(token ? '✅ token: definido' : '❌ token: VAZIO');
+            log(usuarioEad ? '✅ usuario_ead: definido' : '❌ usuario_ead: VAZIO');
+            log(tokenEad ? '✅ token_ead: definido' : '❌ token_ead: VAZIO');
+            
+            setStatus('✅ Verificação concluída', 'success');
+        }
+
+        function limparStorage() {
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            log('LIMPANDO localStorage');
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            
+            localStorage.clear();
+            log('✅ localStorage limpo');
+            setStatus('✅ localStorage limpo', 'success');
+        }
+
+        function salvarDados(usuario) {
+            log(`Salvando dados para ${usuario.email}...`);
+            localStorage.setItem('usuario', JSON.stringify(usuario));
+            localStorage.setItem('token', 'token_' + usuario.id);
+            log(`✅ Dados salvos:`);
+            log(`   Email: ${usuario.email}`);
+            log(`   Tipo: ${usuario.tipo}`);
+        }
+
+        function simularLoginAluno() {
+            setStatus('⏳ Processando login...', 'warning');
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            log('SIMULANDO LOGIN - ALUNO');
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+            const aluno = {
+                id: 3,
+                nomeCompleto: "Maria Santos Oliveira",
+                email: "aluno@creeser.com",
+                tipo: "aluno"
+            };
+
+            salvarDados(aluno);
+            log('✅ Login simulado com sucesso');
+            log('Próximo: Clique em "Ir para /dashboard"');
+            setStatus('✅ Aluno preparado. Clique em "Ir para /dashboard"', 'success');
+        }
+
+        function simularLoginProfessor() {
+            setStatus('⏳ Processando login...', 'warning');
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            log('SIMULANDO LOGIN - PROFESSOR');
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+            const professor = {
+                id: 2,
+                nomeCompleto: "João Silva Santos",
+                email: "professor@creeser.com",
+                tipo: "professor"
+            };
+
+            salvarDados(professor);
+            log('✅ Login simulado com sucesso');
+            log('Próximo: Clique em "Ir para /professor/dashboard"');
+            setStatus('✅ Professor preparado. Clique em "Ir para /dashboard"', 'success');
+        }
+
+        function irParaDashboard() {
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            log('REDIRECIONANDO PARA /dashboard');
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            
+            const usuario = localStorage.getItem('usuario');
+            if (!usuario) {
+                log('❌ ERRO: Nenhum usuario em localStorage');
+                log('Faça o login primeiro!');
+                setStatus('❌ Erro: Nenhum usuario definido', 'error');
+                return;
+            }
+
+            const obj = JSON.parse(usuario);
+            log(`Redirecionando ${obj.email} para /dashboard...`);
+            log('⏳ Aguarde...');
+            setStatus('⏳ Redirecionando...', 'warning');
+
+            setTimeout(() => {
+                window.location.href = '/dashboard';
+            }, 300);
+        }
+
+        function irParaDashboardEAD() {
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            log('REDIRECIONANDO PARA /dashboard_ead');
+            log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            
+            log('Navegando para /dashboard_ead...');
+            log('⏳ Aguarde...');
+            setStatus('⏳ Redirecionando...', 'warning');
+
+            setTimeout(() => {
+                window.location.href = '/dashboard_ead';
+            }, 300);
+        }
+
+        // Inicializar
+        log('Sistema de diagnóstico carregado');
+        log('Pronto para testes!');
+    </script>
+</body>
+</html>

@@ -1,0 +1,882 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+// ===== TENANT (EMPRESA) =====
+model Empresa {
+  id           String   @id @default(cuid())
+  nome         String
+  nomeFantasia String?
+  cnpj         String   @unique
+  razaoSocial  String
+  email        String
+  telefone     String?
+  website      String?
+  logo         String?
+  logoUrl      String?  // ← NOVO: URL alternativa para logo
+  descricao    String?
+
+  // Customização visual
+  corPrimaria  String   @default("#0066cc")  // ← NOVO: Cor tema empresa
+  timeZone     String   @default("America/Sao_Paulo")  // ← NOVO: Fuso horário
+
+  // Endereço
+  endereco    String?
+  numero      String?
+  complemento String?
+  bairro      String?
+  cidade      String?
+  estado      String?
+  cep         String?
+  pais        String?  @default("Brasil")
+
+  // Controle
+  status        String   @default("ativo") // ativo, inativo, suspeso
+  planoPagamento String?  // ← NOVO: gratis, pro, enterprise
+  limiteUsuarios Int?     // ← NOVO: null = ilimitado
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+  deletedAt     DateTime?  // ← NOVO: Soft delete
+
+  // Relacionamentos
+  unidades      Unidade[]
+  usuarios      Usuario[]
+  funcionarios  Funcionario[]
+  alunos        Aluno[]
+  professores   Professor[]
+  cursos        Curso[]
+  turmas        Turma[]
+  disciplinas   Disciplina[]
+  avaliacoes    Avaliacao[]
+  notas         Nota[]
+  faltas        Falta[]
+  documentos    Documento[]
+  emails        EmailEnviado[]
+  forum         Forum[]
+  noticias      Noticia[]
+  schemas       SchemaCustomizado[]
+  dadosDinamicos DadosDinamicos[]
+  auditoria     AuditoriaLog[]
+  
+  // ===== FINANCEIRO =====
+  assinaturas   Assinatura[]
+  faturas       Fatura[]
+  pagamentos    Pagamento[]
+  transacoes    Transacao[]
+
+  @@index([cnpj])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+// ===== UNIDADES (FILIAIS/POLOS) =====
+model Unidade {
+  id                      String   @id @default(cuid())
+  empresaId               String
+  nome                    String
+  cnpj                    String?
+  email                   String?
+  telefone                String?
+  endereco                String?
+  numero                  String?
+  complemento             String?
+  bairro                  String?
+  cidade                  String?
+  estado                  String?
+  cep                     String?
+  local                   String?
+  codigoPoloRecenseamento String?
+  instituicaoEnsinoSuperior Boolean?
+  situacao                String?  @default("ATIVO")
+  codMecMantenedora       String?
+  cnpjMantenedora         String?
+  razaoSocial             String?
+  cepMantenedora          String?
+  logradouroMantenedora   String?
+
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+  deletedAt     DateTime?  // ← NOVO: Soft delete
+
+  // Relacionamentos
+  empresa  Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  turmas   Turma[]
+  usuarios Usuario[]
+
+  @@unique([empresaId, cnpj])
+  @@index([empresaId])
+  @@index([deletedAt])
+}
+
+// ===== USUÁRIOS DO SISTEMA =====
+model Usuario {
+  id           String   @id @default(cuid())
+  empresaId    String
+  unidadeId    String?
+  nomeCompleto String
+  email        String
+  senha        String   // hash bcrypt
+  tipo         String   // admin, professor, aluno, funcionario, matriculador
+  avatar       String?
+  ativo        Boolean  @default(true)
+
+  // Verificação e Segurança
+  emailVerificado     Boolean  @default(false)  // ← NOVO
+  telefoneVerificado  Boolean  @default(false)  // ← NOVO
+  autenticacao2FA     Boolean  @default(false)  // ← NOVO
+
+  // Controle de acesso
+  ultimoLogin      DateTime?
+  tentativasFalhas Int      @default(0)
+  bloqueadoAte     DateTime?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  deletedAt    DateTime?  // ← NOVO: Soft delete
+
+  // Relacionamentos
+  empresa     Empresa   @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  unidade     Unidade?  @relation(fields: [unidadeId], references: [id])
+  tokens      TokenAcesso[]
+  permissoes  Permissao[]
+  logs        AuditoriaLog[]
+
+  @@unique([empresaId, email])
+  @@index([empresaId])
+  @@index([email])
+  @@index([tipo])
+  @@index([empresaId, tipo])  // ← NOVO: Query comum (usuários por empresa + tipo)
+  @@index([empresaId, ativo])  // ← NOVO: Query comum (usuários ativos por empresa)
+  @@index([deletedAt])
+}
+
+// ===== TOKENS DE AUTENTICAÇÃO =====
+model TokenAcesso {
+  id           String   @id @default(cuid())
+  usuarioId    String
+  token        String   @unique
+  tokenRefresh String?  @unique
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  criadoEm     DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@index([token])
+}
+
+// ===== PERMISSÕES (RBAC) =====
+model Permissao {
+  id        String   @id @default(cuid())
+  usuarioId String
+  recurso   String   // exemplo: "alunos", "turmas", "notas"
+  acao      String   // criar, ler, atualizar, deletar
+  criadoEm  DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, recurso, acao])
+  @@index([usuarioId])
+}
+
+// ===== FUNCIONÁRIOS =====
+model Funcionario {
+  id           String   @id @default(cuid())
+  empresaId    String
+  nomeCompleto String
+  email        String
+  cpf          String?
+  rg           String?
+  telefone     String?
+  celular      String?
+  dataNascimento DateTime?
+  nacionalidade  String?
+  estadoCivil    String?
+  sexo           String?
+
+  // Endereço
+  endereco    String?
+  numero      String?
+  complemento String?
+  bairro      String?
+  cidade      String?
+  estado      String?
+  cep         String?
+
+  // Profissional
+  cargo            String?
+  departamento     String?
+  dataPosseTomacao DateTime?
+  dataAdmissao     DateTime?
+  dataExoneracao   DateTime?
+  statusVinculo    String?
+  cargaHoraria     Int?
+
+  ativo       Boolean  @default(true)
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  deletedAt   DateTime?  // ← NOVO: Soft delete
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@unique([empresaId, cpf])
+  @@index([empresaId])
+  @@index([email])
+  @@index([deletedAt])
+}
+
+// ===== PROFESSORES =====
+model Professor {
+  id            String   @id @default(cuid())
+  empresaId     String
+  nomeCompleto  String
+  email         String
+  cpf           String?
+  telefone      String?
+  celular       String?
+  dataNascimento DateTime?
+  formacao       String?
+  especializacao String?
+  areaAtuacao    String?
+
+  ativo       Boolean  @default(true)
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  deletedAt   DateTime?  // ← NOVO: Soft delete
+
+  empresa      Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  disciplinas  DisciplinaProfessor[]
+  avaliacoes   Avaliacao[]
+
+  @@unique([empresaId, email])
+  @@index([empresaId])
+  @@index([deletedAt])
+}
+
+// ===== ALUNOS =====
+model Aluno {
+  id            String   @id @default(cuid())
+  empresaId     String
+  nomeCompleto  String
+  email         String?
+  cpf           String?
+  rg            String?
+  dataNascimento DateTime?
+  sexo           String?
+  nacionalidade  String?
+  naturalidade   String?
+  nomeMae        String?
+  nomePai        String?
+
+  // Endereço
+  endereco    String?
+  numero      String?
+  complemento String?
+  bairro      String?
+  cidade      String?
+  estado      String?
+  cep         String?
+
+  // Responsáveis
+  nomeResponsavel1     String?
+  emailResponsavel1    String?
+  telefoneResponsavel1 String?
+  nomeResponsavel2     String?
+  emailResponsavel2    String?
+  telefoneResponsavel2 String?
+
+  // Acadêmico
+  statusAcademico String? @default("ativo") // ativo, inativo, trancado, concluido
+  dataCadastro    DateTime @default(now())
+  ativo           Boolean  @default(true)
+
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+  deletedAt     DateTime?  // ← NOVO: Soft delete
+
+  empresa    Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  matriculas Matricula[]
+  notas      Nota[]
+  faltas     Falta[]
+
+  @@unique([empresaId, cpf])
+  @@unique([empresaId, email])
+  @@index([empresaId])
+  @@index([statusAcademico])
+  @@index([deletedAt])
+}
+
+// ===== CURSOS =====
+model Curso {
+  id          String   @id @default(cuid())
+  empresaId   String
+  codigo      String
+  nome        String
+  descricao   String?
+  cargaHoraria Int?
+  tipo        String?  // presencial, ead, hibrido
+  nivel       String?  // fundamental, medio, superior
+  status      String?  @default("ativo")
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  deletedAt    DateTime?  // ← NOVO: Soft delete
+
+  empresa     Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  turmas      Turma[]
+  disciplinas Disciplina[]
+
+  @@unique([empresaId, codigo])
+  @@index([empresaId])
+  @@index([deletedAt])
+}
+
+// ===== TURMAS =====
+model Turma {
+  id        String   @id @default(cuid())
+  empresaId String
+  unidadeId String
+  cursoId   String
+  anoLetivo String
+  semestre  String?
+  codigo    String
+  nome      String
+  turno     String?  // matutino, vespertino, noturno
+  capacidade Int?
+  dataInicio DateTime?
+  dataFim    DateTime?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  deletedAt    DateTime?  // ← NOVO: Soft delete
+
+  empresa     Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  unidade     Unidade @relation(fields: [unidadeId], references: [id])
+  curso       Curso   @relation(fields: [cursoId], references: [id])
+  matriculas  Matricula[]
+  disciplinas DisciplinaTurma[]
+  avaliacoes  Avaliacao[]
+  notas       Nota[]
+  faltas      Falta[]
+
+  @@unique([empresaId, anoLetivo, codigo])
+  @@index([empresaId])
+  @@index([unidadeId])
+  @@index([cursoId])
+  @@index([deletedAt])
+}
+
+// ===== MATRÍCULAS =====
+model Matricula {
+  id        String   @id @default(cuid())
+  empresaId String
+  alunoId   String
+  turmaId   String
+  anoLetivo String
+  status    String?  @default("ativo") // ativo, trancado, cancelado, concluido
+  dataMatricula DateTime @default(now())
+  dataVencimento DateTime?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  deletedAt    DateTime?  // ← NOVO: Soft delete
+
+  aluno Aluno @relation(fields: [alunoId], references: [id])
+  turma Turma @relation(fields: [turmaId], references: [id])
+
+  @@unique([alunoId, turmaId])
+  @@index([empresaId])
+  @@index([alunoId])
+  @@index([turmaId])
+  @@index([deletedAt])
+}
+
+// ===== DISCIPLINAS =====
+model Disciplina {
+  id           String   @id @default(cuid())
+  empresaId    String
+  cursoId      String
+  codigo       String
+  nome         String
+  descricao    String?
+  cargaHoraria Int?
+  creditosAula Int?
+  creditosTrabalho Int?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  deletedAt    DateTime?  // ← NOVO: Soft delete
+
+  empresa     Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  curso       Curso   @relation(fields: [cursoId], references: [id])
+  turmas      DisciplinaTurma[]
+  professores DisciplinaProfessor[]
+  avaliacoes  Avaliacao[]
+  notas       Nota[]
+  faltas      Falta[]
+
+  @@unique([empresaId, codigo])
+  @@index([empresaId])
+  @@index([cursoId])
+  @@index([deletedAt])
+}
+
+// ===== DISCIPLINA POR TURMA =====
+model DisciplinaTurma {
+  id           String   @id @default(cuid())
+  turmaId      String
+  disciplinaId String
+  semestreLetivo String?
+
+  turma      Turma      @relation(fields: [turmaId], references: [id])
+  disciplina Disciplina @relation(fields: [disciplinaId], references: [id])
+
+  @@unique([turmaId, disciplinaId])
+}
+
+// ===== DISCIPLINA POR PROFESSOR =====
+model DisciplinaProfessor {
+  id          String   @id @default(cuid())
+  professorId String
+  disciplinaId String
+  anoLetivo   String
+
+  professor  Professor  @relation(fields: [professorId], references: [id])
+  disciplina Disciplina @relation(fields: [disciplinaId], references: [id])
+
+  @@unique([professorId, disciplinaId, anoLetivo])
+}
+
+// ===== AVALIAÇÕES =====
+model Avaliacao {
+  id          String   @id @default(cuid())
+  empresaId   String
+  turmaId     String
+  disciplinaId String
+  professorId String
+  tipo        String?  // prova, trabalho, participacao, etc
+  descricao   String?
+  dataAplicacao DateTime?
+  dataResultado DateTime?
+  pesoNota    Float?   @default(1.0)
+  status      String?  @default("planejada")
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  deletedAt    DateTime?  // ← NOVO: Soft delete
+
+  empresa    Empresa    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  turma      Turma      @relation(fields: [turmaId], references: [id])
+  disciplina Disciplina @relation(fields: [disciplinaId], references: [id])
+  professor  Professor  @relation(fields: [professorId], references: [id])
+  notas      Nota[]
+
+  @@index([empresaId])
+  @@index([turmaId])
+  @@index([deletedAt])
+}
+
+// ===== NOTAS =====
+model Nota {
+  id          String   @id @default(cuid())
+  empresaId   String
+  alunoId     String
+  turmaId     String
+  disciplinaId String
+  avaliacaoId String?
+  valor       Float?
+  descricao   String?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  deletedAt    DateTime?  // ← NOVO: Soft delete
+
+  empresa    Empresa    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  aluno      Aluno      @relation(fields: [alunoId], references: [id])
+  turma      Turma      @relation(fields: [turmaId], references: [id])
+  disciplina Disciplina @relation(fields: [disciplinaId], references: [id])
+  avaliacao  Avaliacao? @relation(fields: [avaliacaoId], references: [id])
+
+  @@unique([empresaId, alunoId, disciplinaId, avaliacaoId])
+  @@index([empresaId])
+  @@index([alunoId])
+  @@index([empresaId, alunoId, turmaId])  // ← NOVO: Query comum para boletins
+  @@index([disciplinaId, avaliacaoId])  // ← NOVO
+  @@index([deletedAt])
+}
+
+// ===== FALTAS =====
+model Falta {
+  id          String   @id @default(cuid())
+  empresaId   String
+  alunoId     String
+  turmaId     String
+  disciplinaId String
+  dataFalta   DateTime
+  qtdFaltas   Int
+  descricao   String?
+  justificativa String?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  deletedAt    DateTime?  // ← NOVO: Soft delete
+
+  empresa    Empresa    @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  aluno      Aluno      @relation(fields: [alunoId], references: [id])
+  turma      Turma      @relation(fields: [turmaId], references: [id])
+  disciplina Disciplina @relation(fields: [disciplinaId], references: [id])
+
+  @@index([empresaId])
+  @@index([alunoId])
+  @@index([deletedAt])
+}
+
+// ===== DOCUMENTOS =====
+model Documento {
+  id          String   @id @default(cuid())
+  empresaId   String
+  titulo      String
+  descricao   String?
+  tipo        String?  // termo, decreto, etc
+  urlArquivo  String
+  dataCriacao DateTime @default(now())
+  dataAtualizacao DateTime @updatedAt
+  deletedAt   DateTime?  // ← NOVO: Soft delete
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([empresaId])
+  @@index([deletedAt])
+}
+
+// ===== EMAILS ENVIADOS =====
+model EmailEnviado {
+  id          String   @id @default(cuid())
+  empresaId   String
+  destinatario String
+  assunto     String
+  corpo       String
+  status      String?  @default("enviado")
+  dataTentativa DateTime @default(now())
+  deletedAt   DateTime?  // ← NOVO: Soft delete
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([empresaId])
+  @@index([destinatario])
+  @@index([deletedAt])
+}
+
+// ===== FORUM =====
+model Forum {
+  id          String   @id @default(cuid())
+  empresaId   String
+  titulo      String
+  descricao   String?
+  categoria   String?
+  status      String?  @default("ativo")
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  deletedAt   DateTime?  // ← NOVO: Soft delete
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([empresaId])
+  @@index([deletedAt])
+}
+
+// ===== NOTÍCIAS =====
+model Noticia {
+  id          String   @id @default(cuid())
+  empresaId   String
+  titulo      String
+  descricao   String?
+  conteudo    String?
+  autor       String?
+  destaque    Boolean  @default(false)
+  status      String?  @default("publicada")
+  dataCriacao DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  deletedAt   DateTime?  // ← NOVO: Soft delete
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([empresaId])
+  @@index([deletedAt])
+}
+
+// ===== SCHEMA CUSTOMIZADO (FIELDS DINÂMICOS) =====
+model SchemaCustomizado {
+  id           String   @id @default(cuid())
+  empresaId    String
+  nomeEntidade String   // "perfil_aluno", "dados_laboratoriais", etc
+  descricao    String?
+
+  // Campos customizáveis como JSONB
+  // Formato: [{ nome, tipo, obrigatorio, label, regex, minLength, maxLength }]
+  campos       Json
+
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  deletedAt    DateTime?  // ← NOVO: Soft delete
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  dados   DadosDinamicos[]
+
+  @@unique([empresaId, nomeEntidade])
+  @@index([empresaId])
+  @@index([ativo])
+  @@index([deletedAt])
+}
+
+// ===== DADOS DINÂMICOS (VALORES DE SCHEMA CUSTOMIZADO) =====
+model DadosDinamicos {
+  id        String   @id @default(cuid())
+  empresaId String
+  schemaId  String
+
+  // Dados sem schema fixo - valores validados contra SchemaCustomizado.campos
+  dados     Json     // { campo1: valor, campo2: valor, ... }
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  deletedAt    DateTime?  // ← NOVO: Soft delete
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  schema  SchemaCustomizado @relation(fields: [schemaId], references: [id], onDelete: Cascade)
+
+  @@index([empresaId])
+  @@index([schemaId])
+  @@index([deletedAt])
+}
+
+// ===== AUDITORIA (LOGS) =====
+model AuditoriaLog {
+  id          String   @id @default(cuid())
+  usuarioId   String
+  empresaId   String
+  acao        String   // CREATE, READ, UPDATE, DELETE, LOGIN, LOGOUT
+  tabela      String   // nome da tabela afetada
+  registroId  String?  // ID do registro afetado
+  versao      Int      @default(1)  // ← NOVO: Versão da mudança
+  dadosAntigos Json?
+  dadosNovos   Json?
+  ipAddress   String?
+  userAgent   String?
+  criadoEm    DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+  empresa Empresa @relation(fields: [empresaId], references: [id])  // ← NOVO: Relação com empresa
+
+  @@index([usuarioId])
+  @@index([empresaId])
+  @@index([criadoEm])
+  @@index([tabela, registroId])  // ← NOVO: Query para histórico de um registro
+}
+
+// ========================================================================================
+// ===== MÓDULO FINANCEIRO - GESTÃO DE CLIENTES E ASSINATURAS =====
+// ========================================================================================
+
+// ===== PLANOS DE ASSINATURA =====
+model PlanoAssinatura {
+  id            String   @id @default(cuid())
+  nome          String   // "Básico", "Profissional", "Enterprise"
+  descricao     String?
+  precoMensal   Float    // Preço em R$
+  precoAnual    Float?   // Preço em R$ (com desconto)
+  
+  // Limites do plano
+  limiteAlunos       Int     // -1 = ilimitado
+  limiteProfessores  Int     // -1 = ilimitado
+  limiteFuncionarios Int     // -1 = ilimitado
+  limiteArmazenamento Int    // em GB, -1 = ilimitado
+  
+  // Funcionalidades
+  relatorios      Boolean @default(true)
+  integracao      Boolean @default(false)
+  suportePrioritario Boolean @default(false)
+  customizacao    Boolean @default(false)
+  
+  ativo           Boolean @default(true)
+  ordenExibicao   Int     @default(0)
+  criadoEm        DateTime @default(now())
+  atualizadoEm    DateTime @updatedAt
+  
+  // Relacionamentos
+  assinaturas   Assinatura[]
+  
+  @@index([ativo])
+  @@index([ordenExibicao])
+}
+
+// ===== ASSINATURAS (CLIENTES) =====
+model Assinatura {
+  id            String   @id @default(cuid())
+  empresaId     String
+  planoId       String
+  
+  // Dados da assinatura
+  dataInicio    DateTime @default(now())
+  dataFim       DateTime?
+  dataProximoVencimento DateTime
+  status        String   @default("ativa") // ativa, cancelada, suspensa, vencida
+  
+  // Configuração
+  cobrancaAnual Boolean @default(false)
+  tentativasCobranca Int @default(0)
+  ultimaTentativaCobranca DateTime?
+  
+  // Descontos e promoções
+  codigoPromocional String?
+  descontoPercentual Float @default(0)
+  
+  // Observações
+  observacoes   String?
+  
+  canceladoEm   DateTime?
+  motivoCancelamento String?
+  
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+  deletedAt     DateTime?
+  
+  // Relacionamentos
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  plano   PlanoAssinatura @relation(fields: [planoId], references: [id])
+  faturas Fatura[]
+  
+  @@unique([empresaId])
+  @@index([empresaId])
+  @@index([status])
+  @@index([dataProximoVencimento])
+  @@index([deletedAt])
+}
+
+// ===== FATURAS =====
+model Fatura {
+  id            String   @id @default(cuid())
+  empresaId     String
+  assinaturaId  String
+  
+  // Identificação
+  numero        String   // NF-2024-001, NF-2024-002, etc
+  dataEmissao   DateTime @default(now())
+  dataVencimento DateTime
+  dataPagamento DateTime?
+  
+  // Valores
+  subtotal      Float
+  desconto      Float   @default(0)
+  imposto       Float   @default(0)
+  total         Float
+  
+  // Status
+  status        String  @default("pendente") // pendente, paga, vencida, cancelada
+  metodoCobranca String? // cartao_credito, boleto, pix, transferencia
+  
+  // Observações
+  observacoes   String?
+  linkBoleto    String?
+  
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+  deletedAt     DateTime?
+  
+  // Relacionamentos
+  empresa      Empresa     @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  assinatura   Assinatura  @relation(fields: [assinaturaId], references: [id], onDelete: Cascade)
+  pagamentos   Pagamento[]
+  
+  @@unique([numero])
+  @@index([empresaId])
+  @@index([status])
+  @@index([dataVencimento])
+  @@index([deletedAt])
+}
+
+// ===== PAGAMENTOS =====
+model Pagamento {
+  id            String   @id @default(cuid())
+  faturaId      String
+  empresaId     String
+  
+  // Identificação
+  dataRecebimento DateTime @default(now())
+  metodo        String  // cartao_credito, boleto, pix, transferencia, dinheiro
+  referencia    String? // ID transação gateway, código boleto, etc
+  
+  // Valores
+  valor         Float
+  taxa          Float   @default(0)
+  valorLiquido  Float
+  
+  // Status
+  status        String  @default("confirmado") // confirmado, pendente, devolvido
+  
+  // Observações
+  observacoes   String?
+  
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+  deletedAt     DateTime?
+  
+  // Relacionamentos
+  fatura   Fatura @relation(fields: [faturaId], references: [id], onDelete: Cascade)
+  empresa  Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  transacao Transacao?
+  
+  @@index([empresaId])
+  @@index([faturaId])
+  @@index([status])
+  @@index([dataRecebimento])
+  @@index([deletedAt])
+}
+
+// ===== TRANSAÇÕES (GATEWAY DE PAGAMENTO) =====
+model Transacao {
+  id            String   @id @default(cuid())
+  empresaId     String
+  pagamentoId   String?
+  
+  // Dados da transação
+  idGateway     String?  // ID no sistema de pagamento (Stripe, MercadoPago, etc)
+  gateway       String   // stripe, mercadopago, pagseguro
+  valor         Float
+  
+  // Status
+  status        String  @default("processando") // processando, aprovada, rejeitada, cancelada
+  codigoResposta String?
+  mensagemResposta String?
+  
+  // Tentativas
+  tentativa     Int     @default(1)
+  ultimaTentativa DateTime @default(now())
+  
+  // Dados completos (JSON)
+  dadosCompletos Json?
+  
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+  
+  // Relacionamentos
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  pagamento Pagamento? @relation(fields: [pagamentoId], references: [id])
+  
+  @@index([empresaId])
+  @@index([status])
+  @@index([idGateway])
+  @@index([criadoEm])
+}
+

@@ -1,0 +1,16 @@
+# Supabase Configuration File
+
+project_id = "wjcbobcqyqdkludsbqgf"
+
+[api]
+enabled = true
+
+[db]
+# Database push/pull settings
+# Migrations directory
+# push_dir and pull_dir are set automatically based on migrations folder
+
+[functions]
+# Edge Functions settings
+# Folder for storing edge functions
+
