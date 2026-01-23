@@ -70,3 +70,5 @@ apply-*.ps1
 
 # Readme antigos
 README-IGEPPS.txt
+.vercel
+.env*.local
