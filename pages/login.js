@@ -154,17 +154,6 @@ export default function Login() {
             )}
           </button>
         </form>
-          
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <Link href="/">
-            <button
-              type="button"
-              className="w-full text-teal-600 hover:text-teal-700 font-semibold py-2 rounded-lg hover:bg-teal-50 transition text-sm"
-            >
-              ← Voltar para Home
-            </button>
-          </Link>
-        </div>
 
         <div className="mt-6 pt-6 border-t border-gray-200">
           <p className="text-center text-gray-600 text-xs font-semibold uppercase tracking-wider mb-4">Dados de Acesso</p>
