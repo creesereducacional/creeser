@@ -76,9 +76,26 @@ export default function ConfiguracaoEmpresa() {
   });
 
   const [loading, setLoading] = useState(false);
+  const [instituicoes, setInstituicoes] = useState([]);
+  const [loadingInstituicoes, setLoadingInstituicoes] = useState(false);
+  const [formInstituicao, setFormInstituicao] = useState({
+    nome: '',
+    cnpj: '',
+    email: '',
+    telefone: '',
+    endereco: '',
+    cidade: '',
+    estado: '',
+    cep: '',
+    website: '',
+    ativa: true,
+    descricao: ''
+  });
+  const [editandoInstituicao, setEditandoInstituicao] = useState(null);
 
   useEffect(() => {
     carregarDados();
+    carregarInstituicoes();
   }, []);
 
   const carregarDados = async () => {
@@ -94,6 +111,115 @@ export default function ConfiguracaoEmpresa() {
     } catch (error) {
       console.error('Erro ao carregar configurações:', error);
     }
+  };
+
+  const carregarInstituicoes = async () => {
+    setLoadingInstituicoes(true);
+    try {
+      const res = await fetch('/api/instituicoes');
+      if (res.ok) {
+        const data = await res.json();
+        setInstituicoes(data || []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar instituições:', error);
+    } finally {
+      setLoadingInstituicoes(false);
+    }
+  };
+
+  const handleChangeInstituicao = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormInstituicao(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  const salvarInstituicao = async () => {
+    if (!formInstituicao.nome.trim()) {
+      alert('Por favor, informe o nome da instituição');
+      return;
+    }
+
+    try {
+      const metodo = editandoInstituicao ? 'PUT' : 'POST';
+      const url = editandoInstituicao 
+        ? `/api/instituicoes/${editandoInstituicao.id}`
+        : '/api/instituicoes';
+      
+      const res = await fetch(url, {
+        method: metodo,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formInstituicao)
+      });
+
+      if (res.ok) {
+        alert(editandoInstituicao ? 'Instituição atualizada!' : 'Instituição criada com sucesso!');
+        setFormInstituicao({
+          nome: '',
+          cnpj: '',
+          email: '',
+          telefone: '',
+          endereco: '',
+          cidade: '',
+          estado: '',
+          cep: '',
+          website: '',
+          ativa: true,
+          descricao: ''
+        });
+        setEditandoInstituicao(null);
+        carregarInstituicoes();
+      } else {
+        alert('Erro ao salvar instituição');
+      }
+    } catch (error) {
+      console.error('Erro:', error);
+      alert('Erro ao salvar instituição');
+    }
+  };
+
+  const editarInstituicao = (instituicao) => {
+    setFormInstituicao(instituicao);
+    setEditandoInstituicao(instituicao);
+  };
+
+  const deletarInstituicao = async (id) => {
+    if (confirm('Tem certeza que deseja deletar esta instituição?')) {
+      try {
+        const res = await fetch(`/api/instituicoes/${id}`, {
+          method: 'DELETE'
+        });
+
+        if (res.ok) {
+          alert('Instituição deletada com sucesso!');
+          carregarInstituicoes();
+        } else {
+          alert('Erro ao deletar instituição');
+        }
+      } catch (error) {
+        console.error('Erro:', error);
+        alert('Erro ao deletar instituição');
+      }
+    }
+  };
+
+  const cancelarEdicaoInstituicao = () => {
+    setFormInstituicao({
+      nome: '',
+      cnpj: '',
+      email: '',
+      telefone: '',
+      endereco: '',
+      cidade: '',
+      estado: '',
+      cep: '',
+      website: '',
+      ativa: true,
+      descricao: ''
+    });
+    setEditandoInstituicao(null);
   };
 
   const aplicarFormatacao = (tipo) => {
@@ -258,7 +384,8 @@ export default function ConfiguracaoEmpresa() {
     { id: 'informacoes', nome: 'Informações', icon: '📋' },
     { id: 'pedagogico', nome: 'Pedagógico', icon: '📚' },
     { id: 'financeiro', nome: 'Financeiro', icon: '💰' },
-    { id: 'biblioteca', nome: 'Biblioteca', icon: '📖' }
+    { id: 'biblioteca', nome: 'Biblioteca', icon: '📖' },
+    { id: 'instituicoes', nome: 'Instituições', icon: '🏫' }
   ];
 
   return (
@@ -1456,6 +1583,244 @@ export default function ConfiguracaoEmpresa() {
                       <option value="7">Limitar Vencimento em 7 Dias</option>
                       <option value="14">Limitar Vencimento em 14 Dias</option>
                     </select>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ABA: INSTITUIÇÕES */}
+            {activeTab === 'instituicoes' && (
+              <>
+                <div className="space-y-6">
+                  {/* Formulário para adicionar/editar instituição */}
+                  <div className="bg-teal-50 border border-teal-300 rounded-lg p-4">
+                    <h3 className="text-sm font-bold text-teal-600 mb-4">🏫 {editandoInstituicao ? 'Editar' : 'Adicionar Nova'} Instituição</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="text-xs font-medium text-teal-600 mb-1 block">NOME DA INSTITUIÇÃO *</label>
+                        <input
+                          type="text"
+                          name="nome"
+                          value={formInstituicao.nome}
+                          onChange={handleChangeInstituicao}
+                          placeholder="Ex: CREESER Educacional"
+                          className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-medium text-teal-600 mb-1 block">CNPJ</label>
+                        <input
+                          type="text"
+                          name="cnpj"
+                          value={formInstituicao.cnpj}
+                          onChange={handleChangeInstituicao}
+                          placeholder="00.000.000/0000-00"
+                          className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-medium text-teal-600 mb-1 block">EMAIL</label>
+                        <input
+                          type="email"
+                          name="email"
+                          value={formInstituicao.email}
+                          onChange={handleChangeInstituicao}
+                          className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-medium text-teal-600 mb-1 block">TELEFONE</label>
+                        <input
+                          type="tel"
+                          name="telefone"
+                          value={formInstituicao.telefone}
+                          onChange={handleChangeInstituicao}
+                          placeholder="(00) 00000-0000"
+                          className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-medium text-teal-600 mb-1 block">SITE</label>
+                        <input
+                          type="url"
+                          name="website"
+                          value={formInstituicao.website}
+                          onChange={handleChangeInstituicao}
+                          placeholder="https://exemplo.com.br"
+                          className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-medium text-teal-600 mb-1 block">CIDADE</label>
+                        <input
+                          type="text"
+                          name="cidade"
+                          value={formInstituicao.cidade}
+                          onChange={handleChangeInstituicao}
+                          className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-medium text-teal-600 mb-1 block">ESTADO</label>
+                        <select
+                          name="estado"
+                          value={formInstituicao.estado}
+                          onChange={handleChangeInstituicao}
+                          className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
+                        >
+                          <option value="">- ESCOLHA -</option>
+                          <option value="AC">AC</option>
+                          <option value="AL">AL</option>
+                          <option value="AP">AP</option>
+                          <option value="AM">AM</option>
+                          <option value="BA">BA</option>
+                          <option value="CE">CE</option>
+                          <option value="DF">DF</option>
+                          <option value="ES">ES</option>
+                          <option value="GO">GO</option>
+                          <option value="MA">MA</option>
+                          <option value="MT">MT</option>
+                          <option value="MS">MS</option>
+                          <option value="MG">MG</option>
+                          <option value="PA">PA</option>
+                          <option value="PB">PB</option>
+                          <option value="PR">PR</option>
+                          <option value="PE">PE</option>
+                          <option value="PI">PI</option>
+                          <option value="RJ">RJ</option>
+                          <option value="RN">RN</option>
+                          <option value="RS">RS</option>
+                          <option value="RO">RO</option>
+                          <option value="RR">RR</option>
+                          <option value="SC">SC</option>
+                          <option value="SP">SP</option>
+                          <option value="SE">SE</option>
+                          <option value="TO">TO</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-medium text-teal-600 mb-1 block">CEP</label>
+                        <input
+                          type="text"
+                          name="cep"
+                          value={formInstituicao.cep}
+                          onChange={handleChangeInstituicao}
+                          placeholder="00000-000"
+                          className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mb-4">
+                      <label className="text-xs font-medium text-teal-600 mb-1 block">ENDEREÇO</label>
+                      <input
+                        type="text"
+                        name="endereco"
+                        value={formInstituicao.endereco}
+                        onChange={handleChangeInstituicao}
+                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
+                      />
+                    </div>
+
+                    <div className="mb-4">
+                      <label className="text-xs font-medium text-teal-600 mb-1 block">DESCRIÇÃO</label>
+                      <textarea
+                        name="descricao"
+                        value={formInstituicao.descricao}
+                        onChange={handleChangeInstituicao}
+                        rows="3"
+                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-3 mb-4 p-3 bg-green-50 border border-green-300 rounded-lg">
+                      <input
+                        type="checkbox"
+                        id="ativa"
+                        name="ativa"
+                        checked={formInstituicao.ativa}
+                        onChange={handleChangeInstituicao}
+                        className="w-5 h-5"
+                      />
+                      <label htmlFor="ativa" className="text-sm font-medium text-gray-800 cursor-pointer">
+                        Instituição Ativa
+                      </label>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={salvarInstituicao}
+                        className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold transition"
+                      >
+                        {editandoInstituicao ? '✏️ Atualizar' : '➕ Adicionar'} Instituição
+                      </button>
+                      
+                      {editandoInstituicao && (
+                        <button
+                          type="button"
+                          onClick={cancelarEdicaoInstituicao}
+                          className="px-4 py-2 bg-gray-400 hover:bg-gray-500 text-white rounded-lg font-semibold transition"
+                        >
+                          ❌ Cancelar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Lista de instituições */}
+                  <div>
+                    <h3 className="text-sm font-bold text-teal-600 mb-4">📋 Instituições Cadastradas</h3>
+                    
+                    {loadingInstituicoes ? (
+                      <div className="text-center py-4 text-gray-500">Carregando...</div>
+                    ) : instituicoes && instituicoes.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {instituicoes.map((inst) => (
+                          <div key={inst.id} className="bg-white border border-gray-300 rounded-lg p-4 hover:shadow-md transition">
+                            <div className="flex justify-between items-start mb-2">
+                              <h4 className="font-bold text-teal-600">{inst.nome}</h4>
+                              <span className={`text-xs px-2 py-1 rounded ${inst.ativa ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                {inst.ativa ? '✓ Ativa' : '✗ Inativa'}
+                              </span>
+                            </div>
+                            
+                            {inst.cnpj && <p className="text-xs text-gray-600">CNPJ: {inst.cnpj}</p>}
+                            {inst.email && <p className="text-xs text-gray-600">Email: {inst.email}</p>}
+                            {inst.telefone && <p className="text-xs text-gray-600">Tel: {inst.telefone}</p>}
+                            {inst.cidade && inst.estado && <p className="text-xs text-gray-600">{inst.cidade}, {inst.estado}</p>}
+                            
+                            <div className="flex gap-2 mt-3 pt-3 border-t border-gray-200">
+                              <button
+                                onClick={() => editarInstituicao(inst)}
+                                className="flex-1 px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded font-semibold transition"
+                              >
+                                ✏️ Editar
+                              </button>
+                              <button
+                                onClick={() => deletarInstituicao(inst.id)}
+                                className="flex-1 px-2 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded font-semibold transition"
+                              >
+                                🗑️ Deletar
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 bg-gray-50 border border-dashed border-gray-300 rounded-lg">
+                        <p className="text-gray-500">Nenhuma instituição cadastrada yet.</p>
+                        <p className="text-xs text-gray-400 mt-1">Adicione a primeira institucição usando o formulário acima.</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </>

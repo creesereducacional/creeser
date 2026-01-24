@@ -8,9 +8,12 @@ export default function CadastroAluno() {
   const { id } = router.query;
   const isEditando = id && id !== 'novo';
 
+  const [instituicoes, setInstituicoes] = useState([]);
+  const [loadingInstituicoes, setLoadingInstituicoes] = useState(true);
+
   const [formData, setFormData] = useState({
     // Identificação
-    instituicao: 'CREESER',
+    instituicao: '',
     turma: '',
     anoLetivo: new Date().getFullYear().toString(),
     turnoIntegral: false,
@@ -74,10 +77,26 @@ export default function CadastroAluno() {
   const [fotoAluno, setFotoAluno] = useState(null);
 
   useEffect(() => {
+    carregarInstituicoes();
     if (isEditando) {
       carregarAluno();
     }
   }, [isEditando]);
+
+  const carregarInstituicoes = async () => {
+    try {
+      setLoadingInstituicoes(true);
+      const response = await fetch('/api/instituicoes');
+      if (response.ok) {
+        const data = await response.json();
+        setInstituicoes(data || []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar instituições:', error);
+    } finally {
+      setLoadingInstituicoes(false);
+    }
+  };
 
   const carregarAluno = async () => {
     try {
@@ -329,9 +348,21 @@ export default function CadastroAluno() {
                   name="instituicao"
                   value={formData.instituicao}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                  disabled={loadingInstituicoes}
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50 disabled:opacity-50"
                 >
-                  <option value="CREESER">CREESER</option>
+                  <option value="">- Selecione uma Instituição -</option>
+                  {!loadingInstituicoes && instituicoes && instituicoes.length > 0 ? (
+                    instituicoes.map((inst) => (
+                      <option key={inst.id || inst.nome} value={inst.nome}>
+                        {inst.nome}
+                      </option>
+                    ))
+                  ) : loadingInstituicoes ? (
+                    <option disabled>Carregando instituições...</option>
+                  ) : (
+                    <option disabled>Nenhuma instituição cadastrada</option>
+                  )}
                 </select>
               </div>
 

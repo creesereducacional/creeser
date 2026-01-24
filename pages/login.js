@@ -15,48 +15,49 @@ export default function Login() {
     setCarregando(true);
 
     try {
-      const res = await fetch("/api/usuarios");
-      const usuarios = await res.json();
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, senha }),
+      });
 
-      const usuarioEncontrado = usuarios.find(
-        (u) => u.email === email && u.senha === senha
-      );
-
-      if (!usuarioEncontrado) {
-        setErro("Email ou senha inválidos");
+      if (!res.ok) {
+        const errorData = await res.json();
+        setErro(errorData.error || "Email ou senha inválidos");
         setCarregando(false);
         return;
       }
 
-      localStorage.setItem("token", "token_" + usuarioEncontrado.id);
-      localStorage.setItem("usuario", JSON.stringify(usuarioEncontrado));
+      const data = await res.json();
       
-      console.log('[LOGIN] Salvando usuario no localStorage:', {
-        email: usuarioEncontrado.email,
-        tipo: usuarioEncontrado.tipo,
-        savedToKey: 'usuario'
+      // Salvar token e dados do usuário
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("usuario", JSON.stringify(data.usuario));
+      
+      console.log('[LOGIN] Login bem-sucedido:', {
+        email: data.usuario.email,
+        tipo: data.usuario.tipo,
       });
 
       // Aguarda um pouco para garantir que localStorage foi salvo
       setTimeout(() => {
         // Redireciona conforme tipo de usuário
-        console.log('[LOGIN] Redirecionando usuario tipo:', usuarioEncontrado.tipo);
-        if (usuarioEncontrado.tipo === "admin") {
-          console.log('[LOGIN] Redirecting to /admin/dashboard');
+        console.log('[LOGIN] Redirecionando usuario tipo:', data.usuario.tipo);
+        if (data.usuario.tipo === "admin") {
           router.push("/admin/dashboard");
-        } else if (usuarioEncontrado.tipo === "professor") {
-          console.log('[LOGIN] Redirecting to /professor/dashboard');
+        } else if (data.usuario.tipo === "professor") {
           router.push("/professor/dashboard");
-        } else if (usuarioEncontrado.tipo === "aluno") {
-          console.log('[LOGIN] Redirecting to /aluno/home');
+        } else if (data.usuario.tipo === "aluno") {
           router.push("/aluno/home");
         } else {
-          console.log('[LOGIN] Tipo desconhecido, redirecionando para login');
           router.push("/login");
         }
       }, 50);
     } catch (err) {
-      setErro("Erro ao conectar ao servidor");
+      console.error('[LOGIN] Erro:', err);
+      setErro("Erro ao conectar ao servidor. Verifique sua conexão.");
       setCarregando(false);
     }
   };
