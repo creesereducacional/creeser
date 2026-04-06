@@ -126,15 +126,18 @@ async function criarCobranca(req, res) {
     });
 
     const billet = billetData.data;
-
+    // A resposta do definePayMethod tem a estrutura:
+    // { data: { charge_id, status, barcode, link, ... } }
+    const barcode = billet.barcode || billet.identifications?.barcode || null;
+    const boletoUrl = billet.link || billet.pdf?.charge || null;
     // 4. Salvar na tabela financeiro_boletos
     await supabase.from('financeiro_boletos').insert({
       parcela_id,
       gateway: 'efi',
       boleto_id_gateway: String(chargeId),
-      boleto_numero: billet.identifications?.barcode || null,
-      boleto_barcode: billet.identifications?.barcode || null,
-      boleto_url: billet.link || null,
+      boleto_numero: barcode,
+      boleto_barcode: barcode,
+      boleto_url: boletoUrl,
       status_gateway: 'waiting',
       resposta_json: billet,
     });
@@ -144,8 +147,8 @@ async function criarCobranca(req, res) {
       .from('financeiro_parcelas')
       .update({
         efi_charge_id: String(chargeId),
-        boleto_barcode: billet.identifications?.barcode || null,
-        boleto_url: billet.link || null,
+        boleto_barcode: barcode,
+        boleto_url: boletoUrl,
       })
       .eq('id', parcela_id);
 
@@ -158,8 +161,8 @@ async function criarCobranca(req, res) {
     return res.status(201).json({
       message: 'Boleto criado com sucesso.',
       charge_id: chargeId,
-      boleto_url: billet.link,
-      barcode: billet.identifications?.barcode,
+      boleto_url: boletoUrl,
+      barcode,
       vencimento: parcela.data_vencimento,
     });
   } catch (err) {
