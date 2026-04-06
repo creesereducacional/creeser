@@ -217,6 +217,7 @@ function ModalOrdem({ aluno, onClose, onSalvo }) {
     if (!form.valor || Number(form.valor) <= 0) return setErro('Valor deve ser maior que zero');
     setSalvando(true); setErro('');
     try {
+      // 1. Criar ordem + parcela no banco
       const res = await fetch('/api/admin-financeiro/ordens/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -229,12 +230,29 @@ function ModalOrdem({ aluno, onClose, onSalvo }) {
           observacoes: form.observacoes.trim() || null, criado_por: 'financeiro'
         }),
       });
-      if (!res.ok) {
-        const body = await res.json();
-        throw new Error(body.error || body.message || 'Erro');
+      const resBody = await res.json();
+      if (!res.ok) throw new Error(resBody.error || resBody.message || 'Erro ao criar ordem');
+
+      const parcela_id = resBody.parcelas?.[0]?.id;
+
+      // 2. Gerar boleto na EFI
+      if (parcela_id) {
+        setSucesso('⏳ Gerando boleto no banco EFI...');
+        const efiRes = await fetch('/api/admin-financeiro/efi/cobranca', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ parcela_id, descricao: form.descricao.trim() }),
+        });
+        if (!efiRes.ok) {
+          const efiBody = await efiRes.json();
+          setSucesso('✅ Ordem criada, mas falha no boleto EFI: ' + (efiBody.message || 'erro desconhecido'));
+          setTimeout(() => { onSalvo(); onClose(); }, 3000);
+          return;
+        }
       }
-      setSucesso('✅ Ordem criada com sucesso!');
-      setTimeout(() => { onSalvo(); onClose(); }, 1200);
+
+      setSucesso('✅ Ordem e boleto EFI criados com sucesso!');
+      setTimeout(() => { onSalvo(); onClose(); }, 1500);
     } catch (e) { setErro(e.message); } finally { setSalvando(false); }
   };
 
