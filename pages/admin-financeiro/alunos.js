@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/router';
 import AdminFinanceiroLayout from '@/components/AdminFinanceiro/Layout';
 
 const PLANOS_FINANCEIROS = [
@@ -187,7 +188,7 @@ function ModalDadosFinanceiros({ aluno, onClose, onSalvo }) {
   );
 }
 
-function ModalOrdem({ aluno, onClose, onSalvo }) {
+function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
   const hoje = new Date();
   const diaAluno = aluno.dia_pagamento || hoje.getDate();
   const vencimentoPadrao = new Date(hoje.getFullYear(), hoje.getMonth(), diaAluno);
@@ -246,13 +247,13 @@ function ModalOrdem({ aluno, onClose, onSalvo }) {
         if (!efiRes.ok) {
           const efiBody = await efiRes.json();
           setSucesso('✅ Ordem criada, mas falha no boleto EFI: ' + (efiBody.message || 'erro desconhecido'));
-          setTimeout(() => { onSalvo(); onClose(); }, 3000);
+          setTimeout(() => { onSalvo(); onSuccess(); }, 3000);
           return;
         }
       }
 
       setSucesso('✅ Ordem e boleto EFI criados com sucesso!');
-      setTimeout(() => { onSalvo(); onClose(); }, 1500);
+      setTimeout(() => { onSalvo(); onSuccess(); }, 1500);
     } catch (e) { setErro(e.message); } finally { setSalvando(false); }
   };
 
@@ -446,6 +447,7 @@ function ModalCarne({ aluno, onClose, onSalvo }) {
 }
 
 export default function AlunosFinanceiroPage() {
+  const router = useRouter();
   const [alunos, setAlunos] = useState([]);
   const [turmas, setTurmas] = useState([]);
   const [cursos, setCursos] = useState([]);
@@ -611,7 +613,7 @@ export default function AlunosFinanceiroPage() {
         <ModalDadosFinanceiros aluno={modalFinanceiro} onClose={() => setModalFinanceiro(null)} onSalvo={carregarDados} />
       )}
       {modalOrdem && (
-        <ModalOrdem aluno={modalOrdem} onClose={() => setModalOrdem(null)} onSalvo={carregarDados} />
+        <ModalOrdem aluno={modalOrdem} onClose={() => setModalOrdem(null)} onSalvo={carregarDados} onSuccess={() => router.push('/admin-financeiro/ordens')} />
       )}
       {modalCarne && (
         <ModalCarne aluno={modalCarne} onClose={() => setModalCarne(null)} onSalvo={carregarDados} />
