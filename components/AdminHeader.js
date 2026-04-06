@@ -35,7 +35,7 @@ export default function AdminHeader({ usuario }) {
             </div>
           </div>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600">{usuario?.nomeCompleto || usuario?.nome}</span>
+          <span className="text-sm text-gray-600">{usuario?.nomecompleto || usuario?.nomeCompleto || usuario?.nome}</span>
           <div className="flex items-center gap-2 bg-teal-50 px-3 py-1.5 rounded-lg border border-teal-200">
             <span className="text-xs font-bold text-teal-700 uppercase tracking-wide">Administrador</span>
           </div>

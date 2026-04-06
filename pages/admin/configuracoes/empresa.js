@@ -1,6 +1,66 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import DashboardLayout from '../../../components/DashboardLayout';
+import RichTextEditor from '../../../components/RichTextEditor';
+import ConfirmModal from '../../../components/ConfirmModal';
+
+const CONTRATO_PLACEHOLDERS = [
+  '{{ALUNO_NOME}}',
+  '{{ALUNO_CPF}}',
+  '{{ALUNO_RG}}',
+  '{{ALUNO_EMAIL}}',
+  '{{ALUNO_TELEFONE}}',
+  '{{ALUNO_DATA_NASCIMENTO}}',
+  '{{ALUNO_NACIONALIDADE}}',
+  '{{ALUNO_NATURALIDADE}}',
+  '{{ALUNO_ESTADO_CIVIL}}',
+  '{{ALUNO_PROFISSAO}}',
+  '{{ALUNO_ENDERECO_RESIDENCIAL}}',
+  '{{ALUNO_ENDERECO}}',
+  '{{ALUNO_BAIRRO}}',
+  '{{ALUNO_CIDADE}}',
+  '{{ALUNO_CEP}}',
+  '{{ALUNO_UF}}',
+  '{{CURSO_NOME}}',
+  '{{CURSO_CARGA_HORARIA}}',
+  '{{TURMA_NOME}}',
+  '{{VALOR_MENSALIDADE}}',
+  '{{VALOR_MATRICULA}}',
+  '{{QTD_PARCELAS}}',
+  '{{DATA_INICIO_CURSO}}',
+  '{{DATA_FIM_CURSO}}',
+  '{{INSTITUICAO_NOME}}',
+  '{{INSTITUICAO_CNPJ}}',
+  '{{INSTITUICAO_ENDERECO}}',
+  '{{RESPONSAVEL_NOME}}',
+  '{{RESPONSAVEL_CPF}}',
+  '{{DATA_ASSINATURA}}'
+];
+
+const createContratoInicial = () => ({
+  nome: '',
+  descricao: '',
+  conteudoHtml: '',
+  ativo: true,
+  padrao: false,
+  ordem: 0,
+  placeholders: []
+});
+
+const extrairPlaceholders = (conteudo) => {
+  const matches = String(conteudo || '').match(/\{\{[A-Z0-9_]+\}\}/g) || [];
+  return [...new Set(matches)];
+};
+
+const resumirHtml = (html, max = 180) => {
+  const texto = String(html || '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (texto.length <= max) return texto;
+  return `${texto.slice(0, max)}...`;
+};
 
 export default function ConfiguracaoEmpresa() {
   const router = useRouter();
@@ -80,6 +140,7 @@ export default function ConfiguracaoEmpresa() {
   const [loadingInstituicoes, setLoadingInstituicoes] = useState(false);
   const [formInstituicao, setFormInstituicao] = useState({
     nome: '',
+    codMec: '',
     cnpj: '',
     email: '',
     telefone: '',
@@ -92,6 +153,26 @@ export default function ConfiguracaoEmpresa() {
     descricao: ''
   });
   const [editandoInstituicao, setEditandoInstituicao] = useState(null);
+  const [instituicaoContratoId, setInstituicaoContratoId] = useState('');
+  const [contratos, setContratos] = useState([]);
+  const [loadingContratos, setLoadingContratos] = useState(false);
+  const [salvandoContrato, setSalvandoContrato] = useState(false);
+  const [formContrato, setFormContrato] = useState(createContratoInicial());
+  const [editandoContrato, setEditandoContrato] = useState(null);
+  const editorContratoRef = useRef(null);
+  const confirmActionRef = useRef(null);
+  const [feedbackModal, setFeedbackModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'alert'
+  });
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'confirm'
+  });
 
   useEffect(() => {
     carregarDados();
@@ -128,6 +209,239 @@ export default function ConfiguracaoEmpresa() {
     }
   };
 
+  useEffect(() => {
+    if (!instituicoes || instituicoes.length === 0) {
+      if (instituicaoContratoId) {
+        setInstituicaoContratoId('');
+      }
+      return;
+    }
+
+    const existeSelecionada = instituicoes.some(inst => String(inst.id) === String(instituicaoContratoId));
+    if (!instituicaoContratoId || !existeSelecionada) {
+      setInstituicaoContratoId(String(instituicoes[0].id));
+    }
+  }, [instituicoes, instituicaoContratoId]);
+
+  useEffect(() => {
+    if (activeTab !== 'contratos') return;
+
+    if (!instituicaoContratoId) {
+      setContratos([]);
+      return;
+    }
+
+    carregarContratos(instituicaoContratoId);
+  }, [activeTab, instituicaoContratoId]);
+
+  const mostrarFeedback = (message, type = 'alert', title = 'Aviso') => {
+    setFeedbackModal({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
+
+  const fecharFeedback = () => {
+    setFeedbackModal(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const abrirConfirmacao = (message, onConfirm, title = 'Confirmação', type = 'confirm') => {
+    confirmActionRef.current = onConfirm;
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
+
+  const fecharConfirmacao = () => {
+    confirmActionRef.current = null;
+    setConfirmModal(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const confirmarAcaoModal = async () => {
+    const acao = confirmActionRef.current;
+    fecharConfirmacao();
+
+    if (typeof acao === 'function') {
+      await acao();
+    }
+  };
+
+  const carregarContratos = async (instituicaoId) => {
+    setLoadingContratos(true);
+    try {
+      const res = await fetch(`/api/instituicoes/${instituicaoId}/contratos`);
+      if (!res.ok) {
+        const erro = await res.json().catch(() => ({}));
+        throw new Error(erro?.error || 'Falha ao carregar modelos de contrato');
+      }
+
+      const data = await res.json();
+      setContratos(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Erro ao carregar contratos:', error);
+      mostrarFeedback(error.message || 'Erro ao carregar contratos', 'error', 'Falha ao carregar');
+    } finally {
+      setLoadingContratos(false);
+    }
+  };
+
+  const limparFormularioContrato = () => {
+    setFormContrato(createContratoInicial());
+    setEditandoContrato(null);
+  };
+
+  const handleChangeContrato = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormContrato(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  const inserirPlaceholderNoContrato = (placeholder) => {
+    if (editorContratoRef.current && typeof editorContratoRef.current.insertText === 'function') {
+      editorContratoRef.current.insertText(placeholder);
+      setFormContrato(prev => ({
+        ...prev,
+        placeholders: [...new Set([...(prev.placeholders || []), placeholder])]
+      }));
+      return;
+    }
+
+    setFormContrato(prev => {
+      const conteudoAtual = String(prev.conteudoHtml || '');
+      const separador = conteudoAtual && !conteudoAtual.endsWith(' ') ? ' ' : '';
+      const novoConteudo = `${conteudoAtual}${separador}${placeholder}`;
+
+      return {
+        ...prev,
+        conteudoHtml: novoConteudo,
+        placeholders: [...new Set([...(prev.placeholders || []), placeholder])]
+      };
+    });
+  };
+
+  const editarContrato = (contrato) => {
+    setEditandoContrato(contrato);
+    setFormContrato({
+      nome: contrato?.nome || '',
+      descricao: contrato?.descricao || '',
+      conteudoHtml: contrato?.conteudoHtml || contrato?.conteudo_html || '',
+      ativo: contrato?.ativo !== false,
+      padrao: contrato?.padrao === true,
+      ordem: Number.isFinite(Number(contrato?.ordem)) ? Number(contrato.ordem) : 0,
+      placeholders: Array.isArray(contrato?.placeholders) ? contrato.placeholders : []
+    });
+  };
+
+  const salvarContrato = async () => {
+    if (!instituicaoContratoId) {
+      mostrarFeedback('Selecione uma instituição para configurar contratos', 'alert', 'Atenção');
+      return;
+    }
+
+    if (!String(formContrato.nome || '').trim()) {
+      mostrarFeedback('Informe o nome do modelo de contrato', 'alert', 'Atenção');
+      return;
+    }
+
+    setSalvandoContrato(true);
+    try {
+      const payload = {
+        nome: String(formContrato.nome || '').trim(),
+        descricao: String(formContrato.descricao || '').trim() || null,
+        conteudoHtml: formContrato.conteudoHtml || '',
+        ativo: formContrato.ativo !== false,
+        padrao: formContrato.padrao === true,
+        ordem: Number.isFinite(Number(formContrato.ordem)) ? Number(formContrato.ordem) : 0,
+        placeholders: extrairPlaceholders(formContrato.conteudoHtml || '')
+      };
+
+      const url = editandoContrato
+        ? `/api/contratos/${editandoContrato.id}`
+        : `/api/instituicoes/${instituicaoContratoId}/contratos`;
+
+      const metodo = editandoContrato ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method: metodo,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const erro = await res.json().catch(() => ({}));
+        throw new Error(erro?.error || 'Falha ao salvar modelo de contrato');
+      }
+
+      mostrarFeedback(
+        editandoContrato ? 'Modelo atualizado com sucesso!' : 'Modelo criado com sucesso!',
+        'success',
+        'Tudo certo'
+      );
+      limparFormularioContrato();
+      await carregarContratos(instituicaoContratoId);
+    } catch (error) {
+      console.error('Erro ao salvar contrato:', error);
+      mostrarFeedback(error.message || 'Erro ao salvar contrato', 'error', 'Falha ao salvar');
+    } finally {
+      setSalvandoContrato(false);
+    }
+  };
+
+  const definirContratoPadrao = async (contratoId) => {
+    try {
+      const res = await fetch(`/api/contratos/${contratoId}/padrao`, {
+        method: 'POST'
+      });
+
+      if (!res.ok) {
+        const erro = await res.json().catch(() => ({}));
+        throw new Error(erro?.error || 'Falha ao definir modelo padrão');
+      }
+
+      await carregarContratos(instituicaoContratoId);
+    } catch (error) {
+      console.error('Erro ao definir padrão:', error);
+      mostrarFeedback(error.message || 'Erro ao definir padrão', 'error', 'Falha ao definir padrão');
+    }
+  };
+
+  const deletarContrato = (contratoId) => {
+    abrirConfirmacao(
+      'Tem certeza que deseja deletar este modelo de contrato?',
+      async () => {
+        try {
+          const res = await fetch(`/api/contratos/${contratoId}`, {
+            method: 'DELETE'
+          });
+
+          if (!res.ok) {
+            const erro = await res.json().catch(() => ({}));
+            throw new Error(erro?.error || 'Falha ao deletar modelo de contrato');
+          }
+
+          if (editandoContrato && String(editandoContrato.id) === String(contratoId)) {
+            limparFormularioContrato();
+          }
+
+          mostrarFeedback('Modelo de contrato deletado com sucesso.', 'success', 'Modelo removido');
+          await carregarContratos(instituicaoContratoId);
+        } catch (error) {
+          console.error('Erro ao deletar contrato:', error);
+          mostrarFeedback(error.message || 'Erro ao deletar contrato', 'error', 'Falha ao deletar');
+        }
+      },
+      'Excluir modelo de contrato',
+      'delete'
+    );
+  };
+
   const handleChangeInstituicao = (e) => {
     const { name, value, type, checked } = e.target;
     setFormInstituicao(prev => ({
@@ -138,7 +452,7 @@ export default function ConfiguracaoEmpresa() {
 
   const salvarInstituicao = async () => {
     if (!formInstituicao.nome.trim()) {
-      alert('Por favor, informe o nome da instituição');
+      mostrarFeedback('Por favor, informe o nome da instituição', 'alert', 'Atenção');
       return;
     }
 
@@ -155,9 +469,14 @@ export default function ConfiguracaoEmpresa() {
       });
 
       if (res.ok) {
-        alert(editandoInstituicao ? 'Instituição atualizada!' : 'Instituição criada com sucesso!');
+        mostrarFeedback(
+          editandoInstituicao ? 'Instituição atualizada!' : 'Instituição criada com sucesso!',
+          'success',
+          'Tudo certo'
+        );
         setFormInstituicao({
           nome: '',
+          codMec: '',
           cnpj: '',
           email: '',
           telefone: '',
@@ -172,42 +491,51 @@ export default function ConfiguracaoEmpresa() {
         setEditandoInstituicao(null);
         carregarInstituicoes();
       } else {
-        alert('Erro ao salvar instituição');
+        mostrarFeedback('Erro ao salvar instituição', 'error', 'Falha ao salvar');
       }
     } catch (error) {
       console.error('Erro:', error);
-      alert('Erro ao salvar instituição');
+      mostrarFeedback('Erro ao salvar instituição', 'error', 'Falha ao salvar');
     }
   };
 
   const editarInstituicao = (instituicao) => {
-    setFormInstituicao(instituicao);
+    setFormInstituicao({
+      ...instituicao,
+      codMec: instituicao.codMec || instituicao.cod_mec || ''
+    });
     setEditandoInstituicao(instituicao);
   };
 
-  const deletarInstituicao = async (id) => {
-    if (confirm('Tem certeza que deseja deletar esta instituição?')) {
-      try {
-        const res = await fetch(`/api/instituicoes/${id}`, {
-          method: 'DELETE'
-        });
+  const deletarInstituicao = (id) => {
+    abrirConfirmacao(
+      'Tem certeza que deseja deletar esta instituição?',
+      async () => {
+        try {
+          const res = await fetch(`/api/instituicoes/${id}`, {
+            method: 'DELETE'
+          });
 
-        if (res.ok) {
-          alert('Instituição deletada com sucesso!');
-          carregarInstituicoes();
-        } else {
-          alert('Erro ao deletar instituição');
+          if (res.ok) {
+            mostrarFeedback('Instituição deletada com sucesso!', 'success', 'Instituição removida');
+            carregarInstituicoes();
+          } else {
+            mostrarFeedback('Erro ao deletar instituição', 'error', 'Falha ao deletar');
+          }
+        } catch (error) {
+          console.error('Erro:', error);
+          mostrarFeedback('Erro ao deletar instituição', 'error', 'Falha ao deletar');
         }
-      } catch (error) {
-        console.error('Erro:', error);
-        alert('Erro ao deletar instituição');
-      }
-    }
+      },
+      'Excluir instituição',
+      'delete'
+    );
   };
 
   const cancelarEdicaoInstituicao = () => {
     setFormInstituicao({
       nome: '',
+      codMec: '',
       cnpj: '',
       email: '',
       telefone: '',
@@ -368,13 +696,13 @@ export default function ConfiguracaoEmpresa() {
       });
 
       if (res.ok) {
-        alert('Configurações salvas com sucesso');
+        mostrarFeedback('Configurações salvas com sucesso', 'success', 'Tudo certo');
       } else {
-        alert('Erro ao salvar configurações');
+        mostrarFeedback('Erro ao salvar configurações', 'error', 'Falha ao salvar');
       }
     } catch (error) {
       console.error('Erro:', error);
-      alert('Erro ao salvar configurações');
+      mostrarFeedback('Erro ao salvar configurações', 'error', 'Falha ao salvar');
     } finally {
       setLoading(false);
     }
@@ -385,6 +713,7 @@ export default function ConfiguracaoEmpresa() {
     { id: 'pedagogico', nome: 'Pedagógico', icon: '📚' },
     { id: 'financeiro', nome: 'Financeiro', icon: '💰' },
     { id: 'biblioteca', nome: 'Biblioteca', icon: '📖' },
+    { id: 'contratos', nome: 'Contratos', icon: '📝' },
     { id: 'instituicoes', nome: 'Instituições', icon: '🏫' }
   ];
 
@@ -1588,6 +1917,237 @@ export default function ConfiguracaoEmpresa() {
               </>
             )}
 
+            {/* ABA: CONTRATOS */}
+            {activeTab === 'contratos' && (
+              <>
+                <div className="space-y-6">
+                  <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-r-lg">
+                    <h3 className="text-sm font-bold text-blue-800 mb-1">📝 Modelos de Contrato por Instituição</h3>
+                    <p className="text-xs text-blue-700">
+                      Configure modelos com placeholders dinâmicos. Esta etapa prepara a base para geração de PDF e assinatura digital em fases seguintes.
+                    </p>
+                  </div>
+
+                  <div className="bg-teal-50 border border-teal-300 rounded-lg p-4">
+                    <label className="text-xs font-medium text-teal-600 mb-1 block">INSTITUIÇÃO *</label>
+                    <select
+                      value={instituicaoContratoId}
+                      onChange={(e) => {
+                        setInstituicaoContratoId(e.target.value);
+                        limparFormularioContrato();
+                      }}
+                      className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
+                    >
+                      {instituicoes && instituicoes.length > 0 ? (
+                        instituicoes.map((inst) => (
+                          <option key={inst.id} value={inst.id}>{inst.nome}</option>
+                        ))
+                      ) : (
+                        <option value="">Nenhuma instituição cadastrada</option>
+                      )}
+                    </select>
+                  </div>
+
+                  {!instituicaoContratoId ? (
+                    <div className="text-center py-8 bg-gray-50 border border-dashed border-gray-300 rounded-lg">
+                      <p className="text-gray-500">Cadastre ao menos uma instituição para criar modelos de contrato.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="bg-teal-50 border border-teal-300 rounded-lg p-4">
+                        <h3 className="text-sm font-bold text-teal-600 mb-4">
+                          {editandoContrato ? '✏️ Editar Modelo de Contrato' : '➕ Novo Modelo de Contrato'}
+                        </h3>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <label className="text-xs font-medium text-teal-600 mb-1 block">NOME DO MODELO *</label>
+                            <input
+                              type="text"
+                              name="nome"
+                              value={formContrato.nome}
+                              onChange={handleChangeContrato}
+                              placeholder="Ex: Contrato de Prestação de Serviços"
+                              className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="text-xs font-medium text-teal-600 mb-1 block">ORDEM DE EXIBIÇÃO</label>
+                            <input
+                              type="number"
+                              name="ordem"
+                              value={formContrato.ordem}
+                              onChange={handleChangeContrato}
+                              className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mb-4">
+                          <label className="text-xs font-medium text-teal-600 mb-1 block">DESCRIÇÃO</label>
+                          <textarea
+                            name="descricao"
+                            value={formContrato.descricao}
+                            onChange={handleChangeContrato}
+                            rows="2"
+                            placeholder="Descrição interna para identificação do modelo"
+                            className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                          <label className="flex items-center gap-3 p-3 bg-green-50 border border-green-300 rounded-lg cursor-pointer hover:bg-green-100 transition">
+                            <input
+                              type="checkbox"
+                              name="ativo"
+                              checked={formContrato.ativo}
+                              onChange={handleChangeContrato}
+                              className="w-5 h-5"
+                            />
+                            <span className="text-sm font-medium text-gray-800">Modelo ativo</span>
+                          </label>
+
+                          <label className="flex items-center gap-3 p-3 bg-yellow-50 border border-yellow-300 rounded-lg cursor-pointer hover:bg-yellow-100 transition">
+                            <input
+                              type="checkbox"
+                              name="padrao"
+                              checked={formContrato.padrao}
+                              onChange={handleChangeContrato}
+                              className="w-5 h-5"
+                            />
+                            <span className="text-sm font-medium text-gray-800">Definir como modelo padrão</span>
+                          </label>
+                        </div>
+
+                        <div className="mb-4">
+                          <label className="text-xs font-medium text-teal-600 mb-2 block">CONTEÚDO DO CONTRATO</label>
+                          <RichTextEditor
+                            ref={editorContratoRef}
+                            value={formContrato.conteudoHtml}
+                            onChange={(conteudoHtml) => setFormContrato(prev => ({
+                              ...prev,
+                              conteudoHtml
+                            }))}
+                          />
+                        </div>
+
+                        <div className="mb-4">
+                          <h4 className="text-xs font-bold text-teal-600 mb-2">⚙️ Placeholders Disponíveis</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {CONTRATO_PLACEHOLDERS.map((placeholder) => (
+                              <button
+                                key={placeholder}
+                                type="button"
+                                onClick={() => inserirPlaceholderNoContrato(placeholder)}
+                                className="px-2 py-1 text-xs bg-white border border-blue-300 text-blue-700 rounded hover:bg-blue-50 transition"
+                              >
+                                {placeholder}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-xs text-gray-500 mt-2">
+                            Clique em um placeholder para inseri-lo no conteúdo em edição.
+                          </p>
+                        </div>
+
+                        <div className="flex gap-3">
+                          <button
+                            type="button"
+                            onClick={salvarContrato}
+                            disabled={salvandoContrato}
+                            className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold transition disabled:opacity-50"
+                          >
+                            {salvandoContrato
+                              ? 'Salvando...'
+                              : editandoContrato
+                                ? '✏️ Atualizar Modelo'
+                                : '💾 Salvar Modelo'}
+                          </button>
+
+                          {editandoContrato && (
+                            <button
+                              type="button"
+                              onClick={limparFormularioContrato}
+                              className="px-4 py-2 bg-gray-400 hover:bg-gray-500 text-white rounded-lg font-semibold transition"
+                            >
+                              ❌ Cancelar Edição
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h3 className="text-sm font-bold text-teal-600 mb-4">📋 Modelos Cadastrados</h3>
+
+                        {loadingContratos ? (
+                          <div className="text-center py-4 text-gray-500">Carregando modelos...</div>
+                        ) : contratos && contratos.length > 0 ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {contratos.map((contrato) => (
+                              <div key={contrato.id} className="bg-white border border-gray-300 rounded-lg p-4 hover:shadow-md transition">
+                                <div className="flex justify-between items-start mb-2 gap-3">
+                                  <h4 className="font-bold text-teal-700">{contrato.nome}</h4>
+                                  <div className="flex items-center gap-2">
+                                    {contrato.padrao && (
+                                      <span className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-800">Padrão</span>
+                                    )}
+                                    <span className={`text-xs px-2 py-1 rounded ${contrato.ativo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                      {contrato.ativo ? 'Ativo' : 'Inativo'}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {contrato.descricao && (
+                                  <p className="text-xs text-gray-600 mb-2">{contrato.descricao}</p>
+                                )}
+
+                                <p className="text-xs text-gray-500 mb-1">Ordem: {contrato.ordem || 0}</p>
+                                <p className="text-xs text-gray-600 mb-3">{resumirHtml(contrato.conteudoHtml || contrato.conteudo_html) || 'Sem conteúdo'}</p>
+
+                                <div className="flex gap-2 pt-3 border-t border-gray-200">
+                                  <button
+                                    type="button"
+                                    onClick={() => editarContrato(contrato)}
+                                    className="flex-1 px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded font-semibold transition"
+                                  >
+                                    ✏️ Editar
+                                  </button>
+
+                                  {!contrato.padrao && (
+                                    <button
+                                      type="button"
+                                      onClick={() => definirContratoPadrao(contrato.id)}
+                                      className="flex-1 px-2 py-1 bg-yellow-500 hover:bg-yellow-600 text-white text-xs rounded font-semibold transition"
+                                    >
+                                      ⭐ Padrão
+                                    </button>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => deletarContrato(contrato.id)}
+                                    className="flex-1 px-2 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded font-semibold transition"
+                                  >
+                                    🗑️ Deletar
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 bg-gray-50 border border-dashed border-gray-300 rounded-lg">
+                            <p className="text-gray-500">Nenhum modelo de contrato cadastrado para esta instituição.</p>
+                            <p className="text-xs text-gray-400 mt-1">Crie o primeiro modelo usando o formulário acima.</p>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+
             {/* ABA: INSTITUIÇÕES */}
             {activeTab === 'instituicoes' && (
               <>
@@ -1605,6 +2165,18 @@ export default function ConfiguracaoEmpresa() {
                           value={formInstituicao.nome}
                           onChange={handleChangeInstituicao}
                           placeholder="Ex: CREESER Educacional"
+                          className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-medium text-teal-600 mb-1 block">CÓD. DO MEC</label>
+                        <input
+                          type="text"
+                          name="codMec"
+                          value={formInstituicao.codMec}
+                          onChange={handleChangeInstituicao}
+                          placeholder="Código do MEC"
                           className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
                         />
                       </div>
@@ -1848,6 +2420,23 @@ export default function ConfiguracaoEmpresa() {
           </div>
         </form>
       </div>
+
+      <ConfirmModal
+        isOpen={feedbackModal.isOpen}
+        onClose={fecharFeedback}
+        title={feedbackModal.title}
+        message={feedbackModal.message}
+        type={feedbackModal.type}
+      />
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={fecharConfirmacao}
+        onConfirm={confirmarAcaoModal}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+      />
     </DashboardLayout>
   );
 }

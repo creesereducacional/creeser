@@ -4,6 +4,20 @@ import path from 'path';
 const sliderDataPath = path.join(process.cwd(), 'data', 'slider.json');
 const slidesDirectory = path.join(process.cwd(), 'public', 'images', 'slider');
 
+const withLowercaseKeys = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const lowered = {};
+  Object.entries(obj).forEach(([key, value]) => {
+    lowered[key.toLowerCase()] = value;
+  });
+  return { ...obj, ...lowered };
+};
+
+const getBodyValue = (body, key) => {
+  if (!body) return undefined;
+  return body[key] ?? body[key.toLowerCase()];
+};
+
 function getSliderData() {
   if (!fs.existsSync(sliderDataPath)) {
     return [];
@@ -36,14 +50,16 @@ export default function handler(req, res) {
       });
 
       console.log('API /api/slider - Slides encontrados:', slides);
-      res.status(200).json(slides);
+      res.status(200).json(slides.map(withLowercaseKeys));
     } catch (error) {
       console.error('Erro ao listar slides:', error);
       res.status(500).json({ error: 'Erro ao buscar imagens do slider.' });
     }
   } else if (req.method === 'POST') { // Adicionando o método POST para salvar os metadados
     try {
-        const { fileName, title, description } = req.body;
+        const fileName = getBodyValue(req.body, 'fileName');
+        const title = getBodyValue(req.body, 'title');
+        const description = getBodyValue(req.body, 'description');
 
         if (!fileName || !title) {
             return res.status(400).json({ error: 'Nome do arquivo e título são obrigatórios.' });
@@ -71,7 +87,8 @@ export default function handler(req, res) {
     }
   } else if (req.method === 'DELETE') {
     try {
-      const { fileName, deleteAll } = req.body;
+      const fileName = getBodyValue(req.body, 'fileName');
+      const deleteAll = getBodyValue(req.body, 'deleteAll');
 
       if (!fileName) {
         return res.status(400).json({ error: 'Nome do arquivo é obrigatório.' });

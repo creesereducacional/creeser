@@ -4,12 +4,16 @@ import Link from 'next/link';
 
 export default function AdminUnidades() {
   const [unidades, setUnidades] = useState([]);
+  const [instituicoes, setInstituicoes] = useState([]);
+  const [carregandoInstituicoes, setCarregandoInstituicoes] = useState(true);
   const [filtroNome, setFiltroNome] = useState('');
+  const [filtroInstituicao, setFiltroInstituicao] = useState('');
   const [filtroSituacao, setFiltroSituacao] = useState('ATIVO');
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
     carregarUnidades();
+    carregarInstituicoes();
   }, []);
 
   const carregarUnidades = async () => {
@@ -26,11 +30,37 @@ export default function AdminUnidades() {
     }
   };
 
+  const carregarInstituicoes = async () => {
+    try {
+      setCarregandoInstituicoes(true);
+      const response = await fetch('/api/instituicoes');
+
+      if (response.ok) {
+        const data = await response.json();
+        setInstituicoes(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar instituições:', error);
+    } finally {
+      setCarregandoInstituicoes(false);
+    }
+  };
+
   const filtrarUnidades = () => {
     return unidades.filter(unidade => {
       const nomeMatch = unidade.nome.toLowerCase().includes(filtroNome.toLowerCase());
+      const filtroInstituicaoNormalizado = filtroInstituicao.toString();
+      const instituicaoSelecionada = instituicoes.find(
+        (inst) => inst.id?.toString() === filtroInstituicaoNormalizado
+      );
+      const nomeInstituicaoSelecionada = instituicaoSelecionada?.nome?.toString();
+      const instituicaoMatch = !filtroInstituicaoNormalizado
+        ? true
+        : unidade.instituicaoId?.toString() === filtroInstituicaoNormalizado
+          || unidade.instituicaoNome?.toString() === filtroInstituicaoNormalizado
+          || (nomeInstituicaoSelecionada && unidade.instituicaoNome?.toString() === nomeInstituicaoSelecionada);
       const situacaoMatch = filtroSituacao === '' || unidade.situacao === filtroSituacao;
-      return nomeMatch && situacaoMatch;
+      return nomeMatch && instituicaoMatch && situacaoMatch;
     });
   };
 
@@ -55,6 +85,7 @@ export default function AdminUnidades() {
 
   const handleLimpar = () => {
     setFiltroNome('');
+    setFiltroInstituicao('');
     setFiltroSituacao('ATIVO');
   };
 
@@ -81,7 +112,7 @@ export default function AdminUnidades() {
             <span>🔍</span> Filtro de Busca
           </h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-xs font-bold text-gray-700 bg-blue-200 px-3 py-1 rounded mb-2">
                 NOME
@@ -93,6 +124,28 @@ export default function AdminUnidades() {
                 onChange={(e) => setFiltroNome(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 bg-blue-200 px-3 py-1 rounded mb-2">
+                INSTITUIÇÃO
+              </label>
+              <select
+                value={filtroInstituicao}
+                onChange={(e) => setFiltroInstituicao(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">TODAS</option>
+                {carregandoInstituicoes ? (
+                  <option value="" disabled>Carregando...</option>
+                ) : (
+                  instituicoes.map((inst) => (
+                    <option key={inst.id || inst.nome} value={inst.id}>
+                      {inst.nome}
+                    </option>
+                  ))
+                )}
+              </select>
             </div>
 
             <div>

@@ -49,82 +49,82 @@ export default function GestaoClientes() {
 
   return (
     <AdminFinanceiroLayout>
-      <div className="max-w-6xl mx-auto">
+      <div className="space-y-6">
         {/* HEADER */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-3xl font-bold text-white mb-2">👥 Gestão de Clientes</h2>
-            <p className="text-slate-400">Controle todas as empresas cadastradas</p>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Gestão de Clientes</h2>
+            <p className="text-gray-600">Controle todas as empresas cadastradas</p>
           </div>
           <button
             onClick={() => setModalAberto(true)}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition"
+            className="px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold transition"
           >
             ➕ Novo Cliente
           </button>
         </div>
 
         {/* FILTRO */}
-        <div className="mb-6">
+        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
           <input
             type="text"
             placeholder="🔍 Buscar por nome, CNPJ ou email..."
             value={filtro}
             onChange={(e) => setFiltro(e.target.value)}
-            className="w-full px-4 py-3 bg-slate-700 border border-slate-600 text-white rounded-lg placeholder-slate-400 focus:outline-none focus:border-blue-500"
+            className="w-full px-4 py-3 bg-white border border-teal-300 text-gray-800 rounded-lg placeholder-gray-400 focus:outline-none focus:border-teal-500"
           />
         </div>
 
         {/* TABELA */}
-        <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden shadow-lg">
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
           <table className="w-full">
             <thead>
-              <tr className="bg-slate-700 border-b border-slate-600">
-                <th className="text-left px-6 py-4 text-sm font-semibold text-slate-200">Empresa</th>
-                <th className="text-left px-6 py-4 text-sm font-semibold text-slate-200">CNPJ</th>
-                <th className="text-left px-6 py-4 text-sm font-semibold text-slate-200">Plano</th>
-                <th className="text-left px-6 py-4 text-sm font-semibold text-slate-200">Status</th>
-                <th className="text-left px-6 py-4 text-sm font-semibold text-slate-200">Próx. Vencimento</th>
-                <th className="text-left px-6 py-4 text-sm font-semibold text-slate-200">MRR</th>
-                <th className="text-center px-6 py-4 text-sm font-semibold text-slate-200">Ações</th>
+              <tr className="bg-teal-50 border-b border-teal-100">
+                <th className="text-left px-6 py-4 text-sm font-semibold text-teal-800">Empresa</th>
+                <th className="text-left px-6 py-4 text-sm font-semibold text-teal-800">CNPJ</th>
+                <th className="text-left px-6 py-4 text-sm font-semibold text-teal-800">Plano</th>
+                <th className="text-left px-6 py-4 text-sm font-semibold text-teal-800">Status</th>
+                <th className="text-left px-6 py-4 text-sm font-semibold text-teal-800">Próx. Vencimento</th>
+                <th className="text-left px-6 py-4 text-sm font-semibold text-teal-800">MRR</th>
+                <th className="text-center px-6 py-4 text-sm font-semibold text-teal-800">Ações</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-4 text-center text-slate-400">
+                  <td colSpan="7" className="px-6 py-4 text-center text-gray-500">
                     Carregando...
                   </td>
                 </tr>
               ) : clientesFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-4 text-center text-slate-400">
+                  <td colSpan="7" className="px-6 py-4 text-center text-gray-500">
                     Nenhum cliente encontrado
                   </td>
                 </tr>
               ) : (
                 clientesFiltrados.map((cliente) => (
-                  <tr key={cliente.id} className="border-b border-slate-700 hover:bg-slate-700 transition">
-                    <td className="px-6 py-4 text-sm text-white font-semibold">{cliente.nome}</td>
-                    <td className="px-6 py-4 text-sm text-slate-300">{cliente.cnpj}</td>
-                    <td className="px-6 py-4 text-sm text-slate-300">{cliente.plano || '—'}</td>
+                  <tr key={cliente.id} className="border-b border-gray-100 hover:bg-teal-50 transition">
+                    <td className="px-6 py-4 text-sm text-gray-900 font-semibold">{cliente.nome}</td>
+                    <td className="px-6 py-4 text-sm text-gray-700">{cliente.cnpj}</td>
+                    <td className="px-6 py-4 text-sm text-gray-700">{cliente.plano || '—'}</td>
                     <td className="px-6 py-4 text-sm">
                       <StatusBadge status={cliente.status} />
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-300">
+                    <td className="px-6 py-4 text-sm text-gray-700">
                       {new Date(cliente.dataProximoVencimento).toLocaleDateString('pt-BR')}
                     </td>
-                    <td className="px-6 py-4 text-sm font-semibold text-green-400">
+                    <td className="px-6 py-4 text-sm font-semibold text-emerald-700">
                       R$ {cliente.mrr?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <Link href={`/admin-financeiro/clientes/${cliente.id}`}>
-                          <button className="p-2 hover:bg-blue-600 rounded-lg transition text-slate-300 hover:text-white">
+                          <button className="p-2 hover:bg-teal-600 rounded-lg transition text-gray-500 hover:text-white">
                             ✏️
                           </button>
                         </Link>
-                        <button className="p-2 hover:bg-red-600 rounded-lg transition text-slate-300 hover:text-white">
+                        <button className="p-2 hover:bg-red-600 rounded-lg transition text-gray-500 hover:text-white">
                           🗑️
                         </button>
                       </div>
@@ -137,20 +137,20 @@ export default function GestaoClientes() {
         </div>
 
         {/* ESTATÍSTICAS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
-          <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
-            <p className="text-slate-400 text-sm">Total de Clientes</p>
-            <p className="text-2xl font-bold text-white mt-2">{clientes.length}</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+            <p className="text-gray-600 text-sm">Total de Clientes</p>
+            <p className="text-2xl font-bold text-gray-900 mt-2">{clientes.length}</p>
           </div>
-          <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
-            <p className="text-slate-400 text-sm">Clientes Ativos</p>
-            <p className="text-2xl font-bold text-green-400 mt-2">
+          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+            <p className="text-gray-600 text-sm">Clientes Ativos</p>
+            <p className="text-2xl font-bold text-emerald-700 mt-2">
               {clientes.filter(c => c.status === 'ativa').length}
             </p>
           </div>
-          <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
-            <p className="text-slate-400 text-sm">MRR Total</p>
-            <p className="text-2xl font-bold text-emerald-400 mt-2">
+          <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+            <p className="text-gray-600 text-sm">MRR Total</p>
+            <p className="text-2xl font-bold text-teal-700 mt-2">
               R$ {clientes.reduce((sum, c) => sum + (c.mrr || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
           </div>

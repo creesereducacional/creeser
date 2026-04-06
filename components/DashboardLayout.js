@@ -98,15 +98,16 @@ export default function DashboardLayout({ children }) {
       em_breve: false,
       secao: 'Pedagógico',
       submenu: [
-        { id: 'ped-professores', nome: 'Professores', icon: '▪', url: '/admin/professores', em_breve: false, completed: true },
         { id: 'ped-cursos', nome: 'Cursos', icon: '▪', url: '/admin/cursos', em_breve: false, completed: true },
         { id: 'ped-turmas', nome: 'Turmas', icon: '▪', url: '/admin/turmas', em_breve: false, completed: true },
-        { id: 'ped-responsaveis', nome: 'Responsáveis', icon: '▪', url: '/admin/responsaveis', em_breve: false, completed: true },
         { id: 'ped-alunos', nome: 'Alunos', icon: '▪', url: '/admin/alunos', em_breve: false, completed: true },
+        { id: 'ped-responsaveis', nome: 'Responsáveis', icon: '▪', url: '/admin/responsaveis', em_breve: false, completed: true },
+        { id: 'ped-componente-curricular', nome: 'Componente Curricular', icon: '▪', url: '/admin/disciplinas/grades', em_breve: false, completed: true },
         { id: 'ped-disciplinas', nome: 'Disciplinas', icon: '▪', url: '/admin/disciplinas', em_breve: false, completed: true },
+        { id: 'ped-professores', nome: 'Professores', icon: '▪', url: '/admin/professores', em_breve: false, completed: true },
         { id: 'ped-notas', nome: 'Notas e Faltas', icon: '▪', url: '/admin/notas-faltas', em_breve: false, completed: true },
         { id: 'ped-planejamento', nome: 'Planejamento Diário', icon: '▪', url: '/admin/planejamento-diario', em_breve: false, completed: true },
-        { id: 'ped-livro-registro', nome: 'Livro de Registro', icon: '▪', url: '/admin/livro-registro', em_breve: false, completed: true },
+        { id: 'ped-livro-registro', nome: 'Livro de Registros', icon: '▪', url: '/admin/livro-registro', em_breve: false, completed: true },
         { id: 'ped-atividades', nome: 'Atividades Complementares', icon: '▪', url: '/admin/atividades-complementares', em_breve: false, completed: true },
       ]
     },
@@ -127,21 +128,13 @@ export default function DashboardLayout({ children }) {
     },
 
     // Financeiro
-    { 
-      id: 'financeiro', 
-      nome: 'Financeiro', 
-      icon: '💵', 
-      em_breve: true, 
-      secao: 'Administração',
-      submenu: [
-        { id: 'gerar-fatura', nome: 'Gerar Fatura', icon: '▪', url: '#', em_breve: true },
-        { id: 'localizar-boletos', nome: 'Localizar Boletos', icon: '▪', url: '#', em_breve: true },
-        { id: 'baixar-faturas', nome: 'Baixar Faturas', icon: '▪', url: '#', em_breve: true },
-        { id: 'imprimir-faturas', nome: 'Imprimir Faturas', icon: '▪', url: '#', em_breve: true },
-        { id: 'gerar-remessa', nome: 'Gerar Remessa', icon: '▪', url: '#', em_breve: true },
-        { id: 'planos-financeiros', nome: 'Planos Financeiros', icon: '▪', url: '#', em_breve: true },
-        { id: 'nfs-e', nome: 'NFS-e', icon: '▪', url: '#', em_breve: true },
-      ]
+    {
+      id: 'financeiro',
+      nome: 'Financeiro',
+      icon: '💵',
+      url: '/admin-financeiro',
+      em_breve: false,
+      secao: 'Administração'
     },
 
     // Processo Seletivo
@@ -436,7 +429,7 @@ export default function DashboardLayout({ children }) {
         <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
           <div className="px-4 md:px-8 py-3 md:py-4 flex flex-col md:flex-row md:justify-between md:items-center gap-3 md:gap-0">
             <div className="hidden md:block">
-              <h2 className="text-2xl font-bold text-gray-800">Bem-vindo a Faculdade CREESER Educacional</h2>
+              <h2 className="text-2xl font-bold text-gray-800">Bem-vindo ao Grupo Educacional CREESER</h2>
               <p className="text-sm text-gray-500 mt-1">Gerencie sua instituição educacional</p>
             </div>
             <h2 className="md:hidden text-xl font-bold text-gray-800">CREESER</h2>

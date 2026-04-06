@@ -5,10 +5,15 @@ import Link from 'next/link';
 
 export default function ListagemAlunos() {
   const router = useRouter();
+  const currentYear = new Date().getFullYear().toString();
   const [abaAtiva, setAbaAtiva] = useState('listar');
   const [alunos, setAlunos] = useState([]);
   const [filteredAlunos, setFilteredAlunos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [instituicoes, setInstituicoes] = useState([]);
+  const [loadingInstituicoes, setLoadingInstituicoes] = useState(true);
+  const [anosLetivos, setAnosLetivos] = useState([]);
+  const [loadingAnosLetivos, setLoadingAnosLetivos] = useState(true);
   const [searchNome, setSearchNome] = useState('');
   const [searchMatricula, setSearchMatricula] = useState('');
   const [searchInstituicao, setSearchInstituicao] = useState('');
@@ -19,6 +24,8 @@ export default function ListagemAlunos() {
 
   useEffect(() => {
     carregarAlunos();
+    carregarInstituicoes();
+    carregarAnosLetivos();
   }, []);
 
   useEffect(() => {
@@ -40,6 +47,40 @@ export default function ListagemAlunos() {
     }
   };
 
+  const carregarInstituicoes = async () => {
+    try {
+      setLoadingInstituicoes(true);
+      const response = await fetch('/api/instituicoes');
+
+      if (response.ok) {
+        const data = await response.json();
+        const lista = Array.isArray(data) ? data : [];
+        setInstituicoes(lista);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar instituições:', error);
+    } finally {
+      setLoadingInstituicoes(false);
+    }
+  };
+
+  const carregarAnosLetivos = async () => {
+    try {
+      setLoadingAnosLetivos(true);
+      const response = await fetch('/api/configuracoes/anos-letivos');
+
+      if (response.ok) {
+        const data = await response.json();
+        const lista = Array.isArray(data) ? data : [];
+        setAnosLetivos(lista);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar anos letivos:', error);
+    } finally {
+      setLoadingAnosLetivos(false);
+    }
+  };
+
   const filtrarAlunos = () => {
     let filtered = alunos;
 
@@ -57,13 +98,19 @@ export default function ListagemAlunos() {
     }
 
     if (searchInstituicao) {
+      const filtroInstituicao = searchInstituicao.toLowerCase();
       filtered = filtered.filter(a =>
-        a.instituicao && a.instituicao.toLowerCase().includes(searchInstituicao.toLowerCase())
+        a.instituicao && a.instituicao.toLowerCase().includes(filtroInstituicao)
       );
     }
 
     if (searchAnoLetivo) {
-      filtered = filtered.filter(a => a.anoLetivo === searchAnoLetivo);
+      const filtroAno = searchAnoLetivo.toString();
+      filtered = filtered.filter(a => {
+        const ano = a.anoLetivo ?? a.ano_letivo ?? a.anoLetivoAtual ?? a.ano;
+        if (ano === null || ano === undefined) return false;
+        return ano.toString() === filtroAno;
+      });
     }
 
     if (searchTurma) {
@@ -111,6 +158,87 @@ export default function ListagemAlunos() {
     setSearchTurma('');
     setSearchStatus('');
     setSearchCPF('');
+  };
+
+  const abrirContratoAluno = (alunoId) => {
+    if (!alunoId) {
+      alert('Aluno não identificado para gerar contrato');
+      return;
+    }
+
+    window.open(`/admin/alunos/contrato/${alunoId}?autoprint=1`, '_blank', 'noopener,noreferrer');
+  };
+
+  const iniciarAssinaturaDigital = async (alunoId) => {
+    if (!alunoId) {
+      alert('Aluno não identificado para assinatura digital');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/contratos/aluno/${alunoId}/assinar-digital`, {
+        method: 'POST'
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Erro ao iniciar assinatura digital');
+      }
+
+      const signingUrls = Array.isArray(data?.signingUrls) ? data.signingUrls : [];
+      if (signingUrls.length > 0) {
+        signingUrls.forEach((item) => {
+          const url = typeof item === 'string' ? item : item?.url;
+          if (url) {
+            window.open(url, '_blank', 'noopener,noreferrer');
+          }
+        });
+
+        alert('Assinatura digital iniciada. Os links de assinatura foram abertos em nova aba.');
+      } else {
+        alert('Assinatura digital iniciada, mas a Assinafy não retornou links de assinatura. Verifique o documento no painel da Assinafy.');
+      }
+    } catch (error) {
+      console.error('Erro ao iniciar assinatura digital:', error);
+      alert(error.message || 'Erro ao iniciar assinatura digital');
+    }
+  };
+
+  const consultarAssinaturaDigital = async (alunoId) => {
+    if (!alunoId) {
+      alert('Aluno não identificado para consulta de assinatura digital');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/contratos/aluno/${alunoId}/assinatura-status`);
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Erro ao consultar assinatura digital');
+      }
+
+      const status = String(data?.status || 'desconhecido').toUpperCase();
+      const provider = String(data?.provider || 'assinafy').toUpperCase();
+      const documentId = data?.providerDocumentId || '-';
+      const assignmentId = data?.providerAssignmentId || '-';
+      const requestedAt = data?.requestedAt
+        ? new Date(data.requestedAt).toLocaleString('pt-BR')
+        : '-';
+      const syncWarning = data?.syncWarning ? `\nAviso de sincronização: ${data.syncWarning}` : '';
+
+      alert(
+        `Assinatura Digital (${provider})\n\n` +
+        `Status: ${status}\n` +
+        `Documento: ${documentId}\n` +
+        `Assignment: ${assignmentId}\n` +
+        `Solicitado em: ${requestedAt}${syncWarning}`
+      );
+    } catch (error) {
+      console.error('Erro ao consultar assinatura digital:', error);
+      alert(error.message || 'Erro ao consultar assinatura digital');
+    }
   };
 
   return (
@@ -174,7 +302,17 @@ export default function ListagemAlunos() {
                       className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
                     >
                       <option value="">- Instituição -</option>
-                      <option value="CREESER">CREESER</option>
+                      {loadingInstituicoes ? (
+                        <option value="" disabled>Carregando...</option>
+                      ) : instituicoes.length > 0 ? (
+                        instituicoes.map((inst) => (
+                          <option key={inst.id || inst.nome} value={inst.nome}>
+                            {inst.nome}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="CREESER">CREESER</option>
+                      )}
                     </select>
                   </div>
 
@@ -186,9 +324,21 @@ export default function ListagemAlunos() {
                       className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
                     >
                       <option value="">- Escolha o ano letivo -</option>
-                      <option value="2024">2024</option>
-                      <option value="2025">2025</option>
-                      <option value="2026">2026</option>
+                      {loadingAnosLetivos ? (
+                        <option value="" disabled>Carregando...</option>
+                      ) : anosLetivos.length > 0 ? (
+                        anosLetivos.map((ano) => {
+                          const valorAno = (ano.nome ?? ano.ano ?? '').toString();
+                          if (!valorAno) return null;
+                          return (
+                            <option key={ano.id || valorAno} value={valorAno}>
+                              {valorAno}
+                            </option>
+                          );
+                        })
+                      ) : (
+                        <option value={currentYear}>{currentYear}</option>
+                      )}
                     </select>
                   </div>
 
@@ -356,20 +506,23 @@ export default function ListagemAlunos() {
                             ☁️
                           </button>
                           <button
+                            onClick={() => abrirContratoAluno(aluno.id)}
                             className="p-2 text-gray-600 hover:text-gray-800 transition"
-                            title="Documentos"
+                            title="Contrato para impressão"
                           >
                             📄
                           </button>
                           <button
+                            onClick={() => iniciarAssinaturaDigital(aluno.id)}
                             className="p-2 text-gray-600 hover:text-gray-800 transition"
-                            title="Bloqueado"
+                            title="Iniciar assinatura digital"
                           >
                             🔒
                           </button>
                           <button
+                            onClick={() => consultarAssinaturaDigital(aluno.id)}
                             className="p-2 text-gray-600 hover:text-gray-800 transition"
-                            title="Visualizar"
+                            title="Consultar status da assinatura digital"
                           >
                             👁️
                           </button>

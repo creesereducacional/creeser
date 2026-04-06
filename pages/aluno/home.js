@@ -92,6 +92,8 @@ export default function AlunoHome() {
     router.push("/login");
   };
 
+  const nomeExibicao = usuario?.nomecompleto || usuario?.nomeCompleto || usuario?.nome || '';
+
   // Função para limpar HTML e extrair apenas texto com quebras de linha
   const limparHTML = (html) => {
     if (!html) return '';
@@ -160,10 +162,10 @@ export default function AlunoHome() {
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-teal-600 bg-teal-900">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-full flex items-center justify-center text-teal-900 font-bold text-sm">
-              {usuario?.nomeCompleto?.charAt(0).toUpperCase() || 'A'}
+              {nomeExibicao.charAt(0).toUpperCase() || 'A'}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white truncate">{usuario?.nomeCompleto}</p>
+              <p className="text-sm font-semibold text-white truncate">{nomeExibicao}</p>
               <p className="text-xs text-teal-200 truncate">{usuario?.email}</p>
             </div>
           </div>
@@ -176,17 +178,17 @@ export default function AlunoHome() {
         <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
           <div className="px-8 py-4 flex justify-between items-center">
             <div>
-              <h2 className="text-2xl font-bold text-gray-800">Bem-vindo a Faculdade CREESER Educacional</h2>
+              <h2 className="text-2xl font-bold text-gray-800">Bem-vindo ao Grupo Educacional CREESER</h2>
               <p className="text-sm text-gray-500 mt-1">Acompanhe seu progresso e continue aprendendo</p>
             </div>
             <div className="flex items-center gap-6">
               <div className="text-right">
                 <p className="text-sm text-gray-600">Conectado como</p>
-                <p className="font-semibold text-gray-800">{usuario?.nomeCompleto}</p>
+                <p className="font-semibold text-gray-800">{nomeExibicao}</p>
                 <p className="text-xs text-gray-500 uppercase tracking-wide">Aluno</p>
               </div>
               <div className="w-10 h-10 bg-gradient-to-br from-teal-400 to-teal-600 rounded-full flex items-center justify-center text-white font-bold">
-                {usuario?.nomeCompleto?.charAt(0).toUpperCase()}
+                {nomeExibicao.charAt(0).toUpperCase()}
               </div>
               <button
                 onClick={handleLogout}

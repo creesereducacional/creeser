@@ -29,6 +29,7 @@ export default async function handler(req, res) {
     // POST - Criar nova instituição
     if (method === 'POST') {
       const { nome, cnpj, email, telefone, endereco, cidade, estado, cep, website, ativa, descricao } = req.body;
+      const codMec = req.body?.codMec || req.body?.cod_mec || null;
 
       if (!nome || nome.trim() === '') {
         return res.status(400).json({ error: 'Nome é obrigatório' });
@@ -39,6 +40,7 @@ export default async function handler(req, res) {
         .insert([
           {
             nome: nome.trim(),
+            cod_mec: codMec || null,
             cnpj: cnpj || null,
             email: email || null,
             telefone: telefone || null,

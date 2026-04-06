@@ -42,6 +42,9 @@ export default function NoticiaPage() {
     });
   };
 
+  const dataPublicacao = noticia?.datapublicacao || noticia?.dataPublicacao;
+  const autorExibicao = noticia?.autor || noticia?.autorNome || noticia?.autorid || 'Autor';
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -107,7 +110,7 @@ export default function NoticiaPage() {
               {noticia.categoria}
             </span>
             <span className="text-gray-500 text-sm">
-              {formatarData(noticia.dataPublicacao)}
+              {dataPublicacao ? formatarData(dataPublicacao) : ''}
             </span>
           </div>
 
@@ -119,10 +122,10 @@ export default function NoticiaPage() {
           {/* Autor */}
           <div className="flex items-center gap-2 mb-8 pb-6 border-b">
             <div className="w-10 h-10 bg-blue-900 rounded-full flex items-center justify-center text-white font-bold">
-              {noticia.autor.charAt(0)}
+              {autorExibicao.charAt(0)}
             </div>
             <div>
-              <p className="font-medium text-gray-900">Por {noticia.autor}</p>
+              <p className="font-medium text-gray-900">Por {autorExibicao}</p>
               <p className="text-sm text-gray-500">IGEPPS Academy</p>
             </div>
           </div>

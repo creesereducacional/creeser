@@ -1,51 +1,98 @@
-import fs from 'fs';
-import path from 'path';
+import {
+  attachAlunoIdsToRows,
+  filterExistingAlunoIds,
+  mapBodyToPayload,
+  parseAlunoIdsFromBody,
+  parseResponsavelId,
+  supabase,
+  syncResponsavelAlunos,
+} from './_shared';
 
-const dataPath = path.join(process.cwd(), 'data', 'responsaveis.json');
+export default async function handler(req, res) {
+  const id = parseResponsavelId(req.query.id);
 
-const lerResponsaveis = () => {
-  try {
-    const data = fs.readFileSync(dataPath, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('Erro ao ler responsáveis:', error);
-    return [];
+  if (id === null) {
+    return res.status(400).json({ message: 'ID invalido' });
   }
-};
 
-const salvarResponsaveis = (responsaveis) => {
   try {
-    fs.writeFileSync(dataPath, JSON.stringify(responsaveis, null, 2), 'utf8');
+    if (req.method === 'GET') {
+      const { data, error } = await supabase
+        .from('responsaveis')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Supabase GET responsavel by id error:', error);
+        return res.status(500).json({ message: 'Erro ao buscar responsavel', error: error.message });
+      }
+
+      if (!data) {
+        return res.status(404).json({ message: 'Responsavel nao encontrado' });
+      }
+
+      const [response] = await attachAlunoIdsToRows([data]);
+      return res.status(200).json(response);
+    }
+
+    if (req.method === 'PUT') {
+      const body = req.body || {};
+      const payload = mapBodyToPayload(body);
+
+      if (!payload.nome) {
+        return res.status(400).json({ message: 'Nome e obrigatorio' });
+      }
+
+      const alunoIds = parseAlunoIdsFromBody(body);
+      const existingAlunoIds = await filterExistingAlunoIds(alunoIds);
+
+      const { data, error } = await supabase
+        .from('responsaveis')
+        .update(payload)
+        .eq('id', id)
+        .select('*')
+        .maybeSingle();
+
+      if (error) {
+        console.error('Supabase PUT responsavel error:', error);
+        return res.status(500).json({ message: 'Erro ao atualizar responsavel', error: error.message });
+      }
+
+      if (!data) {
+        return res.status(404).json({ message: 'Responsavel nao encontrado' });
+      }
+
+      await syncResponsavelAlunos(id, existingAlunoIds);
+      const [response] = await attachAlunoIdsToRows([data]);
+      return res.status(200).json(response);
+    }
+
+    if (req.method === 'DELETE') {
+      await syncResponsavelAlunos(id, []);
+
+      const { data, error } = await supabase
+        .from('responsaveis')
+        .delete()
+        .eq('id', id)
+        .select('id')
+        .maybeSingle();
+
+      if (error) {
+        console.error('Supabase DELETE responsavel error:', error);
+        return res.status(500).json({ message: 'Erro ao deletar responsavel', error: error.message });
+      }
+
+      if (!data) {
+        return res.status(404).json({ message: 'Responsavel nao encontrado' });
+      }
+
+      return res.status(200).json({ mensagem: 'Responsavel deletado com sucesso' });
+    }
+
+    return res.status(405).json({ erro: 'Metodo nao permitido' });
   } catch (error) {
-    console.error('Erro ao salvar responsáveis:', error);
-  }
-};
-
-export default function handler(req, res) {
-  const { id } = req.query;
-  const responsaveis = lerResponsaveis();
-  const responsavelIndex = responsaveis.findIndex(r => r.id === id);
-
-  if (req.method === 'GET') {
-    if (responsavelIndex === -1) {
-      return res.status(404).json({ erro: 'Responsável não encontrado' });
-    }
-    res.status(200).json(responsaveis[responsavelIndex]);
-  } else if (req.method === 'PUT') {
-    if (responsavelIndex === -1) {
-      return res.status(404).json({ erro: 'Responsável não encontrado' });
-    }
-    responsaveis[responsavelIndex] = { ...responsaveis[responsavelIndex], ...req.body };
-    salvarResponsaveis(responsaveis);
-    res.status(200).json(responsaveis[responsavelIndex]);
-  } else if (req.method === 'DELETE') {
-    if (responsavelIndex === -1) {
-      return res.status(404).json({ erro: 'Responsável não encontrado' });
-    }
-    responsaveis.splice(responsavelIndex, 1);
-    salvarResponsaveis(responsaveis);
-    res.status(200).json({ mensagem: 'Responsável deletado com sucesso' });
-  } else {
-    res.status(405).json({ erro: 'Método não permitido' });
+    console.error('Erro em /api/responsaveis/[id]:', error);
+    return res.status(500).json({ message: 'Erro interno no servidor', error: error.message });
   }
 }

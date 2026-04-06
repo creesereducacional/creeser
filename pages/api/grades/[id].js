@@ -3,6 +3,32 @@ import path from 'path';
 
 const gradesPath = path.join(process.cwd(), 'data', 'grades.json');
 
+const withLowercaseKeys = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const lowered = {};
+  Object.entries(obj).forEach(([key, value]) => {
+    lowered[key.toLowerCase()] = value;
+  });
+  return { ...obj, ...lowered };
+};
+
+const getBodyValue = (body, key) => {
+  if (!body) return undefined;
+  return body[key] ?? body[key.toLowerCase()];
+};
+
+const parseAno = (value) => {
+  if (value === undefined || value === null || value === '') return null;
+
+  const digits = String(value).replace(/\D/g, '');
+  if (digits.length !== 4) return null;
+
+  const parsed = Number.parseInt(digits, 10);
+  if (Number.isNaN(parsed) || parsed < 1900 || parsed > 3000) return null;
+
+  return parsed;
+};
+
 const lerGrades = () => {
   try {
     if (fs.existsSync(gradesPath)) {
@@ -54,7 +80,7 @@ function handleGet(req, res, id) {
       return res.status(404).json({ error: 'Grade não encontrada' });
     }
 
-    res.status(200).json(grade);
+    res.status(200).json(withLowercaseKeys(grade));
   } catch (error) {
     res.status(500).json({ error: 'Erro ao recuperar grade' });
   }
@@ -69,15 +95,35 @@ function handlePut(req, res, id) {
       return res.status(404).json({ error: 'Grade não encontrada' });
     }
 
+    const instituicaoId = getBodyValue(req.body, 'instituicaoId');
+    const instituicaoNome = getBodyValue(req.body, 'instituicaoNome');
+    const cursoId = getBodyValue(req.body, 'cursoId');
+    const cursoNome = getBodyValue(req.body, 'cursoNome');
+    const anoRaw = getBodyValue(req.body, 'ano');
+    const nome = getBodyValue(req.body, 'nome');
+    const situacao = getBodyValue(req.body, 'situacao');
+
+    const anoFoiInformado = anoRaw !== undefined;
+    const ano = anoFoiInformado ? parseAno(anoRaw) : null;
+
+    if (anoFoiInformado && ano === null) {
+      return res.status(400).json({ error: 'Ano deve conter 4 dígitos' });
+    }
+
     grades[index] = {
       ...grades[index],
-      nome: req.body.nome,
-      situacao: req.body.situacao,
+      instituicaoId: instituicaoId ?? grades[index].instituicaoId,
+      instituicaoNome: instituicaoNome ?? grades[index].instituicaoNome,
+      cursoId: cursoId ?? grades[index].cursoId,
+      cursoNome: cursoNome ?? grades[index].cursoNome,
+      ano: anoFoiInformado ? ano : grades[index].ano,
+      nome: nome ?? grades[index].nome,
+      situacao: situacao ?? grades[index].situacao,
       dataAtualizacao: new Date().toISOString()
     };
 
     salvarGrades(grades);
-    res.status(200).json(grades[index]);
+    res.status(200).json(withLowercaseKeys(grades[index]));
   } catch (error) {
     res.status(500).json({ error: 'Erro ao atualizar grade' });
   }

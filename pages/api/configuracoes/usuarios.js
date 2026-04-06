@@ -3,6 +3,15 @@ import path from 'path';
 
 const dataFile = path.join(process.cwd(), 'data', 'usuarios-sistema.json');
 
+const withLowercaseKeys = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const lowered = {};
+  Object.entries(obj).forEach(([key, value]) => {
+    lowered[key.toLowerCase()] = value;
+  });
+  return { ...obj, ...lowered };
+};
+
 async function readData() {
   try {
     const data = await fs.readFile(dataFile, 'utf-8');
@@ -20,19 +29,20 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     try {
       const data = await readData();
-      res.status(200).json(data);
+      res.status(200).json(data.map(withLowercaseKeys));
     } catch (error) {
       res.status(500).json({ erro: 'Erro ao ler dados' });
     }
   } else if (req.method === 'POST') {
     try {
       const data = await readData();
-      data.push({
+      const novoRegistro = {
         ...req.body,
         criado: new Date().toISOString()
-      });
+      };
+      data.push(novoRegistro);
       await writeData(data);
-      res.status(200).json(req.body);
+      res.status(200).json(withLowercaseKeys(novoRegistro));
     } catch (error) {
       res.status(500).json({ erro: 'Erro ao salvar dados' });
     }

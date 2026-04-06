@@ -190,9 +190,10 @@ export default function AdminUsuarios() {
 
   const deletarUsuario = useCallback(
     (usuario) => {
+      const nomeUsuario = usuario.nomecompleto || usuario.nomeCompleto || usuario.nome || 'este usuário';
       pedirConfirmacao(
         'Deletar Usuário',
-        `Deseja deletar "${usuario.nomeCompleto}"? Esta ação não pode ser desfeita.`,
+        `Deseja deletar "${nomeUsuario}"? Esta ação não pode ser desfeita.`,
         async () => {
           try {
             await ClienteAPI.delete(`/api/usuarios/${usuario.id}`);
@@ -210,10 +211,11 @@ export default function AdminUsuarios() {
 
   const alternarStatus = useCallback(
     (usuario) => {
+      const nomeUsuario = usuario.nomecompleto || usuario.nomeCompleto || usuario.nome || 'este usuário';
       const novoStatus = usuario.status === 'ativo' ? 'inativo' : 'ativo';
       pedirConfirmacao(
         novoStatus === 'ativo' ? 'Ativar Usuário' : 'Inativar Usuário',
-        `Deseja ${novoStatus === 'ativo' ? 'ativar' : 'inativar'} "${usuario.nomeCompleto}"?`,
+        `Deseja ${novoStatus === 'ativo' ? 'ativar' : 'inativar'} "${nomeUsuario}"?`,
         async () => {
           try {
             await ClienteAPI.put(`/api/usuarios/${usuario.id}`, {
@@ -430,7 +432,7 @@ export default function AdminUsuarios() {
                     }`}
                   >
                     <td className="px-4 py-3 text-xs md:text-sm font-semibold text-gray-800">
-                      {usuario.nomeCompleto}
+                      {usuario.nomecompleto || usuario.nomeCompleto || usuario.nome}
                     </td>
                     <td className="px-4 py-3 text-xs md:text-sm text-gray-600">
                       {usuario.email}

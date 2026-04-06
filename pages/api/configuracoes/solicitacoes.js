@@ -3,6 +3,15 @@ import path from 'path';
 
 const dataPath = path.join(process.cwd(), 'data', 'solicitacoes.json');
 
+const withLowercaseKeys = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const lowered = {};
+  Object.entries(obj).forEach(([key, value]) => {
+    lowered[key.toLowerCase()] = value;
+  });
+  return { ...obj, ...lowered };
+};
+
 export default function handler(req, res) {
   try {
     // GET - Listar todas as solicitações
@@ -13,7 +22,7 @@ export default function handler(req, res) {
 
       const fileContent = fs.readFileSync(dataPath, 'utf-8');
       const solicitacoes = JSON.parse(fileContent || '[]');
-      return res.status(200).json(solicitacoes);
+      return res.status(200).json(solicitacoes.map(withLowercaseKeys));
     }
 
     // POST - Criar nova solicitação
@@ -33,7 +42,7 @@ export default function handler(req, res) {
       solicitacoes.push(newSolicitacao);
       fs.writeFileSync(dataPath, JSON.stringify(solicitacoes, null, 2));
 
-      return res.status(201).json(newSolicitacao);
+      return res.status(201).json(withLowercaseKeys(newSolicitacao));
     }
 
     res.status(405).json({ error: 'Método não permitido' });

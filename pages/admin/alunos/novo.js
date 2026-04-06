@@ -3,6 +3,26 @@ import { useRouter } from 'next/router';
 import DashboardLayout from '@/components/DashboardLayout';
 import Link from 'next/link';
 
+const UF_OPTIONS = [
+  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
+  'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
+  'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
+];
+
+const HIDDEN_SECTIONS_BY_INSTITUTION = {
+  'INOVE TECNICO': ['registroNascimento'],
+  'FACULDADE FAETE': ['registroNascimento'],
+  'COLEGIO INOVE': ['ensinoMedio'],
+};
+
+const normalizeInstitutionName = (value = '') =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
+
 export default function CadastroAluno() {
   const router = useRouter();
   const { id } = router.query;
@@ -10,10 +30,17 @@ export default function CadastroAluno() {
 
   const [instituicoes, setInstituicoes] = useState([]);
   const [loadingInstituicoes, setLoadingInstituicoes] = useState(true);
+  const [cursos, setCursos] = useState([]);
+  const [loadingCursos, setLoadingCursos] = useState(true);
+  const [turmas, setTurmas] = useState([]);
+  const [loadingTurmas, setLoadingTurmas] = useState(true);
+  const [anosLetivos, setAnosLetivos] = useState([]);
+  const [loadingAnosLetivos, setLoadingAnosLetivos] = useState(true);
 
   const [formData, setFormData] = useState({
     // Identificação
     instituicao: '',
+    curso: '',
     turma: '',
     anoLetivo: new Date().getFullYear().toString(),
     turnoIntegral: false,
@@ -22,6 +49,7 @@ export default function CadastroAluno() {
     // Dados Pessoais
     nome: '',
     nomeSocial: false,
+    apelido: '',
     cpf: '',
     estadoCivil: '',
     sexo: '',
@@ -29,6 +57,7 @@ export default function CadastroAluno() {
     rg: '',
     dataExpedicaoRG: '',
     orgaoExpedidorRG: '',
+    ufRG: '',
     telefoneCelular: '',
     
     // Filiação
@@ -67,6 +96,32 @@ export default function CadastroAluno() {
     // Deficiências
     pessoaComDeficiencia: false,
     tipoDeficiencia: '',
+
+    // Dados Financeiros
+    planoFinanceiro: '',
+    valorMatricula: '',
+    valorMensalidade: '',
+    percentualDesconto: '',
+    quantidadeParcelas: '',
+    diaPagamento: '',
+    quantidadeMesesContrato: '',
+    cnpjBoleto: '',
+    razaoSocialBoleto: '',
+    alunoBolsista: '',
+    percentualBolsaEstudo: '',
+    financiamentoEstudantil: '',
+    percentualFinanciamento: '',
+
+    // Informações Adicionais
+    tituloEleitoral: '',
+    zonaEleitoral: '',
+    secaoEleitoral: '',
+    carteiraReservista: '',
+    numeroRegistroConselho: '',
+    religiao: '',
+    laudoCid: '',
+    observacoesAdicionais: '',
+    indicacaoQuem: '',
     
     // Status
     status: 'ATIVO'
@@ -76,12 +131,79 @@ export default function CadastroAluno() {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [fotoAluno, setFotoAluno] = useState(null);
 
+  const instituicaoAtual = normalizeInstitutionName(formData.instituicao);
+  const hiddenSections = HIDDEN_SECTIONS_BY_INSTITUTION[instituicaoAtual] || [];
+  const shouldShowSection = (sectionId) => !hiddenSections.includes(sectionId);
+
+  const instituicaoSelecionada = instituicoes.find(
+    (inst) => normalizeInstitutionName(inst.nome) === instituicaoAtual
+  );
+  const instituicaoSelecionadaId = String(instituicaoSelecionada?.id || '');
+
+  const cursosVinculadosInstituicao = cursos.filter((curso) => {
+    const cursoInstituicaoId = String(curso.instituicaoId || curso.instituicao_id || curso.instituicaoid || '');
+    if (instituicaoSelecionadaId && cursoInstituicaoId) {
+      return cursoInstituicaoId === instituicaoSelecionadaId;
+    }
+
+    const cursoInstituicaoNome = normalizeInstitutionName(curso.instituicaoNome || curso.instituicao_nome || '');
+    return Boolean(instituicaoAtual && cursoInstituicaoNome && cursoInstituicaoNome === instituicaoAtual);
+  });
+
+  const cursoSelecionado = cursosVinculadosInstituicao.find(
+    (curso) => String(curso.id) === String(formData.curso)
+  );
+  const cursoSelecionadoNome = normalizeInstitutionName(cursoSelecionado?.nome || '');
+
+  const turmasFiltradas = turmas.filter((turma) => {
+    const turmaInstituicaoId = String(turma.instituicaoId || turma.instituicao_id || '');
+    const turmaInstituicaoNome = normalizeInstitutionName(turma.instituicao || turma.instituicaoNome || turma.instituicao_nome || '');
+
+    const turmaVinculadaInstituicao = !formData.instituicao
+      ? true
+      : instituicaoSelecionadaId && turmaInstituicaoId
+        ? turmaInstituicaoId === instituicaoSelecionadaId
+        : turmaInstituicaoNome === instituicaoAtual;
+
+    if (!turmaVinculadaInstituicao) {
+      return false;
+    }
+
+    if (!formData.curso) {
+      return true;
+    }
+
+    const turmaCursoId = String(turma.cursoId || turma.cursoid || '');
+    const turmaCursoNome = normalizeInstitutionName(turma.curso || '');
+
+    return turmaCursoId
+      ? turmaCursoId === String(formData.curso)
+      : Boolean(cursoSelecionadoNome && turmaCursoNome === cursoSelecionadoNome);
+  });
+
   useEffect(() => {
     carregarInstituicoes();
+    carregarCursos();
+    carregarTurmas();
+    carregarAnosLetivos();
     if (isEditando) {
       carregarAluno();
     }
   }, [isEditando]);
+
+  useEffect(() => {
+    if (!formData.turma || formData.curso) return;
+
+    const turmaSelecionada = turmas.find((turma) => String(turma.id) === String(formData.turma));
+    const cursoDaTurma = turmaSelecionada?.cursoId || turmaSelecionada?.cursoid || '';
+
+    if (!cursoDaTurma) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      curso: String(cursoDaTurma),
+    }));
+  }, [formData.turma, formData.curso, turmas]);
 
   const carregarInstituicoes = async () => {
     try {
@@ -98,6 +220,51 @@ export default function CadastroAluno() {
     }
   };
 
+  const carregarTurmas = async () => {
+    try {
+      setLoadingTurmas(true);
+      const response = await fetch('/api/turmas');
+      if (response.ok) {
+        const data = await response.json();
+        setTurmas(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar turmas:', error);
+    } finally {
+      setLoadingTurmas(false);
+    }
+  };
+
+  const carregarCursos = async () => {
+    try {
+      setLoadingCursos(true);
+      const response = await fetch('/api/cursos');
+      if (response.ok) {
+        const data = await response.json();
+        setCursos(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar cursos:', error);
+    } finally {
+      setLoadingCursos(false);
+    }
+  };
+
+  const carregarAnosLetivos = async () => {
+    try {
+      setLoadingAnosLetivos(true);
+      const response = await fetch('/api/configuracoes/anos-letivos');
+      if (response.ok) {
+        const data = await response.json();
+        setAnosLetivos(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar anos letivos:', error);
+    } finally {
+      setLoadingAnosLetivos(false);
+    }
+  };
+
   const carregarAluno = async () => {
     try {
       setLoading(true);
@@ -110,6 +277,7 @@ export default function CadastroAluno() {
         const alunoMapeado = {
           // IDENTIFICAÇÃO
           instituicao: data.instituicao || 'CREESER',
+          curso: data.cursoid ? data.cursoid.toString() : '',
           turma: data.turmaid ? data.turmaid.toString() : '',
           anoLetivo: data.ano_letivo ? data.ano_letivo.toString() : new Date().getFullYear().toString(),
           turnoIntegral: data.turno_integral || false,
@@ -118,6 +286,7 @@ export default function CadastroAluno() {
           // DADOS PESSOAIS
           nome: data.nome || '',
           nomeSocial: data.nome_social || false,
+          apelido: data.apelido || '',
           cpf: data.cpf || '',
           estadoCivil: data.estadocivil || '',
           sexo: data.sexo || '',
@@ -125,6 +294,7 @@ export default function CadastroAluno() {
           rg: data.rg || '',
           dataExpedicaoRG: data.data_expedicao_rg || '',
           orgaoExpedidorRG: data.orgao_expedidor_rg || '',
+          ufRG: data.uf_rg || '',
           telefoneCelular: data.telefone_celular || '',
           
           // FILIAÇÃO
@@ -163,6 +333,37 @@ export default function CadastroAluno() {
           // DEFICIÊNCIA
           pessoaComDeficiencia: data.pessoa_com_deficiencia || false,
           tipoDeficiencia: data.tipo_deficiencia || '',
+
+          // DADOS FINANCEIROS
+          planoFinanceiro: data.plano_financeiro || '',
+          valorMatricula: data.valor_matricula ?? '',
+          valorMensalidade: data.valor_mensalidade ?? '',
+          percentualDesconto: data.percentual_desconto ?? '',
+          quantidadeParcelas: data.qtd_parcelas ?? '',
+          diaPagamento: data.dia_pagamento ?? '',
+          quantidadeMesesContrato: data.qtd_meses_contrato ?? '',
+          cnpjBoleto: data.cnpj_boleto || '',
+          razaoSocialBoleto: data.razao_social_boleto || '',
+          alunoBolsista:
+            data.aluno_bolsista === true
+              ? 'SIM'
+              : data.aluno_bolsista === false
+                ? 'NAO'
+                : '',
+          percentualBolsaEstudo: data.percentual_bolsa ?? '',
+          financiamentoEstudantil: data.financiamento_estudantil || '',
+          percentualFinanciamento: data.percentual_financiamento ?? '',
+
+          // INFORMAÇÕES ADICIONAIS
+          tituloEleitoral: data.titulo_eleitoral || '',
+          zonaEleitoral: data.zona_eleitoral ?? '',
+          secaoEleitoral: data.secao_eleitoral ?? '',
+          carteiraReservista: data.carteira_reservista || '',
+          numeroRegistroConselho: data.registro_conselho || '',
+          religiao: data.religiao || '',
+          laudoCid: data.laudo_cid || '',
+          observacoesAdicionais: data.observacoes_adicionais || '',
+          indicacaoQuem: data.indicacao_quem || '',
           
           // STATUS
           status: data.statusmatricula || 'ATIVO',
@@ -189,9 +390,14 @@ export default function CadastroAluno() {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
+    const parsedValue = type === 'checkbox' ? checked : value;
+
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: parsedValue,
+      ...(name === 'instituicao' ? { curso: '', turma: '' } : {}),
+      ...(name === 'curso' ? { turma: '' } : {}),
+      ...(name === 'nomeSocial' && !checked ? { apelido: '' } : {})
     }));
   };
 
@@ -341,7 +547,7 @@ export default function CadastroAluno() {
           <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
             <h2 className="text-lg font-bold text-teal-600 mb-4">Identificação</h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
               <div>
                 <label className="text-xs font-medium text-teal-600 mb-1 block">INSTITUIÇÃO</label>
                 <select
@@ -367,31 +573,83 @@ export default function CadastroAluno() {
               </div>
 
               <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">CURSO</label>
+                <select
+                  name="curso"
+                  value={formData.curso}
+                  onChange={handleInputChange}
+                  disabled={!formData.instituicao || loadingCursos}
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50 disabled:opacity-50"
+                >
+                  <option value="">{formData.instituicao ? 'Selecione um Curso' : 'Selecione a instituição primeiro'}</option>
+                  {!loadingCursos && cursosVinculadosInstituicao.length > 0 ? (
+                    cursosVinculadosInstituicao.map((curso) => (
+                      <option key={curso.id} value={String(curso.id)}>
+                        {curso.nome}
+                      </option>
+                    ))
+                  ) : loadingCursos ? (
+                    <option disabled>Carregando cursos...</option>
+                  ) : (
+                    <option disabled>Nenhum curso vinculado à instituição</option>
+                  )}
+                </select>
+              </div>
+
+              <div>
                 <label className="text-xs font-medium text-teal-600 mb-1 block">TURMA</label>
                 <select
                   name="turma"
                   value={formData.turma}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                  disabled={!formData.instituicao || loadingTurmas}
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50 disabled:opacity-50"
                 >
-                  <option value="">Selecione uma Turma</option>
-                  <option value="1A">1A</option>
-                  <option value="1B">1B</option>
-                  <option value="2A">2A</option>
-                  <option value="2B">2B</option>
-                  <option value="3A">3A</option>
+                  <option value="">{formData.instituicao ? 'Selecione uma Turma' : 'Selecione a instituição primeiro'}</option>
+                  {!loadingTurmas && turmasFiltradas.length > 0 ? (
+                    turmasFiltradas.map((turma) => (
+                      <option key={turma.id} value={String(turma.id)}>
+                        {turma.nome}
+                        {turma.curso ? ` - ${turma.curso}` : ''}
+                        {turma.turno ? ` (${turma.turno})` : ''}
+                      </option>
+                    ))
+                  ) : loadingTurmas ? (
+                    <option disabled>Carregando turmas...</option>
+                  ) : (
+                    <option disabled>Nenhuma turma vinculada aos filtros</option>
+                  )}
                 </select>
               </div>
 
               <div>
                 <label className="text-xs font-medium text-teal-600 mb-1 block">ANO LETIVO</label>
-                <input
-                  type="number"
+                <select
                   name="anoLetivo"
                   value={formData.anoLetivo}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                />
+                  disabled={loadingAnosLetivos}
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50 disabled:opacity-50"
+                >
+                  <option value="">Selecione o Ano Letivo</option>
+                  {!loadingAnosLetivos && anosLetivos.length > 0 ? (
+                    anosLetivos.map((ano) => {
+                      const valorAno = (ano.nome ?? ano.ano ?? '').toString();
+                      if (!valorAno) return null;
+                      return (
+                        <option key={ano.id || valorAno} value={valorAno}>
+                          {valorAno}
+                        </option>
+                      );
+                    })
+                  ) : loadingAnosLetivos ? (
+                    <option disabled>Carregando anos letivos...</option>
+                  ) : (
+                    <option value={new Date().getFullYear().toString()}>
+                      {new Date().getFullYear()}
+                    </option>
+                  )}
+                </select>
               </div>
 
               <div>
@@ -425,7 +683,11 @@ export default function CadastroAluno() {
           <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
             <h2 className="text-lg font-bold text-teal-600 mb-4">Dados Pessoais</h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div
+              className={`grid grid-cols-1 gap-4 mb-4 ${
+                formData.nomeSocial ? 'md:grid-cols-[1fr_180px_1fr]' : 'md:grid-cols-[1fr_180px]'
+              }`}
+            >
               <div>
                 <label className="text-xs font-medium text-teal-600 mb-1 block">Nome <span className="text-red-500">*</span></label>
                 <input
@@ -441,17 +703,35 @@ export default function CadastroAluno() {
 
               <div>
                 <label className="text-xs font-medium text-teal-600 mb-1 block">Nome social?</label>
-                <input
-                  type="checkbox"
-                  name="nomeSocial"
-                  checked={formData.nomeSocial}
-                  onChange={handleInputChange}
-                  className="w-5 h-5 text-teal-600 rounded cursor-pointer"
-                />
+                <label htmlFor="nomeSocial" className="inline-flex items-center gap-2 h-[42px]">
+                  <input
+                    id="nomeSocial"
+                    type="checkbox"
+                    name="nomeSocial"
+                    checked={formData.nomeSocial}
+                    onChange={handleInputChange}
+                    className="w-5 h-5 text-teal-600 rounded cursor-pointer"
+                  />
+                  <span className="text-xs text-gray-700">Possui nome social</span>
+                </label>
               </div>
+
+              {formData.nomeSocial && (
+                <div>
+                  <label className="text-xs font-medium text-teal-600 mb-1 block">Apelido (Nome Social)</label>
+                  <input
+                    type="text"
+                    name="apelido"
+                    value={formData.apelido}
+                    onChange={handleInputChange}
+                    placeholder="Informe o nome social"
+                    className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                  />
+                </div>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
               <div>
                 <label className="text-xs font-medium text-teal-600 mb-1 block">CPF</label>
                 <input
@@ -493,6 +773,18 @@ export default function CadastroAluno() {
                   <option value="F">Feminino</option>
                   <option value="O">Outro</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">Email</label>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  placeholder="email@exemplo.com"
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                />
               </div>
             </div>
 
@@ -557,9 +849,9 @@ export default function CadastroAluno() {
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 >
                   <option value="">Selecione</option>
-                  <option value="SP">SP</option>
-                  <option value="RJ">RJ</option>
-                  <option value="MG">MG</option>
+                  {UF_OPTIONS.map((ufOption) => (
+                    <option key={ufOption} value={ufOption}>{ufOption}</option>
+                  ))}
                 </select>
               </div>
 
@@ -571,6 +863,32 @@ export default function CadastroAluno() {
                   value={formData.telefoneCelular}
                   onChange={handleInputChange}
                   placeholder="(XX) XXXXX-XXXX"
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 pt-4 border-t border-teal-100">
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">Naturalidade</label>
+                <input
+                  type="text"
+                  name="naturalidade"
+                  value={formData.naturalidade}
+                  onChange={handleInputChange}
+                  placeholder="Ex: São Paulo-SP"
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">Nacionalidade</label>
+                <input
+                  type="text"
+                  name="nacionalidade"
+                  value={formData.nacionalidade}
+                  onChange={handleInputChange}
+                  placeholder="Ex: Brasileiro"
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 />
               </div>
@@ -606,6 +924,7 @@ export default function CadastroAluno() {
                 />
               </div>
             </div>
+
           </div>
 
           {/* Seção: Endereço */}
@@ -652,7 +971,7 @@ export default function CadastroAluno() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
               <div>
                 <label className="text-xs font-medium text-teal-600 mb-1 block">Bairro</label>
                 <input
@@ -686,57 +1005,30 @@ export default function CadastroAluno() {
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 >
                   <option value="">Selecione</option>
-                  <option value="SP">SP</option>
-                  <option value="RJ">RJ</option>
-                  <option value="MG">MG</option>
-                  <option value="BA">BA</option>
+                  {UF_OPTIONS.map((ufOption) => (
+                    <option key={ufOption} value={ufOption}>{ufOption}</option>
+                  ))}
                 </select>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="text-xs font-medium text-teal-600 mb-1 block">Naturalidade</label>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">Complemento</label>
                 <input
                   type="text"
-                  name="naturalidade"
-                  value={formData.naturalidade}
+                  name="complemento"
+                  value={formData.complemento}
                   onChange={handleInputChange}
-                  placeholder="Naturalidade"
-                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-teal-600 mb-1 block">UF Naturalidade</label>
-                <select
-                  name="ufNaturalidade"
-                  value={formData.ufNaturalidade}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                >
-                  <option value="">Selecione</option>
-                  <option value="SP">SP</option>
-                  <option value="RJ">RJ</option>
-                  <option value="MG">MG</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-teal-600 mb-1 block">Email</label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  placeholder="email@exemplo.com"
+                  placeholder="Apto, bloco, referência"
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 />
               </div>
             </div>
+
+
           </div>
 
           {/* Seção: Registro de Nascimento */}
+          {shouldShowSection('registroNascimento') && (
           <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
             <h2 className="text-lg font-bold text-teal-600 mb-4">Registro de Nascimento</h2>
             
@@ -790,6 +1082,7 @@ export default function CadastroAluno() {
               />
             </div>
           </div>
+          )}
 
           {/* Seção: Informações para Censo INEP */}
           <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
@@ -826,6 +1119,7 @@ export default function CadastroAluno() {
           </div>
 
           {/* Seção: Informações do Ensino Médio */}
+          {shouldShowSection('ensinoMedio') && (
           <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
             <h2 className="text-lg font-bold text-teal-600 mb-4">Informações do Ensino Médio</h2>
             
@@ -890,9 +1184,328 @@ export default function CadastroAluno() {
                 className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
               >
                 <option value="">Selecione</option>
-                <option value="SP">SP</option>
-                <option value="RJ">RJ</option>
-                <option value="MG">MG</option>
+                {UF_OPTIONS.map((ufOption) => (
+                  <option key={ufOption} value={ufOption}>{ufOption}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          )}
+
+          {/* Seção: Dados Financeiros */}
+          <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
+            <h2 className="text-lg font-bold text-teal-600 mb-4">Dados Financeiros</h2>
+
+            <div className="mb-4">
+              <label className="text-xs font-medium text-teal-600 mb-1 block">Planos Financeiros</label>
+              <select
+                name="planoFinanceiro"
+                value={formData.planoFinanceiro}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+              >
+                <option value="">Selecione</option>
+                <option value="PADRAO">Plano Padrão</option>
+                <option value="PROMOCIONAL">Plano Promocional</option>
+                <option value="BOLSA">Plano com Bolsa</option>
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">R$ Matrícula</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  name="valorMatricula"
+                  value={formData.valorMatricula}
+                  onChange={handleInputChange}
+                  placeholder="0,00"
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">R$ Mensalidade</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  name="valorMensalidade"
+                  value={formData.valorMensalidade}
+                  onChange={handleInputChange}
+                  placeholder="0,00"
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">Desconto (%)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  name="percentualDesconto"
+                  value={formData.percentualDesconto}
+                  onChange={handleInputChange}
+                  placeholder="0"
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">Qtd. de Parcelas</label>
+                <input
+                  type="number"
+                  min="0"
+                  name="quantidadeParcelas"
+                  value={formData.quantidadeParcelas}
+                  onChange={handleInputChange}
+                  placeholder="Quantidade de parcelas"
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">Dia de Pagamento</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="31"
+                  name="diaPagamento"
+                  value={formData.diaPagamento}
+                  onChange={handleInputChange}
+                  placeholder="Dia de pagamento escolhido pelo aluno"
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">Qtd. Meses Contrato</label>
+                <input
+                  type="number"
+                  min="0"
+                  name="quantidadeMesesContrato"
+                  value={formData.quantidadeMesesContrato}
+                  onChange={handleInputChange}
+                  placeholder="Qtd. período contratual"
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">CNPJ no Boleto</label>
+                <input
+                  type="text"
+                  name="cnpjBoleto"
+                  value={formData.cnpjBoleto}
+                  onChange={handleInputChange}
+                  placeholder="00.000.000/0000-00"
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">Razão Social</label>
+                <input
+                  type="text"
+                  name="razaoSocialBoleto"
+                  value={formData.razaoSocialBoleto}
+                  onChange={handleInputChange}
+                  placeholder="Razão social para emissão"
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">Aluno Bolsista?</label>
+                <select
+                  name="alunoBolsista"
+                  value={formData.alunoBolsista}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                >
+                  <option value="">- Escolha uma opção -</option>
+                  <option value="SIM">Sim</option>
+                  <option value="NAO">Não</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">(%) Bolsa de Estudo</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  name="percentualBolsaEstudo"
+                  value={formData.percentualBolsaEstudo}
+                  onChange={handleInputChange}
+                  placeholder="Percentual da bolsa"
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">Financiamento Estudantil</label>
+                <select
+                  name="financiamentoEstudantil"
+                  value={formData.financiamentoEstudantil}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                >
+                  <option value="">- Escolha uma opção -</option>
+                  <option value="NAO">Não</option>
+                  <option value="FIES">FIES</option>
+                  <option value="PRAVALER">PRAVALER</option>
+                  <option value="OUTRO">Outro</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">(%) Financiamento</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  name="percentualFinanciamento"
+                  value={formData.percentualFinanciamento}
+                  onChange={handleInputChange}
+                  placeholder="Percentual do financiamento"
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Seção: Informações Adicionais */}
+          <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
+            <h2 className="text-lg font-bold text-teal-600 mb-4">Informações Adicionais</h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">Título Eleitoral</label>
+                <input
+                  type="text"
+                  name="tituloEleitoral"
+                  value={formData.tituloEleitoral}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">Zona Eleitoral</label>
+                <input
+                  type="number"
+                  min="0"
+                  name="zonaEleitoral"
+                  value={formData.zonaEleitoral}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">Seção Eleitoral</label>
+                <input
+                  type="number"
+                  min="0"
+                  name="secaoEleitoral"
+                  value={formData.secaoEleitoral}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">Carteira Reservista</label>
+                <input
+                  type="text"
+                  name="carteiraReservista"
+                  value={formData.carteiraReservista}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">Nº de Registro no Conselho</label>
+                <input
+                  type="text"
+                  name="numeroRegistroConselho"
+                  value={formData.numeroRegistroConselho}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">Religião</label>
+                <input
+                  type="text"
+                  name="religiao"
+                  value={formData.religiao}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                />
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="text-xs font-medium text-teal-600 mb-1 block">Laudo - CID</label>
+              <input
+                type="text"
+                name="laudoCid"
+                value={formData.laudoCid}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+              />
+            </div>
+
+            <div className="mb-4">
+              <label className="text-xs font-medium text-teal-600 mb-1 block">Observações</label>
+              <textarea
+                name="observacoesAdicionais"
+                value={formData.observacoesAdicionais}
+                onChange={handleInputChange}
+                rows={3}
+                className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-teal-600 mb-1 block">Houve indicação? Quem?</label>
+              <select
+                name="indicacaoQuem"
+                value={formData.indicacaoQuem}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+              >
+                <option value="">Escolha uma opção</option>
+                <option value="NAO">Não houve indicação</option>
+                <option value="AMIGO">Amigo(a)</option>
+                <option value="ALUNO">Aluno(a)</option>
+                <option value="PROFESSOR">Professor(a)</option>
+                <option value="REDES_SOCIAIS">Redes Sociais</option>
+                <option value="OUTRO">Outro</option>
               </select>
             </div>
           </div>

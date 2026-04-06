@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import DashboardLayout from '../../../components/DashboardLayout';
@@ -26,9 +26,56 @@ export default function NovoResponsavel() {
     cnpj: '',
     observacoes: '',
     situacao: 'ATIVO',
+    alunoIds: [],
   });
 
+  const [alunosDisponiveis, setAlunosDisponiveis] = useState([]);
+  const [alunosSelecionados, setAlunosSelecionados] = useState([]);
+  const [buscaAluno, setBuscaAluno] = useState('');
+  const [loadingAlunos, setLoadingAlunos] = useState(false);
   const [loading, setLoading] = useState(false);
+  const termoBuscaAluno = buscaAluno.trim().toLowerCase();
+  const buscaAlunoValida = termoBuscaAluno.length >= 3;
+
+  useEffect(() => {
+    carregarAlunos();
+  }, []);
+
+  const alunosFiltrados = useMemo(() => {
+    const idsSelecionados = new Set(alunosSelecionados);
+
+    if (!buscaAlunoValida) {
+      return [];
+    }
+
+    return alunosDisponiveis.filter((aluno) => {
+      const alunoId = String(aluno.id);
+      if (idsSelecionados.has(alunoId)) return false;
+
+      const nome = String(aluno.nome || '').toLowerCase();
+      return nome.includes(termoBuscaAluno);
+    });
+  }, [alunosDisponiveis, alunosSelecionados, termoBuscaAluno, buscaAlunoValida]);
+
+  const formatarOpcaoAluno = (aluno) => {
+    const nome = String(aluno.nome || `Aluno #${aluno.id}`);
+    return `${nome} (ID: ${aluno.id})`;
+  };
+
+  const carregarAlunos = async () => {
+    try {
+      setLoadingAlunos(true);
+      const res = await fetch('/api/alunos');
+      if (!res.ok) return;
+
+      const data = await res.json();
+      setAlunosDisponiveis(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Erro ao carregar alunos:', error);
+    } finally {
+      setLoadingAlunos(false);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -38,17 +85,37 @@ export default function NovoResponsavel() {
     }));
   };
 
+  const handleBuscaAlunoChange = (e) => {
+    const valor = e.target.value;
+    setBuscaAluno(valor);
+
+    const alunoEncontrado = alunosDisponiveis.find((aluno) => {
+      const alunoId = String(aluno.id);
+      if (alunosSelecionados.includes(alunoId)) return false;
+      return formatarOpcaoAluno(aluno) === valor;
+    });
+
+    if (alunoEncontrado) {
+      adicionarAluno(alunoEncontrado.id);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      const payload = {
+        ...formData,
+        alunoIds: alunosSelecionados,
+      };
+
       const res = await fetch('/api/responsaveis', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
@@ -63,6 +130,20 @@ export default function NovoResponsavel() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const adicionarAluno = (alunoId) => {
+    const alunoIdString = String(alunoId);
+    if (!alunoIdString || alunosSelecionados.includes(alunoIdString)) {
+      return;
+    }
+
+    setAlunosSelecionados((prev) => [...prev, alunoIdString]);
+    setBuscaAluno('');
+  };
+
+  const removerAluno = (alunoId) => {
+    setAlunosSelecionados((prev) => prev.filter((id) => id !== alunoId));
   };
 
   return (
@@ -367,6 +448,56 @@ export default function NovoResponsavel() {
                 placeholder="Somente Números"
                 className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
               />
+            </div>
+          </div>
+
+          {/* Seção: Alunos sob Responsabilidade */}
+          <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
+            <h3 className="text-lg font-bold text-teal-600 mb-4">Aluno(s) de Responsabilidade</h3>
+
+            <div className="mb-4">
+              <label className="text-xs font-medium text-teal-600 mb-1 block">BUSCAR ALUNO</label>
+              <input
+                type="text"
+                list="alunos-busca-novo"
+                value={buscaAluno}
+                onChange={handleBuscaAlunoChange}
+                placeholder="Digite 3+ letras do nome do aluno"
+                disabled={loadingAlunos}
+                className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+              />
+              <datalist id="alunos-busca-novo">
+                {alunosFiltrados.map((aluno) => (
+                  <option key={aluno.id} value={formatarOpcaoAluno(aluno)} />
+                ))}
+              </datalist>
+            </div>
+
+            <div className="mt-4">
+              <label className="text-xs font-medium text-teal-600 mb-1 block">ALUNOS VINCULADOS</label>
+              <div className="w-full px-3 py-2 border border-teal-300 rounded-lg bg-white min-h-[64px]">
+                {alunosSelecionados.length > 0 ? (
+                  alunosSelecionados.map((alunoId) => {
+                    const aluno = alunosDisponiveis.find((item) => String(item.id) === String(alunoId));
+                    const nome = aluno?.nome || `Aluno #${alunoId}`;
+
+                    return (
+                      <div key={alunoId} className="px-2 py-1 bg-teal-100 text-teal-600 rounded mb-1 flex justify-between items-center text-sm">
+                        <span>{nome}</span>
+                        <button
+                          type="button"
+                          onClick={() => removerAluno(alunoId)}
+                          className="text-red-600 hover:text-red-800 text-xs"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-gray-400 text-sm">Nenhum aluno vinculado</div>
+                )}
+              </div>
             </div>
           </div>
 

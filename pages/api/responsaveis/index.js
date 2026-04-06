@@ -1,41 +1,64 @@
-import fs from 'fs';
-import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import {
+  attachAlunoIdsToRows,
+  filterExistingAlunoIds,
+  isMissingSupabaseObjectError,
+  mapBodyToPayload,
+  parseAlunoIdsFromBody,
+  supabase,
+  syncResponsavelAlunos,
+} from './_shared';
 
-const dataPath = path.join(process.cwd(), 'data', 'responsaveis.json');
-
-const lerResponsaveis = () => {
+export default async function handler(req, res) {
   try {
-    const data = fs.readFileSync(dataPath, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('Erro ao ler responsáveis:', error);
-    return [];
-  }
-};
+    if (req.method === 'GET') {
+      const { data, error } = await supabase
+        .from('responsaveis')
+        .select('*')
+        .order('id', { ascending: false });
 
-const salvarResponsaveis = (responsaveis) => {
-  try {
-    fs.writeFileSync(dataPath, JSON.stringify(responsaveis, null, 2), 'utf8');
-  } catch (error) {
-    console.error('Erro ao salvar responsáveis:', error);
-  }
-};
+      if (error) {
+        if (isMissingSupabaseObjectError(error)) {
+          return res.status(200).json([]);
+        }
 
-export default function handler(req, res) {
-  if (req.method === 'GET') {
-    const responsaveis = lerResponsaveis();
-    res.status(200).json(responsaveis);
-  } else if (req.method === 'POST') {
-    const responsaveis = lerResponsaveis();
-    const novoResponsavel = {
-      id: uuidv4(),
-      ...req.body,
-    };
-    responsaveis.push(novoResponsavel);
-    salvarResponsaveis(responsaveis);
-    res.status(201).json(novoResponsavel);
-  } else {
-    res.status(405).json({ erro: 'Método não permitido' });
+        console.error('Supabase GET responsaveis error:', error);
+        return res.status(500).json({ message: 'Erro ao recuperar responsaveis', error: error.message });
+      }
+
+      const response = await attachAlunoIdsToRows(data || []);
+      return res.status(200).json(response);
+    }
+
+    if (req.method === 'POST') {
+      const body = req.body || {};
+      const payload = mapBodyToPayload(body);
+
+      if (!payload.nome) {
+        return res.status(400).json({ message: 'Nome e obrigatorio' });
+      }
+
+      const alunoIds = parseAlunoIdsFromBody(body);
+      const existingAlunoIds = await filterExistingAlunoIds(alunoIds);
+
+      const { data, error } = await supabase
+        .from('responsaveis')
+        .insert(payload)
+        .select('*')
+        .maybeSingle();
+
+      if (error) {
+        console.error('Supabase POST responsaveis error:', error);
+        return res.status(500).json({ message: 'Erro ao cadastrar responsavel', error: error.message });
+      }
+
+      await syncResponsavelAlunos(data.id, existingAlunoIds);
+      const [response] = await attachAlunoIdsToRows([data]);
+      return res.status(201).json(response);
+    }
+
+    return res.status(405).json({ erro: 'Metodo nao permitido' });
+  } catch (error) {
+    console.error('Erro em /api/responsaveis:', error);
+    return res.status(500).json({ message: 'Erro interno no servidor', error: error.message });
   }
 }

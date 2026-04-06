@@ -3,6 +3,15 @@ import path from 'path';
 
 const dataPath = path.join(process.cwd(), 'data', 'disciplinas.json');
 
+const withLowercaseKeys = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const lowered = {};
+  Object.entries(obj).forEach(([key, value]) => {
+    lowered[key.toLowerCase()] = value;
+  });
+  return { ...obj, ...lowered };
+};
+
 const lerDisciplinas = () => {
   try {
     const data = fs.readFileSync(dataPath, 'utf8');
@@ -30,14 +39,14 @@ export default function handler(req, res) {
     if (disciplinaIndex === -1) {
       return res.status(404).json({ erro: 'Disciplina não encontrada' });
     }
-    res.status(200).json(disciplinas[disciplinaIndex]);
+    res.status(200).json(withLowercaseKeys(disciplinas[disciplinaIndex]));
   } else if (req.method === 'PUT') {
     if (disciplinaIndex === -1) {
       return res.status(404).json({ erro: 'Disciplina não encontrada' });
     }
     disciplinas[disciplinaIndex] = { ...disciplinas[disciplinaIndex], ...req.body };
     salvarDisciplinas(disciplinas);
-    res.status(200).json(disciplinas[disciplinaIndex]);
+    res.status(200).json(withLowercaseKeys(disciplinas[disciplinaIndex]));
   } else if (req.method === 'DELETE') {
     if (disciplinaIndex === -1) {
       return res.status(404).json({ erro: 'Disciplina não encontrada' });

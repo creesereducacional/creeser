@@ -3,16 +3,21 @@ import AdminFinanceiroLayout from '@/components/AdminFinanceiro/Layout';
 
 export default function DashboardFinanceiro() {
   const [dados, setDados] = useState({
-    totalClientes: 0,
-    totalRecurring: 0,
-    receita30dias: 0,
-    receita12meses: 0,
-    faturasPendentes: 0,
-    taxaRetencao: 0,
-    churnRate: 0,
-    arpu: 0, // Average Revenue Per User
-    mrr: 0   // Monthly Recurring Revenue
+    totalAlunosComPendencias: 0,
+    totalAlunosAtivos: 0,
+    totalAReceber: 0,
+    boletosVencidos: 0,
+    valorVencido: 0,
+    totalOrdens: 0,
+    valorTotalOrdens: 0,
+    totalCarnes: 0,
+    valorTotalCarnes: 0,
+    totalRecebido: 0,
+    taxaRecebimento: 0,
+    totalGerado: 0 
   });
+
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     carregarDados();
@@ -27,11 +32,20 @@ export default function DashboardFinanceiro() {
       }
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
+  const formataValor = (valor) => {
+    return Number(valor || 0).toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    });
+  };
+
   const CardStat = ({ titulo, valor, subtexto, cor, icone }) => (
-    <div className={`bg-gradient-to-br ${cor} rounded-lg p-6 text-white shadow-lg hover:shadow-xl transition`}>
+    <div className={`bg-gradient-to-br ${cor} rounded-xl p-6 text-white shadow-sm hover:shadow-md transition border border-transparent`}>
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm font-semibold opacity-90">{titulo}</p>
@@ -43,103 +57,164 @@ export default function DashboardFinanceiro() {
     </div>
   );
 
+  if (loading) {
+    return (
+      <AdminFinanceiroLayout>
+        <div className="flex items-center justify-center h-96">
+          <p className="text-lg text-gray-600">Carregando dashboard...</p>
+        </div>
+      </AdminFinanceiroLayout>
+    );
+  }
+
   return (
     <AdminFinanceiroLayout>
-      <div className="max-w-7xl mx-auto">
+      <div className="space-y-8">
         {/* HEADER */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-white mb-2">Dashboard Financeiro</h2>
-          <p className="text-slate-400">Visão geral do faturamento e gestão de clientes</p>
+        <div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Dashboard Financeiro</h2>
+          <p className="text-gray-600">Visão geral de cobrança e pagamentos de alunos</p>
         </div>
 
-        {/* KPIs PRINCIPAIS */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <CardStat
-            titulo="Total de Clientes"
-            valor={dados.totalClientes}
-            subtexto="Empresas ativas"
-            cor="from-blue-600 to-blue-700"
-            icone="👥"
-          />
-          <CardStat
-            titulo="MRR"
-            valor={`R$ ${(dados.mrr || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-            subtexto="Receita mensal recorrente"
-            cor="from-green-600 to-green-700"
-            icone="💚"
-          />
-          <CardStat
-            titulo="Faturamento 30 dias"
-            valor={`R$ ${(dados.receita30dias || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-            subtexto="Últimos 30 dias"
-            cor="from-emerald-600 to-emerald-700"
-            icone="📈"
-          />
-          <CardStat
-            titulo="Faturas Pendentes"
-            valor={dados.faturasPendentes}
-            subtexto="Aguardando pagamento"
-            cor="from-orange-600 to-orange-700"
-            icone="⏰"
-          />
-        </div>
-
-        {/* METRICAS SECUNDARIAS */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <CardStat
-            titulo="Faturamento 12 meses"
-            valor={`R$ ${(dados.receita12meses || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-            subtexto="Últimos 12 meses"
-            cor="from-purple-600 to-purple-700"
-            icone="📊"
-          />
-          <CardStat
-            titulo="Taxa de Retenção"
-            valor={`${dados.taxaRetencao || 0}%`}
-            subtexto="Clientes que continuam"
-            cor="from-cyan-600 to-cyan-700"
-            icone="📍"
-          />
-          <CardStat
-            titulo="Churn Rate"
-            valor={`${dados.churnRate || 0}%`}
-            subtexto="Clientes perdidos"
-            cor="from-red-600 to-red-700"
-            icone="📉"
-          />
-          <CardStat
-            titulo="ARPU"
-            valor={`R$ ${(dados.arpu || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
-            subtexto="Receita por usuário"
-            cor="from-indigo-600 to-indigo-700"
-            icone="💰"
-          />
-        </div>
-
-        {/* AÇÕES RÁPIDAS */}
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 shadow-lg">
-          <h3 className="text-lg font-bold text-white mb-4">⚡ Ações Rápidas</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <button className="p-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-semibold">
-              ➕ Novo Cliente
-            </button>
-            <button className="p-4 bg-green-600 hover:bg-green-700 text-white rounded-lg transition font-semibold">
-              💰 Registrar Pagamento
-            </button>
-            <button className="p-4 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition font-semibold">
-              📄 Gerar Fatura
-            </button>
-            <button className="p-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition font-semibold">
-              📊 Exportar Relatório
-            </button>
+        {/* KPIs EDUCACIONAIS */}
+        <div>
+          <h3 className="text-xl font-bold text-gray-900 mb-4">📚 Educacional</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <CardStat
+              titulo="Alunos com Pendências"
+              valor={dados.totalAlunosComPendencias}
+              subtexto="Com cobrança ativa"
+              cor="from-orange-500 to-amber-600"
+              icone="⚠️"
+            />
+            <CardStat
+              titulo="Boletos Vencidos"
+              valor={dados.boletosVencidos}
+              subtexto="Necessita cobrança"
+              cor="from-red-500 to-rose-600"
+              icone="📅"
+            />
+            <CardStat
+              titulo="Valor Vencido"
+              valor={formataValor(dados.valorVencido)}
+              subtexto="Com atraso"
+              cor="from-red-600 to-red-700"
+              icone="💰"
+            />
+            <CardStat
+              titulo="Alunos Ativos"
+              valor={dados.totalAlunosAtivos}
+              subtexto="Matriculados"
+              cor="from-teal-600 to-teal-700"
+              icone="✅"
+            />
           </div>
         </div>
 
-        {/* ALERTAS */}
-        <div className="mt-8 bg-yellow-900 border-l-4 border-yellow-500 rounded-lg p-4">
-          <p className="text-yellow-100">
-            <strong>⚠️ Atenção:</strong> Você tem 3 faturas vencidas e 5 com vencimento nos próximos 7 dias.
-          </p>
+        {/* KPIs COBRANÇA */}
+        <div>
+          <h3 className="text-xl font-bold text-gray-900 mb-4">💳 Cobrança</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <CardStat
+              titulo="Total a Receber"
+              valor={formataValor(dados.totalAReceber)}
+              subtexto="Pendências ativas"
+              cor="from-cyan-600 to-cyan-700"
+              icone="📈"
+            />
+            <CardStat
+              titulo="Total Gerado"
+              valor={formataValor(dados.totalGerado)}
+              subtexto="Todas as parcelas"
+              cor="from-slate-700 to-slate-800"
+              icone="📊"
+            />
+            <CardStat
+              titulo="Total Recebido"
+              valor={formataValor(dados.totalRecebido)}
+              subtexto="Parcelas pagas"
+              cor="from-green-600 to-emerald-700"
+              icone="✅"
+            />
+            <CardStat
+              titulo="Taxa Recebimento"
+              valor={`${dados.taxaRecebimento}%`}
+              subtexto="Do total gerado"
+              cor="from-purple-600 to-purple-700"
+              icone="📉"
+            />
+          </div>
+        </div>
+
+        {/* KPIs ORDENS E CARNÊS */}
+        <div>
+          <h3 className="text-xl font-bold text-gray-900 mb-4">🧾 Ordens & Carnês</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <CardStat
+              titulo="Ordens Simples"
+              valor={dados.totalOrdens}
+              subtexto={formataValor(dados.valorTotalOrdens)}
+              cor="from-teal-600 to-teal-700"
+              icone="🧾"
+            />
+            <CardStat
+              titulo="Carnês"
+              valor={dados.totalCarnes}
+              subtexto={formataValor(dados.valorTotalCarnes)}
+              cor="from-cyan-600 to-cyan-700"
+              icone="📋"
+            />
+            <CardStat
+              titulo="Total de Documentos"
+              valor={dados.totalOrdens + dados.totalCarnes}
+              subtexto="Ordens + Carnês"
+              cor="from-blue-600 to-blue-700"
+              icone="📄"
+            />
+            <CardStat
+              titulo="Valor Total Movimentado"
+              valor={formataValor(dados.valorTotalOrdens + dados.valorTotalCarnes)}
+              subtexto="Em cobrança"
+              cor="from-indigo-600 to-indigo-700"
+              icone="💵"
+            />
+          </div>
+        </div>
+
+        {/* RODAPÉ COM BOTÕES DE AÇÃO */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6">
+          <a
+            href="/admin-financeiro/alunos"
+            className="block p-6 bg-gradient-to-br from-teal-50 to-cyan-50 border border-teal-200 rounded-xl hover:shadow-md transition text-center"
+          >
+            <p className="text-2xl mb-2">🎓</p>
+            <p className="font-bold text-teal-900">Selecionar Aluno</p>
+            <p className="text-sm text-teal-700 mt-1">Criar ordem ou carnê</p>
+          </a>
+          <a
+            href="/admin-financeiro/ordens"
+            className="block p-6 bg-gradient-to-br from-blue-50 to-teal-50 border border-blue-200 rounded-xl hover:shadow-md transition text-center"
+          >
+            <p className="text-2xl mb-2">📊</p>
+            <p className="font-bold text-blue-900">Ver Ordens</p>
+            <p className="text-sm text-blue-700 mt-1">{dados.totalOrdens} ordens ativas</p>
+          </a>
+          <a
+            href="/admin-financeiro/carnes"
+            className="block p-6 bg-gradient-to-br from-cyan-50 to-blue-50 border border-cyan-200 rounded-xl hover:shadow-md transition text-center"
+          >
+            <p className="text-2xl mb-2">📋</p>
+            <p className="font-bold text-cyan-900">Ver Carnês</p>
+            <p className="text-sm text-cyan-700 mt-1">{dados.totalCarnes} carnês ativas</p>
+          </a>
+          <button
+            onClick={carregarDados}
+            className="block p-6 bg-gradient-to-br from-gray-100 to-gray-50 border border-gray-200 rounded-xl hover:shadow-md transition text-center"
+          >
+            <p className="text-2xl mb-2">🔄</p>
+            <p className="font-bold text-gray-900">Atualizar</p>
+            <p className="text-sm text-gray-600 mt-1">Sincronizar dados</p>
+          </button>
         </div>
       </div>
     </AdminFinanceiroLayout>

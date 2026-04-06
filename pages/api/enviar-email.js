@@ -3,6 +3,15 @@ import path from 'path';
 
 const emailsFilePath = path.join(process.cwd(), 'data', 'emails-enviados.json');
 
+const withLowercaseKeys = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const lowered = {};
+  Object.entries(obj).forEach(([key, value]) => {
+    lowered[key.toLowerCase()] = value;
+  });
+  return { ...obj, ...lowered };
+};
+
 // Função para ler histórico de e-mails
 function lerHistoricoEmails() {
   try {
@@ -55,7 +64,7 @@ export default async function handler(req, res) {
       case 'GET': {
         // Retornar histórico de e-mails enviados
         const historico = lerHistoricoEmails();
-        return res.status(200).json(historico);
+        return res.status(200).json(historico.map(withLowercaseKeys));
       }
 
       case 'POST': {
@@ -73,26 +82,26 @@ export default async function handler(req, res) {
           case 'todos':
             listaDestinatarios = alunos
               .filter(a => a.status === 'aprovado' && a.ativo)
-              .map(a => ({ email: a.email, nome: a.nomeCompleto }));
+              .map(a => ({ email: a.email, nome: a.nomecompleto || a.nomeCompleto || a.nome }));
             break;
 
           case 'ativos':
             listaDestinatarios = alunos
               .filter(a => a.status === 'aprovado' && a.ativo === true)
-              .map(a => ({ email: a.email, nome: a.nomeCompleto }));
+              .map(a => ({ email: a.email, nome: a.nomecompleto || a.nomeCompleto || a.nome }));
             break;
 
           case 'inativos':
             listaDestinatarios = alunos
               .filter(a => a.status === 'aprovado' && a.ativo === false)
-              .map(a => ({ email: a.email, nome: a.nomeCompleto }));
+              .map(a => ({ email: a.email, nome: a.nomecompleto || a.nomeCompleto || a.nome }));
             break;
 
           case 'selecionados':
             // destinatarios deve ser um array de emails
             listaDestinatarios = destinatarios.map(email => {
               const aluno = alunos.find(a => a.email === email);
-              return { email, nome: aluno?.nomeCompleto || 'Aluno' };
+              return { email, nome: aluno?.nomecompleto || aluno?.nomeCompleto || aluno?.nome || 'Aluno' };
             });
             break;
 
@@ -155,7 +164,7 @@ export default async function handler(req, res) {
         return res.status(200).json({
           success: true,
           resultados,
-          historico: novoEmail
+          historico: withLowercaseKeys(novoEmail)
         });
       }
 

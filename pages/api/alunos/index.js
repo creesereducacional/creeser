@@ -9,6 +9,108 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+let hasUfRgColumnCache = null;
+let hasApelidoColumnCache = null;
+let hasFinanceiroColumnsCache = null;
+let hasInformacoesAdicionaisColumnsCache = null;
+
+const isMissingColumnError = (error) => {
+  const message = String(error?.message || '').toLowerCase();
+  return error?.code === '42703' || message.includes('does not exist') || message.includes('column');
+};
+
+const supportsUfRgColumn = async () => {
+  if (hasUfRgColumnCache !== null) {
+    return hasUfRgColumnCache;
+  }
+
+  const { error } = await supabase
+    .from('alunos')
+    .select('uf_rg')
+    .limit(1);
+
+  if (!error) {
+    hasUfRgColumnCache = true;
+    return true;
+  }
+
+  if (isMissingColumnError(error)) {
+    hasUfRgColumnCache = false;
+    return false;
+  }
+
+  throw error;
+};
+
+const supportsApelidoColumn = async () => {
+  if (hasApelidoColumnCache !== null) {
+    return hasApelidoColumnCache;
+  }
+
+  const { error } = await supabase
+    .from('alunos')
+    .select('apelido')
+    .limit(1);
+
+  if (!error) {
+    hasApelidoColumnCache = true;
+    return true;
+  }
+
+  if (isMissingColumnError(error)) {
+    hasApelidoColumnCache = false;
+    return false;
+  }
+
+  throw error;
+};
+
+const supportsFinanceiroColumns = async () => {
+  if (hasFinanceiroColumnsCache !== null) {
+    return hasFinanceiroColumnsCache;
+  }
+
+  const { error } = await supabase
+    .from('alunos')
+    .select('plano_financeiro')
+    .limit(1);
+
+  if (!error) {
+    hasFinanceiroColumnsCache = true;
+    return true;
+  }
+
+  if (isMissingColumnError(error)) {
+    hasFinanceiroColumnsCache = false;
+    return false;
+  }
+
+  throw error;
+};
+
+const supportsInformacoesAdicionaisColumns = async () => {
+  if (hasInformacoesAdicionaisColumnsCache !== null) {
+    return hasInformacoesAdicionaisColumnsCache;
+  }
+
+  const { error } = await supabase
+    .from('alunos')
+    .select('titulo_eleitoral')
+    .limit(1);
+
+  if (!error) {
+    hasInformacoesAdicionaisColumnsCache = true;
+    return true;
+  }
+
+  if (isMissingColumnError(error)) {
+    hasInformacoesAdicionaisColumnsCache = false;
+    return false;
+  }
+
+  throw error;
+};
+
 export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
@@ -43,6 +145,42 @@ export default async function handler(req, res) {
         if (!value) return value;
         return typeof value === 'string' ? value.toUpperCase() : value;
       };
+
+      const parseDecimal = (value) => {
+        if (value === null || value === undefined || value === '') return null;
+        if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+
+        let normalized = String(value).trim().replace(/[^\d,.-]/g, '');
+        if (!normalized) return null;
+
+        if (normalized.includes(',') && normalized.includes('.')) {
+          normalized = normalized.replace(/\./g, '').replace(',', '.');
+        } else if (normalized.includes(',')) {
+          normalized = normalized.replace(',', '.');
+        }
+
+        const parsed = Number.parseFloat(normalized);
+        return Number.isNaN(parsed) ? null : parsed;
+      };
+
+      const parseInteger = (value) => {
+        if (value === null || value === undefined || value === '') return null;
+        if (typeof value === 'number') return Number.isInteger(value) ? value : Math.trunc(value);
+
+        const onlyDigits = String(value).replace(/\D/g, '');
+        if (!onlyDigits) return null;
+
+        const parsed = Number.parseInt(onlyDigits, 10);
+        return Number.isNaN(parsed) ? null : parsed;
+      };
+
+      const parseBooleanFromOption = (value) => {
+        if (value === true || value === false) return value;
+        const normalized = String(value || '').trim().toUpperCase();
+        if (normalized === 'SIM') return true;
+        if (normalized === 'NAO' || normalized === 'NÃO') return false;
+        return null;
+      };
       
       const alunoData = {
         // ===== IDENTIFICAÇÃO =====
@@ -50,6 +188,7 @@ export default async function handler(req, res) {
         instituicao: toUppercase(formData.instituicao) || 'CREESER',
         statusmatricula: toUppercase(formData.status) || 'ATIVO',
         datamatricula: formData.dataMatricula || new Date().toISOString().split('T')[0],
+        cursoid: formData.curso ? parseInt(formData.curso) : null,
         turmaid: formData.turma ? parseInt(formData.turma) : null,
         ano_letivo: formData.anoLetivo ? parseInt(formData.anoLetivo) : null,
         turno_integral: Boolean(formData.turnoIntegral),
@@ -63,6 +202,7 @@ export default async function handler(req, res) {
         rg: toUppercase(formData.rg) || null,
         data_expedicao_rg: formData.dataExpedicaoRG || null,
         orgao_expedidor_rg: toUppercase(formData.orgaoExpedidorRG) || null,
+        uf_rg: toUppercase(formData.ufRG) || null,
         telefone_celular: formData.telefoneCelular || null,
         email: formData.email ? formData.email.toLowerCase() : null,  // Email sempre lowercase
 
@@ -102,8 +242,35 @@ export default async function handler(req, res) {
         pessoa_com_deficiencia: Boolean(formData.pessoaComDeficiencia),
         tipo_deficiencia: toUppercase(formData.tipoDeficiencia) || null,
 
+        // ===== DADOS FINANCEIROS =====
+        plano_financeiro: toUppercase(formData.planoFinanceiro) || null,
+        valor_matricula: parseDecimal(formData.valorMatricula),
+        valor_mensalidade: parseDecimal(formData.valorMensalidade),
+        percentual_desconto: parseDecimal(formData.percentualDesconto),
+        qtd_parcelas: parseInteger(formData.quantidadeParcelas),
+        dia_pagamento: parseInteger(formData.diaPagamento),
+        qtd_meses_contrato: parseInteger(formData.quantidadeMesesContrato),
+        cnpj_boleto: formData.cnpjBoleto || null,
+        razao_social_boleto: toUppercase(formData.razaoSocialBoleto) || null,
+        aluno_bolsista: parseBooleanFromOption(formData.alunoBolsista),
+        percentual_bolsa: parseDecimal(formData.percentualBolsaEstudo),
+        financiamento_estudantil: toUppercase(formData.financiamentoEstudantil) || null,
+        percentual_financiamento: parseDecimal(formData.percentualFinanciamento),
+
+        // ===== INFORMAÇÕES ADICIONAIS =====
+        titulo_eleitoral: formData.tituloEleitoral || null,
+        zona_eleitoral: parseInteger(formData.zonaEleitoral),
+        secao_eleitoral: parseInteger(formData.secaoEleitoral),
+        carteira_reservista: toUppercase(formData.carteiraReservista) || null,
+        registro_conselho: toUppercase(formData.numeroRegistroConselho) || null,
+        religiao: toUppercase(formData.religiao) || null,
+        laudo_cid: toUppercase(formData.laudoCid) || null,
+        observacoes_adicionais: formData.observacoesAdicionais || null,
+        indicacao_quem: toUppercase(formData.indicacaoQuem) || null,
+
         // ===== OUTROS =====
         nome_social: Boolean(formData.nomeSocial),
+        apelido: formData.nomeSocial ? toUppercase(formData.apelido) || null : null,
         foto: formData.foto || null
       };
 
@@ -121,6 +288,46 @@ export default async function handler(req, res) {
           delete alunoData[key];
         }
       });
+
+      // Compatibilidade: se a coluna ainda não foi migrada, ignora ufRG sem quebrar o cadastro.
+      if (!(await supportsUfRgColumn())) {
+        delete alunoData.uf_rg;
+      }
+
+      // Compatibilidade: se a coluna ainda não foi migrada, ignora apelido sem quebrar o cadastro.
+      if (!(await supportsApelidoColumn())) {
+        delete alunoData.apelido;
+      }
+
+      // Compatibilidade: se as colunas financeiras ainda não foram migradas, ignora os campos sem quebrar o cadastro.
+      if (!(await supportsFinanceiroColumns())) {
+        delete alunoData.plano_financeiro;
+        delete alunoData.valor_matricula;
+        delete alunoData.valor_mensalidade;
+        delete alunoData.percentual_desconto;
+        delete alunoData.qtd_parcelas;
+        delete alunoData.dia_pagamento;
+        delete alunoData.qtd_meses_contrato;
+        delete alunoData.cnpj_boleto;
+        delete alunoData.razao_social_boleto;
+        delete alunoData.aluno_bolsista;
+        delete alunoData.percentual_bolsa;
+        delete alunoData.financiamento_estudantil;
+        delete alunoData.percentual_financiamento;
+      }
+
+      // Compatibilidade: se as colunas de informações adicionais ainda não foram migradas, ignora os campos sem quebrar o cadastro.
+      if (!(await supportsInformacoesAdicionaisColumns())) {
+        delete alunoData.titulo_eleitoral;
+        delete alunoData.zona_eleitoral;
+        delete alunoData.secao_eleitoral;
+        delete alunoData.carteira_reservista;
+        delete alunoData.registro_conselho;
+        delete alunoData.religiao;
+        delete alunoData.laudo_cid;
+        delete alunoData.observacoes_adicionais;
+        delete alunoData.indicacao_quem;
+      }
 
       try {
         const { data, error } = await supabase

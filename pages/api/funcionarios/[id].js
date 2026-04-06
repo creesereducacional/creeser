@@ -3,6 +3,15 @@ import path from 'path';
 
 const dataPath = path.join(process.cwd(), 'data', 'funcionarios.json');
 
+const withLowercaseKeys = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const lowered = {};
+  Object.entries(obj).forEach(([key, value]) => {
+    lowered[key.toLowerCase()] = value;
+  });
+  return { ...obj, ...lowered };
+};
+
 // Função para ler dados
 function lerFuncionarios() {
   try {
@@ -43,7 +52,7 @@ export default function handler(req, res) {
         return res.status(404).json({ message: 'Funcionário não encontrado' });
       }
 
-      res.status(200).json(funcionario);
+      res.status(200).json(withLowercaseKeys(funcionario));
     } catch (error) {
       console.error('[API GET Error]', error);
       res.status(500).json({ message: 'Erro ao carregar funcionário', error: error.message });
@@ -68,7 +77,7 @@ export default function handler(req, res) {
 
       if (salvarFuncionarios(funcionarios)) {
         console.log(`[API] Funcionário ${idNumerico} atualizado com sucesso`);
-        res.status(200).json(funcionarios[index]);
+        res.status(200).json(withLowercaseKeys(funcionarios[index]));
       } else {
         console.error('[API] Erro ao salvar arquivo');
         res.status(500).json({ message: 'Erro ao atualizar funcionário' });
@@ -95,7 +104,7 @@ export default function handler(req, res) {
 
       if (salvarFuncionarios(funcionarios)) {
         console.log(`[API] Funcionário ${idNumerico} removido com sucesso`);
-        res.status(200).json({ message: 'Funcionário removido com sucesso', funcionario: funcionarioRemovido });
+        res.status(200).json({ message: 'Funcionário removido com sucesso', funcionario: withLowercaseKeys(funcionarioRemovido) });
       } else {
         console.error('[API] Erro ao salvar arquivo após DELETE');
         res.status(500).json({ message: 'Erro ao remover funcionário' });

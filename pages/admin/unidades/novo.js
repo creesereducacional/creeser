@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
+import { formatarCNPJ, formatarCEP, formatarTelefone } from '@/utils/formatadores';
 
 export default function NovaUnidade() {
   const router = useRouter();
@@ -9,9 +10,13 @@ export default function NovaUnidade() {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [cursosDisponiveis, setCursosDisponiveis] = useState([]);
   const [cursosSelecionados, setCursosSelecionados] = useState([]);
+  const [instituicoes, setInstituicoes] = useState([]);
+  const [carregandoInstituicoes, setCarregandoInstituicoes] = useState(true);
 
   const [formData, setFormData] = useState({
     // Seção Unidade
+    instituicaoId: '',
+    instituicaoNome: '',
     nome: '',
     cnpj: '',
     cep: '',
@@ -80,6 +85,7 @@ export default function NovaUnidade() {
 
   useEffect(() => {
     carregarCursos();
+    carregarInstituicoes();
   }, []);
 
   const carregarCursos = async () => {
@@ -92,6 +98,79 @@ export default function NovaUnidade() {
     } catch (error) {
       console.error('Erro ao carregar cursos:', error);
     }
+  };
+
+  const sanitizeNumber = (valor, maxLength) => {
+    if (!valor) return '';
+    return valor.replace(/\D/g, '').slice(0, maxLength);
+  };
+
+  const handleMaskedChange = (name, maxLength) => (e) => {
+    const value = sanitizeNumber(e.target.value, maxLength);
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const carregarInstituicoes = async () => {
+    try {
+      setCarregandoInstituicoes(true);
+      const response = await fetch('/api/instituicoes');
+
+      if (response.ok) {
+        const data = await response.json();
+        setInstituicoes(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar instituições:', error);
+    } finally {
+      setCarregandoInstituicoes(false);
+    }
+  };
+
+  const preencherDadosMantenedora = (instituicao) => {
+    if (!instituicao) {
+      setFormData((prev) => ({
+        ...prev,
+        codMecMantenedora: '',
+        cnpjMantenedora: '',
+        razaoSocial: '',
+        cepMantenedora: '',
+        logradouroMantenedora: '',
+        numeroMantenedora: '',
+        complementoMantenedora: '',
+        bairroMantenedora: '',
+        ufMantenedora: '',
+      }));
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      codMecMantenedora: instituicao.codMec || instituicao.cod_mec || prev.codMecMantenedora || '',
+      cnpjMantenedora: instituicao.cnpj || '',
+      razaoSocial: instituicao.nome || '',
+      cepMantenedora: instituicao.cep || '',
+      logradouroMantenedora: instituicao.endereco || '',
+      numeroMantenedora: prev.numeroMantenedora || '',
+      complementoMantenedora: prev.complementoMantenedora || '',
+      bairroMantenedora: prev.bairroMantenedora || '',
+      ufMantenedora: instituicao.estado || '',
+    }));
+  };
+
+  const handleInstituicaoChange = (e) => {
+    const instituicaoId = e.target.value;
+    const instituicaoSelecionada = instituicoes.find((inst) => inst.id?.toString() === instituicaoId);
+
+    setFormData((prev) => ({
+      ...prev,
+      instituicaoId,
+      instituicaoNome: instituicaoSelecionada?.nome || '',
+    }));
+
+    preencherDadosMantenedora(instituicaoSelecionada);
   };
 
   // Auto-preenchimento de endereço ao inserir CEP
@@ -123,8 +202,7 @@ export default function NovaUnidade() {
 
   // Handle para CEP com limpeza e formatação
   const handleCepChange = (e) => {
-    let value = e.target.value.replace(/\D/g, ''); // Remove não-dígitos
-    if (value.length > 8) value = value.slice(0, 8);
+    const value = sanitizeNumber(e.target.value, 8);
     
     setFormData(prev => ({
       ...prev,
@@ -166,6 +244,11 @@ export default function NovaUnidade() {
     try {
       const dataToSave = {
         ...formData,
+        cnpj: sanitizeNumber(formData.cnpj, 14),
+        telefone: sanitizeNumber(formData.telefone, 11),
+        cep: sanitizeNumber(formData.cep, 8),
+        cnpjMantenedora: sanitizeNumber(formData.cnpjMantenedora, 14),
+        cepMantenedora: sanitizeNumber(formData.cepMantenedora, 8),
         cursos: cursosSelecionados.map(c => c.id),
       };
 
@@ -181,7 +264,10 @@ export default function NovaUnidade() {
         setMessage({ type: 'success', text: 'Unidade criada com sucesso!' });
         setTimeout(() => router.push('/admin/unidades'), 1500);
       } else {
-        setMessage({ type: 'error', text: 'Erro ao criar unidade' });
+        const payload = await response.json().catch(() => null);
+        const detalhe = payload?.error || payload?.message || 'Erro ao criar unidade';
+        console.error('Erro ao criar unidade:', payload || response.statusText);
+        setMessage({ type: 'error', text: detalhe });
       }
     } catch (error) {
       console.error('Erro ao salvar:', error);
@@ -267,8 +353,8 @@ export default function NovaUnidade() {
                   <input
                     type="text"
                     name="cnpj"
-                    value={formData.cnpj}
-                    onChange={handleChange}
+                    value={formatarCNPJ(formData.cnpj || '')}
+                    onChange={handleMaskedChange('cnpj', 14)}
                     placeholder="XX.XXX.XXX/XXXX-XX"
                     className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                   />
@@ -299,7 +385,7 @@ export default function NovaUnidade() {
                   <input
                     type="text"
                     name="cep"
-                    value={formData.cep}
+                    value={formatarCEP(formData.cep || '')}
                     onChange={handleCepChange}
                     placeholder="CEP"
                     maxLength="8"
@@ -377,8 +463,8 @@ export default function NovaUnidade() {
                   <input
                     type="tel"
                     name="telefone"
-                    value={formData.telefone}
-                    onChange={handleChange}
+                    value={formatarTelefone(formData.telefone || '')}
+                    onChange={handleMaskedChange('telefone', 11)}
                     placeholder="(XX) XXXX-XXXX"
                     className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                     required
@@ -459,6 +545,30 @@ export default function NovaUnidade() {
             </div>
 
             <div className="space-y-4">
+              <div>
+                <label className="block text-xs md:text-sm font-medium text-teal-600 mb-2">
+                  Instituição <span className="text-red-500">*</span>
+                </label>
+                <select
+                  name="instituicaoId"
+                  value={formData.instituicaoId}
+                  onChange={handleInstituicaoChange}
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                  required
+                >
+                  <option value="">Selecione a instituição</option>
+                  {carregandoInstituicoes ? (
+                    <option value="" disabled>Carregando...</option>
+                  ) : (
+                    instituicoes.map((inst) => (
+                      <option key={inst.id || inst.nome} value={inst.id}>
+                        {inst.nome}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
               {/* Linha 1: Cód. MEC e CNPJ */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -482,8 +592,8 @@ export default function NovaUnidade() {
                   <input
                     type="text"
                     name="cnpjMantenedora"
-                    value={formData.cnpjMantenedora}
-                    onChange={handleChange}
+                    value={formatarCNPJ(formData.cnpjMantenedora || '')}
+                    onChange={handleMaskedChange('cnpjMantenedora', 14)}
                     placeholder="XX.XXX.XXX/XXXX-XX"
                     className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                   />
@@ -514,8 +624,8 @@ export default function NovaUnidade() {
                   <input
                     type="text"
                     name="cepMantenedora"
-                    value={formData.cepMantenedora}
-                    onChange={handleChange}
+                    value={formatarCEP(formData.cepMantenedora || '')}
+                    onChange={handleMaskedChange('cepMantenedora', 8)}
                     placeholder="CEP"
                     className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                   />

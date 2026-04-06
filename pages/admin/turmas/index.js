@@ -5,12 +5,14 @@ import DashboardLayout from '../../../components/DashboardLayout';
 export default function ListagemTurmas() {
   const [turmas, setTurmas] = useState([]);
   const [filtradas, setFiltradas] = useState([]);
+  const [opcoes, setOpcoes] = useState({ unidades: [] });
   const [loading, setLoading] = useState(true);
   const [searchUnidade, setSearchUnidade] = useState('');
   const [searchSituacao, setSearchSituacao] = useState('');
 
   useEffect(() => {
     carregarTurmas();
+    carregarOpcoes();
   }, []);
 
   useEffect(() => {
@@ -23,7 +25,7 @@ export default function ListagemTurmas() {
       const res = await fetch('/api/turmas');
       if (res.ok) {
         const data = await res.json();
-        setTurmas(data);
+        setTurmas(Array.isArray(data) ? data : []);
       }
     } catch (error) {
       console.error('Erro ao carregar turmas:', error);
@@ -32,13 +34,25 @@ export default function ListagemTurmas() {
     }
   };
 
+  const carregarOpcoes = async () => {
+    try {
+      const res = await fetch('/api/turmas/opcoes');
+      if (!res.ok) return;
+
+      const data = await res.json();
+      setOpcoes({
+        unidades: Array.isArray(data.unidades) ? data.unidades : [],
+      });
+    } catch (error) {
+      console.error('Erro ao carregar opções de turmas:', error);
+    }
+  };
+
   const aplicarFiltros = () => {
     let resultado = turmas;
 
     if (searchUnidade) {
-      resultado = resultado.filter(turma =>
-        turma.unidade.toLowerCase().includes(searchUnidade.toLowerCase())
-      );
+      resultado = resultado.filter((turma) => turma.unidadeId?.toString() === searchUnidade.toString());
     }
 
     if (searchSituacao) {
@@ -106,7 +120,11 @@ export default function ListagemTurmas() {
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
                 >
                   <option value="">- Selecione uma Unidade -</option>
-                  <option value="TESTE">TESTE</option>
+                  {opcoes.unidades.map((unidade) => (
+                    <option key={unidade.id} value={unidade.id}>
+                      {unidade.nome}
+                    </option>
+                  ))}
                 </select>
               </div>
 

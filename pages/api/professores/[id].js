@@ -3,6 +3,15 @@ import path from 'path';
 
 const dataPath = path.join(process.cwd(), 'data', 'professores.json');
 
+const withLowercaseKeys = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const lowered = {};
+  Object.entries(obj).forEach(([key, value]) => {
+    lowered[key.toLowerCase()] = value;
+  });
+  return { ...obj, ...lowered };
+};
+
 function lerProfessores() {
   try {
     const data = fs.readFileSync(dataPath, 'utf-8');
@@ -27,7 +36,7 @@ export default function handler(req, res) {
     }
 
     if (req.method === 'GET') {
-      res.status(200).json(professores[professorIndex]);
+      res.status(200).json(withLowercaseKeys(professores[professorIndex]));
     } else if (req.method === 'PUT') {
       professores[professorIndex] = {
         ...professores[professorIndex],
@@ -37,7 +46,7 @@ export default function handler(req, res) {
         dataAtualizacao: new Date().toISOString()
       };
       salvarProfessores(professores);
-      res.status(200).json(professores[professorIndex]);
+      res.status(200).json(withLowercaseKeys(professores[professorIndex]));
     } else if (req.method === 'DELETE') {
       professores.splice(professorIndex, 1);
       salvarProfessores(professores);

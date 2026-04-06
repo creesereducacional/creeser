@@ -48,7 +48,8 @@ export default function DashboardAlunos() {
   // Filtrar alunos por turma
   const alunosFiltrados = alunos.filter(aluno => {
     if (turmaFiltrada === 'todos') return true;
-    return aluno.turmaId === parseInt(turmaFiltrada);
+    const turmaIdAtual = aluno.turmaid ?? aluno.turmaId;
+    return turmaIdAtual === parseInt(turmaFiltrada);
   });
 
   if (carregando) {
@@ -134,11 +135,11 @@ export default function DashboardAlunos() {
                       {aluno.usuarios?.foto && (
                         <img
                           src={aluno.usuarios.foto}
-                          alt={aluno.usuarios.nomeCompleto}
+                          alt={aluno.usuarios.nomecompleto || aluno.usuarios.nomeCompleto || 'Aluno'}
                           className="w-8 h-8 rounded-full mr-2"
                         />
                       )}
-                      {aluno.usuarios?.nomeCompleto || 'Sem nome'}
+                      {aluno.usuarios?.nomecompleto || aluno.usuarios?.nomeCompleto || 'Sem nome'}
                     </div>
                   </td>
                   <td className="border border-gray-300 px-4 py-2">
@@ -153,12 +154,12 @@ export default function DashboardAlunos() {
                   <td className="border border-gray-300 px-4 py-2">
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        aluno.statusMatricula === 'ativa'
+                        (aluno.statusmatricula ?? aluno.statusMatricula) === 'ativa'
                           ? 'bg-green-100 text-green-800'
                           : 'bg-red-100 text-red-800'
                       }`}
                     >
-                      {aluno.statusMatricula === 'ativa' ? 'Ativa' : 'Inativa'}
+                      {(aluno.statusmatricula ?? aluno.statusMatricula) === 'ativa' ? 'Ativa' : 'Inativa'}
                     </span>
                   </td>
                   <td className="border border-gray-300 px-4 py-2 text-center">
@@ -259,7 +260,7 @@ export function LancamentoNotas({ disciplinaId, turmaId }) {
             {alunos.map(aluno => (
               <tr key={aluno.id} className="hover:bg-gray-50">
                 <td className="border border-gray-300 px-4 py-2">
-                  {aluno.usuarios?.nomeCompleto}
+                  {aluno.usuarios?.nomecompleto || aluno.usuarios?.nomeCompleto}
                 </td>
                 <td className="border border-gray-300 px-4 py-2">
                   <input

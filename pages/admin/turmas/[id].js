@@ -6,11 +6,14 @@ import DashboardLayout from '../../../components/DashboardLayout';
 export default function EditarTurma() {
   const router = useRouter();
   const { id } = router.query;
+  const [opcoes, setOpcoes] = useState({ instituicoes: [], unidades: [], cursos: [], grades: [] });
+  const [loadingOpcoes, setLoadingOpcoes] = useState(true);
   const [formData, setFormData] = useState({
     nome: '',
-    unidade: '',
-    curso: '',
-    grade: '',
+    instituicaoId: '',
+    unidadeId: '',
+    cursoId: '',
+    gradeId: '',
     cargaHoraria: '',
     processoSeletivo: '',
     edittalProcessoSeletivo: '',
@@ -35,12 +38,72 @@ export default function EditarTurma() {
     }
   }, [id]);
 
+  useEffect(() => {
+    carregarOpcoes(formData.instituicaoId, formData.unidadeId);
+  }, [formData.instituicaoId, formData.unidadeId]);
+
+  useEffect(() => {
+    if (!opcoes.unidades.length && !opcoes.cursos.length && !opcoes.grades.length) {
+      return;
+    }
+
+    setFormData((prev) => {
+      const proximo = { ...prev };
+
+      if (!proximo.unidadeId && proximo.unidade) {
+        const unidadeEncontrada = opcoes.unidades.find((item) => item.nome === proximo.unidade);
+        if (unidadeEncontrada) {
+          proximo.unidadeId = String(unidadeEncontrada.id);
+        }
+      }
+
+      if (!proximo.instituicaoId) {
+        const unidadeDaTurma = opcoes.unidades.find((item) => String(item.id) === String(proximo.unidadeId));
+        const instituicaoViaUnidade = String(unidadeDaTurma?.instituicaoId || unidadeDaTurma?.instituicao_id || '');
+
+        if (instituicaoViaUnidade) {
+          proximo.instituicaoId = instituicaoViaUnidade;
+        }
+      }
+
+      if (!proximo.instituicaoId && proximo.instituicao) {
+        const instituicaoEncontrada = opcoes.instituicoes.find((item) => item.nome === proximo.instituicao);
+        if (instituicaoEncontrada) {
+          proximo.instituicaoId = String(instituicaoEncontrada.id);
+        }
+      }
+
+      if (!proximo.cursoId && proximo.curso) {
+        const cursoEncontrado = opcoes.cursos.find((item) => item.nome === proximo.curso);
+        if (cursoEncontrado) {
+          proximo.cursoId = String(cursoEncontrado.id);
+        }
+      }
+
+      if (!proximo.gradeId && proximo.grade) {
+        const gradeEncontrada = opcoes.grades.find((item) => item.nome === proximo.grade);
+        if (gradeEncontrada) {
+          proximo.gradeId = String(gradeEncontrada.id);
+        }
+      }
+
+      return proximo;
+    });
+  }, [opcoes]);
+
   const carregarTurma = async () => {
     try {
       const res = await fetch(`/api/turmas/${id}`);
       if (res.ok) {
         const data = await res.json();
-        setFormData(data);
+        setFormData((prev) => ({
+          ...prev,
+          ...data,
+          instituicaoId: data.instituicaoId ? String(data.instituicaoId) : '',
+          unidadeId: data.unidadeId ? String(data.unidadeId) : '',
+          cursoId: data.cursoId ? String(data.cursoId) : '',
+          gradeId: data.gradeId ? String(data.gradeId) : '',
+        }));
       } else {
         alert('Turma não encontrada');
         router.push('/admin/turmas');
@@ -53,8 +116,68 @@ export default function EditarTurma() {
     }
   };
 
+  const carregarOpcoes = async (instituicaoId = '', unidadeId = '') => {
+    try {
+      setLoadingOpcoes(true);
+      const params = new URLSearchParams();
+      if (instituicaoId) {
+        params.set('instituicaoId', instituicaoId);
+      }
+      if (unidadeId) {
+        params.set('unidadeId', unidadeId);
+      }
+
+      const query = params.toString() ? `?${params.toString()}` : '';
+      const res = await fetch(`/api/turmas/opcoes${query}`);
+      if (!res.ok) return;
+
+      const data = await res.json();
+      setOpcoes({
+        instituicoes: Array.isArray(data.instituicoes) ? data.instituicoes : [],
+        unidades: Array.isArray(data.unidades) ? data.unidades : [],
+        cursos: Array.isArray(data.cursos) ? data.cursos : [],
+        grades: Array.isArray(data.grades) ? data.grades : [],
+      });
+    } catch (error) {
+      console.error('Erro ao carregar opções de turmas:', error);
+    } finally {
+      setLoadingOpcoes(false);
+    }
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    if (name === 'instituicaoId') {
+      setFormData((prev) => ({
+        ...prev,
+        instituicaoId: value,
+        unidadeId: '',
+        cursoId: '',
+        gradeId: '',
+      }));
+      return;
+    }
+
+    if (name === 'unidadeId') {
+      setFormData((prev) => ({
+        ...prev,
+        unidadeId: value,
+        cursoId: '',
+        gradeId: '',
+      }));
+      return;
+    }
+
+    if (name === 'cursoId') {
+      setFormData((prev) => ({
+        ...prev,
+        cursoId: value,
+        gradeId: '',
+      }));
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -66,12 +189,31 @@ export default function EditarTurma() {
     setSaving(true);
 
     try {
+      if (!formData.instituicaoId) {
+        alert('A instituição da turma é obrigatória');
+        setSaving(false);
+        return;
+      }
+
+      const instituicaoSelecionada = opcoes.instituicoes.find((item) => item.id?.toString() === formData.instituicaoId);
+      const unidadeSelecionada = opcoes.unidades.find((item) => item.id?.toString() === formData.unidadeId);
+      const cursoSelecionado = opcoes.cursos.find((item) => item.id?.toString() === formData.cursoId);
+      const gradeSelecionada = opcoes.grades.find((item) => item.id?.toString() === formData.gradeId);
+
+      const payload = {
+        ...formData,
+        instituicao: instituicaoSelecionada?.nome || '',
+        unidade: unidadeSelecionada?.nome || '',
+        curso: cursoSelecionado?.nome || '',
+        grade: gradeSelecionada?.nome || '',
+      };
+
       const res = await fetch(`/api/turmas/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
@@ -113,46 +255,99 @@ export default function EditarTurma() {
           <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
             <h3 className="text-lg font-bold text-teal-600 mb-4">Configuração Básica</h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
               <div>
-                <label className="text-xs font-medium text-teal-600 mb-1 block">UNIDADE *</label>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">INSTITUIÇÃO *</label>
                 <select
-                  name="unidade"
-                  value={formData.unidade}
+                  name="instituicaoId"
+                  value={formData.instituicaoId}
                   onChange={handleChange}
                   required
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 >
-                  <option value="">Defina uma Unidade</option>
-                  <option value="TESTE">TESTE</option>
+                  <option value="">Selecione a Instituição</option>
+                  {loadingOpcoes ? (
+                    <option value="" disabled>Carregando...</option>
+                  ) : (
+                    opcoes.instituicoes
+                      .filter((instituicao) => instituicao.ativa !== false)
+                      .map((instituicao) => (
+                        <option key={instituicao.id} value={instituicao.id}>
+                          {instituicao.nome}
+                        </option>
+                      ))
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">UNIDADE *</label>
+                <select
+                  name="unidadeId"
+                  value={formData.unidadeId}
+                  onChange={handleChange}
+                  required
+                  disabled={!formData.instituicaoId || loadingOpcoes}
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                >
+                  <option value="">{formData.instituicaoId ? 'Selecione a Unidade' : 'Selecione a instituição primeiro'}</option>
+                  {loadingOpcoes ? (
+                    <option value="" disabled>Carregando...</option>
+                  ) : (
+                    opcoes.unidades.map((unidade) => (
+                      <option key={unidade.id} value={unidade.id}>
+                        {unidade.nome}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
 
               <div>
                 <label className="text-xs font-medium text-teal-600 mb-1 block">CURSO *</label>
                 <select
-                  name="curso"
-                  value={formData.curso}
+                  name="cursoId"
+                  value={formData.cursoId}
                   onChange={handleChange}
                   required
+                  disabled={!formData.unidadeId || loadingOpcoes}
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 >
-                  <option value="">Defina um Curso</option>
-                  <option value="PEDAGOGIA">PEDAGOGIA</option>
+                  <option value="">{formData.unidadeId ? 'Selecione o Curso' : 'Selecione a unidade primeiro'}</option>
+                  {loadingOpcoes ? (
+                    <option value="" disabled>Carregando...</option>
+                  ) : (
+                    opcoes.cursos.map((curso) => (
+                      <option key={curso.id} value={curso.id}>
+                        {curso.nome}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
 
               <div>
                 <label className="text-xs font-medium text-teal-600 mb-1 block">GRADE *</label>
                 <select
-                  name="grade"
-                  value={formData.grade}
+                  name="gradeId"
+                  value={formData.gradeId}
                   onChange={handleChange}
                   required
+                  disabled={!formData.cursoId || loadingOpcoes}
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 >
-                  <option value="">Defina uma Grade</option>
-                  <option value="-">-</option>
+                  <option value="">{formData.cursoId ? 'Selecione a Grade' : 'Selecione o curso primeiro'}</option>
+                  {loadingOpcoes ? (
+                    <option value="" disabled>Carregando...</option>
+                  ) : (
+                    opcoes.grades
+                      .filter((grade) => !formData.cursoId || !grade.cursoid || grade.cursoid?.toString() === formData.cursoId)
+                      .map((grade) => (
+                        <option key={grade.id} value={grade.id}>
+                          {grade.nome}
+                        </option>
+                      ))
+                  )}
                 </select>
               </div>
             </div>

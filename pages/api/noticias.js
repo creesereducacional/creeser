@@ -3,6 +3,20 @@ import path from 'path';
 
 const noticiasFilePath = path.join(process.cwd(), 'data', 'noticias.json');
 
+const withLowercaseKeys = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const lowered = {};
+  Object.entries(obj).forEach(([key, value]) => {
+    lowered[key.toLowerCase()] = value;
+  });
+  return { ...obj, ...lowered };
+};
+
+const getBodyValue = (body, key) => {
+  if (!body) return undefined;
+  return body[key] ?? body[key.toLowerCase()];
+};
+
 // Função para ler notícias
 function lerNoticias() {
   try {
@@ -43,29 +57,29 @@ export default function handler(req, res) {
           if (!noticia) {
             return res.status(404).json({ error: 'Notícia não encontrada' });
           }
-          return res.status(200).json(noticia);
+          return res.status(200).json(withLowercaseKeys(noticia));
         }
         
-        return res.status(200).json(noticias);
+        return res.status(200).json(noticias.map(withLowercaseKeys));
       }
 
       case 'POST': {
         const noticias = lerNoticias();
         const novaNoticia = {
           id: Date.now(),
-          titulo: req.body.titulo,
-          resumo: req.body.resumo,
-          conteudo: req.body.conteudo,
-          imagem: req.body.imagem || '',
-          autor: req.body.autor || 'IGEPPS',
-          categoria: req.body.categoria || 'Geral',
-          ativo: req.body.ativo !== false,
+          titulo: getBodyValue(req.body, 'titulo'),
+          resumo: getBodyValue(req.body, 'resumo'),
+          conteudo: getBodyValue(req.body, 'conteudo'),
+          imagem: getBodyValue(req.body, 'imagem') || '',
+          autor: getBodyValue(req.body, 'autor') || 'IGEPPS',
+          categoria: getBodyValue(req.body, 'categoria') || 'Geral',
+          ativo: getBodyValue(req.body, 'ativo') !== false,
           dataCriacao: new Date().toISOString(),
-          dataPublicacao: req.body.dataPublicacao || new Date().toISOString()
+          dataPublicacao: getBodyValue(req.body, 'dataPublicacao') || new Date().toISOString()
         };
         noticias.unshift(novaNoticia); // Adiciona no início
         salvarNoticias(noticias);
-        return res.status(201).json(novaNoticia);
+        return res.status(201).json(withLowercaseKeys(novaNoticia));
       }
 
       case 'PUT': {
@@ -79,18 +93,18 @@ export default function handler(req, res) {
 
         noticias[noticiaIndex] = {
           ...noticias[noticiaIndex],
-          titulo: req.body.titulo,
-          resumo: req.body.resumo,
-          conteudo: req.body.conteudo,
-          imagem: req.body.imagem || noticias[noticiaIndex].imagem,
-          autor: req.body.autor || noticias[noticiaIndex].autor,
-          categoria: req.body.categoria || noticias[noticiaIndex].categoria,
-          ativo: req.body.ativo !== undefined ? req.body.ativo : noticias[noticiaIndex].ativo,
-          dataPublicacao: req.body.dataPublicacao || noticias[noticiaIndex].dataPublicacao
+          titulo: getBodyValue(req.body, 'titulo'),
+          resumo: getBodyValue(req.body, 'resumo'),
+          conteudo: getBodyValue(req.body, 'conteudo'),
+          imagem: getBodyValue(req.body, 'imagem') || noticias[noticiaIndex].imagem,
+          autor: getBodyValue(req.body, 'autor') || noticias[noticiaIndex].autor,
+          categoria: getBodyValue(req.body, 'categoria') || noticias[noticiaIndex].categoria,
+          ativo: getBodyValue(req.body, 'ativo') !== undefined ? getBodyValue(req.body, 'ativo') : noticias[noticiaIndex].ativo,
+          dataPublicacao: getBodyValue(req.body, 'dataPublicacao') || noticias[noticiaIndex].dataPublicacao
         };
 
         salvarNoticias(noticias);
-        return res.status(200).json(noticias[noticiaIndex]);
+        return res.status(200).json(withLowercaseKeys(noticias[noticiaIndex]));
       }
 
       case 'DELETE': {

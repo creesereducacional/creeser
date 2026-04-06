@@ -1,3 +1,12 @@
+const withLowercaseKeys = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const lowered = {};
+  Object.entries(obj).forEach(([key, value]) => {
+    lowered[key.toLowerCase()] = value;
+  });
+  return { ...obj, ...lowered };
+};
+
 export default async function handler(req, res) {
   if (req.method === 'GET') {
     // TODO: Buscar clientes do Supabase/Prisma
@@ -27,7 +36,7 @@ export default async function handler(req, res) {
         }
       ];
 
-      res.status(200).json(clientes);
+      res.status(200).json(clientes.map(withLowercaseKeys));
     } catch (error) {
       console.error('Erro ao buscar clientes:', error);
       res.status(500).json({ message: 'Erro ao buscar clientes' });

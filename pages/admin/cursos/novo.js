@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import DashboardLayout from '../../../components/DashboardLayout';
@@ -9,6 +9,7 @@ export default function CadastroCurso() {
   const isEditando = id && id !== 'novo';
 
   const [formData, setFormData] = useState({
+    instituicaoId: '',
     nome: '',
     descricaoGeral: '',
     duracao: '',
@@ -31,41 +32,90 @@ export default function CadastroCurso() {
     unidades: [],
   });
 
+  const [instituicoes, setInstituicoes] = useState([]);
   const [unidadesDisponiveis, setUnidadesDisponiveis] = useState([]);
   const [unidadesSelecionadas, setUnidadesSelecionadas] = useState([]);
+  const [unidadeDisponivelId, setUnidadeDisponivelId] = useState('');
   const [situacao, setSituacao] = useState('ATIVO');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
   useEffect(() => {
-    carregarUnidades();
-    if (isEditando) {
-      carregarCurso();
+    const carregarDados = async () => {
+      await carregarInstituicoes();
+      const unidades = await carregarUnidades();
+      if (isEditando) {
+        await carregarCurso(unidades);
+      }
+    };
+
+    carregarDados();
+  }, [isEditando, id]);
+
+  const carregarInstituicoes = async () => {
+    try {
+      const res = await fetch('/api/instituicoes');
+      if (res.ok) {
+        const data = await res.json();
+        setInstituicoes(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar instituições:', error);
     }
-  }, [isEditando]);
+  };
 
   const carregarUnidades = async () => {
     try {
       const res = await fetch('/api/unidades');
       if (res.ok) {
         const data = await res.json();
-        const nomes = data.map(u => u.nome);
-        setUnidadesDisponiveis(nomes);
+        setUnidadesDisponiveis(data || []);
+        return data || [];
       }
     } catch (error) {
       console.error('Erro ao carregar unidades:', error);
     }
+
+    return [];
   };
 
-  const carregarCurso = async () => {
+  const carregarCurso = async (listaUnidades = []) => {
     try {
       setLoading(true);
       const res = await fetch(`/api/cursos/${id}`);
       if (res.ok) {
         const curso = await res.json();
-        setFormData(curso);
+        const idsDiretos = Array.isArray(curso.unidadeIds)
+          ? curso.unidadeIds.map((valor) => String(valor))
+          : [];
+
+        let instituicaoId = String(curso.instituicaoId || curso.instituicaoid || curso.instituicao_id || '');
+
+        if (!instituicaoId && idsDiretos.length > 0) {
+          const unidadeCurso = listaUnidades.find((unidade) => String(unidade.id) === String(idsDiretos[0]));
+          instituicaoId = String(unidadeCurso?.instituicaoId || unidadeCurso?.instituicao_id || '');
+        }
+
+        setFormData((prev) => ({
+          ...prev,
+          ...curso,
+          instituicaoId,
+        }));
         setSituacao(curso.situacao || 'ATIVO');
-        setUnidadesSelecionadas(curso.unidades || []);
+
+        if (idsDiretos.length > 0) {
+          setUnidadesSelecionadas(idsDiretos);
+        } else {
+          const nomes = Array.isArray(curso.unidades) ? curso.unidades : [];
+          const idsPorNome = nomes
+            .map((nome) => {
+              const encontrada = listaUnidades.find((unidade) => unidade.nome === nome);
+              return encontrada?.id ? String(encontrada.id) : null;
+            })
+            .filter(Boolean);
+
+          setUnidadesSelecionadas(idsPorNome);
+        }
       } else {
         setMessage({ type: 'error', text: 'Erro ao carregar curso' });
       }
@@ -78,23 +128,47 @@ export default function CadastroCurso() {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
+
+    if (name === 'instituicaoId') {
+      setFormData(prev => ({
+        ...prev,
+        instituicaoId: value
+      }));
+
+      setUnidadeDisponivelId('');
+      setUnidadesSelecionadas((prev) => prev.filter((unidadeId) => {
+        const unidade = unidadesDisponiveis.find((item) => String(item.id) === String(unidadeId));
+        const unidadeInstituicaoId = String(unidade?.instituicaoId || unidade?.instituicao_id || '');
+        return unidadeInstituicaoId === String(value);
+      }));
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
   };
 
+  const unidadesDisponiveisFiltradas = useMemo(() => {
+    if (!formData.instituicaoId) return [];
+
+    return unidadesDisponiveis.filter((u) => {
+      const instituicaoId = String(u.instituicaoId || u.instituicao_id || '');
+      return instituicaoId === String(formData.instituicaoId);
+    });
+  }, [formData.instituicaoId, unidadesDisponiveis]);
+
   const adicionarUnidade = () => {
-    const select = document.getElementById('unidadeDisponivel');
-    if (select.value && !unidadesSelecionadas.includes(select.value)) {
-      const novas = [...unidadesSelecionadas, select.value];
+    if (unidadeDisponivelId && !unidadesSelecionadas.includes(unidadeDisponivelId)) {
+      const novas = [...unidadesSelecionadas, unidadeDisponivelId];
       setUnidadesSelecionadas(novas);
-      select.value = '';
+      setUnidadeDisponivelId('');
     }
   };
 
-  const removerUnidade = (unidade) => {
-    const novas = unidadesSelecionadas.filter(u => u !== unidade);
+  const removerUnidade = (unidadeId) => {
+    const novas = unidadesSelecionadas.filter((u) => u !== unidadeId);
     setUnidadesSelecionadas(novas);
   };
 
@@ -109,6 +183,12 @@ export default function CadastroCurso() {
       return;
     }
 
+    if (!formData.instituicaoId) {
+      setMessage({ type: 'error', text: 'A instituição do curso é obrigatória' });
+      setLoading(false);
+      return;
+    }
+
     try {
       const method = isEditando ? 'PUT' : 'POST';
       const url = isEditando ? `/api/cursos/${id}` : '/api/cursos';
@@ -116,7 +196,13 @@ export default function CadastroCurso() {
       const payload = {
         ...formData,
         situacao,
+        unidadeIds: unidadesSelecionadas,
         unidades: unidadesSelecionadas
+          .map((unidadeId) => {
+            const encontrada = unidadesDisponiveis.find((unidade) => String(unidade.id) === String(unidadeId));
+            return encontrada?.nome || null;
+          })
+          .filter(Boolean),
       };
 
       const res = await fetch(url, {
@@ -195,6 +281,22 @@ export default function CadastroCurso() {
             <h2 className="text-lg font-bold text-teal-600 mb-4">Dados do Curso</h2>
             
             <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">INSTITUIÇÃO *</label>
+                <select
+                  name="instituicaoId"
+                  value={formData.instituicaoId}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                >
+                  <option value="">Selecione a instituição</option>
+                  {instituicoes.map((instituicao) => (
+                    <option key={instituicao.id} value={instituicao.id}>{instituicao.nome}</option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="text-xs font-medium text-teal-600 mb-1 block">NOME *</label>
                 <input
@@ -490,11 +592,14 @@ export default function CadastroCurso() {
                 <label className="text-xs font-medium text-teal-600 mb-1 block">UNIDADES DISPONÍVEIS</label>
                 <select
                   id="unidadeDisponivel"
+                  value={unidadeDisponivelId}
+                  onChange={(e) => setUnidadeDisponivelId(e.target.value)}
+                  disabled={!formData.instituicaoId}
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 >
-                  <option value="">Selecione</option>
-                  {unidadesDisponiveis.map(u => (
-                    <option key={u} value={u}>{u}</option>
+                  <option value="">{formData.instituicaoId ? 'Selecione' : 'Selecione a instituição primeiro'}</option>
+                  {unidadesDisponiveisFiltradas.map((u) => (
+                    <option key={u.id} value={String(u.id)}>{u.nome}</option>
                   ))}
                 </select>
               </div>
@@ -503,6 +608,7 @@ export default function CadastroCurso() {
                 <button
                   type="button"
                   onClick={adicionarUnidade}
+                  disabled={!formData.instituicaoId}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition text-sm"
                 >
                   ➕ Adicionar
@@ -513,18 +619,23 @@ export default function CadastroCurso() {
                 <label className="text-xs font-medium text-teal-600 mb-1 block">UNIDADES DO CURSO</label>
                 <div className="w-full px-3 py-2 border border-teal-300 rounded-lg bg-white h-24 overflow-y-auto">
                   {unidadesSelecionadas.length > 0 ? (
-                    unidadesSelecionadas.map(u => (
-                      <div key={u} className="px-2 py-1 bg-teal-100 text-teal-600 rounded mb-1 flex justify-between items-center text-sm">
-                        <span>{u}</span>
+                    unidadesSelecionadas.map((unidadeId) => {
+                      const unidade = unidadesDisponiveis.find((item) => String(item.id) === String(unidadeId));
+                      const nome = unidade?.nome || `Unidade #${unidadeId}`;
+
+                      return (
+                        <div key={unidadeId} className="px-2 py-1 bg-teal-100 text-teal-600 rounded mb-1 flex justify-between items-center text-sm">
+                          <span>{nome}</span>
                         <button
                           type="button"
-                          onClick={() => removerUnidade(u)}
+                          onClick={() => removerUnidade(unidadeId)}
                           className="text-red-600 hover:text-red-800 text-xs"
                         >
                           ✕
                         </button>
-                      </div>
-                    ))
+                        </div>
+                      );
+                    })
                   ) : (
                     <div className="text-gray-400 text-sm">Nenhuma unidade</div>
                   )}

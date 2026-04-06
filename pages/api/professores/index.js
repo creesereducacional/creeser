@@ -4,6 +4,15 @@ import { v4 as uuidv4 } from 'uuid';
 
 const dataPath = path.join(process.cwd(), 'data', 'professores.json');
 
+const withLowercaseKeys = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const lowered = {};
+  Object.entries(obj).forEach(([key, value]) => {
+    lowered[key.toLowerCase()] = value;
+  });
+  return { ...obj, ...lowered };
+};
+
 function lerProfessores() {
   try {
     const data = fs.readFileSync(dataPath, 'utf-8');
@@ -21,7 +30,7 @@ export default function handler(req, res) {
   try {
     if (req.method === 'GET') {
       const professores = lerProfessores();
-      res.status(200).json(professores);
+      res.status(200).json(professores.map(withLowercaseKeys));
     } else if (req.method === 'POST') {
       const professores = lerProfessores();
       const novoProfessor = {
@@ -31,7 +40,7 @@ export default function handler(req, res) {
       };
       professores.push(novoProfessor);
       salvarProfessores(professores);
-      res.status(201).json(novoProfessor);
+      res.status(201).json(withLowercaseKeys(novoProfessor));
     } else {
       res.status(405).json({ message: 'Método não permitido' });
     }

@@ -152,7 +152,7 @@ export default function AdminEmails() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               ...formData,
-              remetente: JSON.parse(localStorage.getItem('usuario'))?.nomeCompleto || 'Admin'
+              remetente: JSON.parse(localStorage.getItem('usuario'))?.nomecompleto || JSON.parse(localStorage.getItem('usuario'))?.nomeCompleto || 'Admin'
             })
           });
 
@@ -303,7 +303,7 @@ export default function AdminEmails() {
                         className="mr-3"
                       />
                       <div className="flex-1">
-                        <span className="font-medium">{aluno.nomeCompleto}</span>
+                        <span className="font-medium">{aluno.nomecompleto || aluno.nomeCompleto || aluno.nome}</span>
                         <span className="text-sm text-gray-500 ml-2">({aluno.email})</span>
                       </div>
                     </label>

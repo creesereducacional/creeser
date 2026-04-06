@@ -1,51 +1,255 @@
-import fs from 'fs';
-import path from 'path';
+import { createClient } from '@supabase/supabase-js';
 
-const dataPath = path.join(process.cwd(), 'data', 'turmas.json');
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const lerTurmas = () => {
+if (!supabaseUrl || !supabaseKey) {
+  console.error('Supabase credentials not configured');
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+const isMissingColumnError = (error) => {
+  const message = String(error?.message || '').toLowerCase();
+  return error?.code === '42703' || message.includes('does not exist') || message.includes('could not find');
+};
+
+const parseInteger = (value) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+const normalizeText = (value) => {
+  if (value === undefined || value === null) return null;
+  const normalized = String(value).trim();
+  return normalized || null;
+};
+
+const parseTurmaMeta = (descricao) => {
+  if (!descricao) return {};
+  if (typeof descricao !== 'string') return {};
+
   try {
-    const data = fs.readFileSync(dataPath, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('Erro ao ler turmas:', error);
-    return [];
+    const parsed = JSON.parse(descricao);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return { descricaoTexto: descricao };
   }
 };
 
-const salvarTurmas = (turmas) => {
-  try {
-    fs.writeFileSync(dataPath, JSON.stringify(turmas, null, 2), 'utf8');
-  } catch (error) {
-    console.error('Erro ao salvar turmas:', error);
-  }
+const mapRowToResponse = (row) => {
+  const meta = parseTurmaMeta(row.descricao);
+  const descricaoDireta = typeof row.descricao === 'string' && row.descricao.trim().startsWith('{')
+    ? meta.descricao || meta.descricaoTexto || ''
+    : row.descricao || meta.descricao || meta.descricaoTexto || '';
+
+  return {
+    id: row.id,
+    nome: row.nome || '',
+    instituicaoId: row.instituicao_id || row.instituicaoid || '',
+    instituicao: meta.instituicao || '',
+    unidadeId: row.unidadeid ? String(row.unidadeid) : '',
+    unidade: row.unidades?.nome || meta.unidade || '',
+    cursoId: row.cursoid ? String(row.cursoid) : '',
+    curso: row.cursos?.nome || meta.curso || '',
+    gradeId: row.gradeid ? String(row.gradeid) : '',
+    grade: row.grades?.nome || meta.grade || '',
+    cargaHoraria: row.cargahoraria || meta.cargaHoraria || '',
+    processoSeletivo: row.datainicio || meta.processoSeletivo || '',
+    edittalProcessoSeletivo: row.editalprocessoseletivo || meta.edittalProcessoSeletivo || '',
+    turno: row.turno || meta.turno || '',
+    tipo: row.tipocobranca || meta.tipo || 'Boleto',
+    mensalidade: row.mensalidade || meta.mensalidade || '',
+    desconto: row.desconto || meta.desconto || '',
+    inscricao: row.inscricao || meta.inscricao || '',
+    matricula: row.matricula || meta.matricula || '',
+    contaRecebimento: row.contarecebimento || meta.contaRecebimento || '',
+    mesesContrato:
+      row.mesescontrato !== null && row.mesescontrato !== undefined
+        ? String(row.mesescontrato)
+        : meta.mesesContrato || '',
+    limiteCadastroAlunos:
+      row.capacidademaxima !== null && row.capacidademaxima !== undefined
+        ? String(row.capacidademaxima)
+        : meta.limiteCadastroAlunos || '',
+    iesRegistradoraDiploma: row.iesregistradoradiploma || meta.iesRegistradoraDiploma || '',
+    situacao: row.situacao || 'ATIVO',
+    descricao: descricaoDireta,
+    dataInicio: row.datainicio || '',
+    dataFim: row.datafim || '',
+    dataCriacao: row.datacriacao || null,
+    dataAtualizacao: row.dataatualizacao || null,
+  };
 };
 
-export default function handler(req, res) {
+const mapBodyToPayload = (body) => {
+  const instituicaoId = normalizeText(body.instituicaoId || body.instituicao_id || body.instituicaoid);
+  const unidadeId = parseInteger(body.unidadeId || body.unidadeid || body.unidade);
+  const cursoId = parseInteger(body.cursoId || body.cursoid || body.curso);
+  const gradeId = parseInteger(body.gradeId || body.gradeid || body.grade);
+  const capacidadeMaxima = parseInteger(body.limiteCadastroAlunos || body.capacidadeMaxima || body.capacidademaxima);
+  const mesesContrato = parseInteger(body.mesesContrato || body.mesescontrato);
+
+  const descricaoMeta = {
+    instituicao: body.instituicao || '',
+    unidade: body.unidade || '',
+    curso: body.curso || '',
+    grade: body.grade || '',
+    cargaHoraria: body.cargaHoraria || '',
+    processoSeletivo: body.processoSeletivo || '',
+    edittalProcessoSeletivo: body.edittalProcessoSeletivo || '',
+    turno: body.turno || '',
+    tipo: body.tipo || 'Boleto',
+    mensalidade: body.mensalidade || '',
+    desconto: body.desconto || '',
+    inscricao: body.inscricao || '',
+    matricula: body.matricula || '',
+    contaRecebimento: body.contaRecebimento || '',
+    mesesContrato: body.mesesContrato || '',
+    limiteCadastroAlunos: body.limiteCadastroAlunos || '',
+    iesRegistradoraDiploma: body.iesRegistradoraDiploma || '',
+    descricao: body.descricao || '',
+  };
+
+  const payloadBase = {
+    nome: (body.nome || '').trim(),
+    instituicao_id: instituicaoId,
+    unidadeid: unidadeId,
+    cursoid: cursoId,
+    gradeid: gradeId,
+    situacao: body.situacao || 'ATIVO',
+    datainicio: body.processoSeletivo || body.dataInicio || null,
+    datafim: body.dataFim || null,
+    capacidademaxima: capacidadeMaxima,
+  };
+
+  const payloadNormalizado = {
+    ...payloadBase,
+    cargahoraria: body.cargaHoraria || null,
+    editalprocessoseletivo: body.edittalProcessoSeletivo || null,
+    turno: body.turno || null,
+    tipocobranca: body.tipo || null,
+    mensalidade: body.mensalidade || null,
+    desconto: body.desconto || null,
+    inscricao: body.inscricao || null,
+    matricula: body.matricula || null,
+    contarecebimento: body.contaRecebimento || null,
+    mesescontrato: mesesContrato,
+    iesregistradoradiploma: body.iesRegistradoraDiploma || null,
+    descricao: body.descricao || null,
+  };
+
+  const payloadLegado = {
+    ...payloadBase,
+    descricao: JSON.stringify(descricaoMeta),
+  };
+
+  return {
+    payloadNormalizado,
+    payloadLegado,
+  };
+};
+
+const selectTurma = `
+  *,
+  unidades(id,nome),
+  cursos(id,nome),
+  grades(id,nome)
+`;
+
+export default async function handler(req, res) {
   const { id } = req.query;
-  const turmas = lerTurmas();
-  const turmaIndex = turmas.findIndex(t => t.id === id);
+  const turmaId = parseInteger(id);
 
-  if (req.method === 'GET') {
-    if (turmaIndex === -1) {
-      return res.status(404).json({ erro: 'Turma não encontrada' });
+  if (!turmaId) {
+    return res.status(400).json({ error: 'ID inválido' });
+  }
+
+  try {
+    if (req.method === 'GET') {
+      const { data, error } = await supabase
+        .from('turmas')
+        .select(selectTurma)
+        .eq('id', turmaId)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return res.status(404).json({ error: 'Turma não encontrada' });
+        }
+        console.error('Supabase GET turma error:', error);
+        return res.status(500).json({ error: 'Erro ao recuperar turma', detail: error.message });
+      }
+
+      return res.status(200).json(mapRowToResponse(data));
     }
-    res.status(200).json(turmas[turmaIndex]);
-  } else if (req.method === 'PUT') {
-    if (turmaIndex === -1) {
-      return res.status(404).json({ erro: 'Turma não encontrada' });
+
+    if (req.method === 'PUT') {
+      const body = req.body || {};
+      const { payloadNormalizado, payloadLegado } = mapBodyToPayload(body);
+
+      if (!payloadNormalizado.nome) {
+        return res.status(400).json({ error: 'Nome é obrigatório' });
+      }
+
+      if (!payloadNormalizado.instituicao_id || !payloadNormalizado.unidadeid || !payloadNormalizado.cursoid || !payloadNormalizado.gradeid) {
+        return res.status(400).json({ error: 'Instituição, unidade, curso e grade são obrigatórios' });
+      }
+
+      let data = null;
+      let error = null;
+
+      ({ data, error } = await supabase
+        .from('turmas')
+        .update({
+          ...payloadNormalizado,
+          dataatualizacao: new Date().toISOString(),
+        })
+        .eq('id', turmaId)
+        .select(selectTurma)
+        .single());
+
+      if (error && isMissingColumnError(error)) {
+        ({ data, error } = await supabase
+          .from('turmas')
+          .update({
+            ...payloadLegado,
+            dataatualizacao: new Date().toISOString(),
+          })
+          .eq('id', turmaId)
+          .select(selectTurma)
+          .single());
+      }
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return res.status(404).json({ error: 'Turma não encontrada' });
+        }
+        console.error('Supabase PUT turma error:', error);
+        return res.status(500).json({ error: 'Erro ao atualizar turma', detail: error.message });
+      }
+
+      return res.status(200).json(mapRowToResponse(data));
     }
-    turmas[turmaIndex] = { ...turmas[turmaIndex], ...req.body };
-    salvarTurmas(turmas);
-    res.status(200).json(turmas[turmaIndex]);
-  } else if (req.method === 'DELETE') {
-    if (turmaIndex === -1) {
-      return res.status(404).json({ erro: 'Turma não encontrada' });
+
+    if (req.method === 'DELETE') {
+      const { error } = await supabase
+        .from('turmas')
+        .delete()
+        .eq('id', turmaId);
+
+      if (error) {
+        console.error('Supabase DELETE turma error:', error);
+        return res.status(500).json({ error: 'Erro ao deletar turma', detail: error.message });
+      }
+
+      return res.status(200).json({ mensagem: 'Turma deletada com sucesso' });
     }
-    turmas.splice(turmaIndex, 1);
-    salvarTurmas(turmas);
-    res.status(200).json({ mensagem: 'Turma deletada com sucesso' });
-  } else {
-    res.status(405).json({ erro: 'Método não permitido' });
+
+    res.setHeader('Allow', ['GET', 'PUT', 'DELETE']);
+    return res.status(405).json({ error: 'Método não permitido' });
+  } catch (error) {
+    console.error('Erro na API de turma:', error);
+    return res.status(500).json({ error: 'Erro ao processar requisição', detail: error.message });
   }
 }

@@ -105,6 +105,8 @@ export default function AdminAlunos() {
         whatsapp: '',
         dataNascimento: '',
         genero: '',
+        nacionalidade: '',
+        naturalidade: '',
         rua: '',
         numero: '',
         complemento: '',
@@ -238,9 +240,10 @@ export default function AdminAlunos() {
    */
   const deletarAluno = useCallback(
     (aluno) => {
+      const nomeAluno = aluno.nomecompleto || aluno.nomeCompleto || aluno.nome || 'este aluno';
       pedirConfirmacao(
         'Deletar Aluno',
-        `Deseja deletar ${aluno.nomeCompleto}? Esta ação não pode ser desfeita.`,
+        `Deseja deletar ${nomeAluno}? Esta ação não pode ser desfeita.`,
         async () => {
           try {
             await ClienteAPI.delete(`/api/alunos/${aluno.id}`);
@@ -323,7 +326,8 @@ export default function AdminAlunos() {
       chave: 'nomeCompleto',
       titulo: 'Nome',
       largura: '25%',
-      renderizador: (valor) => formatarNome(valor),
+      renderizador: (_, aluno) =>
+        formatarNome(aluno.nomecompleto || aluno.nomeCompleto || aluno.nome || ''),
     },
     {
       chave: 'email',
@@ -341,23 +345,28 @@ export default function AdminAlunos() {
       chave: 'whatsapp',
       titulo: 'Telefone',
       largura: '15%',
-      renderizador: (valor) => formatarTelefone(valor),
+      renderizador: (valor, aluno) =>
+        formatarTelefone(aluno.telefone_celular || aluno.telefonecelular || valor),
     },
     {
       chave: 'status',
       titulo: 'Status',
       largura: '10%',
-      renderizador: (valor) => (
-        <span
-          className={`px-3 py-1 rounded-full text-sm font-medium ${
-            valor === STATUS_USUARIO.ATIVO
-              ? 'bg-green-100 text-green-800'
-              : 'bg-gray-100 text-gray-800'
-          }`}
-        >
-          {valor === STATUS_USUARIO.ATIVO ? 'Ativo' : 'Inativo'}
-        </span>
-      ),
+      renderizador: (valor, aluno) => {
+        const statusAtual = valor || aluno.statusmatricula || aluno.statusMatricula || aluno.status;
+        const statusNormalizado = (statusAtual || '').toString().toLowerCase();
+        const statusAtivo = statusNormalizado === STATUS_USUARIO.ATIVO.toLowerCase();
+
+        return (
+          <span
+            className={`px-3 py-1 rounded-full text-sm font-medium ${
+              statusAtivo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+            }`}
+          >
+            {statusAtivo ? 'Ativo' : 'Inativo'}
+          </span>
+        );
+      },
     },
     {
       chave: 'acoes',
@@ -385,11 +394,10 @@ export default function AdminAlunos() {
   ];
 
   // Filtrar alunos pelo nome
-  const alunosFiltrados = alunos?.filter((aluno) =>
-    aluno.nomeCompleto
-      ?.toLowerCase()
-      .includes(filtroNome.toLowerCase())
-  ) || [];
+  const alunosFiltrados = alunos?.filter((aluno) => {
+    const nomeAluno = (aluno.nomecompleto || aluno.nomeCompleto || aluno.nome || '').toLowerCase();
+    return nomeAluno.includes(filtroNome.toLowerCase());
+  }) || [];
 
   // ========================================
   // RENDER
@@ -546,6 +554,22 @@ export default function AdminAlunos() {
                       valor,
                       label: valor.charAt(0).toUpperCase() + valor.slice(1),
                     }))}
+                  />
+                  <CampoFormulario
+                    nome="nacionalidade"
+                    label="Nacionalidade"
+                    tipo="text"
+                    valor={valores.nacionalidade}
+                    onChange={handleChange}
+                    placeholder="Ex: Brasileiro"
+                  />
+                  <CampoFormulario
+                    nome="naturalidade"
+                    label="Naturalidade"
+                    tipo="text"
+                    valor={valores.naturalidade}
+                    onChange={handleChange}
+                    placeholder="Ex: São Paulo-SP"
                   />
                 </div>
               </fieldset>

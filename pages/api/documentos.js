@@ -10,6 +10,15 @@ export const config = {
 
 const documentosPath = path.join(process.cwd(), 'data', 'documentos.json');
 
+const withLowercaseKeys = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const lowered = {};
+  Object.entries(obj).forEach(([key, value]) => {
+    lowered[key.toLowerCase()] = value;
+  });
+  return { ...obj, ...lowered };
+};
+
 // Garantir que o arquivo existe
 if (!fs.existsSync(documentosPath)) {
   fs.writeFileSync(documentosPath, JSON.stringify([], null, 2));
@@ -20,7 +29,7 @@ export default async function handler(req, res) {
     try {
       const data = fs.readFileSync(documentosPath, 'utf8');
       const documentos = JSON.parse(data);
-      res.status(200).json(documentos);
+      res.status(200).json(documentos.map(withLowercaseKeys));
     } catch (error) {
       console.error('Erro ao ler documentos:', error);
       res.status(500).json({ error: 'Erro ao carregar documentos' });
@@ -79,7 +88,7 @@ export default async function handler(req, res) {
 
         res.status(201).json({ 
           message: 'Documento enviado com sucesso', 
-          documento: novoDocumento 
+          documento: withLowercaseKeys(novoDocumento) 
         });
       } catch (error) {
         console.error('Erro ao salvar documento:', error);
@@ -107,7 +116,7 @@ export default async function handler(req, res) {
 
       res.status(200).json({ 
         message: 'Documento atualizado com sucesso', 
-        documento: documentos[index] 
+        documento: withLowercaseKeys(documentos[index]) 
       });
     } catch (error) {
       console.error('Erro ao atualizar documento:', error);

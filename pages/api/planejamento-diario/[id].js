@@ -3,6 +3,15 @@ import path from 'path';
 
 const filePath = path.join(process.cwd(), 'data', 'planejamento-diario.json');
 
+const withLowercaseKeys = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const lowered = {};
+  Object.entries(obj).forEach(([key, value]) => {
+    lowered[key.toLowerCase()] = value;
+  });
+  return { ...obj, ...lowered };
+};
+
 export default function handler(req, res) {
   try {
     const { id } = req.query;
@@ -14,7 +23,7 @@ export default function handler(req, res) {
       if (!registro) {
         return res.status(404).json({ error: 'Registro não encontrado' });
       }
-      res.status(200).json(registro);
+      res.status(200).json(withLowercaseKeys(registro));
     } else if (req.method === 'PUT') {
       const index = registros.findIndex(r => r.id === id);
       if (index === -1) {
@@ -28,7 +37,7 @@ export default function handler(req, res) {
       };
       
       fs.writeFileSync(filePath, JSON.stringify(registros, null, 2));
-      res.status(200).json(registros[index]);
+      res.status(200).json(withLowercaseKeys(registros[index]));
     } else if (req.method === 'DELETE') {
       const index = registros.findIndex(r => r.id === id);
       if (index === -1) {

@@ -3,6 +3,15 @@ import path from 'path';
 
 const dataPath = path.join(process.cwd(), 'data', 'funcionarios.json');
 
+const withLowercaseKeys = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const lowered = {};
+  Object.entries(obj).forEach(([key, value]) => {
+    lowered[key.toLowerCase()] = value;
+  });
+  return { ...obj, ...lowered };
+};
+
 // Função para ler dados
 function lerFuncionarios() {
   try {
@@ -31,13 +40,14 @@ export default function handler(req, res) {
   if (req.method === 'GET') {
     try {
       const funcionarios = lerFuncionarios();
-      res.status(200).json(funcionarios);
+      res.status(200).json(funcionarios.map(withLowercaseKeys));
     } catch (error) {
       res.status(500).json({ message: 'Erro ao carregar funcionários', error: error.message });
     }
   } else if (req.method === 'POST') {
     try {
       const funcionarios = lerFuncionarios();
+      const body = req.body || {};
       
       // Gerar novo ID como número
       const novoId = funcionarios.length > 0 
@@ -46,14 +56,14 @@ export default function handler(req, res) {
 
       const novoFuncionario = {
         id: novoId,
-        ...req.body,
+        ...body,
         dataCriacao: new Date().toISOString()
       };
 
       funcionarios.push(novoFuncionario);
       
       if (salvarFuncionarios(funcionarios)) {
-        res.status(201).json(novoFuncionario);
+        res.status(201).json(withLowercaseKeys(novoFuncionario));
       } else {
         res.status(500).json({ message: 'Erro ao salvar funcionário' });
       }

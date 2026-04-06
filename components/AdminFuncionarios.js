@@ -265,13 +265,13 @@ export default function AdminFuncionarios() {
                       {func.id}
                     </td>
                     <td className="px-4 py-3 text-xs md:text-sm font-semibold text-gray-800">
-                      {func.nome}
+                      {func.nome || func.usuarios?.nomecompleto || func.usuarios?.nomeCompleto || func.usuarios?.nome || '-'}
                     </td>
                     <td className="px-4 py-3 text-xs md:text-sm text-gray-600">
                       {func.email || '-'}
                     </td>
                     <td className="px-4 py-3 text-xs md:text-sm text-gray-600">
-                      {func.telefoneCelular || '-'}
+                      {func.telefonecelular || func.telefoneCelular || '-'}
                     </td>
                     <td className="px-4 py-3 text-xs md:text-sm text-gray-600">
                       {func.funcao}

@@ -32,6 +32,8 @@ export default function DashboardTest() {
     return <div className="p-8 text-center">Carregando...</div>;
   }
 
+  const nomeExibicao = usuario?.nomecompleto || usuario?.nomeCompleto || usuario?.nome || '';
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 to-teal-100 p-8">
       <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-8">
@@ -39,7 +41,7 @@ export default function DashboardTest() {
         
         <div className="bg-blue-50 border-l-4 border-blue-600 p-6 mb-8">
           <p className="text-lg font-bold text-blue-900">Você está na página CORRETA!</p>
-          <p className="text-blue-800 mt-2">Usuário: {usuario.nomeCompleto}</p>
+          <p className="text-blue-800 mt-2">Usuário: {nomeExibicao}</p>
           <p className="text-blue-800">Email: {usuario.email}</p>
           <p className="text-blue-800">Tipo: {usuario.tipo}</p>
         </div>

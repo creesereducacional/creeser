@@ -49,6 +49,8 @@ export default function AlunoForumPage() {
     router.push("/login");
   };
 
+  const nomeExibicao = usuario?.nomecompleto || usuario?.nomeCompleto || usuario?.nome || '';
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
@@ -102,11 +104,11 @@ export default function AlunoForumPage() {
             <div className="flex items-center gap-6">
               <div className="text-right">
                 <p className="text-sm text-gray-600">Conectado como</p>
-                <p className="font-semibold text-gray-800">{usuario?.nomeCompleto || usuario?.nome}</p>
+                <p className="font-semibold text-gray-800">{nomeExibicao}</p>
                 <p className="text-xs text-gray-500 uppercase tracking-wide">ALUNO</p>
               </div>
               <div className="w-10 h-10 bg-gradient-to-br from-teal-400 to-teal-600 rounded-full flex items-center justify-center text-white font-bold">
-                {usuario?.nomeCompleto?.charAt(0).toUpperCase() || usuario?.nome?.charAt(0).toUpperCase()}
+                {nomeExibicao.charAt(0).toUpperCase()}
               </div>
               <button
                 onClick={handleLogout}

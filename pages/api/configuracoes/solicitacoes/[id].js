@@ -3,6 +3,15 @@ import path from 'path';
 
 const dataPath = path.join(process.cwd(), 'data', 'solicitacoes.json');
 
+const withLowercaseKeys = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const lowered = {};
+  Object.entries(obj).forEach(([key, value]) => {
+    lowered[key.toLowerCase()] = value;
+  });
+  return { ...obj, ...lowered };
+};
+
 export default function handler(req, res) {
   try {
     const { id } = req.query;
@@ -28,7 +37,7 @@ export default function handler(req, res) {
       };
 
       fs.writeFileSync(dataPath, JSON.stringify(solicitacoes, null, 2));
-      return res.status(200).json(solicitacoes[index]);
+      return res.status(200).json(withLowercaseKeys(solicitacoes[index]));
     }
 
     // DELETE - Deletar solicitação

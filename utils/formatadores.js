@@ -91,6 +91,47 @@ export function formatarCPF(cpf) {
 }
 
 /**
+ * Formata CNPJ com máscara
+ * 
+ * @param {string} cnpj - CNPJ sem formatação
+ * @returns {string} CNPJ formatado como XX.XXX.XXX/XXXX-XX
+ * 
+ * @example
+ * formatarCNPJ('12345678000199') // '12.345.678/0001-99'
+ */
+export function formatarCNPJ(cnpj) {
+  if (!cnpj) return '';
+
+  const cnpjLimpo = cnpj.replace(/\D/g, '');
+
+  if (cnpjLimpo.length !== 14) return cnpj;
+
+  return `${cnpjLimpo.substring(0, 2)}.${cnpjLimpo.substring(2, 5)}.${cnpjLimpo.substring(
+    5,
+    8
+  )}/${cnpjLimpo.substring(8, 12)}-${cnpjLimpo.substring(12)}`;
+}
+
+/**
+ * Formata CEP com máscara
+ * 
+ * @param {string} cep - CEP sem formatação
+ * @returns {string} CEP formatado como 00000-000
+ * 
+ * @example
+ * formatarCEP('58000000') // '58000-000'
+ */
+export function formatarCEP(cep) {
+  if (!cep) return '';
+
+  const cepLimpo = cep.replace(/\D/g, '');
+
+  if (cepLimpo.length !== 8) return cep;
+
+  return `${cepLimpo.substring(0, 5)}-${cepLimpo.substring(5)}`;
+}
+
+/**
  * Formata telefone com máscara
  * 
  * @param {string} telefone - Telefone sem formatação
@@ -286,6 +327,8 @@ export default {
   formatarData,
   formatarDataHora,
   formatarCPF,
+  formatarCNPJ,
+  formatarCEP,
   formatarTelefone,
   formatarMoeda,
   formatarNumero,

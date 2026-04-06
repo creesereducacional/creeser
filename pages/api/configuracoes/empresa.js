@@ -3,6 +3,15 @@ import path from 'path';
 
 const dataFile = path.join(process.cwd(), 'data', 'configuracoes-empresa.json');
 
+const withLowercaseKeys = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const lowered = {};
+  Object.entries(obj).forEach(([key, value]) => {
+    lowered[key.toLowerCase()] = value;
+  });
+  return { ...obj, ...lowered };
+};
+
 async function readData() {
   try {
     const data = await fs.readFile(dataFile, 'utf-8');
@@ -20,7 +29,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     try {
       const data = await readData();
-      res.status(200).json(data[0] || {});
+      res.status(200).json(withLowercaseKeys(data[0] || {}));
     } catch (error) {
       res.status(500).json({ erro: 'Erro ao ler dados' });
     }
@@ -28,7 +37,7 @@ export default async function handler(req, res) {
     try {
       const data = [req.body];
       await writeData(data);
-      res.status(200).json(req.body);
+      res.status(200).json(withLowercaseKeys(req.body));
     } catch (error) {
       res.status(500).json({ erro: 'Erro ao salvar dados' });
     }

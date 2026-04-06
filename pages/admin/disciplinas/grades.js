@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import DashboardLayout from '../../../components/DashboardLayout';
 import CustomModal from '../../../components/CustomModal';
@@ -15,15 +15,97 @@ export default function GerenciarGrades() {
   const [recordsPerPage, setRecordsPerPage] = useState(10);
   const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'success' });
   const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, id: null });
+  const [instituicoes, setInstituicoes] = useState([]);
+  const [cursos, setCursos] = useState([]);
+  const [unidades, setUnidades] = useState([]);
+  const [loadingOpcoes, setLoadingOpcoes] = useState(false);
 
   const [formData, setFormData] = useState({
+    instituicaoId: '',
+    cursoId: '',
+    ano: '',
     nome: '',
     situacao: 'ATIVO'
   });
 
   useEffect(() => {
     carregarGrades();
+    carregarOpcoesFormulario();
   }, []);
+
+  const getValue = (obj, key) => obj?.[key] ?? obj?.[key.toLowerCase()];
+
+  const carregarOpcoesFormulario = async () => {
+    try {
+      setLoadingOpcoes(true);
+
+      const [instituicoesRes, cursosRes, unidadesRes] = await Promise.all([
+        fetch('/api/instituicoes'),
+        fetch('/api/cursos'),
+        fetch('/api/unidades')
+      ]);
+
+      if (instituicoesRes.ok) {
+        const data = await instituicoesRes.json();
+        setInstituicoes(Array.isArray(data) ? data : []);
+      }
+
+      if (cursosRes.ok) {
+        const data = await cursosRes.json();
+        setCursos(Array.isArray(data) ? data : []);
+      }
+
+      if (unidadesRes.ok) {
+        const data = await unidadesRes.json();
+        setUnidades(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar opções do formulário de grades:', error);
+    } finally {
+      setLoadingOpcoes(false);
+    }
+  };
+
+  const unidadesById = useMemo(() => {
+    const map = new Map();
+    unidades.forEach((unidade) => {
+      const unidadeId = String(getValue(unidade, 'id') || '');
+      if (!unidadeId) return;
+
+      const instituicaoId = String(
+        getValue(unidade, 'instituicaoId') || getValue(unidade, 'instituicao_id') || ''
+      );
+
+      map.set(unidadeId, instituicaoId);
+    });
+    return map;
+  }, [unidades]);
+
+  const cursosFiltradosPorInstituicao = useMemo(() => {
+    const instituicaoSelecionada = String(formData.instituicaoId || '');
+    if (!instituicaoSelecionada) return [];
+
+    return cursos.filter((curso) => {
+      const cursoInstituicaoId = String(
+        getValue(curso, 'instituicaoId') || getValue(curso, 'instituicao_id') || ''
+      );
+
+      if (cursoInstituicaoId) {
+        return cursoInstituicaoId === instituicaoSelecionada;
+      }
+
+      const unidadeIdsRaw = getValue(curso, 'unidadeIds') || getValue(curso, 'unidadeids') || [];
+      const unidadeIds = Array.isArray(unidadeIdsRaw)
+        ? unidadeIdsRaw.map((id) => String(id))
+        : [];
+
+      if (unidadeIds.length === 0) {
+        return false;
+      }
+
+      return unidadeIds.some((unidadeId) => unidadesById.get(unidadeId) === instituicaoSelecionada);
+    });
+  }, [cursos, formData.instituicaoId, unidadesById]);
 
   const carregarGrades = async () => {
     try {
@@ -58,6 +140,24 @@ export default function GerenciarGrades() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+
+    if (name === 'instituicaoId') {
+      setFormData(prev => ({
+        ...prev,
+        instituicaoId: value,
+        cursoId: ''
+      }));
+      return;
+    }
+
+    if (name === 'ano') {
+      setFormData(prev => ({
+        ...prev,
+        ano: value.replace(/\D/g, '').slice(0, 4)
+      }));
+      return;
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -78,6 +178,48 @@ export default function GerenciarGrades() {
       return;
     }
 
+    if (!formData.instituicaoId) {
+      setModal({
+        isOpen: true,
+        title: 'Aviso!',
+        message: 'Selecione a instituição.',
+        type: 'warning'
+      });
+      return;
+    }
+
+    if (!formData.cursoId) {
+      setModal({
+        isOpen: true,
+        title: 'Aviso!',
+        message: 'Selecione o curso.',
+        type: 'warning'
+      });
+      return;
+    }
+
+    if (!/^\d{4}$/.test(String(formData.ano || ''))) {
+      setModal({
+        isOpen: true,
+        title: 'Aviso!',
+        message: 'Informe um ano válido com 4 dígitos (ex.: 2026).',
+        type: 'warning'
+      });
+      return;
+    }
+
+    const instituicaoSelecionada = instituicoes.find((inst) => String(getValue(inst, 'id')) === String(formData.instituicaoId));
+    const cursoSelecionado = cursos.find((curso) => String(getValue(curso, 'id')) === String(formData.cursoId));
+
+    const payload = {
+      ...formData,
+      instituicaoId: String(formData.instituicaoId),
+      instituicaoNome: getValue(instituicaoSelecionada, 'nome') || '',
+      cursoId: String(formData.cursoId),
+      cursoNome: getValue(cursoSelecionado, 'nome') || '',
+      ano: Number.parseInt(formData.ano, 10)
+    };
+
     try {
       if (editingId) {
         console.log('Updating grade:', editingId);
@@ -85,7 +227,7 @@ export default function GerenciarGrades() {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            ...formData,
+            ...payload,
             id: editingId
           })
         });
@@ -117,7 +259,7 @@ export default function GerenciarGrades() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            ...formData,
+            ...payload,
             id: uuidv4()
           })
         });
@@ -156,13 +298,20 @@ export default function GerenciarGrades() {
   };
 
   const resetForm = () => {
-    setFormData({ nome: '', situacao: 'ATIVO' });
+    setFormData({ instituicaoId: '', cursoId: '', ano: '', nome: '', situacao: 'ATIVO' });
     setEditingId(null);
     setCurrentPage(1);
   };
 
   const handleEdit = (grade) => {
+    const instituicaoId = String(getValue(grade, 'instituicaoId') || getValue(grade, 'instituicaoid') || '');
+    const cursoId = String(getValue(grade, 'cursoId') || getValue(grade, 'cursoid') || '');
+    const ano = String(getValue(grade, 'ano') || '');
+
     setFormData({
+      instituicaoId,
+      cursoId,
+      ano,
       nome: grade.nome,
       situacao: grade.situacao
     });
@@ -315,6 +464,7 @@ export default function GerenciarGrades() {
                         <tr className="bg-teal-100 border-b border-teal-300">
                           <th className="text-left px-4 py-3 text-xs font-semibold text-teal-800">#</th>
                           <th className="text-left px-4 py-3 text-xs font-semibold text-teal-800">Nome</th>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-teal-800">Ano</th>
                           <th className="text-left px-4 py-3 text-xs font-semibold text-teal-800">Situação</th>
                           <th className="text-center px-4 py-3 text-xs font-semibold text-teal-800">Ações</th>
                         </tr>
@@ -324,6 +474,7 @@ export default function GerenciarGrades() {
                           <tr key={grade.id} className="border-b border-gray-200 hover:bg-teal-50 transition">
                             <td className="px-4 py-3 text-sm text-gray-700">{startIndex + index + 1}</td>
                             <td className="px-4 py-3 text-sm text-gray-700 font-semibold">{grade.nome}</td>
+                            <td className="px-4 py-3 text-sm text-gray-700">{getValue(grade, 'ano') || '-'}</td>
                             <td className="px-4 py-3 text-sm">
                               <span
                                 className={`px-2 py-1 rounded text-xs font-semibold ${
@@ -401,6 +552,42 @@ export default function GerenciarGrades() {
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
+                <label className="block text-xs font-semibold text-teal-600 mb-2">Instituição *</label>
+                <select
+                  name="instituicaoId"
+                  value={formData.instituicaoId}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm"
+                  disabled={loadingOpcoes}
+                >
+                  <option value="">Selecione a instituição</option>
+                  {instituicoes.map((instituicao) => (
+                    <option key={getValue(instituicao, 'id')} value={getValue(instituicao, 'id')}>
+                      {getValue(instituicao, 'nome')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-teal-600 mb-2">Curso *</label>
+                <select
+                  name="cursoId"
+                  value={formData.cursoId}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm"
+                  disabled={!formData.instituicaoId || loadingOpcoes}
+                >
+                  <option value="">{formData.instituicaoId ? 'Selecione o curso' : 'Selecione a instituição primeiro'}</option>
+                  {cursosFiltradosPorInstituicao.map((curso) => (
+                    <option key={getValue(curso, 'id')} value={getValue(curso, 'id')}>
+                      {getValue(curso, 'nome')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-xs font-semibold text-teal-600 mb-2">Nome *</label>
                 <input
                   type="text"
@@ -413,7 +600,20 @@ export default function GerenciarGrades() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-teal-600 mb-2">Situação</label>
+                <label className="block text-xs font-semibold text-teal-600 mb-2">Ano *</label>
+                <input
+                  type="text"
+                  name="ano"
+                  value={formData.ano}
+                  onChange={handleInputChange}
+                  placeholder="Ex.: 2026"
+                  maxLength={4}
+                  className="w-full px-4 py-3 border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-teal-600 mb-2">Status</label>
                 <select
                   name="situacao"
                   value={formData.situacao}

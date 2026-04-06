@@ -4,6 +4,20 @@ import path from 'path';
 const dataDir = path.join(process.cwd(), 'data');
 const usuariosFile = path.join(dataDir, 'usuarios.json');
 
+const withLowercaseKeys = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const lowered = {};
+  Object.entries(obj).forEach(([key, value]) => {
+    lowered[key.toLowerCase()] = value;
+  });
+  return { ...obj, ...lowered };
+};
+
+const getBodyValue = (body, key) => {
+  if (!body) return undefined;
+  return body[key] ?? body[key.toLowerCase()];
+};
+
 // Criar diretório se não existir
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
@@ -76,12 +90,18 @@ export default function handler(req, res) {
 
   if (method === 'GET') {
     const { tipo } = query;
-    if (tipo) return res.status(200).json(usuarios.filter(u => u.tipo === tipo));
-    return res.status(200).json(usuarios);
+    if (tipo) return res.status(200).json(usuarios.filter(u => u.tipo === tipo).map(withLowercaseKeys));
+    return res.status(200).json(usuarios.map(withLowercaseKeys));
   }
 
   if (method === 'POST') {
-    const { nomeCompleto, email, senha, cpf, dataNascimento, whatsapp, tipo } = body;
+    const nomeCompleto = getBodyValue(body, 'nomeCompleto');
+    const email = getBodyValue(body, 'email');
+    const senha = getBodyValue(body, 'senha');
+    const cpf = getBodyValue(body, 'cpf');
+    const dataNascimento = getBodyValue(body, 'dataNascimento');
+    const whatsapp = getBodyValue(body, 'whatsapp');
+    const tipo = getBodyValue(body, 'tipo');
     if (!nomeCompleto || !email || !senha || !cpf || !dataNascimento || !whatsapp || !tipo) {
       return res.status(400).json({ error: 'Todos os campos sÃ£o obrigatÃ³rios' });
     }
@@ -96,7 +116,7 @@ export default function handler(req, res) {
     };
     usuarios.push(novo);
     salvarUsuarios(usuarios);
-    return res.status(201).json({ message: 'Usuário criado com sucesso', usuario: novo });
+    return res.status(201).json({ message: 'Usuário criado com sucesso', usuario: withLowercaseKeys(novo) });
   }
 
   if (method === 'PUT') {
@@ -104,7 +124,13 @@ export default function handler(req, res) {
     const idx = usuarios.findIndex(u => u.id === parseInt(id));
     if (idx === -1) return res.status(404).json({ error: 'UsuÃ¡rio nÃ£o encontrado' });
 
-    const { nomeCompleto, email, cpf, dataNascimento, whatsapp, tipo, status } = body;
+    const nomeCompleto = getBodyValue(body, 'nomeCompleto');
+    const email = getBodyValue(body, 'email');
+    const cpf = getBodyValue(body, 'cpf');
+    const dataNascimento = getBodyValue(body, 'dataNascimento');
+    const whatsapp = getBodyValue(body, 'whatsapp');
+    const tipo = getBodyValue(body, 'tipo');
+    const status = getBodyValue(body, 'status');
 
     if (cpf && cpf !== usuarios[idx].cpf && usuarios.some(u => u.cpf === cpf)) return res.status(409).json({ error: 'CPF jÃ¡ cadastrado' });
     if (email && email !== usuarios[idx].email && usuarios.some(u => u.email === email)) return res.status(409).json({ error: 'Email jÃ¡ cadastrado' });
@@ -112,7 +138,7 @@ export default function handler(req, res) {
     usuarios[idx] = { ...usuarios[idx], nomeCompleto: nomeCompleto || usuarios[idx].nomeCompleto, email: email || usuarios[idx].email, cpf: cpf || usuarios[idx].cpf, dataNascimento: dataNascimento || usuarios[idx].dataNascimento, whatsapp: whatsapp || usuarios[idx].whatsapp, tipo: tipo || usuarios[idx].tipo, status: status || usuarios[idx].status };
 
     salvarUsuarios(usuarios);
-    return res.status(200).json({ message: 'Usuário atualizado com sucesso', usuario: usuarios[idx] });
+    return res.status(200).json({ message: 'Usuário atualizado com sucesso', usuario: withLowercaseKeys(usuarios[idx]) });
   }
 
   if (method === 'DELETE') {
@@ -121,7 +147,7 @@ export default function handler(req, res) {
     if (idx === -1) return res.status(404).json({ error: 'Usuário não encontrado' });
     const removed = usuarios.splice(idx, 1)[0];
     salvarUsuarios(usuarios);
-    return res.status(200).json({ message: 'Usuário deletado com sucesso', usuario: removed });
+    return res.status(200).json({ message: 'Usuário deletado com sucesso', usuario: withLowercaseKeys(removed) });
   }
 
   res.status(405).json({ error: 'Método não permitido' });

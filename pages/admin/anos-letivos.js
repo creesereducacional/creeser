@@ -1,26 +1,27 @@
 import { useState, useEffect } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 import DashboardLayout from '@/components/DashboardLayout';
 import CustomModal from '@/components/CustomModal';
 import ConfirmModal from '@/components/ConfirmModal';
 
 export default function AnosLetivos() {
+  const currentYear = new Date().getFullYear().toString();
   const [anosLetivos, setAnosLetivos] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [searchNome, setSearchNome] = useState('');
-  const [searchSituacao, setSearchSituacao] = useState('ATIVO');
+  const [searchSituacao, setSearchSituacao] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [recordsPerPage, setRecordsPerPage] = useState(10);
   const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'success' });
   const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, id: null });
 
   const [formData, setFormData] = useState({
-    nome: '',
+    nome: currentYear,
     dataInicio: '',
     dataFim: '',
-    anoVigente: false
+    anoVigente: true
   });
+  const isAnoAtual = formData.nome === currentYear;
 
   useEffect(() => {
     carregarAnosLetivos();
@@ -54,6 +55,20 @@ export default function AnosLetivos() {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
+    if (name === 'nome') {
+      const nomeAtualizado = value;
+      setFormData(prev => ({
+        ...prev,
+        nome: nomeAtualizado,
+        anoVigente: nomeAtualizado === currentYear
+      }));
+      return;
+    }
+
+    if (name === 'anoVigente') {
+      return;
+    }
+
     setFormData({
       ...formData,
       [name]: type === 'checkbox' ? checked : value
@@ -88,7 +103,7 @@ export default function AnosLetivos() {
       if (response.ok) {
         await carregarAnosLetivos();
         setShowForm(false);
-        setFormData({ nome: '', dataInicio: '', dataFim: '', anoVigente: false });
+        setFormData({ nome: currentYear, dataInicio: '', dataFim: '', anoVigente: true });
         setEditingId(null);
         setModal({
           isOpen: true,
@@ -117,11 +132,12 @@ export default function AnosLetivos() {
 
   const handleEdit = (ano) => {
     setEditingId(ano.id);
+    const nomeAno = ano.nome ? ano.nome.toString() : '';
     setFormData({
-      nome: ano.nome,
+      nome: nomeAno,
       dataInicio: ano.dataInicio,
       dataFim: ano.dataFim,
-      anoVigente: ano.anoVigente || false
+      anoVigente: nomeAno === currentYear
     });
     setShowForm(true);
   };
@@ -171,7 +187,7 @@ export default function AnosLetivos() {
   const handleCancelForm = () => {
     setShowForm(false);
     setEditingId(null);
-    setFormData({ nome: '', dataInicio: '', dataFim: '', anoVigente: false });
+    setFormData({ nome: currentYear, dataInicio: '', dataFim: '', anoVigente: true });
   };
 
   const handleChangeRecordsPerPage = (value) => {
@@ -207,7 +223,11 @@ export default function AnosLetivos() {
                 <span className="text-lg">📋</span> Listar
               </button>
               <button
-                onClick={() => setShowForm(true)}
+                onClick={() => {
+                  setEditingId(null);
+                  setFormData({ nome: currentYear, dataInicio: '', dataFim: '', anoVigente: true });
+                  setShowForm(true);
+                }}
                 className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold transition"
               >
                 <span className="text-lg">➕</span> Inserir
@@ -249,7 +269,7 @@ export default function AnosLetivos() {
                   <button
                     onClick={() => {
                       setSearchNome('');
-                      setSearchSituacao('ATIVO');
+                      setSearchSituacao('');
                     }}
                     className="w-full px-3 py-2 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold transition"
                   >
@@ -433,12 +453,13 @@ export default function AnosLetivos() {
                   type="checkbox"
                   id="anoVigente"
                   name="anoVigente"
-                  checked={formData.anoVigente}
+                  checked={isAnoAtual}
                   onChange={handleInputChange}
+                  disabled
                   className="w-5 h-5 border-gray-300 rounded focus:ring-2 focus:ring-teal-500 cursor-pointer accent-teal-600"
                 />
                 <label htmlFor="anoVigente" className="ml-3 text-sm font-medium text-gray-700 cursor-pointer">
-                  Ano Letivo Vigente?
+                  Ano Letivo Vigente (automatico)
                 </label>
               </div>
 

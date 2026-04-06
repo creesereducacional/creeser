@@ -1,73 +1,420 @@
-import fs from 'fs';
-import path from 'path';
+import { createClient } from '@supabase/supabase-js';
 
-const dataPath = path.join(process.cwd(), 'data', 'cursos.json');
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-function lerCursos() {
-  try {
-    if (fs.existsSync(dataPath)) {
-      const data = fs.readFileSync(dataPath, 'utf-8');
-      return JSON.parse(data);
-    }
-  } catch (error) {
-    console.error('Erro ao ler cursos:', error);
-  }
-  return [];
+if (!supabaseUrl || !supabaseKey) {
+  console.error('Supabase credentials not configured');
 }
 
-function salvarCursos(cursos) {
-  try {
-    fs.writeFileSync(dataPath, JSON.stringify(cursos, null, 2), 'utf-8');
-  } catch (error) {
-    console.error('Erro ao salvar cursos:', error);
-  }
-}
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-export default function handler(req, res) {
-  const { id } = req.query;
+let cursoUnidadeSchemaCache = null;
 
-  if (req.method === 'GET') {
-    const cursos = lerCursos();
-    const curso = cursos.find(c => c.id === id);
-    
-    if (!curso) {
-      return res.status(404).json({ error: 'Curso não encontrado' });
-    }
-    
-    return res.status(200).json(curso);
+const parseInteger = (value) => {
+  const parsed = Number.parseInt(String(value ?? '').trim(), 10);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+const parseDecimal = (value) => {
+  if (value === undefined || value === null || value === '') {
+    return null;
   }
 
-  if (req.method === 'PUT') {
-    const cursos = lerCursos();
-    const index = cursos.findIndex(c => c.id === id);
-    
-    if (index === -1) {
-      return res.status(404).json({ error: 'Curso não encontrado' });
+  if (typeof value === 'number') {
+    return Number.isNaN(value) ? null : value;
+  }
+
+  const normalized = String(value)
+    .trim()
+    .replace(/\.(?=\d{3}(\D|$))/g, '')
+    .replace(',', '.');
+
+  const parsed = Number.parseFloat(normalized);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+const parseBoolean = (value) => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    return normalized === 'true' || normalized === '1' || normalized === 'sim' || normalized === 'on';
+  }
+  if (typeof value === 'number') return value === 1;
+  return false;
+};
+
+const normalizeText = (value) => {
+  if (value === undefined || value === null) return null;
+  const normalized = String(value).trim();
+  return normalized || null;
+};
+
+const isMissingColumnError = (error) => {
+  const message = String(error?.message || '').toLowerCase();
+  return error?.code === '42703' || message.includes('does not exist') || message.includes('could not find');
+};
+
+const isMissingTableError = (error) => {
+  const message = String(error?.message || '').toLowerCase();
+  return error?.code === '42P01' || message.includes('relation') || message.includes('does not exist');
+};
+
+const getCursoUnidadeSchema = async () => {
+  if (cursoUnidadeSchemaCache) {
+    return cursoUnidadeSchemaCache;
+  }
+
+  const candidates = [
+    { cursoCol: 'cursoid', unidadeCol: 'unidadeid' },
+    { cursoCol: 'curso_id', unidadeCol: 'unidade_id' },
+    { cursoCol: 'cursoId', unidadeCol: 'unidadeId' },
+  ];
+
+  for (const schema of candidates) {
+    const { error } = await supabase
+      .from('curso_unidade')
+      .select(`${schema.cursoCol},${schema.unidadeCol}`)
+      .limit(1);
+
+    if (!error) {
+      cursoUnidadeSchemaCache = schema;
+      return schema;
     }
-    
-    cursos[index] = {
-      ...cursos[index],
-      ...req.body,
-      id: cursos[index].id,
-      criado_em: cursos[index].criado_em,
-      atualizado_em: new Date().toISOString()
+
+    if (isMissingTableError(error)) {
+      return null;
+    }
+
+    if (!isMissingColumnError(error)) {
+      throw error;
+    }
+  }
+
+  return null;
+};
+
+const getUnidadeBindingsByCursoId = async (cursoId) => {
+  const schema = await getCursoUnidadeSchema();
+  if (!schema) {
+    return {
+      bindings: [],
+      schema: null,
     };
-    
-    salvarCursos(cursos);
-    return res.status(200).json(cursos[index]);
   }
 
-  if (req.method === 'DELETE') {
-    const cursos = lerCursos();
-    const novosCursos = cursos.filter(c => c.id !== id);
-    
-    if (novosCursos.length === cursos.length) {
-      return res.status(404).json({ error: 'Curso não encontrado' });
+  const { data, error } = await supabase
+    .from('curso_unidade')
+    .select(`${schema.cursoCol},${schema.unidadeCol}`)
+    .eq(schema.cursoCol, cursoId);
+
+  if (error) {
+    if (isMissingTableError(error) || isMissingColumnError(error)) {
+      return {
+        bindings: [],
+        schema,
+      };
     }
-    
-    salvarCursos(novosCursos);
-    return res.status(200).json({ success: true });
+    throw error;
   }
 
-  res.status(405).json({ error: 'Method not allowed' });
+  return {
+    bindings: data || [],
+    schema,
+  };
+};
+
+const resolveUnidadeIdsFromBody = async (body) => {
+  const idsFromBody = Array.isArray(body.unidadeIds)
+    ? body.unidadeIds
+      .map((value) => parseInteger(value))
+      .filter((value) => value !== null)
+    : [];
+
+  if (idsFromBody.length > 0) {
+    return [...new Set(idsFromBody)];
+  }
+
+  const unidades = Array.isArray(body.unidades) ? body.unidades : [];
+  if (unidades.length === 0) {
+    return [];
+  }
+
+  const unidadesNumericas = unidades
+    .map((value) => parseInteger(value))
+    .filter((value) => value !== null);
+
+  if (unidadesNumericas.length > 0) {
+    return [...new Set(unidadesNumericas)];
+  }
+
+  const nomes = unidades
+    .map((value) => String(value || '').trim())
+    .filter((value) => value.length > 0);
+
+  if (nomes.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('unidades')
+    .select('id,nome')
+    .in('nome', nomes);
+
+  if (error) {
+    throw error;
+  }
+
+  return [...new Set((data || []).map((item) => item.id))];
+};
+
+const syncCursoUnidade = async (cursoId, unidadeIds) => {
+  const schema = await getCursoUnidadeSchema();
+  if (!schema) {
+    return;
+  }
+
+  const { error: deleteError } = await supabase
+    .from('curso_unidade')
+    .delete()
+    .eq(schema.cursoCol, cursoId);
+
+  if (deleteError) {
+    throw deleteError;
+  }
+
+  if (!Array.isArray(unidadeIds) || unidadeIds.length === 0) {
+    return;
+  }
+
+  const payload = unidadeIds.map((unidadeId) => ({
+    [schema.cursoCol]: cursoId,
+    [schema.unidadeCol]: unidadeId,
+  }));
+
+  const { error: insertError } = await supabase
+    .from('curso_unidade')
+    .insert(payload);
+
+  if (insertError) {
+    throw insertError;
+  }
+};
+
+const mapRowToResponse = (row, unidadesDoCurso = []) => {
+  const unidadeNomes = unidadesDoCurso
+    .map((unidade) => unidade.nome)
+    .filter(Boolean);
+
+  const unidadeIds = unidadesDoCurso
+    .map((unidade) => unidade.id)
+    .filter((value) => value !== undefined && value !== null)
+    .map((value) => String(value));
+
+  return {
+    id: row.id,
+    instituicaoId: row.instituicao_id || row.instituicaoid || '',
+    instituicaoNome: row.instituicoes?.nome || row.instituicao_nome || '',
+    nome: row.nome || '',
+    descricaoGeral: row.descricaogeral || '',
+    duracao: row.duracao !== null && row.duracao !== undefined ? String(row.duracao) : '',
+    cargaHoraria: row.cargahoraria !== null && row.cargahoraria !== undefined ? String(row.cargahoraria) : '',
+    cargaHorariaEstagio: row.cargahorariaestagio !== null && row.cargahorariaestagio !== undefined ? String(row.cargahorariaestagio) : '',
+    cargaHorariaAtividadesComplementares:
+      row.cargahorariaatividadescomplementares !== null && row.cargahorariaatividadescomplementares !== undefined
+        ? String(row.cargahorariaatividadescomplementares)
+        : '',
+    mediaRequerida: row.mediarequerida !== null && row.mediarequerida !== undefined ? String(row.mediarequerida) : '',
+    frequenciaRequerida: row.frequenciarequerida !== null && row.frequenciarequerida !== undefined ? String(row.frequenciarequerida) : '',
+    nivelEnsino: row.nivelensino || '',
+    grauConferido: row.grauconferido || '',
+    tituloConferido: row.tituloconferido || '',
+    valorInscricao: row.valorinscricao !== null && row.valorinscricao !== undefined ? String(row.valorinscricao) : '',
+    valorMensalidade: row.valormensalidade !== null && row.valormensalidade !== undefined ? String(row.valormensalidade) : '',
+    layoutNotas: row.layoutnotas || '',
+    idCenso: row.idcenso || '',
+    bibliotecaVirtual: row.bibliotecavirtual || '',
+    portariaRecredenciamento: row.portariarecredenciamento || '',
+    exibirCRM: Boolean(row.exibircrm),
+    exibirBibliotecaVirtual: Boolean(row.exibirbibliotecavirtual),
+    situacao: row.situacao || 'ATIVO',
+    unidades: unidadeNomes,
+    unidadeIds,
+    dataCriacao: row.datacriacao || null,
+    dataAtualizacao: row.dataatualizacao || null,
+
+    // Compatibilidade legada para telas antigas.
+    titulo: row.nome || '',
+    descricao: row.descricaogeral || '',
+    categoria: row.nivelensino || '',
+    ativo: (row.situacao || 'ATIVO') === 'ATIVO',
+  };
+};
+
+const mapBodyToPayload = (body = {}) => {
+  const nome = String(body.nome || body.titulo || '').trim();
+  const situacao = body.situacao || (parseBoolean(body.ativo) ? 'ATIVO' : 'INATIVO') || 'ATIVO';
+
+  return {
+    nome,
+    instituicao_id: normalizeText(body.instituicaoId ?? body.instituicao_id ?? body.instituicaoid),
+    descricaogeral: body.descricaoGeral ?? body.descricaogeral ?? body.descricao ?? null,
+    duracao: parseInteger(body.duracao),
+    cargahoraria: parseInteger(body.cargaHoraria ?? body.cargahoraria),
+    cargahorariaestagio: parseInteger(body.cargaHorariaEstagio ?? body.cargahorariaestagio),
+    cargahorariaatividadescomplementares: parseInteger(
+      body.cargaHorariaAtividadesComplementares ?? body.cargahorariaatividadescomplementares
+    ),
+    mediarequerida: parseDecimal(body.mediaRequerida ?? body.mediarequerida),
+    frequenciarequerida: parseInteger(body.frequenciaRequerida ?? body.frequenciarequerida),
+    nivelensino: body.nivelEnsino ?? body.nivelensino ?? body.categoria ?? null,
+    grauconferido: body.grauConferido ?? body.grauconferido ?? null,
+    tituloconferido: body.tituloConferido ?? body.tituloconferido ?? null,
+    valorinscricao: parseDecimal(body.valorInscricao ?? body.valorinscricao),
+    valormensalidade: parseDecimal(body.valorMensalidade ?? body.valormensalidade),
+    layoutnotas: body.layoutNotas ?? body.layoutnotas ?? null,
+    idcenso: body.idCenso ?? body.idcenso ?? null,
+    bibliotecavirtual: body.bibliotecaVirtual ?? body.bibliotecavirtual ?? null,
+    portariarecredenciamento: body.portariaRecredenciamento ?? body.portariarecredenciamento ?? null,
+    exibircrm: parseBoolean(body.exibirCRM ?? body.exibircrm),
+    exibirbibliotecavirtual: parseBoolean(body.exibirBibliotecaVirtual ?? body.exibirbibliotecavirtual),
+    situacao,
+  };
+};
+
+const mapCursoWithUnidades = async (curso) => {
+  if (!curso) return null;
+
+  const { bindings, schema } = await getUnidadeBindingsByCursoId(curso.id);
+
+  if (!schema || bindings.length === 0) {
+    return mapRowToResponse(curso, []);
+  }
+
+  const unidadeIds = [...new Set(bindings
+    .map((item) => parseInteger(item[schema.unidadeCol]))
+    .filter((value) => value !== null))];
+
+  if (unidadeIds.length === 0) {
+    return mapRowToResponse(curso, []);
+  }
+
+  const { data: unidades, error: unidadesError } = await supabase
+    .from('unidades')
+    .select('id,nome')
+    .in('id', unidadeIds);
+
+  if (unidadesError) {
+    throw unidadesError;
+  }
+
+  const unidadeById = new Map((unidades || []).map((unidade) => [unidade.id, unidade]));
+  const unidadesDoCurso = unidadeIds
+    .map((unidadeId) => unidadeById.get(unidadeId))
+    .filter(Boolean);
+
+  return mapRowToResponse(curso, unidadesDoCurso);
+};
+
+export default async function handler(req, res) {
+  const id = parseInteger(req.query.id);
+
+  if (id === null) {
+    return res.status(400).json({ error: 'ID inválido', message: 'ID inválido' });
+  }
+
+  try {
+    if (req.method === 'GET') {
+      const { data, error } = await supabase
+        .from('cursos')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Supabase GET curso error:', error);
+        return res.status(500).json({ error: 'Erro ao buscar curso', message: error.message, detail: error.message });
+      }
+
+      if (!data) {
+        return res.status(404).json({ error: 'Curso não encontrado', message: 'Curso não encontrado' });
+      }
+
+      const response = await mapCursoWithUnidades(data);
+      return res.status(200).json(response);
+    }
+
+    if (req.method === 'PUT') {
+      const body = req.body || {};
+      const payload = mapBodyToPayload(body);
+
+      if (!payload.nome) {
+        return res.status(400).json({ error: 'Nome é obrigatório', message: 'Nome é obrigatório' });
+      }
+
+      if (!payload.instituicao_id) {
+        return res.status(400).json({ error: 'Instituição é obrigatória', message: 'Instituição é obrigatória' });
+      }
+
+      const unidadeIds = await resolveUnidadeIdsFromBody(body);
+
+      const { data, error } = await supabase
+        .from('cursos')
+        .update(payload)
+        .eq('id', id)
+        .select('*')
+        .maybeSingle();
+
+      if (error) {
+        console.error('Supabase PUT curso error:', error);
+        return res.status(500).json({ error: 'Erro ao atualizar curso', message: error.message, detail: error.message });
+      }
+
+      if (!data) {
+        return res.status(404).json({ error: 'Curso não encontrado', message: 'Curso não encontrado' });
+      }
+
+      try {
+        await syncCursoUnidade(id, unidadeIds);
+      } catch (syncError) {
+        console.error('Supabase curso_unidade sync error:', syncError);
+        return res.status(500).json({ error: 'Curso atualizado, mas falhou ao vincular unidades', message: syncError.message, detail: syncError.message });
+      }
+
+      const response = await mapCursoWithUnidades(data);
+      return res.status(200).json(response);
+    }
+
+    if (req.method === 'DELETE') {
+      try {
+        await syncCursoUnidade(id, []);
+      } catch (syncError) {
+        console.error('Supabase curso_unidade cleanup error:', syncError);
+      }
+
+      const { data, error } = await supabase
+        .from('cursos')
+        .delete()
+        .eq('id', id)
+        .select('id')
+        .maybeSingle();
+
+      if (error) {
+        console.error('Supabase DELETE curso error:', error);
+        return res.status(500).json({ error: 'Erro ao excluir curso', message: error.message, detail: error.message });
+      }
+
+      if (!data) {
+        return res.status(404).json({ error: 'Curso não encontrado', message: 'Curso não encontrado' });
+      }
+
+      return res.status(200).json({ success: true });
+    }
+
+    res.setHeader('Allow', ['GET', 'PUT', 'DELETE']);
+    return res.status(405).json({ error: 'Método não permitido', message: 'Método não permitido' });
+  } catch (error) {
+    console.error('Erro na API de cursos por ID:', error);
+    return res.status(500).json({ error: 'Erro ao processar requisição', message: error.message, detail: error.message });
+  }
 }

@@ -5,6 +5,26 @@ const forumPath = path.join(process.cwd(), 'data', 'forum.json');
 const cursosPath = path.join(process.cwd(), 'data', 'cursos.json');
 const professoresPath = path.join(process.cwd(), 'data', 'professores.json');
 
+const withLowercaseKeys = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const lowered = {};
+  Object.entries(obj).forEach(([key, value]) => {
+    lowered[key.toLowerCase()] = value;
+  });
+  return { ...obj, ...lowered };
+};
+
+const normalizeTopico = (topico) => {
+  if (!topico) return topico;
+  const respostas = (topico.respostas || []).map(withLowercaseKeys);
+  return { ...withLowercaseKeys(topico), respostas };
+};
+
+const getBodyValue = (body, key) => {
+  if (!body) return undefined;
+  return body[key] ?? body[key.toLowerCase()];
+};
+
 // Criar arquivo se não existir
 if (!fs.existsSync(forumPath)) {
   fs.writeFileSync(forumPath, JSON.stringify([], null, 2));
@@ -22,23 +42,28 @@ export default function handler(req, res) {
       // Se cursoId for fornecido, retorna apenas tópicos daquele curso
       if (cursoId) {
         const topicosFiltrados = topicos.filter(t => t.cursoId === parseInt(cursoId));
-        return res.status(200).json(topicosFiltrados);
+        return res.status(200).json(topicosFiltrados.map(normalizeTopico));
       }
       
       // Retorna todos os tópicos com informações de curso
       const topicosComInfo = topicos.map(topico => {
         const curso = cursos.find(c => c.id === topico.cursoId);
-        return {
+        return normalizeTopico({
           ...topico,
           cursoTitulo: curso?.titulo || 'Curso não encontrado'
-        };
+        });
       });
       
       return res.status(200).json(topicosComInfo);
     }
 
     if (req.method === 'POST') {
-      const { cursoId, autorId, autorNome, autorTipo, titulo, conteudo } = req.body;
+      const cursoId = getBodyValue(req.body, 'cursoId');
+      const autorId = getBodyValue(req.body, 'autorId');
+      const autorNome = getBodyValue(req.body, 'autorNome');
+      const autorTipo = getBodyValue(req.body, 'autorTipo');
+      const titulo = getBodyValue(req.body, 'titulo');
+      const conteudo = getBodyValue(req.body, 'conteudo');
 
       if (!cursoId || !autorId || !titulo || !conteudo) {
         return res.status(400).json({ erro: 'Campos obrigatórios faltando' });
@@ -63,7 +88,7 @@ export default function handler(req, res) {
       topicos.push(novoTopico);
       fs.writeFileSync(forumPath, JSON.stringify(topicos, null, 2));
       
-      return res.status(201).json(novoTopico);
+      return res.status(201).json(normalizeTopico(novoTopico));
     }
 
     if (req.method === 'PUT') {
@@ -80,10 +105,10 @@ export default function handler(req, res) {
       if (acao === 'responder') {
         const novaResposta = {
           id: Date.now(),
-          autorId: dados.autorId,
-          autorNome: dados.autorNome,
-          autorTipo: dados.autorTipo,
-          conteudo: dados.conteudo,
+          autorId: getBodyValue(dados, 'autorId'),
+          autorNome: getBodyValue(dados, 'autorNome'),
+          autorTipo: getBodyValue(dados, 'autorTipo'),
+          conteudo: getBodyValue(dados, 'conteudo'),
           dataCriacao: new Date().toISOString()
         };
 
@@ -106,7 +131,7 @@ export default function handler(req, res) {
 
       fs.writeFileSync(forumPath, JSON.stringify(topicos, null, 2));
       
-      return res.status(200).json(topicos[topicoIndex]);
+      return res.status(200).json(normalizeTopico(topicos[topicoIndex]));
     }
 
     if (req.method === 'DELETE') {

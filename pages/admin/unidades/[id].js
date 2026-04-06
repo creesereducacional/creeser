@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
+import { formatarCNPJ, formatarCEP, formatarTelefone } from '@/utils/formatadores';
 
 export default function EditarUnidade() {
   const router = useRouter();
@@ -11,8 +12,11 @@ export default function EditarUnidade() {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [cursosDisponiveis, setCursosDisponiveis] = useState([]);
   const [cursosSelecionados, setCursosSelecionados] = useState([]);
+  const [instituicoes, setInstituicoes] = useState([]);
+  const [carregandoInstituicoes, setCarregandoInstituicoes] = useState(true);
 
   const [formData, setFormData] = useState({
+    instituicaoId: '', instituicaoNome: '',
     nome: '', cnpj: '', cep: '', cidade: '', endereco: '', numero: '', bairro: '', local: '', email: '', telefone: '', codigoPoloRecenseamento: '', instituicaoEnsinoSuperior: false, situacao: 'ATIVO',
     codMecMantenedora: '', cnpjMantenedora: '', razaoSocial: '', cepMantenedora: '', logradouroMantenedora: '', numeroMantenedora: '', complementoMantenedora: '', bairroMantenedora: '', ufMantenedora: '',
     tipoCredenciamento: '', numeroCredenciamento: '', dataCredenciamento: '', veiculoPublicacao: '', dataPublicacao: '', secaoPublicacao: '', paginaPublicacao: '', numeroDOU: '',
@@ -36,15 +40,47 @@ export default function EditarUnidade() {
     if (id) {
       carregarUnidade();
       carregarCursos();
+      carregarInstituicoes();
     }
   }, [id]);
+
+  useEffect(() => {
+    if (instituicoes.length === 0) return;
+
+    if (!formData.instituicaoId && formData.instituicaoNome) {
+      const instituicaoPorNome = instituicoes.find(
+        (inst) => inst.nome?.toString() === formData.instituicaoNome.toString()
+      );
+      if (instituicaoPorNome) {
+        setFormData((prev) => ({
+          ...prev,
+          instituicaoId: instituicaoPorNome.id?.toString() || '',
+          instituicaoNome: instituicaoPorNome.nome || prev.instituicaoNome,
+        }));
+      }
+      return;
+    }
+
+    if (!formData.instituicaoId) return;
+
+    const instituicaoSelecionada = instituicoes.find(
+      (inst) => inst.id?.toString() === formData.instituicaoId.toString()
+    );
+    if (instituicaoSelecionada) {
+      preencherDadosMantenedora(instituicaoSelecionada);
+    }
+  }, [formData.instituicaoId, formData.instituicaoNome, instituicoes]);
 
   const carregarUnidade = async () => {
     try {
       const response = await fetch(`/api/unidades/${id}`);
       if (response.ok) {
         const data = await response.json();
-        setFormData(data);
+        setFormData({
+          ...data,
+          instituicaoId: data.instituicaoId || '',
+          instituicaoNome: data.instituicaoNome || data.instituicao || '',
+        });
         if (data.cursos) {
           const cursosData = await Promise.all(
             data.cursos.map(cursoId =>
@@ -76,6 +112,67 @@ export default function EditarUnidade() {
     }
   };
 
+  const sanitizeNumber = (valor, maxLength) => {
+    if (!valor) return '';
+    return valor.replace(/\D/g, '').slice(0, maxLength);
+  };
+
+  const handleMaskedChange = (name, maxLength) => (e) => {
+    const value = sanitizeNumber(e.target.value, maxLength);
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const carregarInstituicoes = async () => {
+    try {
+      setCarregandoInstituicoes(true);
+      const response = await fetch('/api/instituicoes');
+
+      if (response.ok) {
+        const data = await response.json();
+        setInstituicoes(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar instituições:', error);
+    } finally {
+      setCarregandoInstituicoes(false);
+    }
+  };
+
+  const preencherDadosMantenedora = (instituicao) => {
+    if (!instituicao) {
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      codMecMantenedora: instituicao.codMec || instituicao.cod_mec || prev.codMecMantenedora || '',
+      cnpjMantenedora: instituicao.cnpj || '',
+      razaoSocial: instituicao.nome || '',
+      cepMantenedora: instituicao.cep || '',
+      logradouroMantenedora: instituicao.endereco || '',
+      numeroMantenedora: prev.numeroMantenedora || '',
+      complementoMantenedora: prev.complementoMantenedora || '',
+      bairroMantenedora: prev.bairroMantenedora || '',
+      ufMantenedora: instituicao.estado || '',
+    }));
+  };
+
+  const handleInstituicaoChange = (e) => {
+    const instituicaoId = e.target.value;
+    const instituicaoSelecionada = instituicoes.find((inst) => inst.id?.toString() === instituicaoId);
+
+    setFormData((prev) => ({
+      ...prev,
+      instituicaoId,
+      instituicaoNome: instituicaoSelecionada?.nome || '',
+    }));
+
+    preencherDadosMantenedora(instituicaoSelecionada);
+  };
+
   const buscarEnderecoPorCEP = async (cepValue) => {
     if (!cepValue || cepValue.length !== 8) return;
 
@@ -103,8 +200,7 @@ export default function EditarUnidade() {
   };
 
   const handleCepChange = (e) => {
-    let value = e.target.value.replace(/\D/g, '');
-    if (value.length > 8) value = value.slice(0, 8);
+    const value = sanitizeNumber(e.target.value, 8);
     
     setFormData(prev => ({
       ...prev,
@@ -145,6 +241,11 @@ export default function EditarUnidade() {
     try {
       const dataToSave = {
         ...formData,
+        cnpj: sanitizeNumber(formData.cnpj, 14),
+        telefone: sanitizeNumber(formData.telefone, 11),
+        cep: sanitizeNumber(formData.cep, 8),
+        cnpjMantenedora: sanitizeNumber(formData.cnpjMantenedora, 14),
+        cepMantenedora: sanitizeNumber(formData.cepMantenedora, 8),
         cursos: cursosSelecionados.map(c => c.id),
       };
 
@@ -160,7 +261,10 @@ export default function EditarUnidade() {
         setMessage({ type: 'success', text: 'Unidade atualizada com sucesso!' });
         setTimeout(() => router.push('/admin/unidades'), 1500);
       } else {
-        setMessage({ type: 'error', text: 'Erro ao atualizar unidade' });
+        const payload = await response.json().catch(() => null);
+        const detalhe = payload?.error || payload?.message || 'Erro ao atualizar unidade';
+        console.error('Erro ao atualizar unidade:', payload || response.statusText);
+        setMessage({ type: 'error', text: detalhe });
       }
     } catch (error) {
       console.error('Erro ao salvar:', error);
@@ -232,7 +336,7 @@ export default function EditarUnidade() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs md:text-sm font-medium text-teal-600 mb-2">CNPJ</label>
-                  <input type="text" name="cnpj" value={formData.cnpj} onChange={handleChange} placeholder="XX.XXX.XXX/XXXX-XX" className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50" />
+                  <input type="text" name="cnpj" value={formatarCNPJ(formData.cnpj || '')} onChange={handleMaskedChange('cnpj', 14)} placeholder="XX.XXX.XXX/XXXX-XX" className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50" />
                 </div>
                 <div>
                   <label className="block text-xs md:text-sm font-medium text-teal-600 mb-2">Email <span className="text-red-500">*</span></label>
@@ -241,7 +345,7 @@ export default function EditarUnidade() {
               </div>
               <div className="max-w-xs">
                 <label className="block text-xs md:text-sm font-medium text-teal-600 mb-2">CEP</label>
-                <input type="text" name="cep" value={formData.cep} onChange={handleCepChange} placeholder="CEP" maxLength="8" className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50" />
+                <input type="text" name="cep" value={formatarCEP(formData.cep || '')} onChange={handleCepChange} placeholder="CEP" maxLength="8" className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50" />
                 <p className="text-xs text-teal-600 mt-1">📍 Preencha automaticamente</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -265,7 +369,7 @@ export default function EditarUnidade() {
                 </div>
                 <div>
                   <label className="block text-xs md:text-sm font-medium text-teal-600 mb-2">Telefone <span className="text-red-500">*</span></label>
-                  <input type="tel" name="telefone" value={formData.telefone} onChange={handleChange} placeholder="(XX) XXXX-XXXX" className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50" required />
+                  <input type="tel" name="telefone" value={formatarTelefone(formData.telefone || '')} onChange={handleMaskedChange('telefone', 11)} placeholder="(XX) XXXX-XXXX" className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50" required />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -302,6 +406,28 @@ export default function EditarUnidade() {
               <h2 className="text-lg font-bold">Dados da Mantenedora</h2>
             </div>
             <div className="space-y-4">
+              <div>
+                <label className="block text-xs md:text-sm font-medium text-teal-600 mb-2">Instituição <span className="text-red-500">*</span></label>
+                <select
+                  name="instituicaoId"
+                  value={formData.instituicaoId}
+                  onChange={handleInstituicaoChange}
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                  required
+                >
+                  <option value="">Selecione a instituição</option>
+                  {carregandoInstituicoes ? (
+                    <option value="" disabled>Carregando...</option>
+                  ) : (
+                    instituicoes.map((inst, index) => (
+                      <option key={`${inst.id || inst.nome || 'instituicao'}-${index}`} value={inst.id}>
+                        {inst.nome}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs md:text-sm font-medium text-teal-600 mb-2">Cód. MEC</label>
@@ -309,7 +435,7 @@ export default function EditarUnidade() {
                 </div>
                 <div>
                   <label className="block text-xs md:text-sm font-medium text-teal-600 mb-2">CNPJ da Mantenedora</label>
-                  <input type="text" name="cnpjMantenedora" value={formData.cnpjMantenedora} onChange={handleChange} placeholder="XX.XXX.XXX/XXXX-XX" className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50" />
+                  <input type="text" name="cnpjMantenedora" value={formatarCNPJ(formData.cnpjMantenedora || '')} onChange={handleMaskedChange('cnpjMantenedora', 14)} placeholder="XX.XXX.XXX/XXXX-XX" className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50" />
                 </div>
               </div>
               <div>
@@ -319,7 +445,7 @@ export default function EditarUnidade() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs md:text-sm font-medium text-teal-600 mb-2">CEP</label>
-                  <input type="text" name="cepMantenedora" value={formData.cepMantenedora} onChange={handleChange} placeholder="CEP" className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50" />
+                  <input type="text" name="cepMantenedora" value={formatarCEP(formData.cepMantenedora || '')} onChange={handleMaskedChange('cepMantenedora', 8)} placeholder="CEP" className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50" />
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-xs md:text-sm font-medium text-teal-600 mb-2">Logradouro</label>
@@ -578,8 +704,8 @@ export default function EditarUnidade() {
                   {cursosDisponiveis.length > 0 ? (
                     cursosDisponiveis
                       .filter(c => !cursoDuplicado(c.id))
-                      .map(curso => (
-                        <div key={curso.id} className="flex justify-between items-center p-2 hover:bg-blue-100 rounded text-sm">
+                      .map((curso, index) => (
+                        <div key={`${curso.id || curso.nome || 'curso'}-${index}`} className="flex justify-between items-center p-2 hover:bg-blue-100 rounded text-sm">
                           <span className="text-gray-700">{curso.nome}</span>
                           <button type="button" onClick={() => adicionarCurso(curso.id)} className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-xs font-semibold transition">➕</button>
                         </div>
@@ -593,8 +719,8 @@ export default function EditarUnidade() {
                 <p className="text-xs md:text-sm font-medium text-green-600 bg-green-100 px-3 py-2 rounded mb-3">Cursos da Unidade</p>
                 <div className="border border-gray-300 rounded-lg p-3 h-48 overflow-y-auto bg-gray-50">
                   {cursosSelecionados.length > 0 ? (
-                    cursosSelecionados.map(curso => (
-                      <div key={curso.id} className="flex justify-between items-center p-2 hover:bg-red-100 rounded text-sm">
+                    cursosSelecionados.map((curso, index) => (
+                      <div key={`${curso.id || curso.nome || 'curso-selecionado'}-${index}`} className="flex justify-between items-center p-2 hover:bg-red-100 rounded text-sm">
                         <span className="text-gray-700">{curso.nome}</span>
                         <button type="button" onClick={() => removerCurso(curso.id)} className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-semibold transition">➖</button>
                       </div>

@@ -11,6 +11,7 @@ export default function Forum({ usuario }) {
   const [criandoTopico, setCriandoTopico] = useState(false);
   const [formTopico, setFormTopico] = useState({ titulo: '', conteudo: '' });
   const [formResposta, setFormResposta] = useState('');
+  const nomeUsuario = usuario?.nomecompleto || usuario?.nomeCompleto || usuario?.nome || '';
 
   useEffect(() => {
     carregarCursos();
@@ -90,7 +91,7 @@ export default function Forum({ usuario }) {
         body: JSON.stringify({
           cursoId: cursoSelecionado.id,
           autorId: usuario.id,
-          autorNome: usuario.nomeCompleto || usuario.nome,
+          autorNome: nomeUsuario,
           autorTipo: usuario.tipo,
           titulo: formTopico.titulo,
           conteudo: formTopico.conteudo
@@ -126,7 +127,7 @@ export default function Forum({ usuario }) {
         body: JSON.stringify({
           acao: 'responder',
           autorId: usuario.id,
-          autorNome: usuario.nomeCompleto || usuario.nome,
+          autorNome: nomeUsuario,
           autorTipo: usuario.tipo,
           conteudo: formResposta
         })

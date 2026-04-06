@@ -3,6 +3,32 @@ import path from 'path';
 
 const gradesPath = path.join(process.cwd(), 'data', 'grades.json');
 
+const withLowercaseKeys = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const lowered = {};
+  Object.entries(obj).forEach(([key, value]) => {
+    lowered[key.toLowerCase()] = value;
+  });
+  return { ...obj, ...lowered };
+};
+
+const getBodyValue = (body, key) => {
+  if (!body) return undefined;
+  return body[key] ?? body[key.toLowerCase()];
+};
+
+const parseAno = (value) => {
+  if (value === undefined || value === null || value === '') return null;
+
+  const digits = String(value).replace(/\D/g, '');
+  if (digits.length !== 4) return null;
+
+  const parsed = Number.parseInt(digits, 10);
+  if (Number.isNaN(parsed) || parsed < 1900 || parsed > 3000) return null;
+
+  return parsed;
+};
+
 const lerGrades = () => {
   try {
     if (fs.existsSync(gradesPath)) {
@@ -45,7 +71,7 @@ export default function handler(req, res) {
 function handleGet(req, res) {
   try {
     const grades = lerGrades();
-    res.status(200).json(grades);
+    res.status(200).json(grades.map(withLowercaseKeys));
   } catch (error) {
     res.status(500).json({ error: 'Erro ao recuperar grades' });
   }
@@ -55,15 +81,41 @@ function handlePost(req, res) {
   try {
     console.log('POST /api/grades - Body:', req.body);
     
-    if (!req.body.nome) {
+    const id = getBodyValue(req.body, 'id');
+    const instituicaoId = getBodyValue(req.body, 'instituicaoId');
+    const instituicaoNome = getBodyValue(req.body, 'instituicaoNome');
+    const cursoId = getBodyValue(req.body, 'cursoId');
+    const cursoNome = getBodyValue(req.body, 'cursoNome');
+    const ano = parseAno(getBodyValue(req.body, 'ano'));
+    const nome = getBodyValue(req.body, 'nome');
+    const situacao = getBodyValue(req.body, 'situacao');
+
+    if (!instituicaoId) {
+      return res.status(400).json({ error: 'Instituição é obrigatória' });
+    }
+
+    if (!cursoId) {
+      return res.status(400).json({ error: 'Curso é obrigatório' });
+    }
+
+    if (ano === null) {
+      return res.status(400).json({ error: 'Ano é obrigatório e deve conter 4 dígitos' });
+    }
+
+    if (!nome) {
       return res.status(400).json({ error: 'Nome é obrigatório' });
     }
 
     const grades = lerGrades();
     const novaGrade = {
-      id: req.body.id,
-      nome: req.body.nome,
-      situacao: req.body.situacao || 'ATIVO',
+      id,
+      instituicaoId,
+      instituicaoNome: instituicaoNome || '',
+      cursoId,
+      cursoNome: cursoNome || '',
+      ano,
+      nome,
+      situacao: situacao || 'ATIVO',
       dataCriacao: new Date().toISOString()
     };
 
@@ -72,7 +124,7 @@ function handlePost(req, res) {
     salvarGrades(grades);
     console.log('Grade saved successfully');
 
-    res.status(201).json(novaGrade);
+    res.status(201).json(withLowercaseKeys(novaGrade));
   } catch (error) {
     console.error('POST Error:', error);
     res.status(500).json({ error: 'Erro ao criar grade: ' + error.message });
