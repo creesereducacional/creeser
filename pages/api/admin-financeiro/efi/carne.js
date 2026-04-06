@@ -38,7 +38,7 @@ async function criarCarne(req, res) {
       .from('financeiro_ordens_pagamento')
       .select(`
         id, tipo, descricao, status, quantidade_parcelas, efi_carnet_id,
-        aluno:alunos!inner ( id, nome, cpf, email, datanascimento, celular )
+        aluno:alunos!inner ( id, nome, cpf, email, data_nascimento, telefone_celular )
       `)
       .eq('id', ordem_id)
       .single();
@@ -84,16 +84,17 @@ async function criarCarne(req, res) {
     const valorCentavos = Math.round(Number(parcelas[0].valor) * 100);
     const primeiroVencimento = parcelas[0].data_vencimento;
 
+    const phoneDigits = (aluno.telefone_celular || '').replace(/\D/g, '');
+    const birthRaw = aluno.data_nascimento || null;
+    const birth = birthRaw ? String(birthRaw).substring(0, 10) : undefined;
+
     const customer = {
       name: aluno.nome,
       cpf: cpfLimpo,
-      email: aluno.email || undefined,
-      phone_number: aluno.celular ? aluno.celular.replace(/\D/g, '') : undefined,
-      birth: aluno.datanascimento || undefined,
     };
-
-    // Remove campos undefined
-    Object.keys(customer).forEach(k => customer[k] === undefined && delete customer[k]);
+    if (aluno.email) customer.email = aluno.email;
+    if (phoneDigits.length === 10 || phoneDigits.length === 11) customer.phone_number = phoneDigits;
+    if (birth && /^\d{4}-\d{2}-\d{2}$/.test(birth)) customer.birth = birth;
 
     // URL do webhook para receber confirmações de pagamento de cada parcela
     const notificationUrl = process.env.EFI_WEBHOOK_URL ||
@@ -159,10 +160,13 @@ async function criarCarne(req, res) {
       })),
     });
   } catch (err) {
-    console.error('[EFI carne POST]', err);
+    console.error('[EFI carne POST]', JSON.stringify(err.efiResponse || err.message));
     const status = err.statusCode === 401 ? 502 : err.statusCode >= 400 && err.statusCode < 500 ? 422 : 500;
+    const efiDetail = err.efiResponse
+      ? (err.efiResponse.error_description || err.efiResponse.message || JSON.stringify(err.efiResponse))
+      : null;
     return res.status(status).json({
-      message: err.message,
+      message: efiDetail ? `${err.message}: ${efiDetail}` : err.message,
       efi: err.efiResponse || null,
     });
   }

@@ -321,7 +321,7 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
   );
 }
 
-function ModalCarne({ aluno, onClose, onSalvo }) {
+function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
   const [form, setForm] = useState({
     descricao: '',
     referencia: '',
@@ -349,11 +349,12 @@ function ModalCarne({ aluno, onClose, onSalvo }) {
     if (!form.data_vencimento) return setErro('Data do primeiro vencimento é obrigatória');
     setSalvando(true); setErro('');
     try {
+      // 1. Criar carnê + parcelas no banco
       const res = await fetch('/api/admin-financeiro/ordens/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          aluno_id: Number(aluno.id), tipo: 'carne',
+          aluno_id: aluno.id, tipo: 'carne',
           descricao: form.descricao.trim(), referencia: form.referencia.trim() || null,
           valor_total: Number(form.valor), percentual_desconto: Number(form.percentual_desconto) || 0,
           valor_desconto: Number(form.valor) * ((Number(form.percentual_desconto) || 0) / 100),
@@ -363,9 +364,29 @@ function ModalCarne({ aluno, onClose, onSalvo }) {
           observacoes: form.observacoes.trim() || null, criado_por: 'financeiro'
         }),
       });
-      if (!res.ok) throw new Error((await res.json()).message || 'Erro');
-      setSucesso('✅ Carnê criado com sucesso!');
-      setTimeout(() => { onSalvo(); onClose(); }, 1200);
+      const resBody = await res.json();
+      if (!res.ok) throw new Error(resBody.error || resBody.message || 'Erro ao criar carnê');
+
+      const ordem_id = resBody.ordem?.id;
+
+      // 2. Gerar carnê na EFI
+      if (ordem_id) {
+        setSucesso('⏳ Gerando carnê no banco EFI...');
+        const efiRes = await fetch('/api/admin-financeiro/efi/carne', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ordem_id }),
+        });
+        if (!efiRes.ok) {
+          const efiBody = await efiRes.json();
+          setSucesso('✅ Carnê criado, mas falha no EFI: ' + (efiBody.message || 'erro desconhecido'));
+          setTimeout(() => { onSalvo(); onSuccess(); }, 3000);
+          return;
+        }
+      }
+
+      setSucesso('✅ Carnê e boletos EFI criados com sucesso!');
+      setTimeout(() => { onSalvo(); onSuccess(); }, 1500);
     } catch (e) { setErro(e.message); } finally { setSalvando(false); }
   };
 
@@ -616,7 +637,7 @@ export default function AlunosFinanceiroPage() {
         <ModalOrdem aluno={modalOrdem} onClose={() => setModalOrdem(null)} onSalvo={carregarDados} onSuccess={() => router.push('/admin-financeiro/ordens')} />
       )}
       {modalCarne && (
-        <ModalCarne aluno={modalCarne} onClose={() => setModalCarne(null)} onSalvo={carregarDados} />
+        <ModalCarne aluno={modalCarne} onClose={() => setModalCarne(null)} onSalvo={carregarDados} onSuccess={() => router.push('/admin-financeiro/carnes')} />
       )}
     </AdminFinanceiroLayout>
   );
