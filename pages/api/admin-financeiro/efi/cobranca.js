@@ -42,7 +42,7 @@ async function criarCobranca(req, res) {
       .select(`
         id, ordem_pagamento_id, numero_parcela, valor, data_vencimento, status,
         ordem:financeiro_ordens_pagamento!inner ( id, tipo, efi_charge_id ),
-        aluno:alunos!inner ( id, nome, cpf, email, datanascimento, celular )
+        aluno:alunos!inner ( id, nome, cpf, email, data_nascimento, telefone_celular )
       `)
       .eq('id', parcela_id)
       .single();
@@ -97,8 +97,8 @@ async function criarCobranca(req, res) {
       name: aluno.nome,
       cpf: cpfLimpo,
       email: aluno.email || undefined,
-      phone_number: aluno.celular ? aluno.celular.replace(/\D/g, '') : undefined,
-      birth: aluno.datanascimento || undefined,
+      phone_number: aluno.telefone_celular ? aluno.telefone_celular.replace(/\D/g, '') : undefined,
+      birth: aluno.data_nascimento || undefined,
     };
 
     // Remove campos undefined para não enviar ao EFI
