@@ -81,7 +81,14 @@ async function criarCobranca(req, res) {
       { name: descricao, value: valorCentavos, amount: 1 },
     ]);
 
-    const chargeId = chargeData.data.charge_id;
+    console.log('[EFI createCharge] resposta:', JSON.stringify(chargeData));
+
+    // A EFI retorna { code: 200, data: { charge_id: ... } }
+    const chargeId = chargeData?.data?.charge_id ?? chargeData?.charge_id;
+
+    if (!chargeId) {
+      throw new Error(`charge_id não retornado pela EFI. Resposta: ${JSON.stringify(chargeData)}`);
+    }
 
     // Registrar notification_url via metadata (após criação do charge)
     const notificationUrl = process.env.EFI_WEBHOOK_URL ||
