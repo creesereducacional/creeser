@@ -93,16 +93,25 @@ async function criarCobranca(req, res) {
     }
 
     // 3. Associar ao boleto bancário
+    // phone_number: EFI exige exatamente 10 ou 11 dígitos
+    const phoneDigits = (aluno.telefone_celular || '').replace(/\D/g, '');
+    // birth: EFI exige YYYY-MM-DD — extrair só a parte da data se vier com timestamp
+    const birthRaw = aluno.data_nascimento || null;
+    const birth = birthRaw ? String(birthRaw).substring(0, 10) : undefined;
+
     const customer = {
       name: aluno.nome,
       cpf: cpfLimpo,
-      email: aluno.email || undefined,
-      phone_number: aluno.telefone_celular ? aluno.telefone_celular.replace(/\D/g, '') : undefined,
-      birth: aluno.data_nascimento || undefined,
     };
+    // Só inclui email se houver
+    if (aluno.email) customer.email = aluno.email;
+    // Só inclui phone se tiver 10 ou 11 dígitos
+    if (phoneDigits.length === 10 || phoneDigits.length === 11) customer.phone_number = phoneDigits;
+    // Só inclui birth se tiver formato YYYY-MM-DD válido
+    if (birth && /^\d{4}-\d{2}-\d{2}$/.test(birth)) customer.birth = birth;
 
-    // Remove campos undefined para não enviar ao EFI
-    Object.keys(customer).forEach(k => customer[k] === undefined && delete customer[k]);
+    console.log('[EFI cobranca] customer:', JSON.stringify(customer));
+    console.log('[EFI cobranca] expire_at:', parcela.data_vencimento);
 
     const billetData = await efi.associateBillet(chargeId, {
       expire_at: parcela.data_vencimento,
@@ -147,10 +156,13 @@ async function criarCobranca(req, res) {
       vencimento: parcela.data_vencimento,
     });
   } catch (err) {
-    console.error('[EFI cobranca POST]', err);
+    console.error('[EFI cobranca POST]', JSON.stringify(err.efiResponse || err.message));
     const status = err.statusCode === 401 ? 502 : err.statusCode >= 400 && err.statusCode < 500 ? 422 : 500;
+    const efiDetail = err.efiResponse
+      ? (err.efiResponse.error_description || err.efiResponse.message || JSON.stringify(err.efiResponse))
+      : null;
     return res.status(status).json({
-      message: err.message,
+      message: efiDetail ? `${err.message}: ${efiDetail}` : err.message,
       efi: err.efiResponse || null,
     });
   }
