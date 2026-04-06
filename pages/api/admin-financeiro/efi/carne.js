@@ -9,7 +9,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import efi from '../../../lib/efi-client';
+import efi from '../../../../lib/efi-client';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
