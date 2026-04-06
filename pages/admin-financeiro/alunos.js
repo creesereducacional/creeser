@@ -188,11 +188,18 @@ function ModalDadosFinanceiros({ aluno, onClose, onSalvo }) {
 }
 
 function ModalOrdem({ aluno, onClose, onSalvo }) {
+  const hoje = new Date();
+  const diaAluno = aluno.dia_pagamento || hoje.getDate();
+  const vencimentoPadrao = new Date(hoje.getFullYear(), hoje.getMonth(), diaAluno);
+  if (vencimentoPadrao < hoje) vencimentoPadrao.setMonth(vencimentoPadrao.getMonth() + 1);
+  const vencimentoStr = vencimentoPadrao.toISOString().split('T')[0];
+
   const [form, setForm] = useState({
     descricao: '',
     referencia: '',
     valor: aluno.valor_mensalidade || '',
     percentual_desconto: '',
+    data_vencimento: vencimentoStr,
     observacoes: ''
   });
   const [salvando, setSalvando] = useState(false);
@@ -214,14 +221,18 @@ function ModalOrdem({ aluno, onClose, onSalvo }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          aluno_id: Number(aluno.id), tipo: 'ordem_simples',
+          aluno_id: aluno.id, tipo: 'ordem_simples',
           descricao: form.descricao.trim(), referencia: form.referencia.trim() || null,
           valor_total: Number(form.valor), percentual_desconto: Number(form.percentual_desconto) || 0,
           valor_desconto: Number(form.valor) * ((Number(form.percentual_desconto) || 0) / 100),
-          quantidade_parcelas: 1, observacoes: form.observacoes.trim() || null, criado_por: 'financeiro'
+          quantidade_parcelas: 1, data_vencimento_primeira: form.data_vencimento,
+          observacoes: form.observacoes.trim() || null, criado_por: 'financeiro'
         }),
       });
-      if (!res.ok) throw new Error((await res.json()).message || 'Erro');
+      if (!res.ok) {
+        const body = await res.json();
+        throw new Error(body.error || body.message || 'Erro');
+      }
       setSucesso('✅ Ordem criada com sucesso!');
       setTimeout(() => { onSalvo(); onClose(); }, 1200);
     } catch (e) { setErro(e.message); } finally { setSalvando(false); }
@@ -249,6 +260,11 @@ function ModalOrdem({ aluno, onClose, onSalvo }) {
             <label className="text-xs font-medium text-gray-600 mb-1 block">Referência</label>
             <input type="text" value={form.referencia} onChange={e => setForm(p => ({...p, referencia: e.target.value}))}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-400" placeholder="Ex: 02/2025" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-600 mb-1 block">Vencimento *</label>
+            <input type="date" value={form.data_vencimento} onChange={e => setForm(p => ({...p, data_vencimento: e.target.value}))}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-400" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>

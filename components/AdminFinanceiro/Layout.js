@@ -17,6 +17,7 @@ import DashboardLayout from '@/components/DashboardLayout';
 const MENU_ITEMS = [
   { href: '/admin-financeiro', label: 'Dashboard', icon: '📊', habilitado: true },
   { href: '/admin-financeiro/alunos', label: 'Alunos', icon: '🎓', habilitado: true },
+  { href: '/admin-financeiro/ordens', label: 'Ordens', icon: '📄', habilitado: true },
   { href: '/admin-financeiro/convenios', label: 'Convênios', icon: '🤝', habilitado: true },
   { href: '#', label: 'Relatórios', icon: '📈', habilitado: false },
 ];

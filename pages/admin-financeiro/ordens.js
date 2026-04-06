@@ -72,13 +72,20 @@ export default function OrdensPage() {
 
   const StatusBadge = ({ status }) => {
     const cores = {
-      'ativo': 'bg-green-100 text-green-800',
-      'cancelado': 'bg-red-100 text-red-800',
-      'encerrado': 'bg-gray-100 text-gray-800'
+      'ativo':      'bg-blue-100 text-blue-800',
+      'pendente':   'bg-yellow-100 text-yellow-800',
+      'pago':       'bg-green-100 text-green-800',
+      'vencido':    'bg-orange-100 text-orange-800',
+      'cancelado':  'bg-red-100 text-red-800',
+      'encerrado':  'bg-gray-100 text-gray-800'
+    };
+    const labels = {
+      'ativo': 'Ativo', 'pendente': 'Pendente', 'pago': 'Pago',
+      'vencido': 'Vencido', 'cancelado': 'Cancelado', 'encerrado': 'Encerrado'
     };
     return (
-      <span className={`px-2 py-1 rounded text-xs font-semibold ${cores[status] || 'bg-gray-100 text-gray-800'}`}>
-        {status}
+      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${cores[status] || 'bg-gray-100 text-gray-800'}`}>
+        {labels[status] || status}
       </span>
     );
   };
@@ -170,37 +177,37 @@ export default function OrdensPage() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Aluno</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Descrição</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Referência</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Valor</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Data Criação</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Ações</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Aluno</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Vencimento</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Emissão</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Valor</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Cobrança</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {ordensFiltradas.map(ordem => (
                     <tr key={ordem.id} className="hover:bg-gray-50 transition">
-                      <td className="px-6 py-4 text-sm text-gray-900 font-medium">
-                        {ordem.aluno_nome || 'N/A'}
+                      <td className="px-4 py-4 text-sm text-gray-900 font-medium">
+                        {ordem.aluno_nome}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {ordem.descricao}
+                      <td className="px-4 py-4 text-sm">
+                        <StatusBadge status={ordem.status_parcela || ordem.status} />
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {ordem.referencia || '-'}
+                      <td className="px-4 py-4 text-sm text-gray-600">
+                        {formataData(ordem.data_vencimento)}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 font-semibold">
-                        {formataValor(ordem.valor_total)}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
+                      <td className="px-4 py-4 text-sm text-gray-600">
                         {formataData(ordem.created_at)}
                       </td>
-                      <td className="px-6 py-4 text-sm">
-                        <StatusBadge status={ordem.status} />
+                      <td className="px-4 py-4 text-sm text-gray-900 font-semibold">
+                        {formataValor(ordem.valor_total)}
                       </td>
-                      <td className="px-6 py-4 text-sm">
+                      <td className="px-4 py-4 text-sm text-blue-600 font-mono">
+                        {ordem.cobranca}
+                      </td>
+                      <td className="px-4 py-4 text-sm">
                         <Link
                           href={`/admin-financeiro/ordem/${ordem.id}`}
                           className="inline-block px-3 py-1 bg-teal-100 text-teal-700 rounded hover:bg-teal-200 transition text-xs font-semibold"
