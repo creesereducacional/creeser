@@ -247,8 +247,8 @@ export default function CarnesPage() {
                           <p className="font-semibold text-gray-900">{carne.aluno_cpf}</p>
                         </div>
                         <div>
-                          <p className="text-gray-600">Referência</p>
-                          <p className="font-semibold text-gray-900">{carne.referencia || '-'}</p>
+                          <p className="text-gray-600">Descrição</p>
+                          <p className="font-semibold text-gray-900">{carne.descricao || '-'}</p>
                         </div>
                         <div>
                           <p className="text-gray-600">Data Criação</p>
