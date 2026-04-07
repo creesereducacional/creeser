@@ -24,6 +24,8 @@ export default async function handler(req, res) {
         valor_desconto,
         quantidade_parcelas,
         status,
+        efi_carnet_id,
+        efi_status,
         criado_por,
         created_at,
         updated_at,
@@ -39,7 +41,7 @@ export default async function handler(req, res) {
     for (const carne of (carnes || [])) {
       const { data: parcelas, error: parcelasError } = await supabase
         .from('financeiro_parcelas')
-        .select('id, numero_parcela, valor, data_vencimento, status, boleto_numero')
+        .select('id, numero_parcela, valor, data_vencimento, status, boleto_numero, boleto_url, efi_charge_id')
         .eq('ordem_pagamento_id', carne.id)
         .order('numero_parcela', { ascending: true });
 

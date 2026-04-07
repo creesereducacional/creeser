@@ -17,9 +17,40 @@ const supabase = createClient(
 );
 
 export default async function handler(req, res) {
-  if (req.method === 'POST') return criarCarne(req, res);
+  if (req.method === 'GET')    return buscarCarne(req, res);
+  if (req.method === 'POST')   return criarCarne(req, res);
   if (req.method === 'DELETE') return cancelarCarne(req, res);
   return res.status(405).json({ message: 'Método não permitido' });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET — Buscar link do carnê na EFI
+// ─────────────────────────────────────────────────────────────────────────────
+async function buscarCarne(req, res) {
+  try {
+    const { ordem_id } = req.query;
+    if (!ordem_id) return res.status(400).json({ message: 'ordem_id é obrigatório.' });
+
+    const { data: ordem, error } = await supabase
+      .from('financeiro_ordens_pagamento')
+      .select('efi_carnet_id')
+      .eq('id', ordem_id)
+      .single();
+
+    if (error || !ordem?.efi_carnet_id) {
+      return res.status(404).json({ message: 'Carnê EFI não encontrado para esta ordem.' });
+    }
+
+    const data = await efi.getCarnet(Number(ordem.efi_carnet_id));
+    return res.status(200).json({
+      carnet_id: ordem.efi_carnet_id,
+      link: data?.data?.carnet?.link || data?.data?.link || null,
+      status: data?.data?.carnet?.status || null,
+    });
+  } catch (err) {
+    console.error('[EFI carne GET]', err);
+    return res.status(500).json({ message: err.message });
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

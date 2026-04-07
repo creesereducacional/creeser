@@ -183,7 +183,7 @@ async function criarCobranca(req, res) {
 // ─────────────────────────────────────────────────────────────────────────────
 async function cancelarCobranca(req, res) {
   try {
-    const { ordem_id } = req.body;
+    const { ordem_id, motivo } = req.body;
 
     if (!ordem_id) {
       return res.status(400).json({ message: 'ordem_id é obrigatório.' });
@@ -209,22 +209,23 @@ async function cancelarCobranca(req, res) {
     }
 
     // 2. Cancelar no EFI (se existir charge_id)
+    // Sempre prossegue com cancelamento local, mesmo que EFI rejeite
     let efiCancelado = false;
     if (ordem.efi_charge_id) {
       try {
         await efi.cancelCharge(Number(ordem.efi_charge_id));
         efiCancelado = true;
       } catch (efiErr) {
-        // Se já estava cancelado/expirado na EFI, prossegue com cancelamento local
-        const ignorable = efiErr.statusCode === 422 || (efiErr.efiResponse?.error === 'invalid_operation');
-        if (!ignorable) throw efiErr;
+        console.warn('[EFI cancelCharge] ignorando erro EFI, cancelando localmente:', efiErr.message, efiErr.efiResponse);
       }
     }
 
     // 3. Atualizar status no banco
+    const updateOrdem = { status: 'cancelado', efi_status: 'canceled' };
+    if (motivo) updateOrdem.observacoes = motivo;
     await supabase
       .from('financeiro_ordens_pagamento')
-      .update({ status: 'cancelado', efi_status: 'canceled' })
+      .update(updateOrdem)
       .eq('id', ordem_id);
 
     await supabase

@@ -49,11 +49,44 @@ export default async function handler(req, res) {
 
     if (cursosError) throw cursosError;
 
+    // Buscar resumo financeiro por aluno (parcelas)
+    const hoje = new Date().toISOString().split('T')[0];
+    const { data: parcelas } = await supabase
+      .from('financeiro_parcelas')
+      .select('valor, status, data_vencimento, financeiro_ordens_pagamento!inner(aluno_id)');
+
+    // Agregar por aluno_id
+    const resumoFinanceiro = {};
+    for (const p of (parcelas || [])) {
+      const alunoId = p.financeiro_ordens_pagamento?.aluno_id;
+      if (!alunoId) continue;
+      if (!resumoFinanceiro[alunoId]) {
+        resumoFinanceiro[alunoId] = { aberto: 0, atraso: 0, pago: 0 };
+      }
+      const valor = Number(p.valor) || 0;
+      if (p.status === 'pago') {
+        resumoFinanceiro[alunoId].pago += valor;
+      } else if (p.status === 'pendente' && p.data_vencimento < hoje) {
+        resumoFinanceiro[alunoId].atraso += valor;
+      } else if (p.status === 'vencido') {
+        resumoFinanceiro[alunoId].atraso += valor;
+      } else if (p.status === 'pendente' && p.data_vencimento >= hoje) {
+        resumoFinanceiro[alunoId].aberto += valor;
+      }
+    }
+
+    const alunosComResumo = (alunos || []).map(a => ({
+      ...a,
+      financeiro_aberto: resumoFinanceiro[a.id]?.aberto || 0,
+      financeiro_atraso: resumoFinanceiro[a.id]?.atraso || 0,
+      financeiro_pago: resumoFinanceiro[a.id]?.pago || 0,
+    }));
+
     return res.status(200).json({
-      alunos: alunos || [],
+      alunos: alunosComResumo,
       turmas: turmas || [],
       cursos: cursos || [],
-      total: alunos ? alunos.length : 0
+      total: alunosComResumo.length
     });
   } catch (error) {
     console.error('Erro ao listar alunos:', error);

@@ -801,8 +801,8 @@ export default function ConfiguracaoEmpresa() {
                 </div>
 
                 <div className="pt-4 border-t border-gray-200">
-                  <h3 className="text-sm font-bold text-teal-600 mb-4">🏷️ Logo e Arquivos</h3>
-                  
+                  <h3 className="text-sm font-bold text-teal-600 mb-4">🏷️ Logo</h3>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-medium text-teal-600 mb-1 block">LOGO</label>
@@ -810,16 +810,25 @@ export default function ConfiguracaoEmpresa() {
                         type="file"
                         accept="image/*"
                         className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = ev => setFormData(prev => ({ ...prev, logo: ev.target.result }));
+                          reader.readAsDataURL(file);
+                        }}
                       />
                     </div>
 
                     <div>
-                      <label className="text-xs font-medium text-teal-600 mb-1 block">ARQUIVO(S)</label>
-                      <input
-                        type="file"
-                        multiple
-                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                      />
+                      <label className="text-xs font-medium text-teal-600 mb-1 block">PRÉ-VISUALIZAÇÃO</label>
+                      <div className="w-full h-20 border border-teal-300 rounded-lg bg-teal-50 flex items-center justify-center overflow-hidden">
+                        {formData.logo ? (
+                          <img src={formData.logo} alt="Logo" className="max-h-full max-w-full object-contain" />
+                        ) : (
+                          <span className="text-xs text-gray-400">Nenhuma logo carregada</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

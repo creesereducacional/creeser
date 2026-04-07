@@ -8,6 +8,7 @@ export default function CarnesPage() {
   const [filtroStatus, setFiltroStatus] = useState('');
   const [filtroAluno, setFiltroAluno] = useState('');
   const [expandidoId, setExpandidoId] = useState(null);
+  const [gerandoId, setGerandoId] = useState(null);
 
   useEffect(() => {
     carregarCarnes();
@@ -96,6 +97,38 @@ export default function CarnesPage() {
         {status}
       </span>
     );
+  };
+
+  const handleGerarBoletos = async (carne) => {
+    setGerandoId(carne.id);
+    try {
+      if (!carne.efi_carnet_id) {
+        // Carnê ainda não gerado na EFI — criar agora
+        const res = await fetch('/api/admin-financeiro/efi/carne', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ordem_id: carne.id }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Erro ao gerar carnê');
+        if (data.link) window.open(data.link, '_blank');
+        await carregarCarnes();
+      } else {
+        // Já gerado — buscar link atual na EFI
+        const res = await fetch(`/api/admin-financeiro/efi/carne?ordem_id=${carne.id}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Erro ao buscar carnê');
+        if (data.link) {
+          window.open(data.link, '_blank');
+        } else {
+          alert('Link do carnê não disponível na EFI.');
+        }
+      }
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    } finally {
+      setGerandoId(null);
+    }
   };
 
   if (loading) {
@@ -275,9 +308,13 @@ export default function CarnesPage() {
                           Detalhes
                         </Link>
                         <button
-                          className="flex-1 px-3 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 font-semibold transition text-sm"
+                          onClick={() => handleGerarBoletos(carne)}
+                          disabled={gerandoId === carne.id}
+                          className="flex-1 px-3 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 font-semibold transition text-sm disabled:opacity-50"
                         >
-                          📄 Gerar Boletos
+                          {gerandoId === carne.id
+                            ? '⏳ Aguarde...'
+                            : carne.efi_carnet_id ? '📄 Abrir Carnê PDF' : '📄 Gerar Boletos'}
                         </button>
                       </div>
                     </div>
