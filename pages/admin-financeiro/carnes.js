@@ -9,6 +9,59 @@ export default function CarnesPage() {
   const [filtroAluno, setFiltroAluno] = useState('');
   const [expandidoId, setExpandidoId] = useState(null);
   const [gerandoId, setGerandoId] = useState(null);
+  const [selectedParcelas, setSelectedParcelas] = useState({});
+  const [cancelandoParcela, setCancelandoParcela] = useState(false);
+
+  const toggleParcela = (carneId, parcelaId) => {
+    setSelectedParcelas(prev => {
+      const set = new Set(prev[carneId] || []);
+      set.has(parcelaId) ? set.delete(parcelaId) : set.add(parcelaId);
+      return { ...prev, [carneId]: set };
+    });
+  };
+
+  const toggleTodasParcelas = (carneId, parcelas, selecionar) => {
+    const cancelaveis = parcelas.filter(p => p.status !== 'pago' && p.status !== 'cancelado');
+    setSelectedParcelas(prev => ({
+      ...prev,
+      [carneId]: selecionar ? new Set(cancelaveis.map(p => p.id)) : new Set(),
+    }));
+  };
+
+  const handleCancelarSelecionadas = async (carne) => {
+    const ids = [...(selectedParcelas[carne.id] || [])];
+    if (!ids.length) return;
+    if (!confirm(`Cancelar ${ids.length} parcela(s)?`)) return;
+    setCancelandoParcela(true);
+    try {
+      for (const parcela_id of ids) {
+        await fetch('/api/admin-financeiro/efi/carne', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ordem_id: carne.id, parcela_id }),
+        });
+      }
+      setSelectedParcelas(prev => ({ ...prev, [carne.id]: new Set() }));
+      await carregarCarnes();
+    } finally {
+      setCancelandoParcela(false);
+    }
+  };
+
+  const handleCancelarParcela = async (carne, parcela) => {
+    if (!confirm(`Cancelar parcela ${parcela.numero_parcela}?`)) return;
+    setCancelandoParcela(true);
+    try {
+      await fetch('/api/admin-financeiro/efi/carne', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ordem_id: carne.id, parcela_id: parcela.id }),
+      });
+      await carregarCarnes();
+    } finally {
+      setCancelandoParcela(false);
+    }
+  };
 
   useEffect(() => {
     carregarCarnes();
@@ -265,34 +318,68 @@ export default function CarnesPage() {
                       {/* TABELA DE PARCELAS */}
                       {carne.parcelas && carne.parcelas.length > 0 && (
                         <div className="mt-4">
-                          <h4 className="font-semibold text-gray-900 mb-3">Parcelas:</h4>
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="font-semibold text-gray-900">Parcelas:</h4>
+                            {(selectedParcelas[carne.id]?.size > 0) && (
+                              <div className="flex items-center gap-3 px-3 py-1.5 bg-red-50 border border-red-200 rounded-lg">
+                                <span className="text-sm text-red-700 font-medium">{selectedParcelas[carne.id].size} selecionada(s)</span>
+                                <button onClick={() => handleCancelarSelecionadas(carne)} disabled={cancelandoParcela}
+                                  className="text-xs font-semibold px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50">
+                                  {cancelandoParcela ? 'Cancelando...' : 'Cancelar selecionadas'}
+                                </button>
+                                <button onClick={() => setSelectedParcelas(p => ({ ...p, [carne.id]: new Set() }))}
+                                  className="text-xs text-gray-400 hover:text-gray-600">Limpar</button>
+                              </div>
+                            )}
+                          </div>
                           <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                               <thead>
-                                <tr className="border-b border-gray-200">
-                                  <th className="text-left px-2 py-2 text-gray-700">Parcela</th>
-                                  <th className="text-left px-2 py-2 text-gray-700">Vencimento</th>
-                                  <th className="text-right px-2 py-2 text-gray-700">Valor</th>
-                                  <th className="text-left px-2 py-2 text-gray-700">Status</th>
+                                <tr className="bg-gray-50 border-b border-gray-200 text-gray-600">
+                                  <th className="px-3 py-2 w-8">
+                                    <input type="checkbox"
+                                      className="rounded border-gray-300 text-red-600 cursor-pointer"
+                                      checked={carne.parcelas.filter(p => p.status !== 'pago' && p.status !== 'cancelado').length > 0 &&
+                                        carne.parcelas.filter(p => p.status !== 'pago' && p.status !== 'cancelado').every(p => selectedParcelas[carne.id]?.has(p.id))}
+                                      onChange={e => toggleTodasParcelas(carne.id, carne.parcelas, e.target.checked)}
+                                    />
+                                  </th>
+                                  <th className="text-left px-2 py-2">Parcela</th>
+                                  <th className="text-left px-2 py-2">Vencimento</th>
+                                  <th className="text-right px-2 py-2">Valor</th>
+                                  <th className="text-left px-2 py-2">Status</th>
+                                  <th className="text-center px-2 py-2">Ações</th>
                                 </tr>
                               </thead>
                               <tbody>
-                                {carne.parcelas.map((parcela) => (
-                                  <tr key={parcela.id} className="border-b border-gray-100">
-                                    <td className="px-2 py-2 text-gray-900 font-semibold">
-                                      {parcela.numero_parcela}
-                                    </td>
-                                    <td className="px-2 py-2 text-gray-600">
-                                      {formataData(parcela.data_vencimento)}
-                                    </td>
-                                    <td className="px-2 py-2 text-gray-900 font-semibold text-right">
-                                      {formataValor(parcela.valor)}
-                                    </td>
-                                    <td className="px-2 py-2">
-                                      <StatusParcelaBadge status={parcela.status} />
-                                    </td>
-                                  </tr>
-                                ))}
+                                {carne.parcelas.map((parcela) => {
+                                  const cancelavel = parcela.status !== 'pago' && parcela.status !== 'cancelado';
+                                  return (
+                                    <tr key={parcela.id} className={`border-b border-gray-100 ${selectedParcelas[carne.id]?.has(parcela.id) ? 'bg-red-50' : 'hover:bg-gray-50'}`}>
+                                      <td className="px-3 py-2">
+                                        <input type="checkbox"
+                                          disabled={!cancelavel}
+                                          checked={selectedParcelas[carne.id]?.has(parcela.id) || false}
+                                          onChange={() => toggleParcela(carne.id, parcela.id)}
+                                          className="rounded border-gray-300 text-red-600 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                                        />
+                                      </td>
+                                      <td className="px-2 py-2 text-gray-900 font-semibold">{parcela.numero_parcela}</td>
+                                      <td className="px-2 py-2 text-gray-600">{formataData(parcela.data_vencimento)}</td>
+                                      <td className="px-2 py-2 text-gray-900 font-semibold text-right">{formataValor(parcela.valor)}</td>
+                                      <td className="px-2 py-2"><StatusParcelaBadge status={parcela.status} /></td>
+                                      <td className="px-2 py-2 text-center">
+                                        {cancelavel && (
+                                          <button onClick={() => handleCancelarParcela(carne, parcela)} disabled={cancelandoParcela}
+                                            title="Cancelar parcela"
+                                            className="p-1.5 text-red-500 hover:bg-red-50 rounded transition disabled:opacity-40">
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                          </button>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
                               </tbody>
                             </table>
                           </div>

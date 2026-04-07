@@ -19,6 +19,7 @@ const supabase = createClient(
 export default async function handler(req, res) {
   if (req.method === 'GET')    return buscarCarne(req, res);
   if (req.method === 'POST')   return criarCarne(req, res);
+  if (req.method === 'PATCH')  return cancelarParcela(req, res);
   if (req.method === 'DELETE') return cancelarCarne(req, res);
   return res.status(405).json({ message: 'Método não permitido' });
 }
@@ -200,6 +201,54 @@ async function criarCarne(req, res) {
       message: efiDetail ? `${err.message}: ${efiDetail}` : err.message,
       efi: err.efiResponse || null,
     });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH — Cancelar parcela individual
+// ─────────────────────────────────────────────────────────────────────────────
+async function cancelarParcela(req, res) {
+  try {
+    const { ordem_id, parcela_id } = req.body;
+    if (!ordem_id || !parcela_id) {
+      return res.status(400).json({ message: 'ordem_id e parcela_id são obrigatórios.' });
+    }
+
+    const { data: ordem } = await supabase
+      .from('financeiro_ordens_pagamento')
+      .select('efi_carnet_id')
+      .eq('id', ordem_id)
+      .single();
+
+    const { data: parcela } = await supabase
+      .from('financeiro_parcelas')
+      .select('id, numero_parcela, status')
+      .eq('id', parcela_id)
+      .single();
+
+    if (!parcela) return res.status(404).json({ message: 'Parcela não encontrada.' });
+    if (parcela.status === 'cancelado') return res.status(422).json({ message: 'Parcela já cancelada.' });
+    if (parcela.status === 'pago') return res.status(422).json({ message: 'Parcela já paga, não pode ser cancelada.' });
+
+    // Cancelar na EFI se houver carnet_id
+    if (ordem?.efi_carnet_id) {
+      try {
+        await efi.cancelCarnetParcel(Number(ordem.efi_carnet_id), parcela.numero_parcela);
+      } catch (efiErr) {
+        const ignorable = efiErr.statusCode === 422 || efiErr.efiResponse?.error === 'invalid_operation';
+        if (!ignorable) throw efiErr;
+      }
+    }
+
+    await supabase
+      .from('financeiro_parcelas')
+      .update({ status: 'cancelado' })
+      .eq('id', parcela_id);
+
+    return res.status(200).json({ message: 'Parcela cancelada.' });
+  } catch (err) {
+    console.error('[EFI carne PATCH]', err);
+    return res.status(500).json({ message: err.message });
   }
 }
 
