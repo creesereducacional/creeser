@@ -812,6 +812,7 @@ export default function AlunosFinanceiroPage() {
 
   const [expandedId, setExpandedId] = useState(null);
   const [ordensCache, setOrdensCache] = useState({});
+  const [carnesCache, setCarnesCache] = useState({});
   const [loadingOrdens, setLoadingOrdens] = useState(null);
   const [abaAtiva, setAbaAtiva] = useState('aberto');
 
@@ -823,6 +824,7 @@ export default function AlunosFinanceiroPage() {
       if (res.ok) {
         const data = await res.json();
         setOrdensCache(prev => ({ ...prev, [alunoId]: data.ordens || [] }));
+        setCarnesCache(prev => ({ ...prev, [alunoId]: data.carnes || [] }));
       }
     } catch (e) { console.error(e); } finally { setLoadingOrdens(null); }
   };
@@ -1021,16 +1023,19 @@ export default function AlunosFinanceiroPage() {
                               {/* Abas */}
                               {(() => {
                                 const ordens = ordensCache[aluno.id] || [];
+                                const carnes = carnesCache[aluno.id] || [];
                                 const contagem = {
                                   aberto:     ordens.filter(o => ['pendente','ativo','vencido'].includes(o.status_parcela || o.status)).length,
                                   pago:       ordens.filter(o => (o.status_parcela || o.status) === 'pago').length,
                                   desativado: ordens.filter(o => (o.status_parcela || o.status) === 'cancelado').length,
+                                  carnes:     carnes.filter(c => c.status !== 'cancelado').length,
                                 };
                                 const abas = [
                                   { key: 'aberto',      label: 'Faturas em aberto',   ativo: 'bg-blue-600 text-white shadow-sm',    inativo: 'bg-white text-blue-600 border border-blue-200 hover:bg-blue-50' },
                                   { key: 'pago',        label: 'Faturas pagas',        ativo: 'bg-emerald-600 text-white shadow-sm', inativo: 'bg-white text-emerald-600 border border-emerald-200 hover:bg-emerald-50' },
                                   { key: 'desativado',  label: 'Faturas desativadas',  ativo: 'bg-gray-500 text-white shadow-sm',    inativo: 'bg-white text-gray-500 border border-gray-300 hover:bg-gray-50' },
-                                  { key: 'recorrencia', label: 'Plano Recorrência',    ativo: 'bg-purple-600 text-white shadow-sm',  inativo: 'bg-white text-purple-600 border border-purple-200 hover:bg-purple-50' },
+                                  { key: 'carnes',      label: 'Carnês',               ativo: 'bg-purple-600 text-white shadow-sm',  inativo: 'bg-white text-purple-600 border border-purple-200 hover:bg-purple-50' },
+                                  { key: 'recorrencia', label: 'Plano Recorrência',    ativo: 'bg-orange-500 text-white shadow-sm',  inativo: 'bg-white text-orange-500 border border-orange-200 hover:bg-orange-50' },
                                 ];
                                 return (
                                   <div className="flex gap-2 mb-5">
@@ -1060,7 +1065,51 @@ export default function AlunosFinanceiroPage() {
                                 </div>
                               ) : loadingOrdens === aluno.id ? (
                                 <p className="text-sm text-gray-500 py-4">Carregando faturas...</p>
-                              ) : (() => {
+                              ) : abaAtiva === 'carnes' ? (() => {
+                                const carnes = carnesCache[aluno.id] || [];
+                                if (carnes.length === 0) return (
+                                  <p className="text-sm text-gray-400 py-4 text-center">Nenhum carnê cadastrado para este aluno.</p>
+                                );
+                                const fmtValor = (v) => Number(v||0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                                const fmtData = (d) => d ? new Date(d).toLocaleDateString('pt-BR') : '-';
+                                const coresCarne = { ativo:'bg-blue-100 text-blue-800', waiting:'bg-yellow-100 text-yellow-800', cancelado:'bg-gray-100 text-gray-800', encerrado:'bg-green-100 text-green-800' };
+                                return (
+                                  <table className="w-full text-sm rounded-lg overflow-hidden">
+                                    <thead>
+                                      <tr className="bg-purple-50 text-gray-600 border-b border-purple-200">
+                                        <th className="px-4 py-2 text-left text-xs font-semibold">Descrição</th>
+                                        <th className="px-4 py-2 text-left text-xs font-semibold">Período</th>
+                                        <th className="px-4 py-2 text-center text-xs font-semibold">Parcelas</th>
+                                        <th className="px-4 py-2 text-right text-xs font-semibold">Valor Total</th>
+                                        <th className="px-4 py-2 text-left text-xs font-semibold">Status</th>
+                                        <th className="px-4 py-2 text-left text-xs font-semibold">Criado em</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                      {carnes.map(carne => (
+                                        <tr key={carne.id} className="hover:bg-purple-50 transition">
+                                          <td className="px-4 py-2 text-gray-800 font-medium">{carne.descricao || '-'}</td>
+                                          <td className="px-4 py-2 text-gray-500">{carne.referencia || '-'}</td>
+                                          <td className="px-4 py-2 text-center">
+                                            <span className="text-gray-700 font-semibold">{carne.parcelas_pagas}</span>
+                                            <span className="text-gray-400">/{carne.parcelas_total}</span>
+                                            {carne.parcelas_pagas > 0 && (
+                                              <span className="ml-1 text-xs text-emerald-600 font-semibold">pagas</span>
+                                            )}
+                                          </td>
+                                          <td className="px-4 py-2 text-right font-semibold text-gray-800">{fmtValor(carne.valor_total)}</td>
+                                          <td className="px-4 py-2">
+                                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${coresCarne[carne.status] || 'bg-gray-100 text-gray-800'}`}>
+                                              {carne.status || '-'}
+                                            </span>
+                                          </td>
+                                          <td className="px-4 py-2 text-gray-500 text-xs">{fmtData(carne.created_at)}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                );
+                              })() : (() => {
                                 const ordens = ordensCache[aluno.id] || [];
                                 const filtradas = ordens.filter(o => {
                                   const s = o.status_parcela || o.status;
