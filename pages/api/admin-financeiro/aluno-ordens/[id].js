@@ -71,10 +71,11 @@ export default async function handler(req, res) {
     });
 
     const carnes = (carnesData || []).map(c => {
-      const parcelas = c.financeiro_parcelas || [];
+      const parcelas = (c.financeiro_parcelas || []).sort((a, b) => a.numero_parcela - b.numero_parcela);
+      const { financeiro_parcelas: _, ...carne } = c;
       return {
-        ...c,
-        financeiro_parcelas: undefined,
+        ...carne,
+        parcelas,
         parcelas_total: parcelas.length || c.quantidade_parcelas,
         parcelas_pagas: parcelas.filter(p => p.status === 'pago').length,
         parcelas_canceladas: parcelas.filter(p => p.status === 'cancelado').length,

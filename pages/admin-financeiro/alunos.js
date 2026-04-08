@@ -816,6 +816,13 @@ export default function AlunosFinanceiroPage() {
   const [loadingOrdens, setLoadingOrdens] = useState(null);
   const [abaAtiva, setAbaAtiva] = useState('aberto');
 
+  // Carnês tab states
+  const [expandidoCarneId, setExpandidoCarneId] = useState(null);
+  const [selectedParcelasAluno, setSelectedParcelasAluno] = useState({});
+  const [cancelandoParcelaAluno, setCancelandoParcelaAluno] = useState(false);
+  const [gerandoBoletoAluno, setGerandoBoletoAluno] = useState(null);
+  const [modalConfirmarAluno, setModalConfirmarAluno] = useState(null);
+
   const fetchOrdensAluno = async (alunoId, force = false) => {
     if (!force && ordensCache[alunoId]) return;
     setLoadingOrdens(alunoId);
@@ -827,6 +834,90 @@ export default function AlunosFinanceiroPage() {
         setCarnesCache(prev => ({ ...prev, [alunoId]: data.carnes || [] }));
       }
     } catch (e) { console.error(e); } finally { setLoadingOrdens(null); }
+  };
+
+  const toggleParcelaAluno = (carneId, parcelaId) => {
+    setSelectedParcelasAluno(prev => {
+      const set = new Set(prev[carneId] || []);
+      set.has(parcelaId) ? set.delete(parcelaId) : set.add(parcelaId);
+      return { ...prev, [carneId]: set };
+    });
+  };
+
+  const toggleTodasParcelasAluno = (carneId, parcelas, selecionar) => {
+    const cancelaveis = parcelas.filter(p => p.status !== 'pago' && p.status !== 'cancelado');
+    setSelectedParcelasAluno(prev => ({
+      ...prev,
+      [carneId]: selecionar ? new Set(cancelaveis.map(p => p.id)) : new Set(),
+    }));
+  };
+
+  const handleCancelarParcelaAluno = (carne, parcela, alunoId) => {
+    setModalConfirmarAluno({
+      titulo: 'Cancelar parcela',
+      mensagem: `Confirma o cancelamento da parcela ${parcela.numero_parcela}?`,
+      onConfirm: async () => {
+        setCancelandoParcelaAluno(true);
+        try {
+          await fetch('/api/admin-financeiro/efi/carne', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ordem_id: carne.id, parcela_id: parcela.id }),
+          });
+          setCarnesCache(prev => { const n = {...prev}; delete n[alunoId]; return n; });
+          fetchOrdensAluno(alunoId, true);
+        } catch (e) { console.error(e); } finally { setCancelandoParcelaAluno(false); }
+      },
+    });
+  };
+
+  const handleCancelarSelecionadasAluno = (carne, alunoId) => {
+    const ids = [...(selectedParcelasAluno[carne.id] || [])];
+    if (!ids.length) return;
+    setModalConfirmarAluno({
+      titulo: 'Cancelar parcelas',
+      mensagem: `Confirma o cancelamento de ${ids.length} parcela(s)?`,
+      onConfirm: async () => {
+        setCancelandoParcelaAluno(true);
+        try {
+          for (const parcela_id of ids) {
+            await fetch('/api/admin-financeiro/efi/carne', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ordem_id: carne.id, parcela_id }),
+            });
+          }
+          setSelectedParcelasAluno(prev => ({ ...prev, [carne.id]: new Set() }));
+          setCarnesCache(prev => { const n = {...prev}; delete n[alunoId]; return n; });
+          fetchOrdensAluno(alunoId, true);
+        } catch (e) { console.error(e); } finally { setCancelandoParcelaAluno(false); }
+      },
+    });
+  };
+
+  const handleGerarBoletosAluno = async (carne, alunoId) => {
+    setGerandoBoletoAluno(carne.id);
+    try {
+      if (!carne.efi_carnet_id) {
+        const res = await fetch('/api/admin-financeiro/efi/carne', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ordem_id: carne.id }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Erro ao gerar carnê');
+        if (data.link) window.open(data.link, '_blank');
+        setCarnesCache(prev => { const n = {...prev}; delete n[alunoId]; return n; });
+        fetchOrdensAluno(alunoId, true);
+      } else {
+        const res = await fetch(`/api/admin-financeiro/efi/carne?ordem_id=${carne.id}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Erro ao buscar carnê');
+        if (data.link) window.open(data.link, '_blank');
+        else alert('Link do carnê não disponível na EFI.');
+      }
+    } catch (err) { alert('Erro: ' + err.message); }
+    finally { setGerandoBoletoAluno(null); }
   };
 
   const handleRowClick = (aluno) => {
@@ -1070,44 +1161,155 @@ export default function AlunosFinanceiroPage() {
                                 if (carnes.length === 0) return (
                                   <p className="text-sm text-gray-400 py-4 text-center">Nenhum carnê cadastrado para este aluno.</p>
                                 );
-                                const fmtValor = (v) => Number(v||0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                                const fmtData = (d) => d ? new Date(d).toLocaleDateString('pt-BR') : '-';
-                                const coresCarne = { ativo:'bg-blue-100 text-blue-800', waiting:'bg-yellow-100 text-yellow-800', cancelado:'bg-gray-100 text-gray-800', encerrado:'bg-green-100 text-green-800' };
+                                const fmtV = (v) => Number(v||0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                                const fmtD = (d) => d ? new Date(d).toLocaleDateString('pt-BR') : '-';
+                                const CoresCarne = { ativo:'bg-green-100 text-green-800', cancelado:'bg-red-100 text-red-800', encerrado:'bg-gray-100 text-gray-800' };
+                                const CoresParcela = { pendente:'bg-amber-100 text-amber-800', pago:'bg-green-100 text-green-800', vencido:'bg-red-100 text-red-800', cancelado:'bg-gray-100 text-gray-800' };
                                 return (
-                                  <table className="w-full text-sm rounded-lg overflow-hidden">
-                                    <thead>
-                                      <tr className="bg-purple-50 text-gray-600 border-b border-purple-200">
-                                        <th className="px-4 py-2 text-left text-xs font-semibold">Descrição</th>
-                                        <th className="px-4 py-2 text-left text-xs font-semibold">Período</th>
-                                        <th className="px-4 py-2 text-center text-xs font-semibold">Parcelas</th>
-                                        <th className="px-4 py-2 text-right text-xs font-semibold">Valor Total</th>
-                                        <th className="px-4 py-2 text-left text-xs font-semibold">Status</th>
-                                        <th className="px-4 py-2 text-left text-xs font-semibold">Criado em</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                      {carnes.map(carne => (
-                                        <tr key={carne.id} className="hover:bg-purple-50 transition">
-                                          <td className="px-4 py-2 text-gray-800 font-medium">{carne.descricao || '-'}</td>
-                                          <td className="px-4 py-2 text-gray-500">{carne.referencia || '-'}</td>
-                                          <td className="px-4 py-2 text-center">
-                                            <span className="text-gray-700 font-semibold">{carne.parcelas_pagas}</span>
-                                            <span className="text-gray-400">/{carne.parcelas_total}</span>
-                                            {carne.parcelas_pagas > 0 && (
-                                              <span className="ml-1 text-xs text-emerald-600 font-semibold">pagas</span>
+                                  <div className="space-y-2">
+                                    {carnes.map(carne => (
+                                      <div key={carne.id} className="border border-purple-200 rounded-lg overflow-hidden">
+                                        {/* Cabeçalho */}
+                                        <button
+                                          onClick={e => { e.stopPropagation(); setExpandidoCarneId(expandidoCarneId === carne.id ? null : carne.id); }}
+                                          className="w-full px-4 py-3 bg-purple-50 hover:bg-purple-100 transition text-left flex items-center justify-between"
+                                        >
+                                          <div className="flex-1">
+                                            <p className="font-bold text-gray-900 text-sm">{carne.descricao || 'Carnê'}</p>
+                                            {carne.referencia && <p className="text-xs text-gray-500">{carne.referencia}</p>}
+                                          </div>
+                                          <div className="flex items-center gap-3">
+                                            <div className="text-right">
+                                              <p className="font-semibold text-sm text-gray-900">{fmtV(carne.valor_total)}</p>
+                                              <p className="text-xs text-gray-500">{carne.quantidade_parcelas}x</p>
+                                            </div>
+                                            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${CoresCarne[carne.status] || 'bg-gray-100 text-gray-800'}`}>{carne.status}</span>
+                                            <svg className={`w-4 h-4 text-gray-400 transition-transform ${expandidoCarneId === carne.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                          </div>
+                                        </button>
+
+                                        {/* Detalhes expandidos */}
+                                        {expandidoCarneId === carne.id && (
+                                          <div className="px-4 py-4 bg-white border-t border-purple-100 space-y-4">
+                                            {/* Info grid */}
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                                              <div>
+                                                <p className="text-gray-500 text-xs">CPF</p>
+                                                <p className="font-semibold text-gray-900">{aluno.cpf || '-'}</p>
+                                              </div>
+                                              <div>
+                                                <p className="text-gray-500 text-xs">Descrição</p>
+                                                <p className="font-semibold text-gray-900">{carne.descricao || '-'}</p>
+                                              </div>
+                                              <div>
+                                                <p className="text-gray-500 text-xs">Data Criação</p>
+                                                <p className="font-semibold text-gray-900">{fmtD(carne.created_at)}</p>
+                                              </div>
+                                              <div>
+                                                <p className="text-gray-500 text-xs">Valor/Parcela</p>
+                                                <p className="font-semibold text-gray-900">{fmtV(carne.valor_total / carne.quantidade_parcelas)}</p>
+                                              </div>
+                                            </div>
+
+                                            {/* Parcelas */}
+                                            {carne.parcelas && carne.parcelas.length > 0 && (
+                                              <div>
+                                                <div className="flex items-center justify-between mb-2">
+                                                  <h4 className="font-semibold text-gray-900 text-sm">Parcelas:</h4>
+                                                  {(selectedParcelasAluno[carne.id]?.size > 0) && (
+                                                    <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded-lg">
+                                                      <span className="text-xs text-red-700 font-medium">{selectedParcelasAluno[carne.id].size} selecionada(s)</span>
+                                                      <button onClick={e => { e.stopPropagation(); handleCancelarSelecionadasAluno(carne, aluno.id); }} disabled={cancelandoParcelaAluno}
+                                                        className="text-xs font-semibold px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50">
+                                                        {cancelandoParcelaAluno ? 'Cancelando...' : 'Cancelar selecionadas'}
+                                                      </button>
+                                                      <button onClick={e => { e.stopPropagation(); setSelectedParcelasAluno(p => ({ ...p, [carne.id]: new Set() })); }}
+                                                        className="text-xs text-gray-400 hover:text-gray-600">Limpar</button>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                                <div className="overflow-x-auto">
+                                                  <table className="w-full text-sm">
+                                                    <thead>
+                                                      <tr className="bg-gray-50 border-b border-gray-200 text-gray-600">
+                                                        <th className="px-3 py-2 w-8">
+                                                          <input type="checkbox"
+                                                            className="rounded border-gray-300 text-red-600 cursor-pointer"
+                                                            checked={carne.parcelas.filter(p => p.status !== 'pago' && p.status !== 'cancelado').length > 0 &&
+                                                              carne.parcelas.filter(p => p.status !== 'pago' && p.status !== 'cancelado').every(p => selectedParcelasAluno[carne.id]?.has(p.id))}
+                                                            onChange={e => { e.stopPropagation(); toggleTodasParcelasAluno(carne.id, carne.parcelas, e.target.checked); }}
+                                                            onClick={e => e.stopPropagation()}
+                                                          />
+                                                        </th>
+                                                        <th className="text-left px-2 py-2 text-xs font-semibold">Parcela</th>
+                                                        <th className="text-left px-2 py-2 text-xs font-semibold">Vencimento</th>
+                                                        <th className="text-right px-2 py-2 text-xs font-semibold">Valor</th>
+                                                        <th className="text-left px-2 py-2 text-xs font-semibold">Status</th>
+                                                        <th className="text-center px-2 py-2 text-xs font-semibold">Ações</th>
+                                                      </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                      {carne.parcelas.map(parcela => {
+                                                        const cancelavel = parcela.status !== 'pago' && parcela.status !== 'cancelado';
+                                                        return (
+                                                          <tr key={parcela.id} className={`border-b border-gray-100 ${selectedParcelasAluno[carne.id]?.has(parcela.id) ? 'bg-red-50' : 'hover:bg-gray-50'}`}>
+                                                            <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
+                                                              <input type="checkbox"
+                                                                disabled={!cancelavel}
+                                                                checked={selectedParcelasAluno[carne.id]?.has(parcela.id) || false}
+                                                                onChange={() => toggleParcelaAluno(carne.id, parcela.id)}
+                                                                onClick={e => e.stopPropagation()}
+                                                                className="rounded border-gray-300 text-red-600 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                                                              />
+                                                            </td>
+                                                            <td className="px-2 py-2 text-gray-900 font-semibold">{parcela.numero_parcela}</td>
+                                                            <td className="px-2 py-2 text-gray-600">{fmtD(parcela.data_vencimento)}</td>
+                                                            <td className="px-2 py-2 text-gray-900 font-semibold text-right">{fmtV(parcela.valor)}</td>
+                                                            <td className="px-2 py-2">
+                                                              <span className={`px-2 py-0.5 rounded text-xs font-semibold ${CoresParcela[parcela.status] || 'bg-gray-100 text-gray-800'}`}>{parcela.status}</span>
+                                                            </td>
+                                                            <td className="px-2 py-2 text-center">
+                                                              <div className="flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
+                                                                {parcela.status === 'pago' && (
+                                                                  <button title="Imprimir Recibo" onClick={() => setModalRecibo({ id: carne.id })}
+                                                                    className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition">
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                                                                  </button>
+                                                                )}
+                                                                {cancelavel && (
+                                                                  <button onClick={() => handleCancelarParcelaAluno(carne, parcela, aluno.id)} disabled={cancelandoParcelaAluno}
+                                                                    title="Cancelar parcela"
+                                                                    className="p-1.5 text-red-500 hover:bg-red-50 rounded transition disabled:opacity-40">
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                                  </button>
+                                                                )}
+                                                              </div>
+                                                            </td>
+                                                          </tr>
+                                                        );
+                                                      })}
+                                                    </tbody>
+                                                  </table>
+                                                </div>
+                                              </div>
                                             )}
-                                          </td>
-                                          <td className="px-4 py-2 text-right font-semibold text-gray-800">{fmtValor(carne.valor_total)}</td>
-                                          <td className="px-4 py-2">
-                                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${coresCarne[carne.status] || 'bg-gray-100 text-gray-800'}`}>
-                                              {carne.status || '-'}
-                                            </span>
-                                          </td>
-                                          <td className="px-4 py-2 text-gray-500 text-xs">{fmtData(carne.created_at)}</td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
+
+                                            {/* Botões de ação */}
+                                            <div className="flex gap-2 pt-3 border-t border-gray-200">
+                                              <button
+                                                onClick={e => { e.stopPropagation(); handleGerarBoletosAluno(carne, aluno.id); }}
+                                                disabled={gerandoBoletoAluno === carne.id}
+                                                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 font-semibold transition text-sm disabled:opacity-50"
+                                              >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                                {gerandoBoletoAluno === carne.id ? 'Aguarde...' : carne.efi_carnet_id ? 'Abrir Carnê PDF' : 'Gerar Boletos'}
+                                              </button>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
                                 );
                               })() : (() => {
                                 const ordens = ordensCache[aluno.id] || [];
@@ -1270,7 +1472,46 @@ export default function AlunosFinanceiroPage() {
       {modalRecibo && (
         <ModalRecibo ordem={modalRecibo} onClose={() => setModalRecibo(null)} />
       )}
+      {modalConfirmarAluno && (
+        <ModalConfirmar
+          titulo={modalConfirmarAluno.titulo}
+          mensagem={modalConfirmarAluno.mensagem}
+          onConfirm={async () => { setModalConfirmarAluno(null); await modalConfirmarAluno.onConfirm(); }}
+          onClose={() => setModalConfirmarAluno(null)}
+        />
+      )}
     </AdminFinanceiroLayout>
+  );
+}
+
+
+function ModalConfirmar({ titulo, mensagem, onConfirm, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4">
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <h3 className="text-base font-bold text-gray-800">{titulo}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="px-6 py-5">
+          <p className="text-sm text-gray-600">{mensagem}</p>
+        </div>
+        <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-xl">
+          <button onClick={onClose}
+            className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
+            Cancelar
+          </button>
+          <button onClick={onConfirm}
+            className="px-5 py-2 text-sm font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
