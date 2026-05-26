@@ -23,6 +23,24 @@ const normalizeInstitutionName = (value = '') =>
     .trim()
     .toUpperCase();
 
+const maskCPF = (v) => {
+  const d = v.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0,3)}.${d.slice(3)}`;
+  if (d.length <= 9) return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6)}`;
+  return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`;
+};
+
+const maskTelefone = (v) => {
+  const d = v.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 2) return d.length ? `(${d}` : '';
+  if (d.length <= 6) return `(${d.slice(0,2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+  return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+};
+
+const maskRG = (v) => v.replace(/\D/g, '').slice(0, 14);
+
 export default function CadastroAluno() {
   const router = useRouter();
   const { id } = router.query;
@@ -390,7 +408,14 @@ export default function CadastroAluno() {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    const parsedValue = type === 'checkbox' ? checked : value;
+
+    let parsedValue = type === 'checkbox' ? checked : value;
+
+    if (type !== 'checkbox') {
+      if (name === 'cpf')            parsedValue = maskCPF(value);
+      else if (name === 'telefoneCelular') parsedValue = maskTelefone(value);
+      else if (name === 'rg')        parsedValue = maskRG(value);
+    }
 
     setFormData(prev => ({
       ...prev,
@@ -739,7 +764,8 @@ export default function CadastroAluno() {
                   name="cpf"
                   value={formData.cpf}
                   onChange={handleInputChange}
-                  placeholder="Somente Números"
+                  placeholder="000.000.000-00"
+                  inputMode="numeric"
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 />
               </div>
@@ -808,7 +834,8 @@ export default function CadastroAluno() {
                   name="rg"
                   value={formData.rg}
                   onChange={handleInputChange}
-                  placeholder="RG"
+                  placeholder="Somente números"
+                  inputMode="numeric"
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 />
               </div>
@@ -862,7 +889,8 @@ export default function CadastroAluno() {
                   name="telefoneCelular"
                   value={formData.telefoneCelular}
                   onChange={handleInputChange}
-                  placeholder="(XX) XXXXX-XXXX"
+                  placeholder="(00) 00000-0000"
+                  inputMode="numeric"
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 />
               </div>
