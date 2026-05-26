@@ -150,6 +150,19 @@ export default function CadastroAluno() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [fotoAluno, setFotoAluno] = useState(null);
+  const [authUser, setAuthUser] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.usuario) setAuthUser(data.usuario); })
+      .catch(() => {});
+  }, []);
+
+  const podeVerFinanceiro = isEditando &&
+    ['financeiro', 'grupo_admin', 'instituicao_admin', 'admin'].includes(
+      String(authUser?.perfil || authUser?.tipo || '').toLowerCase()
+    );
 
   const instituicaoAtual = normalizeInstitutionName(formData.instituicao);
   const hiddenSections = HIDDEN_SECTIONS_BY_INSTITUTION[instituicaoAtual] || [];
@@ -418,6 +431,9 @@ export default function CadastroAluno() {
       else if (name === 'telefoneCelular') parsedValue = maskTelefone(value);
       else if (name === 'rg')        parsedValue = maskRG(value);
       else if (name === 'anoConclusao') parsedValue = maskAno(value);
+      else if (['tituloEleitoral', 'zonaEleitoral', 'secaoEleitoral',
+                'carteiraReservista', 'numeroRegistroConselho'].includes(name))
+        parsedValue = value.replace(/\D/g, '');
     }
 
     setFormData(prev => ({
@@ -1230,7 +1246,8 @@ export default function CadastroAluno() {
           </div>
           )}
 
-          {/* Seção: Dados Financeiros */}
+          {/* Seção: Dados Financeiros — visível apenas na edição e somente para financeiro/admin */}
+          {podeVerFinanceiro && (
           <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
             <h2 className="text-lg font-bold text-teal-600 mb-4">Dados Financeiros</h2>
 
@@ -1428,6 +1445,7 @@ export default function CadastroAluno() {
               </div>
             </div>
           </div>
+          )}
 
           {/* Seção: Informações Adicionais */}
           <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
@@ -1441,6 +1459,8 @@ export default function CadastroAluno() {
                   name="tituloEleitoral"
                   value={formData.tituloEleitoral}
                   onChange={handleInputChange}
+                  inputMode="numeric"
+                  placeholder="Somente números"
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 />
               </div>
@@ -1448,11 +1468,12 @@ export default function CadastroAluno() {
               <div>
                 <label className="text-xs font-medium text-teal-600 mb-1 block">Zona Eleitoral</label>
                 <input
-                  type="number"
-                  min="0"
+                  type="text"
                   name="zonaEleitoral"
                   value={formData.zonaEleitoral}
                   onChange={handleInputChange}
+                  inputMode="numeric"
+                  placeholder="Somente números"
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 />
               </div>
@@ -1462,11 +1483,12 @@ export default function CadastroAluno() {
               <div>
                 <label className="text-xs font-medium text-teal-600 mb-1 block">Seção Eleitoral</label>
                 <input
-                  type="number"
-                  min="0"
+                  type="text"
                   name="secaoEleitoral"
                   value={formData.secaoEleitoral}
                   onChange={handleInputChange}
+                  inputMode="numeric"
+                  placeholder="Somente números"
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 />
               </div>
@@ -1478,6 +1500,8 @@ export default function CadastroAluno() {
                   name="carteiraReservista"
                   value={formData.carteiraReservista}
                   onChange={handleInputChange}
+                  inputMode="numeric"
+                  placeholder="Somente números"
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 />
               </div>
@@ -1491,6 +1515,8 @@ export default function CadastroAluno() {
                   name="numeroRegistroConselho"
                   value={formData.numeroRegistroConselho}
                   onChange={handleInputChange}
+                  inputMode="numeric"
+                  placeholder="Somente números"
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 />
               </div>
