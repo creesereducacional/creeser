@@ -41,6 +41,8 @@ const maskTelefone = (v) => {
 
 const maskRG = (v) => v.replace(/\D/g, '').slice(0, 14);
 
+const maskAno = (v) => v.replace(/\D/g, '').slice(0, 4);
+
 export default function CadastroAluno() {
   const router = useRouter();
   const { id } = router.query;
@@ -415,6 +417,7 @@ export default function CadastroAluno() {
       if (name === 'cpf')            parsedValue = maskCPF(value);
       else if (name === 'telefoneCelular') parsedValue = maskTelefone(value);
       else if (name === 'rg')        parsedValue = maskRG(value);
+      else if (name === 'anoConclusao') parsedValue = maskAno(value);
     }
 
     setFormData(prev => ({
@@ -1172,11 +1175,13 @@ export default function CadastroAluno() {
               <div>
                 <label className="text-xs font-medium text-teal-600 mb-1 block">Ano de conclusão</label>
                 <input
-                  type="number"
+                  type="text"
                   name="anoConclusao"
                   value={formData.anoConclusao}
                   onChange={handleInputChange}
-                  placeholder="Ano"
+                  placeholder="0000"
+                  inputMode="numeric"
+                  maxLength={4}
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 />
               </div>
