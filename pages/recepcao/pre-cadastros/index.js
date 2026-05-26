@@ -3,12 +3,12 @@ import RecepcaoLayout from '@/components/RecepcaoLayout';
 import Link from 'next/link';
 
 const STATUS_CONFIG = {
-  PRE_CADASTRO:               { label: 'Pré-Cadastro',         cor: 'bg-gray-100 text-gray-700' },
-  AGUARDANDO_TURMA:           { label: 'Aguardando Turma',     cor: 'bg-yellow-100 text-yellow-800' },
-  AGUARDANDO_ORDEM_PAGAMENTO: { label: 'Aguardando Ordem',     cor: 'bg-orange-100 text-orange-800' },
-  AGUARDANDO_PAGAMENTO:       { label: 'Aguardando Pagamento', cor: 'bg-purple-100 text-purple-800' },
-  ATIVO:                      { label: 'Ativo',                cor: 'bg-green-100 text-green-800' },
-  CANCELADO:                  { label: 'Cancelado',            cor: 'bg-red-100 text-red-700' },
+  PRE_CADASTRO:                    { label: 'Pré-Cadastro',                      cor: 'bg-gray-100 text-gray-700' },
+  AGUARDANDO_PAGAMENTO_MATRICULA:  { label: 'Aguardando Pagamento da Matrícula',  cor: 'bg-purple-100 text-purple-800' },
+  AGUARDANDO_FORMACAO_TURMA:       { label: 'Aguardando Formação de Turma',       cor: 'bg-indigo-100 text-indigo-800' },
+  ATIVO:                           { label: 'Ativo',                             cor: 'bg-green-100 text-green-800' },
+  CANCELADO:                       { label: 'Cancelado',                         cor: 'bg-red-100 text-red-700' },
+  PERDIDO:                         { label: 'Perdido',                           cor: 'bg-gray-200 text-gray-600' },
 };
 
 const s = (status) => STATUS_CONFIG[status] || { label: status || '—', cor: 'bg-gray-100 text-gray-600' };

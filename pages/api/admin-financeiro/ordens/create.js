@@ -68,8 +68,8 @@ export default async function handler(req, res) {
     }
 
     // Validar tipo
-    if (!['ordem_simples', 'carne'].includes(tipo)) {
-      return res.status(400).json({ message: 'Tipo inválido. Use: ordem_simples ou carne' });
+    if (!['ordem_simples', 'carne', 'matricula'].includes(tipo)) {
+      return res.status(400).json({ message: 'Tipo inválido. Use: ordem_simples, carne ou matricula' });
     }
 
     // Criar ordem principal
@@ -126,6 +126,15 @@ export default async function handler(req, res) {
       .select();
 
     if (parcelasError) throw parcelasError;
+
+    // Se for matrícula, avançar status do aluno para AGUARDANDO_PAGAMENTO_MATRICULA
+    if (tipo === 'matricula') {
+      await supabase
+        .from('alunos')
+        .update({ statusmatricula: 'AGUARDANDO_PAGAMENTO_MATRICULA' })
+        .eq('id', aluno_id)
+        .in('statusmatricula', ['PRE_CADASTRO', 'AGUARDANDO_PAGAMENTO_MATRICULA']);
+    }
 
     return res.status(201).json({
       sucesso: true,

@@ -177,6 +177,23 @@ async function atualizarParcelaEOrdem(parcelaId, statusLocal, statusEFI, evento,
           .from('financeiro_ordens_pagamento')
           .update({ status: 'encerrado', efi_status: statusEFI })
           .eq('id', ordemId);
+
+        // Se for ordem de matrícula → avança aluno para AGUARDANDO_FORMACAO_TURMA
+        try {
+          const { data: ordemInfo } = await supabase
+            .from('financeiro_ordens_pagamento')
+            .select('tipo, aluno_id')
+            .eq('id', ordemId)
+            .maybeSingle();
+
+          if (ordemInfo?.tipo === 'matricula' && ordemInfo?.aluno_id) {
+            await supabase
+              .from('alunos')
+              .update({ statusmatricula: 'AGUARDANDO_FORMACAO_TURMA' })
+              .eq('id', ordemInfo.aluno_id)
+              .eq('statusmatricula', 'AGUARDANDO_PAGAMENTO_MATRICULA');
+          }
+        } catch (_) { /* não bloqueia */ }
       }
     }
   }

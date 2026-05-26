@@ -3,10 +3,10 @@ import RecepcaoLayout from '@/components/RecepcaoLayout';
 import Link from 'next/link';
 
 const CARDS = [
-  { key: 'PRE_CADASTRO',               label: 'Pré-Cadastro',            cor: 'border-gray-400',   icon: '📝' },
-  { key: 'AGUARDANDO_TURMA',           label: 'Aguardando Turma',        cor: 'border-yellow-400', icon: '🏫' },
-  { key: 'AGUARDANDO_ORDEM_PAGAMENTO', label: 'Aguardando Ordem',        cor: 'border-orange-400', icon: '📄' },
-  { key: 'AGUARDANDO_PAGAMENTO',       label: 'Aguardando Pagamento',    cor: 'border-purple-500', icon: '💳' },
+  { key: 'PRE_CADASTRO',                   label: 'Pré-Cadastro',                     cor: 'border-gray-400',   icon: '📝' },
+  { key: 'AGUARDANDO_PAGAMENTO_MATRICULA', label: 'Aguardando Pgto. Matrícula',       cor: 'border-purple-500', icon: '💳' },
+  { key: 'AGUARDANDO_FORMACAO_TURMA',      label: 'Aguardando Formação de Turma',     cor: 'border-indigo-500', icon: '🏫' },
+  { key: 'ATIVO',                          label: 'Matriculados Ativos',               cor: 'border-green-500',  icon: '✅' },
 ];
 
 export default function RecepcaoDashboard() {
@@ -66,11 +66,10 @@ export default function RecepcaoDashboard() {
           <h2 className="font-semibold text-gray-800 mb-4 text-sm">Fluxo de Matrícula</h2>
           <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
             {[
-              { s: 'PRE_CADASTRO', l: 'Pré-Cadastro', c: 'bg-gray-100' },
-              { s: 'AGUARDANDO_TURMA', l: 'Aguardando Turma', c: 'bg-yellow-100' },
-              { s: 'AGUARDANDO_ORDEM_PAGAMENTO', l: 'Aguardando Ordem', c: 'bg-orange-100' },
-              { s: 'AGUARDANDO_PAGAMENTO', l: 'Aguardando Pagamento', c: 'bg-purple-100' },
-              { s: 'ATIVO', l: 'Matriculado', c: 'bg-green-100' },
+              { s: 'PRE_CADASTRO',                   l: 'Pré-Cadastro',                    c: 'bg-gray-100' },
+              { s: 'AGUARDANDO_PAGAMENTO_MATRICULA', l: 'Aguardando Pgto. Matrícula',      c: 'bg-purple-100' },
+              { s: 'AGUARDANDO_FORMACAO_TURMA',      l: 'Aguardando Formação de Turma',    c: 'bg-indigo-100' },
+              { s: 'ATIVO',                          l: 'Matriculado',                      c: 'bg-green-100' },
             ].map((item, i, arr) => (
               <span key={item.s} className="flex items-center gap-2">
                 <span className={`px-2.5 py-1 rounded-full font-medium ${item.c}`}>{item.l}</span>
@@ -79,7 +78,9 @@ export default function RecepcaoDashboard() {
             ))}
           </div>
           <p className="text-xs text-gray-400 mt-3">
-            A recepção cria pré-cadastros. O financeiro gera a ordem de pagamento. Após confirmação do pagamento, o aluno é ativado.
+            A recepção cria pré-cadastros. O financeiro gera a cobrança da matrícula.
+            Após confirmação do pagamento, o aluno aguarda formação da turma.
+            O admin confirma a turma e ativa o aluno.
           </p>
         </div>
       </div>

@@ -14,7 +14,7 @@ const supabase = createClient(
 
 const PERFIS_PERMITIDOS = ['recepcao', 'grupo_admin', 'instituicao_admin', 'admin', 'financeiro'];
 
-const STATUS_LISTADOS = ['PRE_CADASTRO', 'AGUARDANDO_TURMA', 'AGUARDANDO_ORDEM_PAGAMENTO', 'AGUARDANDO_PAGAMENTO'];
+const STATUS_LISTADOS = ['PRE_CADASTRO', 'AGUARDANDO_PAGAMENTO_MATRICULA', 'AGUARDANDO_FORMACAO_TURMA', 'ATIVO', 'CANCELADO', 'PERDIDO'];
 
 export default async function handler(req, res) {
   const authUser = requireAuth(req, res);
@@ -67,15 +67,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Instituição não definida para este usuário.' });
     }
 
-    // Status determinado pelo que foi preenchido — nunca ATIVO
-    let statusmatricula;
-    if (turmaid) {
-      statusmatricula = 'AGUARDANDO_ORDEM_PAGAMENTO';
-    } else if (cursoid) {
-      statusmatricula = 'AGUARDANDO_TURMA';
-    } else {
-      statusmatricula = 'PRE_CADASTRO';
-    }
+    // Pré-cadastro sempre inicia como PRE_CADASTRO
+    // O financeiro gerará a cobrança e avançará o status manualmente
+    const statusmatricula = 'PRE_CADASTRO';
 
     const novoAluno = {
       nome: nome.trim(),

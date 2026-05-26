@@ -54,22 +54,20 @@ export default async function handler(req, res) {
     dia_pagamento,
   } = req.body;
 
-  if (!turmaid) {
-    return res.status(400).json({ error: 'Pré-matrícula exige uma turma ativa vinculada ao curso.' });
-  }
-
-  // Verificar se a turma existe e está ativa
-  const { data: turmaCheck, error: turmaErr } = await supabase
-    .from('turmas')
-    .select('id, situacao')
-    .eq('id', Number(turmaid))
-    .maybeSingle();
-  if (turmaErr || !turmaCheck) {
-    return res.status(400).json({ error: 'Turma não encontrada.' });
-  }
-  const situacaoTurma = String(turmaCheck.situacao || '').toUpperCase();
-  if (situacaoTurma && !['ATIVO', 'EM_ANDAMENTO', 'ABERTA'].includes(situacaoTurma)) {
-    return res.status(400).json({ error: 'A turma selecionada não está ativa.' });
+  // Verificar turma somente se fornecida
+  if (turmaid) {
+    const { data: turmaCheck, error: turmaErr } = await supabase
+      .from('turmas')
+      .select('id, situacao')
+      .eq('id', Number(turmaid))
+      .maybeSingle();
+    if (turmaErr || !turmaCheck) {
+      return res.status(400).json({ error: 'Turma não encontrada.' });
+    }
+    const situacaoTurma = String(turmaCheck.situacao || '').toUpperCase();
+    if (situacaoTurma && !['ATIVO', 'EM_ANDAMENTO', 'ABERTA'].includes(situacaoTurma)) {
+      return res.status(400).json({ error: 'A turma selecionada não está ativa.' });
+    }
   }
 
   // Criar aluno com dados mínimos do lead + dados do curso/plano escolhidos
@@ -79,7 +77,7 @@ export default async function handler(req, res) {
     telefone_celular: lead.whatsapp || lead.telefone || null,
     instituicao_id: lead.instituicao_id,
     captado_por_id: lead.captado_por_id || authUser.id,
-    statusmatricula: 'AGUARDANDO_ORDEM_PAGAMENTO',
+    statusmatricula: 'PRE_CADASTRO',
     ...(cursoid           ? { cursoid: Number(cursoid) }                 : {}),
     ...(turmaid           ? { turmaid: Number(turmaid) }                 : {}),
     ...(plano_financeiro  ? { plano_financeiro }                         : {}),

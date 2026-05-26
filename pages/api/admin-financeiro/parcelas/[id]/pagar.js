@@ -145,6 +145,41 @@ export default async function handler(req, res) {
     parcelaAtualizada = resultFull;
   }
 
+  // ── Transição de status de matrícula (silenciosa) ─────────────────────────
+  // Se a parcela pertence a uma ordem de matrícula, avança o aluno para
+  // AGUARDANDO_FORMACAO_TURMA após confirmação do pagamento.
+  if (parcela.ordem_pagamento_id && parcela.aluno_id) {
+    try {
+      const { data: ordem } = await supabase
+        .from('financeiro_ordens_pagamento')
+        .select('tipo')
+        .eq('id', parcela.ordem_pagamento_id)
+        .maybeSingle();
+
+      if (ordem?.tipo === 'matricula') {
+        // Verifica se TODAS as parcelas da ordem estão pagas
+        const { data: todasParcelas } = await supabase
+          .from('financeiro_parcelas')
+          .select('status')
+          .eq('ordem_pagamento_id', parcela.ordem_pagamento_id);
+
+        const todasPagas = todasParcelas?.every(p =>
+          p.status === 'pago' || p.id === id
+        );
+
+        if (todasPagas) {
+          await supabase
+            .from('alunos')
+            .update({ statusmatricula: 'AGUARDANDO_FORMACAO_TURMA' })
+            .eq('id', parcela.aluno_id)
+            .eq('statusmatricula', 'AGUARDANDO_PAGAMENTO_MATRICULA');
+        }
+      }
+    } catch (_) {
+      // Não bloqueia a baixa se houver erro na transição de status
+    }
+  }
+
   // ── Auditoria (silenciosa se tabela ainda não existir) ────────────────────
   await registrarLog({
     parcela_id: id,

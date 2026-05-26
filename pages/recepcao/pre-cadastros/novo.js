@@ -5,18 +5,8 @@ import RecepcaoLayout from '@/components/RecepcaoLayout';
 const STATUS_PREVISTO = {
   PRE_CADASTRO: {
     label: 'Pré-Cadastro',
-    desc: 'Sem curso selecionado. Secretaria definirá curso e turma.',
+    desc: 'O aluno será cadastrado como Pré-Cadastro. O financeiro gerará a cobrança da matrícula e o status avançará automaticamente.',
     cor: 'bg-gray-100 text-gray-700 border-gray-300',
-  },
-  AGUARDANDO_TURMA: {
-    label: 'Aguardando Turma',
-    desc: 'Curso selecionado, mas sem turma disponível. Admin deverá cadastrar turma.',
-    cor: 'bg-yellow-50 text-yellow-800 border-yellow-300',
-  },
-  AGUARDANDO_ORDEM_PAGAMENTO: {
-    label: 'Aguardando Ordem de Pagamento',
-    desc: 'Turma selecionada. Financeiro deverá gerar a ordem de pagamento.',
-    cor: 'bg-orange-50 text-orange-800 border-orange-300',
   },
 };
 
@@ -78,11 +68,8 @@ export default function NovoPrecadastro() {
 
   const set = (campo, valor) => setForm(f => ({ ...f, [campo]: valor }));
 
-  const statusPrevisto = form.turmaid
-    ? 'AGUARDANDO_ORDEM_PAGAMENTO'
-    : form.cursoid
-    ? 'AGUARDANDO_TURMA'
-    : 'PRE_CADASTRO';
+  // Status sempre PRE_CADASTRO ao criar — financeiro avança depois
+  const statusPrevisto = 'PRE_CADASTRO';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -208,7 +195,7 @@ export default function NovoPrecadastro() {
               </select>
               {turmas.length === 0 && !carregandoTurmas && (
                 <p className="text-xs text-amber-600 mt-1">
-                  ⚠️ Nenhuma turma ativa para este curso. O aluno ficará como &quot;Aguardando Turma&quot; até que o admin cadastre uma turma.
+                  ⚠️ Nenhuma turma ativa para este curso. O aluno poderá ser vinculado a uma turma futuramente.
                 </p>
               )}
             </div>
