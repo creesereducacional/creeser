@@ -136,7 +136,7 @@ export default function CadastroCurso() {
       setFormData(prev => ({
         ...prev,
         instituicaoId: value,
-        nivelEnsino: ehInove ? 'Técnico e Profissionalizante' : '',
+        nivelEnsino: '',
         grauConferido: ehInove ? 'Técnico' : '',
       }));
 
@@ -177,14 +177,18 @@ export default function CadastroCurso() {
 
   const opcoesNivelEnsino = useMemo(() => {
     if (isInoveTecnico) {
-      return [{ value: 'Técnico e Profissionalizante', label: 'Nível Técnico e Profissionalizante' }];
+      return [
+        { value: 'Técnico', label: 'Nível Técnico' },
+        { value: 'Profissionalizante', label: 'Profissionalizante' },
+      ];
     }
     return [
       { value: 'Fundamental', label: 'Ensino Fundamental' },
       { value: 'Médio', label: 'Ensino Médio' },
       { value: 'Superior', label: 'Ensino Superior' },
       { value: 'Pós-Graduação', label: 'Pós-Graduação' },
-      { value: 'Técnico e Profissionalizante', label: 'Nível Técnico e Profissionalizante' },
+      { value: 'Técnico', label: 'Nível Técnico' },
+      { value: 'Profissionalizante', label: 'Profissionalizante' },
     ];
   }, [isInoveTecnico]);
 
