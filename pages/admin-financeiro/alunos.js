@@ -400,21 +400,26 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
   const [tipoDesconto, setTipoDesconto] = useState('%');
-  const valorFinal = () => {
+
+  // form.valor = valor da PARCELA (não o total)
+  const calcParcelaFinal = () => {
     const v = Number(form.valor) || 0;
     if (tipoDesconto === '%') return Math.max(0, v - v * ((Number(form.percentual_desconto) || 0) / 100));
     return Math.max(0, v - (Number(form.percentual_desconto) || 0));
   };
-  const valorParcela = () => valorFinal() / (Number(form.quantidade_parcelas) || 1);
+  const calcDescontoParcela = () => (Number(form.valor) || 0) - calcParcelaFinal();
+  const calcValorTotal = () => calcParcelaFinal() * (Number(form.quantidade_parcelas) || 1);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.valor || Number(form.valor) <= 0) return setErro('Valor deve ser maior que zero');
+    if (!form.valor || Number(form.valor) <= 0) return setErro('Valor da parcela deve ser maior que zero');
     if (!form.data_vencimento) return setErro('Data do primeiro vencimento é obrigatória');
     setSalvando(true); setErro('');
     try {
       const pctDesc = tipoDesconto === '%' ? (Number(form.percentual_desconto) || 0) : 0;
       const valDesc = tipoDesconto === 'R$' ? (Number(form.percentual_desconto) || 0) : Number(form.valor) * (pctDesc / 100);
+      // valor_total = parcela_final × qtd → API divide por qtd → cada parcela = parcela_final
+      const valorTotalEnviar = calcValorTotal();
       const res = await fetch('/api/admin-financeiro/ordens/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -422,7 +427,7 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
           aluno_id: aluno.id, tipo: 'carne',
           descricao: form.descricao.trim() || 'MENSALIDADE',
           referencia: form.periodo.trim() || null,
-          valor_total: Number(form.valor),
+          valor_total: valorTotalEnviar,
           percentual_desconto: pctDesc,
           valor_desconto: valDesc,
           quantidade_parcelas: Number(form.quantidade_parcelas),
@@ -473,11 +478,11 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
           <p className="text-xs font-semibold text-teal-600 mb-1">Lançar carnê</p>
 
           <div className="grid grid-cols-2 gap-3">
-            {/* Valor | Desconto */}
-            <FieldGroup label="Valor *">
+            {/* Valor da Parcela | Desconto */}
+            <FieldGroup label="Valor da Parcela *">
               <input type="number" step="0.01" min="0" value={form.valor}
                 onChange={e => set('valor', e.target.value)}
-                className={inputCls} placeholder="Valor total do carnê" />
+                className={inputCls} placeholder="Valor da mensalidade/parcela" />
             </FieldGroup>
             <div className="flex items-stretch rounded-lg border border-teal-300 bg-teal-50 focus-within:border-teal-500">
               <span className="px-3 py-2 text-xs font-semibold text-teal-700 bg-teal-100 border-r border-teal-300 flex items-center rounded-l-lg flex-shrink-0">Desconto</span>
@@ -525,11 +530,32 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
                 placeholder="Caso deixe em branco, será inserido: 'MENSALIDADE'." />
             </FieldGroup>
             {Number(form.valor) > 0 ? (
-              <div className="flex items-center bg-purple-50 border border-purple-200 rounded-lg px-4 text-sm text-purple-800">
-                {form.quantidade_parcelas}x de <strong className="ml-1">R$ {valorParcela().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
-                <span className="mx-2 text-purple-400">·</span>Total: <strong className="ml-1">R$ {valorFinal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+              <div className="col-span-2 bg-purple-50 border border-purple-200 rounded-lg px-4 py-3 text-sm space-y-1">
+                <div className="flex justify-between text-gray-600">
+                  <span>Valor da parcela</span>
+                  <span>R$ {(Number(form.valor) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                </div>
+                {calcDescontoParcela() > 0 && (
+                  <div className="flex justify-between text-red-500">
+                    <span>Desconto por parcela {tipoDesconto === '%' ? `(${form.percentual_desconto || 0}%)` : ''}</span>
+                    <span>- R$ {calcDescontoParcela().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-purple-700 font-medium">
+                  <span>Valor final da parcela</span>
+                  <span>R$ {calcParcelaFinal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="border-t border-purple-200 my-1" />
+                <div className="flex justify-between text-gray-600">
+                  <span>Quantidade de parcelas</span>
+                  <span>{Number(form.quantidade_parcelas) || 1}×</span>
+                </div>
+                <div className="flex justify-between text-purple-800 font-bold text-base">
+                  <span>Total do carnê</span>
+                  <span>R$ {calcValorTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                </div>
               </div>
-            ) : <div />}
+            ) : <div className="col-span-2" />}
           </div>
 
           {erro && <p className="text-sm text-red-600">{erro}</p>}
