@@ -482,7 +482,7 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
             <FieldGroup label="Valor da Parcela *">
               <input type="number" step="0.01" min="0" value={form.valor}
                 onChange={e => set('valor', e.target.value)}
-                className={inputCls} placeholder="Valor da mensalidade/parcela" />
+                className={inputCls} placeholder="0,00" />
             </FieldGroup>
             <div className="flex items-stretch rounded-lg border border-teal-300 bg-teal-50 focus-within:border-teal-500">
               <span className="px-3 py-2 text-xs font-semibold text-teal-700 bg-teal-100 border-r border-teal-300 flex items-center rounded-l-lg flex-shrink-0">Desconto</span>
