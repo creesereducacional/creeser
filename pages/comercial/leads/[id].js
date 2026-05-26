@@ -623,9 +623,9 @@ function WizardPreMatricula({ lead, leadId, onClose, onConvertida }) {
                           : 'border-gray-200 hover:border-purple-300 hover:bg-gray-50'}`}>
                       <div className="font-medium text-sm text-gray-800">{t.nome}</div>
                       <div className="text-xs text-gray-400 mt-0.5 flex gap-3 flex-wrap">
-                        {t.turno      && <span>Turno: {t.turno}</span>}
-                        {t.vagas      && <span>Vagas: {t.vagas}</span>}
-                        {t.datainicio && <span>Início: {t.datainicio}</span>}
+                        {t.turno             && <span>Turno: {t.turno}</span>}
+                        {t.capacidademaxima  && <span>Vagas: {t.capacidademaxima}</span>}
+                        {t.datainicio        && <span>Início: {t.datainicio}</span>}
                         {t.situacao   && <span className="capitalize">{t.situacao.toLowerCase()}</span>}
                       </div>
                     </button>
