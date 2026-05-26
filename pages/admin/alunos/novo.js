@@ -692,14 +692,17 @@ export default function CadastroAluno() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-medium text-teal-600 mb-1 block">Semestre</label>
-                <input
-                  type="text"
+                <select
                   name="semestre"
                   value={formData.semestre}
                   onChange={handleInputChange}
-                  placeholder="Semestre"
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                />
+                >
+                  <option value="">Selecione</option>
+                  {Array.from({ length: 20 }, (_, i) => i + 1).map(n => (
+                    <option key={n} value={n}>{n}º Semestre</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
