@@ -44,14 +44,31 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Este lead já foi convertido em pré-matrícula ou matrícula' });
   }
 
-  // Criar aluno com dados mínimos do lead
+  const {
+    cursoid,
+    turmaid,
+    plano_financeiro,
+    valor_matricula,
+    valor_mensalidade,
+    qtd_parcelas,
+    dia_pagamento,
+  } = req.body;
+
+  // Criar aluno com dados mínimos do lead + dados do curso/plano escolhidos
   const novoAluno = {
     nome: lead.nome,
     email: lead.email || null,
     telefone_celular: lead.whatsapp || lead.telefone || null,
     instituicao_id: lead.instituicao_id,
-    captado_por_id: lead.captado_por_id,
+    captado_por_id: lead.captado_por_id || authUser.id,
     statusmatricula: 'AGUARDANDO_PAGAMENTO',
+    ...(cursoid           ? { cursoid: Number(cursoid) }                 : {}),
+    ...(turmaid           ? { turmaid: Number(turmaid) }                 : {}),
+    ...(plano_financeiro  ? { plano_financeiro }                         : {}),
+    ...(valor_matricula   ? { valor_matricula: Number(valor_matricula) }  : {}),
+    ...(valor_mensalidade ? { valor_mensalidade: Number(valor_mensalidade) } : {}),
+    ...(qtd_parcelas      ? { qtd_parcelas: Number(qtd_parcelas) }       : {}),
+    ...(dia_pagamento     ? { dia_pagamento: Number(dia_pagamento) }      : {}),
   };
 
   const { data: aluno, error: alunoError } = await supabase

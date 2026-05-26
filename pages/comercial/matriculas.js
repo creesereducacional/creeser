@@ -105,6 +105,7 @@ export default function MinhasMatriculas() {
                 <th className="px-4 py-3 text-left">Status Matrícula</th>
                 <th className="px-4 py-3 text-left">Pagamento</th>
                 <th className="px-4 py-3 text-left">Data</th>
+                <th className="px-4 py-3 text-left">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -119,6 +120,17 @@ export default function MinhasMatriculas() {
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-800">{aluno.nome}</div>
                       <div className="text-xs text-gray-400">{aluno.email || '—'}</div>
+                      {/* WhatsApp link */}
+                      {aluno.telefone_celular && (
+                        <a
+                          href={`https://wa.me/55${aluno.telefone_celular.replace(/\D/g,'')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-green-600 hover:underline"
+                        >
+                          📲 WhatsApp
+                        </a>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-gray-500">{aluno.curso_interesse || '—'}</td>
                     <td className="px-4 py-3">
@@ -137,6 +149,12 @@ export default function MinhasMatriculas() {
                     </td>
                     <td className="px-4 py-3 text-gray-400 text-xs">
                       {aluno.created_at ? new Date(aluno.created_at).toLocaleDateString('pt-BR') : '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <a href={`/comercial/leads`}
+                        className="text-xs text-teal-600 hover:underline">
+                        Ver Lead
+                      </a>
                     </td>
                   </tr>
                 );
