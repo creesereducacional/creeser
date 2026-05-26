@@ -54,6 +54,24 @@ export default async function handler(req, res) {
     dia_pagamento,
   } = req.body;
 
+  if (!turmaid) {
+    return res.status(400).json({ error: 'Pré-matrícula exige uma turma ativa vinculada ao curso.' });
+  }
+
+  // Verificar se a turma existe e está ativa
+  const { data: turmaCheck, error: turmaErr } = await supabase
+    .from('turmas')
+    .select('id, situacao')
+    .eq('id', Number(turmaid))
+    .maybeSingle();
+  if (turmaErr || !turmaCheck) {
+    return res.status(400).json({ error: 'Turma não encontrada.' });
+  }
+  const situacaoTurma = String(turmaCheck.situacao || '').toUpperCase();
+  if (situacaoTurma && !['ATIVO', 'EM_ANDAMENTO', 'ABERTA'].includes(situacaoTurma)) {
+    return res.status(400).json({ error: 'A turma selecionada não está ativa.' });
+  }
+
   // Criar aluno com dados mínimos do lead + dados do curso/plano escolhidos
   const novoAluno = {
     nome: lead.nome,

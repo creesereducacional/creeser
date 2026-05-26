@@ -414,6 +414,17 @@ function WizardPreMatricula({ lead, leadId, onClose, onConvertida }) {
   const [convertendo, setConvertendo]   = useState(false);
   const [erroWiz, setErroWiz]           = useState(null);
 
+  // Perfil do usuário logado
+  const [meUser, setMeUser]             = useState(null);
+
+  // Carregar perfil do usuário
+  useEffect(() => {
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => setMeUser(d.usuario || null))
+      .catch(() => {});
+  }, []);
+
   // Carregar instituições ao montar
   useEffect(() => {
     fetch('/api/comercial/instituicoes', { credentials: 'include' })
@@ -458,6 +469,11 @@ function WizardPreMatricula({ lead, leadId, onClose, onConvertida }) {
   useEffect(() => {
     setTurmaObj(turmas.find(t => String(t.id) === String(turmaSel)) || null);
   }, [turmaSel, turmas]);
+
+  const isAdmin = !!(meUser && (
+    ['grupo_admin', 'instituicao_admin', 'admin'].includes(String(meUser.perfil || '').toLowerCase()) ||
+    ['grupo_admin', 'instituicao_admin', 'admin'].includes(String(meUser.tipo || '').toLowerCase())
+  ));
 
   const temPlano = !!(turmaObj && (turmaObj.matricula || turmaObj.mensalidade || turmaObj.mesescontrato));
 
@@ -611,7 +627,24 @@ function WizardPreMatricula({ lead, leadId, onClose, onConvertida }) {
               {carregandoTurmas ? (
                 <div className="text-sm text-gray-400 py-6 text-center">Carregando turmas…</div>
               ) : turmas.length === 0 ? (
-                <p className="text-sm text-gray-400 py-6 text-center">Nenhuma turma ativa para este curso.</p>
+                <div className="space-y-3">
+                  <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 space-y-2">
+                    <p className="font-semibold text-amber-800 text-sm">⚠️ Nenhuma turma ativa encontrada para este curso.</p>
+                    <p className="text-xs text-amber-700">
+                      {isAdmin
+                        ? 'Cadastre uma turma para este curso antes de continuar.'
+                        : 'Solicite à secretaria/admin a criação de uma turma para continuar.'}
+                    </p>
+                  </div>
+                  {isAdmin && (
+                    <a
+                      href={`/admin/turmas/novo?cursoId=${cursoSel}&instituicaoId=${instSel}`}
+                      target="_blank" rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 w-full px-4 py-2.5 text-sm font-semibold bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors">
+                      + Cadastrar Turma
+                    </a>
+                  )}
+                </div>
               ) : (
                 <div className="space-y-2">
                   {turmas.map(t => (
