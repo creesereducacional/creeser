@@ -458,7 +458,7 @@ function WizardPreMatricula({ lead, leadId, onClose, onConvertida }) {
   useEffect(() => {
     if (!cursoSel) { setTurmas([]); setTurmaSel(''); setTurmaObj(null); return; }
     setCarregandoTurmas(true);
-    fetch(`/api/comercial/turmas?cursoid=${cursoSel}`, { credentials: 'include' })
+    fetch(`/api/comercial/turmas?cursoid=${cursoSel}&instituicao_id=${instSel}`, { credentials: 'include' })
       .then(r => r.json())
       .then(data => setTurmas(Array.isArray(data) ? data : []))
       .catch(() => {})
