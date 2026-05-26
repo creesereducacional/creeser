@@ -31,33 +31,23 @@ export default function Login() {
       }
 
       const data = await res.json();
-      
-      // Salvar token e dados do usuário
-      localStorage.setItem("token", data.token);
       localStorage.setItem("usuario", JSON.stringify(data.usuario));
-      
-      console.log('[LOGIN] Login bem-sucedido:', {
-        email: data.usuario.email,
-        tipo: data.usuario.tipo,
-      });
 
-      // Aguarda um pouco para garantir que localStorage foi salvo
-      setTimeout(() => {
-        // Redireciona conforme tipo/perfil de usuário
-        console.log('[LOGIN] Redirecionando usuario tipo:', data.usuario.tipo, 'perfil:', data.usuario.perfil);
-        const perfil = String(data.usuario.perfil || '').toLowerCase();
-        if (data.usuario.tipo === "admin" && perfil === "comercial") {
-          router.push("/comercial/dashboard");
-        } else if (data.usuario.tipo === "admin") {
-          router.push("/admin/dashboard");
-        } else if (data.usuario.tipo === "professor") {
-          router.push("/professor/dashboard");
-        } else if (data.usuario.tipo === "aluno") {
-          router.push("/aluno/home");
-        } else {
-          router.push("/login");
-        }
-      }, 50);
+      // Redireciona conforme perfil do usuário
+      const perfil = String(data.usuario.perfil || '').toLowerCase();
+      const tipo   = String(data.usuario.tipo   || '').toLowerCase();
+      let destino  = '/admin/dashboard'; // fallback seguro
+
+      if (perfil === 'comercial') {
+        destino = '/comercial/dashboard';
+      } else if (tipo === 'professor') {
+        destino = '/professor/dashboard';
+      } else if (tipo === 'aluno') {
+        destino = '/aluno/home';
+      }
+      // grupo_admin, instituicao_admin, financeiro, secretaria, usuario, admin → /admin/dashboard
+
+      router.push(destino);
     } catch (err) {
       console.error('[LOGIN] Erro:', err);
       setErro("Erro ao conectar ao servidor. Verifique sua conexão.");
