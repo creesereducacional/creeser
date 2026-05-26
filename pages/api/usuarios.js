@@ -21,7 +21,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     const { tipo } = req.query;
-    let query = supabase.from('usuarios').select('*').order('nome_completo');
+    let query = supabase.from('usuarios').select('*').order('nomecompleto');
     query = applyInstituicaoFilter(query, instituicaoId);
     if (tipo) query = query.eq('tipo', tipo);
     const { data, error } = await query;
@@ -38,17 +38,17 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Todos os campos são obrigatórios' });
     }
     const { data, error } = await supabase.from('usuarios').insert({
-      nome_completo:   nomeCompleto,
+      nomecompleto:    nomeCompleto,
       email,
       senha,
       cpf,
-      data_nascimento: dataNascimento,
+      datanascimento:  dataNascimento,
       whatsapp,
       tipo,
       perfil:          perfil || (tipo === 'admin' ? 'instituicao_admin' : tipo),
       instituicao_id:  instId || null,
       status:          'ativo',
-    }).select('id, nome_completo, email, cpf, tipo, perfil, status, instituicao_id').single();
+    }).select('id, nomecompleto, email, cpf, tipo, perfil, status, instituicao_id').single();
     if (error) {
       if (error.code === '23505') return res.status(409).json({ error: 'CPF ou email já cadastrado' });
       return res.status(500).json({ error: error.message });
@@ -60,15 +60,15 @@ export default async function handler(req, res) {
     const { id } = req.query;
     const body = req.body || {};
     const updates = {};
-    if (body.nomeCompleto)   updates.nome_completo   = body.nomeCompleto;
+    if (body.nomeCompleto)   updates.nomecompleto    = body.nomeCompleto;
     if (body.email)          updates.email           = body.email;
     if (body.cpf)            updates.cpf             = body.cpf;
-    if (body.dataNascimento) updates.data_nascimento = body.dataNascimento;
+    if (body.dataNascimento) updates.datanascimento  = body.dataNascimento;
     if (body.whatsapp)       updates.whatsapp        = body.whatsapp;
     if (body.tipo)           updates.tipo            = body.tipo;
     if (body.perfil)         updates.perfil          = body.perfil;
     if (body.status)         updates.status          = body.status;
-    const { data, error } = await supabase.from('usuarios').update(updates).eq('id', id).select('id, nome_completo, email, cpf, tipo, perfil, status').single();
+    const { data, error } = await supabase.from('usuarios').update(updates).eq('id', id).select('id, nomecompleto, email, cpf, tipo, perfil, status').single();
     if (error) return res.status(500).json({ error: error.message });
     return res.status(200).json({ message: 'Usuário atualizado com sucesso', usuario: data });
   }
