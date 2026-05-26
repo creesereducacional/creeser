@@ -10,6 +10,13 @@
 
 import { createClient } from '@supabase/supabase-js';
 import efi from '../../../../lib/efi-client';
+import {
+  applyInstituicaoFilter,
+  hasPerfil,
+  requireAuth,
+  requirePerfil,
+  resolveInstituicaoId,
+} from '../../../../lib/auth-server';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -17,6 +24,19 @@ const supabase = createClient(
 );
 
 export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'financeiro', 'admin'])) {
+    return;
+  }
+
+  const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+  req.instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+
+  if (!isGroupAdmin && !req.instituicaoId) {
+    return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
+  }
+
   if (req.method === 'GET')    return buscarCarne(req, res);
   if (req.method === 'POST')   return criarCarne(req, res);
   if (req.method === 'PATCH')  return cancelarParcela(req, res);
@@ -32,19 +52,21 @@ async function buscarCarne(req, res) {
     const { ordem_id } = req.query;
     if (!ordem_id) return res.status(400).json({ message: 'ordem_id é obrigatório.' });
 
-    const { data: ordem, error } = await supabase
+    let ordemQuery = supabase
       .from('financeiro_ordens_pagamento')
-      .select('efi_carnet_id')
-      .eq('id', ordem_id)
-      .single();
+      .select('efi_carnet_id, instituicao_id')
+      .eq('id', ordem_id);
 
-    if (error || !ordem?.efi_carnet_id) {
+    ordemQuery = applyInstituicaoFilter(ordemQuery, req.instituicaoId);
+    const { data: ordemData, error } = await ordemQuery.single();
+
+    if (error || !ordemData?.efi_carnet_id) {
       return res.status(404).json({ message: 'Carnê EFI não encontrado para esta ordem.' });
     }
 
-    const data = await efi.getCarnet(Number(ordem.efi_carnet_id));
+    const data = await efi.getCarnet(Number(ordemData.efi_carnet_id));
     return res.status(200).json({
-      carnet_id: ordem.efi_carnet_id,
+      carnet_id: ordemData.efi_carnet_id,
       link: data?.data?.carnet?.link || data?.data?.link || null,
       status: data?.data?.carnet?.status || null,
     });
@@ -66,46 +88,53 @@ async function criarCarne(req, res) {
     }
 
     // 1. Buscar ordem + parcelas + aluno
-    const { data: ordem, error: ordemErr } = await supabase
+    let ordemQuery = supabase
       .from('financeiro_ordens_pagamento')
       .select(`
-        id, tipo, descricao, status, quantidade_parcelas, efi_carnet_id,
+        id, instituicao_id, tipo, descricao, status, quantidade_parcelas, efi_carnet_id,
         aluno:alunos!inner ( id, nome, cpf, email, data_nascimento, telefone_celular )
       `)
-      .eq('id', ordem_id)
-      .single();
+      .eq('id', ordem_id);
 
-    if (ordemErr || !ordem) {
+    ordemQuery = applyInstituicaoFilter(ordemQuery, req.instituicaoId);
+    const { data: ordemData, error: ordemErrFinal } = await ordemQuery.single();
+
+    if (ordemErrFinal || !ordemData) {
       return res.status(404).json({ message: 'Ordem não encontrada.' });
     }
 
-    if (ordem.tipo !== 'carne') {
+    const ordemSelecionada = ordemData;
+
+    if (ordemSelecionada.tipo !== 'carne') {
       return res.status(422).json({ message: 'Use /efi/cobranca para ordens simples.' });
     }
 
-    if (ordem.status === 'cancelado') {
+    if (ordemSelecionada.status === 'cancelado') {
       return res.status(422).json({ message: 'Ordem já está cancelada.' });
     }
 
-    if (ordem.efi_carnet_id) {
+    if (ordemSelecionada.efi_carnet_id) {
       return res.status(422).json({
         message: 'Carnê EFI já criado para esta ordem.',
-        efi_carnet_id: ordem.efi_carnet_id,
+        efi_carnet_id: ordemSelecionada.efi_carnet_id,
       });
     }
 
     // 2. Buscar parcelas em ordem crescente
-    const { data: parcelas, error: parcelasErr } = await supabase
+    let parcelasQuery = supabase
       .from('financeiro_parcelas')
       .select('id, numero_parcela, valor, data_vencimento')
       .eq('ordem_pagamento_id', ordem_id)
       .order('numero_parcela', { ascending: true });
 
+    parcelasQuery = applyInstituicaoFilter(parcelasQuery, req.instituicaoId);
+    const { data: parcelas, error: parcelasErr } = await parcelasQuery;
+
     if (parcelasErr || !parcelas?.length) {
       return res.status(422).json({ message: 'Nenhuma parcela encontrada para esta ordem.' });
     }
 
-    const aluno = ordem.aluno;
+    const aluno = ordemSelecionada.aluno;
     const cpfLimpo = (aluno.cpf || '').replace(/\D/g, '');
 
     if (!cpfLimpo || cpfLimpo.length !== 11) {
@@ -134,7 +163,7 @@ async function criarCarne(req, res) {
 
     // 3. Criar carnê na EFI
     const carnetData = await efi.createCarnet({
-      items: [{ name: ordem.descricao, value: valorCentavos, amount: 1 }],
+      items: [{ name: ordemSelecionada.descricao, value: valorCentavos, amount: 1 }],
       customer,
       expire_at: primeiroVencimento,
       repeats: parcelas.length,
@@ -145,6 +174,8 @@ async function criarCarne(req, res) {
     const carnet = carnetData.data;
     const carnetId = carnet.carnet_id;
     const charges = carnet.charges || []; // array com charge_id por parcela
+
+    const instituicaoId = ordemSelecionada.instituicao_id || req.instituicaoId || null;
 
     // 4. Salvar cada charge_id na parcela correspondente
     for (const parcela of parcelas) {
@@ -157,6 +188,7 @@ async function criarCarne(req, res) {
       // Registrar em financeiro_boletos
       await supabase.from('financeiro_boletos').insert({
         parcela_id: parcela.id,
+        instituicao_id: instituicaoId,
         gateway: 'efi',
         boleto_id_gateway: String(chargeId),
         boleto_barcode: billet.barcode || null,
@@ -214,17 +246,21 @@ async function cancelarParcela(req, res) {
       return res.status(400).json({ message: 'ordem_id e parcela_id são obrigatórios.' });
     }
 
-    const { data: ordem } = await supabase
+    let ordemQuery = supabase
       .from('financeiro_ordens_pagamento')
-      .select('efi_carnet_id')
-      .eq('id', ordem_id)
-      .single();
+      .select('efi_carnet_id, instituicao_id')
+      .eq('id', ordem_id);
 
-    const { data: parcela } = await supabase
+    ordemQuery = applyInstituicaoFilter(ordemQuery, req.instituicaoId);
+    const { data: ordem } = await ordemQuery.single();
+
+    let parcelaQuery = supabase
       .from('financeiro_parcelas')
       .select('id, numero_parcela, status')
-      .eq('id', parcela_id)
-      .single();
+      .eq('id', parcela_id);
+
+    parcelaQuery = applyInstituicaoFilter(parcelaQuery, req.instituicaoId);
+    const { data: parcela } = await parcelaQuery.single();
 
     if (!parcela) return res.status(404).json({ message: 'Parcela não encontrada.' });
     if (parcela.status === 'cancelado') return res.status(422).json({ message: 'Parcela já cancelada.' });
@@ -264,11 +300,13 @@ async function cancelarCarne(req, res) {
     }
 
     // 1. Buscar ordem
-    const { data: ordem, error: ordemErr } = await supabase
+    let ordemQuery = supabase
       .from('financeiro_ordens_pagamento')
       .select('id, tipo, status, efi_carnet_id')
-      .eq('id', ordem_id)
-      .single();
+      .eq('id', ordem_id);
+
+    ordemQuery = applyInstituicaoFilter(ordemQuery, req.instituicaoId);
+    const { data: ordem, error: ordemErr } = await ordemQuery.single();
 
     if (ordemErr || !ordem) {
       return res.status(404).json({ message: 'Ordem não encontrada.' });

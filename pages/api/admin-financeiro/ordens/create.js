@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { hasPerfil, requireAuth, requirePerfil, resolveInstituicaoId } from '../../../../lib/auth-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -10,6 +11,19 @@ export default async function handler(req, res) {
   }
 
   try {
+    const authUser = requireAuth(req, res);
+    if (!authUser) return;
+    if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'financeiro', 'admin'])) {
+      return;
+    }
+
+    const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+    const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
+
+    if (!instituicaoId && !isGroupAdmin) {
+      return res.status(400).json({ message: 'Instituicao obrigatoria para criar ordem' });
+    }
+
     const {
       aluno_id,
       tipo,
@@ -24,6 +38,27 @@ export default async function handler(req, res) {
       data_vencimento_primeira,
       intervalo_dias
     } = req.body;
+
+    const { data: aluno, error: alunoError } = await supabase
+      .from('alunos')
+      .select('id,instituicao_id')
+      .eq('id', aluno_id)
+      .single();
+
+    if (alunoError || !aluno) {
+      return res.status(404).json({ message: 'Aluno nao encontrado' });
+    }
+
+    const alunoInstituicaoId = aluno.instituicao_id || null;
+    if (!isGroupAdmin && alunoInstituicaoId && alunoInstituicaoId !== instituicaoId) {
+      return res.status(403).json({ message: 'Acesso negado para o aluno informado' });
+    }
+
+    const instituicaoFinal = alunoInstituicaoId || instituicaoId;
+
+    if (!instituicaoFinal) {
+      return res.status(400).json({ message: 'Instituicao obrigatoria para criar ordem' });
+    }
 
     // Validações
     if (!aluno_id || !tipo || !descricao || !valor_total || valor_total <= 0) {
@@ -41,6 +76,7 @@ export default async function handler(req, res) {
     const { data: ordemData, error: ordemError } = await supabase
       .from('financeiro_ordens_pagamento')
       .insert([{
+        instituicao_id: instituicaoFinal,
         aluno_id,
         tipo,
         descricao,
@@ -51,7 +87,7 @@ export default async function handler(req, res) {
         quantidade_parcelas: quantidade_parcelas || 1,
         observacoes: observacoes || null,
         status: 'ativo',
-        criado_por: criado_por || 'financeiro'
+        criado_por: criado_por || authUser.email || authUser.id || 'financeiro'
       }])
       .select()
       .single();
@@ -70,6 +106,7 @@ export default async function handler(req, res) {
 
     for (let i = 1; i <= qtd; i++) {
       parcelas.push({
+        instituicao_id: instituicaoFinal,
         ordem_pagamento_id: ordem_id,
         aluno_id,
         numero_parcela: i,

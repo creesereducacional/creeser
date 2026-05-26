@@ -1,28 +1,12 @@
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/router';
 import AdminHeader from '../../components/AdminHeader';
 import DashboardLayout from '../../components/DashboardLayout';
 import AdminEmails from '../../components/AdminEmails';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function Emails() {
-  const router = useRouter();
-  const [usuario, setUsuario] = useState(null);
+  const { usuario, carregando } = useAuth({ tiposPermitidos: ['admin'] });
 
-  useEffect(() => {
-    const usuarioStorage = localStorage.getItem('usuario');
-    if (usuarioStorage) {
-      const usuarioData = JSON.parse(usuarioStorage);
-      setUsuario(usuarioData);
-      
-      if (usuarioData.tipo !== 'admin') {
-        router.push('/dashboard');
-      }
-    } else {
-      router.push('/login');
-    }
-  }, [router]);
-
-  if (!usuario) {
+  if (carregando || !usuario) {
     return (
       <div className="flex justify-center items-center h-screen">
         <div className="text-center">

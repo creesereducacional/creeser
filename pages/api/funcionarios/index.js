@@ -1,76 +1,57 @@
-import fs from 'fs';
-import path from 'path';
+import { createClient } from '@supabase/supabase-js';
+import { requireAuth, requirePerfil, resolveInstituicaoId, applyInstituicaoFilter } from '../../../lib/auth-server';
 
-const dataPath = path.join(process.cwd(), 'data', 'funcionarios.json');
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
-const withLowercaseKeys = (obj) => {
-  if (!obj || typeof obj !== 'object') return obj;
-  const lowered = {};
-  Object.entries(obj).forEach(([key, value]) => {
-    lowered[key.toLowerCase()] = value;
-  });
-  return { ...obj, ...lowered };
-};
+export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'admin'])) return;
 
-// Função para ler dados
-function lerFuncionarios() {
-  try {
-    if (fs.existsSync(dataPath)) {
-      const data = fs.readFileSync(dataPath, 'utf-8');
-      return JSON.parse(data);
-    }
-  } catch (error) {
-    console.error('Erro ao ler funcionários:', error);
-  }
-  return [];
-}
+  const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: true });
 
-// Função para salvar dados
-function salvarFuncionarios(data) {
-  try {
-    fs.writeFileSync(dataPath, JSON.stringify(data, null, 2), 'utf-8');
-    return true;
-  } catch (error) {
-    console.error('Erro ao salvar funcionários:', error);
-    return false;
-  }
-}
-
-export default function handler(req, res) {
   if (req.method === 'GET') {
-    try {
-      const funcionarios = lerFuncionarios();
-      res.status(200).json(funcionarios.map(withLowercaseKeys));
-    } catch (error) {
-      res.status(500).json({ message: 'Erro ao carregar funcionários', error: error.message });
-    }
-  } else if (req.method === 'POST') {
-    try {
-      const funcionarios = lerFuncionarios();
-      const body = req.body || {};
-      
-      // Gerar novo ID como número
-      const novoId = funcionarios.length > 0 
-        ? Math.max(...funcionarios.map(f => f.id || 0)) + 1 
-        : 2001;
-
-      const novoFuncionario = {
-        id: novoId,
-        ...body,
-        dataCriacao: new Date().toISOString()
-      };
-
-      funcionarios.push(novoFuncionario);
-      
-      if (salvarFuncionarios(funcionarios)) {
-        res.status(201).json(withLowercaseKeys(novoFuncionario));
-      } else {
-        res.status(500).json({ message: 'Erro ao salvar funcionário' });
-      }
-    } catch (error) {
-      res.status(500).json({ message: 'Erro ao cadastrar funcionário', error: error.message });
-    }
-  } else {
-    res.status(405).json({ message: 'Método não permitido' });
+    let query = supabase.from('funcionarios').select('*').order('nome');
+    query = applyInstituicaoFilter(query, instituicaoId);
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json(data);
   }
+
+  if (req.method === 'POST') {
+    const body = req.body || {};
+    const instId = resolveInstituicaoId(req, authUser);
+    const { data, error } = await supabase.from('funcionarios').insert({
+      nome:            body.nome,
+      email:           body.email           || null,
+      cpf:             body.cpf             || null,
+      rg:              body.rg              || null,
+      funcao:          body.funcao          || null,
+      telefone_celular: body.telefoneCelular || body.telefone_celular || null,
+      whatsapp:        body.whatsapp        || null,
+      cep:             body.cep             || null,
+      endereco:        body.endereco        || null,
+      numero:          body.numero          || null,
+      cidade:          body.cidade          || null,
+      bairro:          body.bairro          || null,
+      uf:              body.uf              || null,
+      dt_nascimento:   body.dtNascimento    || body.dt_nascimento    || null,
+      dt_admissao:     body.dtAdmissao      || body.dt_admissao      || null,
+      status:          body.status          || 'ATIVO',
+      banco:           body.banco           || null,
+      agencia:         body.agencia         || null,
+      conta_corrente:  body.contaCorrente   || body.conta_corrente   || null,
+      pix:             body.pix             || null,
+      obs:             body.obs             || null,
+      instituicao_id:  instId               || null,
+    }).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(201).json(data);
+  }
+
+  res.setHeader('Allow', ['GET', 'POST']);
+  return res.status(405).json({ error: `Método ${req.method} não permitido` });
 }

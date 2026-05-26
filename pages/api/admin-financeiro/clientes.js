@@ -1,3 +1,5 @@
+import { requireAuth, requirePerfil } from '../../../lib/auth-server';
+
 const withLowercaseKeys = (obj) => {
   if (!obj || typeof obj !== 'object') return obj;
   const lowered = {};
@@ -8,6 +10,13 @@ const withLowercaseKeys = (obj) => {
 };
 
 export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+
+  if (!requirePerfil(authUser, res, ['grupo_admin'])) {
+    return;
+  }
+
   if (req.method === 'GET') {
     // TODO: Buscar clientes do Supabase/Prisma
     // Fazer join com Assinatura e Plano para obter status e MRR

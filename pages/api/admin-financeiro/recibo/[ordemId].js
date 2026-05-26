@@ -1,17 +1,24 @@
 import { createClient } from '@supabase/supabase-js';
+import { applyInstituicaoFilter, hasPerfil, requireAuth, requirePerfil, resolveInstituicaoId } from '../../../../lib/auth-server';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-async function getEmpresaData() {
+async function getEmpresaData(instituicaoId) {
   try {
-    const { data } = await supabase
+    let query = supabase
       .from('configuracoes_empresa')
-      .select('nome_empresa, cnpj, razao_social, endereco, cidade, estado, telefone, logo')
-      .eq('id', 1)
-      .single();
+      .select('nome_empresa, cnpj, razao_social, endereco, cidade, estado, telefone, logo');
+
+    if (instituicaoId === null) {
+      query = query.is('instituicao_id', null);
+    } else if (instituicaoId) {
+      query = query.eq('instituicao_id', instituicaoId);
+    }
+
+    const { data } = await query.single();
     if (!data) return {};
     return {
       nomeEmpresa: data.nome_empresa || '',
@@ -34,11 +41,26 @@ export default async function handler(req, res) {
   const { ordemId } = req.query;
 
   try {
-    const { data: ordem, error: ordemErr } = await supabase
+    const authUser = requireAuth(req, res);
+    if (!authUser) return;
+    if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'financeiro', 'admin'])) {
+      return;
+    }
+
+    const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+    const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+
+    if (!isGroupAdmin && !instituicaoId) {
+      return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
+    }
+
+    let ordemQuery = supabase
       .from('financeiro_ordens_pagamento')
-      .select('id, descricao, referencia, valor_total, aluno_id, financeiro_parcelas(valor, data_vencimento, status, boleto_numero, updated_at)')
-      .eq('id', ordemId)
-      .single();
+      .select('id, instituicao_id, descricao, referencia, valor_total, aluno_id, financeiro_parcelas(valor, data_vencimento, status, boleto_numero, updated_at)')
+      .eq('id', ordemId);
+
+    ordemQuery = applyInstituicaoFilter(ordemQuery, instituicaoId);
+    const { data: ordem, error: ordemErr } = await ordemQuery.single();
 
     if (ordemErr || !ordem) return res.status(404).json({ message: 'Ordem não encontrada' });
 
@@ -53,7 +75,7 @@ export default async function handler(req, res) {
       aluno?.cursoid ? supabase.from('cursos').select('nome').eq('id', aluno.cursoid).single() : Promise.resolve({ data: null }),
     ]);
 
-    const empresa = await getEmpresaData();
+    const empresa = await getEmpresaData(ordem?.instituicao_id || instituicaoId || null);
     const parcela = (ordem.financeiro_parcelas || [])[0] || {};
 
     return res.status(200).json({

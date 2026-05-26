@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { applyInstituicaoFilter, hasPerfil, requireAuth, requirePerfil, resolveInstituicaoId } from '../../../../lib/auth-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -10,7 +11,20 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     // Buscar aluno específico
     try {
-      const { data, error } = await supabase
+      const authUser = requireAuth(req, res);
+      if (!authUser) return;
+      if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'financeiro', 'admin'])) {
+        return;
+      }
+
+      const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+
+      if (!isGroupAdmin && !instituicaoId) {
+        return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
+      }
+
+      let query = supabase
         .from('alunos')
         .select(
           `id,
@@ -28,8 +42,11 @@ export default async function handler(req, res) {
           telefone_celular,
           endereco`
         )
-        .eq('id', Number(id))
-        .single();
+        .eq('id', Number(id));
+
+      query = applyInstituicaoFilter(query, instituicaoId);
+
+      const { data, error } = await query.single();
 
       if (error) throw error;
       return res.status(200).json(data);

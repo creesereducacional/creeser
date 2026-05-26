@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import AdminFinanceiroLayout from '@/components/AdminFinanceiro/Layout';
+import ModalBaixaManual from '@/components/AdminFinanceiro/ModalBaixaManual';
 
 export default function OrdensPage() {
   const [ordens, setOrdens] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtroStatus, setFiltroStatus] = useState('');
   const [filtroAluno, setFiltroAluno] = useState('');
+  const [modalBaixaManual, setModalBaixaManual] = useState(null); // { parcela_id, valor, efi_charge_id, label }
+  const [baixandoParcela, setBaixandoParcela] = useState(false);
 
   useEffect(() => {
     carregarOrdens();
@@ -24,6 +27,28 @@ export default function OrdensPage() {
       console.error('Erro ao carregar ordens:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleBaixarManual = async (formData) => {
+    const { parcela_id } = modalBaixaManual;
+    setBaixandoParcela(true);
+    try {
+      const res = await fetch(`/api/admin-financeiro/parcelas/${parcela_id}/pagar`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Erro ao registrar baixa');
+      setModalBaixaManual(null);
+      if (data.aviso) alert('⚠️ ' + data.aviso);
+      await carregarOrdens();
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    } finally {
+      setBaixandoParcela(false);
     }
   };
 
@@ -208,12 +233,28 @@ export default function OrdensPage() {
                         {ordem.cobranca}
                       </td>
                       <td className="px-4 py-4 text-sm">
-                        <Link
-                          href={`/admin-financeiro/ordem/${ordem.id}`}
-                          className="inline-block px-3 py-1 bg-teal-100 text-teal-700 rounded hover:bg-teal-200 transition text-xs font-semibold"
-                        >
-                          Ver
-                        </Link>
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/admin-financeiro/ordem/${ordem.id}`}
+                            className="inline-block px-3 py-1 bg-teal-100 text-teal-700 rounded hover:bg-teal-200 transition text-xs font-semibold"
+                          >
+                            Ver
+                          </Link>
+                          {ordem.parcela_id && ordem.status_parcela !== 'pago' && ordem.status_parcela !== 'cancelado' && (
+                            <button
+                              onClick={() => setModalBaixaManual({
+                                parcela_id: ordem.parcela_id,
+                                valor: null,
+                                efi_charge_id: ordem.parcela_efi_charge_id || null,
+                              })}
+                              title="Baixar manualmente"
+                              className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 transition text-xs font-semibold"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                              Baixar
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -223,6 +264,14 @@ export default function OrdensPage() {
           )}
         </div>
       </div>
+      {modalBaixaManual && (
+        <ModalBaixaManual
+          parcela={{ id: modalBaixaManual.parcela_id, valor: modalBaixaManual.valor, efi_charge_id: modalBaixaManual.efi_charge_id }}
+          onConfirm={handleBaixarManual}
+          onClose={() => setModalBaixaManual(null)}
+          loading={baixandoParcela}
+        />
+      )}
     </AdminFinanceiroLayout>
   );
 }

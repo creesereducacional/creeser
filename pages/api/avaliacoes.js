@@ -1,74 +1,51 @@
-import fs from 'fs';
-import path from 'path';
+import { createClient } from '@supabase/supabase-js';
+import { requireAuth, requirePerfil, resolveInstituicaoId, applyInstituicaoFilter } from '../../lib/auth-server';
 
-const avaliacoesPath = path.join(process.cwd(), 'data', 'avaliacoes.json');
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
-const withLowercaseKeys = (obj) => {
-  if (!obj || typeof obj !== 'object') return obj;
-  const lowered = {};
-  Object.entries(obj).forEach(([key, value]) => {
-    lowered[key.toLowerCase()] = value;
-  });
-  return { ...obj, ...lowered };
-};
+export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
 
-const getBodyValue = (body, key) => {
-  if (!body) return undefined;
-  return body[key] ?? body[key.toLowerCase()];
-};
-
-// Garantir que o arquivo existe
-if (!fs.existsSync(avaliacoesPath)) {
-  fs.writeFileSync(avaliacoesPath, JSON.stringify([], null, 2));
-}
-
-export default function handler(req, res) {
-  if (req.method === 'GET') {
-    try {
-      const data = fs.readFileSync(avaliacoesPath, 'utf8');
-      const avaliacoes = JSON.parse(data);
-      res.status(200).json(avaliacoes.map(withLowercaseKeys));
-    } catch (error) {
-      console.error('Erro ao ler avaliações:', error);
-      res.status(500).json({ error: 'Erro ao carregar avaliações' });
-    }
-  } else if (req.method === 'POST') {
-    try {
-      const cursoId = getBodyValue(req.body, 'cursoId');
-      const aulaId = getBodyValue(req.body, 'aulaId');
-      const alunoId = getBodyValue(req.body, 'alunoId');
-      const alunoNome = getBodyValue(req.body, 'alunoNome');
-      const estrelas = getBodyValue(req.body, 'estrelas');
-      const comentario = getBodyValue(req.body, 'comentario');
-
-      if (!cursoId || !aulaId || !alunoId || !estrelas) {
-        return res.status(400).json({ error: 'Dados incompletos' });
-      }
-
-      const data = fs.readFileSync(avaliacoesPath, 'utf8');
-      const avaliacoes = JSON.parse(data);
-
-      const novaAvaliacao = {
-        id: Date.now(),
-        cursoId,
-        aulaId,
-        alunoId,
-        alunoNome,
-        estrelas,
-        comentario: comentario || '',
-        data: new Date().toISOString()
-      };
-
-      avaliacoes.push(novaAvaliacao);
-
-      fs.writeFileSync(avaliacoesPath, JSON.stringify(avaliacoes, null, 2));
-
-      res.status(201).json({ message: 'Avaliação salva com sucesso', avaliacao: withLowercaseKeys(novaAvaliacao) });
-    } catch (error) {
-      console.error('Erro ao salvar avaliação:', error);
-      res.status(500).json({ error: 'Erro ao salvar avaliação' });
-    }
-  } else {
-    res.status(405).json({ error: 'Método não permitido' });
+  if (req.method !== 'GET') {
+    if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'professor', 'aluno'])) return;
   }
+
+  const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: true });
+
+  if (req.method === 'GET') {
+    let query = supabase.from('avaliacoes').select('*').order('created_at', { ascending: false });
+    query = applyInstituicaoFilter(query, instituicaoId);
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json(data);
+  }
+
+  if (req.method === 'POST') {
+    const body = req.body || {};
+    const { cursoId, aulaId, alunoId, alunoNome, estrelas, comentario } = body;
+
+    if (!cursoId || !aulaId || !alunoId || !estrelas) {
+      return res.status(400).json({ error: 'Dados incompletos' });
+    }
+
+    const instId = resolveInstituicaoId(req, authUser);
+    const { data, error } = await supabase.from('avaliacoes').insert({
+      curso_id:      String(cursoId),
+      aula_id:       String(aulaId),
+      aluno_id:      String(alunoId),
+      aluno_nome:    alunoNome    || null,
+      estrelas:      Number(estrelas),
+      comentario:    comentario   || '',
+      data:          new Date().toISOString(),
+      instituicao_id: instId      || null,
+    }).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(201).json({ message: 'Avaliação salva com sucesso', avaliacao: data });
+  }
+
+  return res.status(405).json({ error: `Método ${req.method} não permitido` });
 }

@@ -1,57 +1,46 @@
-import fs from 'fs';
-import path from 'path';
+import { createClient } from '@supabase/supabase-js';
+import { requireAuth, requirePerfil } from '../../../lib/auth-server';
 
-const filePath = path.join(process.cwd(), 'data', 'livro-registro.json');
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
-const withLowercaseKeys = (obj) => {
-  if (!obj || typeof obj !== 'object') return obj;
-  const lowered = {};
-  Object.entries(obj).forEach(([key, value]) => {
-    lowered[key.toLowerCase()] = value;
-  });
-  return { ...obj, ...lowered };
-};
+export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'secretaria', 'coordenador', 'admin'])) return;
 
-export default function handler(req, res) {
-  try {
-    const { id } = req.query;
-    const data = fs.readFileSync(filePath, 'utf8');
-    const registros = JSON.parse(data);
+  const { id } = req.query;
 
-    if (req.method === 'GET') {
-      const registro = registros.find(r => r.id === id);
-      if (!registro) {
-        return res.status(404).json({ error: 'Registro não encontrado' });
-      }
-      res.status(200).json(withLowercaseKeys(registro));
-    } else if (req.method === 'PUT') {
-      const index = registros.findIndex(r => r.id === id);
-      if (index === -1) {
-        return res.status(404).json({ error: 'Registro não encontrado' });
-      }
-      
-      registros[index] = {
-        ...registros[index],
-        ...req.body,
-        atualizado: new Date().toISOString()
-      };
-      
-      fs.writeFileSync(filePath, JSON.stringify(registros, null, 2));
-      res.status(200).json(withLowercaseKeys(registros[index]));
-    } else if (req.method === 'DELETE') {
-      const index = registros.findIndex(r => r.id === id);
-      if (index === -1) {
-        return res.status(404).json({ error: 'Registro não encontrado' });
-      }
-      
-      registros.splice(index, 1);
-      fs.writeFileSync(filePath, JSON.stringify(registros, null, 2));
-      res.status(200).json({ message: 'Registro deletado com sucesso' });
-    } else {
-      res.status(405).json({ error: 'Método não permitido' });
-    }
-  } catch (error) {
-    console.error('Erro:', error);
-    res.status(500).json({ error: 'Erro ao processar requisição' });
+  if (req.method === 'GET') {
+    const { data, error } = await supabase.from('livro_registro').select('*').eq('id', id).single();
+    if (error) return res.status(404).json({ error: 'Registro não encontrado' });
+    return res.status(200).json(data);
   }
+
+  if (req.method === 'PUT') {
+    const body = req.body || {};
+    const { data, error } = await supabase.from('livro_registro').update({
+      nome_aluno:      body.nomeAluno    || body.nome_aluno    || null,
+      numero_registro: body.numeroRegistro || body.numero_registro || null,
+      livro:           body.livro        || null,
+      folha:           body.folha        || null,
+      data:            body.data         || null,
+      curso:           body.curso        || null,
+      turma:           body.turma        || null,
+      periodo:         body.periodo      || null,
+    }).eq('id', id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json(data);
+  }
+
+  if (req.method === 'DELETE') {
+    const { error } = await supabase.from('livro_registro').delete().eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ message: 'Registro removido com sucesso' });
+  }
+
+  res.setHeader('Allow', ['GET', 'PUT', 'DELETE']);
+  return res.status(405).json({ error: `Método ${req.method} não permitido` });
 }

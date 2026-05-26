@@ -1,60 +1,110 @@
-﻿export default function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método não permitido' });
+﻿import { supabaseAdmin } from '../../../lib/supabase';
+import { buildAuthCookie, sanitizeUserForToken, signAuthToken } from '../../../lib/auth-server';
+
+const resolveInstituicao = async (usuario, requestInstituicaoId) => {
+  const userInstituicao = usuario?.instituicao_id || usuario?.instituicaoId || null;
+  const fallbackId = process.env.DEFAULT_INSTITUICAO_ID || null;
+  let instituicaoId = requestInstituicaoId || userInstituicao || fallbackId;
+  let tipoInstituicao = usuario?.tipo_instituicao || usuario?.tipoInstituicao || null;
+
+  if (!supabaseAdmin) {
+    return { instituicaoId, tipoInstituicao };
   }
 
-  const { email, senha } = req.body;
+  if (instituicaoId) {
+    const { data, error } = await supabaseAdmin
+      .from('instituicoes')
+      .select('id,tipo_instituicao')
+      .eq('id', instituicaoId)
+      .single();
 
-  // Validação básica
-  if (!email || !senha) {
-    return res.status(400).json({ error: 'Email e senha são obrigatórios' });
-  }
-
-  // Dados de usuários padrão (em produção seria do Supabase)
-  const usuarios = [
-    { 
-      id: 1, 
-      nome: 'Admin Sistema', 
-      email: 'admin@creeser.com', 
-      senha: 'admin123', 
-      tipo: 'admin' 
-    },
-    { 
-      id: 2, 
-      nome: 'João Silva', 
-      email: 'professor@creeser.com', 
-      senha: 'prof123', 
-      tipo: 'professor' 
-    },
-    { 
-      id: 3, 
-      nome: 'Maria Santos', 
-      email: 'aluno@creeser.com', 
-      senha: 'aluno123', 
-      tipo: 'aluno' 
+    if (!error && data) {
+      return {
+        instituicaoId: data.id,
+        tipoInstituicao: tipoInstituicao || data.tipo_instituicao || null,
+      };
     }
-  ];
-
-  const usuario = usuarios.find(u => u.email === email && u.senha === senha);
-
-  if (!usuario) {
-    return res.status(401).json({ error: 'Email ou senha inválidos' });
   }
 
-  const token = Buffer.from(JSON.stringify({ 
-    id: usuario.id, 
-    email: usuario.email, 
-    tipo: usuario.tipo 
-  })).toString('base64');
+  const { data } = await supabaseAdmin
+    .from('instituicoes')
+    .select('id,tipo_instituicao,ativa')
+    .order('ordem', { ascending: true })
+    .order('nome', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (data) {
+    instituicaoId = data.id;
+    tipoInstituicao = tipoInstituicao || data.tipo_instituicao || null;
+  }
+
+  return { instituicaoId, tipoInstituicao };
+};
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Metodo nao permitido' });
+  }
+
+  const { email, senha, instituicaoId, instituicao_id } = req.body || {};
+
+  if (!email || !senha) {
+    return res.status(400).json({ error: 'Email e senha sao obrigatorios' });
+  }
+
+  const emailNormalizado = String(email || '').trim().toLowerCase();
+
+  // Buscar usuário no Supabase
+  if (!supabaseAdmin) {
+    return res.status(503).json({ error: 'Serviço indisponível' });
+  }
+
+  const { data: usuario, error: dbError } = await supabaseAdmin
+    .from('usuarios')
+    .select('*')
+    .ilike('email', emailNormalizado)
+    .single();
+
+  if (dbError || !usuario) {
+    return res.status(401).json({ error: 'Email ou senha invalidos' });
+  }
+
+  // Verificar senha — campo `senha` em texto plano (sistema legado)
+  if (String(usuario.senha) !== String(senha)) {
+    return res.status(401).json({ error: 'Email ou senha invalidos' });
+  }
+
+  const statusNormalizado = String(usuario.status || 'ativo').toLowerCase();
+  if (statusNormalizado === 'inativo' || statusNormalizado === 'bloqueado' || statusNormalizado === 'suspenso') {
+    return res.status(403).json({ error: 'Conta inativa ou bloqueada' });
+  }
+
+  const requestedInstituicaoId = instituicaoId || instituicao_id || null;
+  const perfil = usuario.perfil || (usuario.tipo === 'admin' ? 'instituicao_admin' : usuario.tipo);
+  const isGroupAdmin = perfil === 'grupo_admin';
+
+  const { instituicaoId: resolvedInstituicaoId, tipoInstituicao } = await resolveInstituicao(
+    usuario,
+    requestedInstituicaoId
+  );
+
+  if (!isGroupAdmin && !resolvedInstituicaoId) {
+    return res.status(400).json({ error: 'Instituicao nao definida para o usuario' });
+  }
+
+  const tokenPayload = sanitizeUserForToken({
+    ...usuario,
+    perfil,
+    instituicao_id: resolvedInstituicaoId,
+    tipo_instituicao: tipoInstituicao,
+  });
+
+  const token = signAuthToken(tokenPayload);
+  res.setHeader('Set-Cookie', buildAuthCookie(token));
 
   return res.status(200).json({
     message: 'Login realizado com sucesso',
-    token,
-    usuario: { 
-      id: usuario.id, 
-      nome: usuario.nome, 
-      email: usuario.email, 
-      tipo: usuario.tipo 
-    }
+    usuario: tokenPayload,
   });
 }

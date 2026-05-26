@@ -1,154 +1,86 @@
-﻿import fs from 'fs';
-import path from 'path';
+﻿import { createClient } from '@supabase/supabase-js';
+import { hasPerfil, requireAuth, requirePerfil, resolveInstituicaoId, applyInstituicaoFilter } from '../../lib/auth-server';
 
-const dataDir = path.join(process.cwd(), 'data');
-const usuariosFile = path.join(dataDir, 'usuarios.json');
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
-const withLowercaseKeys = (obj) => {
-  if (!obj || typeof obj !== 'object') return obj;
-  const lowered = {};
-  Object.entries(obj).forEach(([key, value]) => {
-    lowered[key.toLowerCase()] = value;
-  });
-  return { ...obj, ...lowered };
-};
+export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'admin'])) return;
 
-const getBodyValue = (body, key) => {
-  if (!body) return undefined;
-  return body[key] ?? body[key.toLowerCase()];
-};
+  const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+  const isWrite = ['POST', 'PUT', 'DELETE'].includes(req.method);
+  const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin && !isWrite });
 
-// Criar diretório se não existir
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
-}
-
-// Carregar usuários do arquivo
-const carregarUsuarios = () => {
-  try {
-    if (fs.existsSync(usuariosFile)) {
-      const data = fs.readFileSync(usuariosFile, 'utf-8');
-      return JSON.parse(data);
-    }
-  } catch (err) {
-    console.error('Erro ao carregar usuários:', err);
-  }
-  
-  // Dados padrão se arquivo não existir
-  return [
-    { 
-      id: 1, 
-      nomeCompleto: "Admin Sistema", 
-      email: "admin@creeser.com", 
-      senha: "admin123", 
-      tipo: "admin",
-      cpf: "000.000.000-00",
-      dataNascimento: "1990-01-01",
-      whatsapp: "(11) 99999-9999",
-      dataCriacao: "2025-12-10",
-      status: "ativo"
-    },
-    { 
-      id: 2, 
-      nomeCompleto: "João Silva Santos", 
-      email: "professor@creeser.com", 
-      senha: "prof123", 
-      tipo: "professor",
-      cpf: "123.456.789-00",
-      dataNascimento: "1985-05-15",
-      whatsapp: "(11) 98888-8888",
-      dataCriacao: "2025-12-10",
-      status: "ativo"
-    },
-    { 
-      id: 3, 
-      nomeCompleto: "Maria Santos Oliveira", 
-      email: "aluno@creeser.com", 
-      senha: "aluno123", 
-      tipo: "aluno",
-      cpf: "987.654.321-00",
-      dataNascimento: "2000-03-20",
-      whatsapp: "(11) 97777-7777",
-      dataCriacao: "2025-12-10",
-      status: "ativo"
-    }
-  ];
-};
-
-// Salvar usuários no arquivo
-const salvarUsuarios = (usuarios) => {
-  try {
-    fs.writeFileSync(usuariosFile, JSON.stringify(usuarios, null, 2), 'utf-8');
-  } catch (err) {
-    console.error('Erro ao salvar usuários:', err);
-  }
-};
-
-export default function handler(req, res) {
-  const usuarios = carregarUsuarios();
-  const { method, query, body } = req;
-
-  if (method === 'GET') {
-    const { tipo } = query;
-    if (tipo) return res.status(200).json(usuarios.filter(u => u.tipo === tipo).map(withLowercaseKeys));
-    return res.status(200).json(usuarios.map(withLowercaseKeys));
+  if (!isGroupAdmin && !instituicaoId) {
+    return res.status(403).json({ error: 'Instituicao nao definida para o usuario atual' });
   }
 
-  if (method === 'POST') {
-    const nomeCompleto = getBodyValue(body, 'nomeCompleto');
-    const email = getBodyValue(body, 'email');
-    const senha = getBodyValue(body, 'senha');
-    const cpf = getBodyValue(body, 'cpf');
-    const dataNascimento = getBodyValue(body, 'dataNascimento');
-    const whatsapp = getBodyValue(body, 'whatsapp');
-    const tipo = getBodyValue(body, 'tipo');
+  if (req.method === 'GET') {
+    const { tipo } = req.query;
+    let query = supabase.from('usuarios').select('*').order('nome_completo');
+    query = applyInstituicaoFilter(query, instituicaoId);
+    if (tipo) query = query.eq('tipo', tipo);
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    // Omitir campo senha da resposta
+    return res.status(200).json(data.map(u => { const { senha, ...rest } = u; return rest; }));
+  }
+
+  if (req.method === 'POST') {
+    const body = req.body || {};
+    const instId = resolveInstituicaoId(req, authUser);
+    const { nomeCompleto, email, senha, cpf, dataNascimento, whatsapp, tipo, perfil } = body;
     if (!nomeCompleto || !email || !senha || !cpf || !dataNascimento || !whatsapp || !tipo) {
-      return res.status(400).json({ error: 'Todos os campos sÃ£o obrigatÃ³rios' });
+      return res.status(400).json({ error: 'Todos os campos são obrigatórios' });
     }
-    if (usuarios.some(u => u.cpf === cpf)) return res.status(409).json({ error: 'CPF jÃ¡ cadastrado' });
-    if (usuarios.some(u => u.email === email)) return res.status(409).json({ error: 'Email jÃ¡ cadastrado' });
-
-    const novo = {
-      id: Math.max(...usuarios.map(u => u.id), 0) + 1,
-      nomeCompleto, email, senha, cpf, dataNascimento, whatsapp, tipo,
-      dataCriacao: new Date().toISOString().split('T')[0],
-      status: 'ativo'
-    };
-    usuarios.push(novo);
-    salvarUsuarios(usuarios);
-    return res.status(201).json({ message: 'Usuário criado com sucesso', usuario: withLowercaseKeys(novo) });
+    const { data, error } = await supabase.from('usuarios').insert({
+      nome_completo:   nomeCompleto,
+      email,
+      senha,
+      cpf,
+      data_nascimento: dataNascimento,
+      whatsapp,
+      tipo,
+      perfil:          perfil || (tipo === 'admin' ? 'instituicao_admin' : tipo),
+      instituicao_id:  instId || null,
+      status:          'ativo',
+    }).select('id, nome_completo, email, cpf, tipo, perfil, status, instituicao_id').single();
+    if (error) {
+      if (error.code === '23505') return res.status(409).json({ error: 'CPF ou email já cadastrado' });
+      return res.status(500).json({ error: error.message });
+    }
+    return res.status(201).json({ message: 'Usuário criado com sucesso', usuario: data });
   }
 
-  if (method === 'PUT') {
-    const { id } = query;
-    const idx = usuarios.findIndex(u => u.id === parseInt(id));
-    if (idx === -1) return res.status(404).json({ error: 'UsuÃ¡rio nÃ£o encontrado' });
-
-    const nomeCompleto = getBodyValue(body, 'nomeCompleto');
-    const email = getBodyValue(body, 'email');
-    const cpf = getBodyValue(body, 'cpf');
-    const dataNascimento = getBodyValue(body, 'dataNascimento');
-    const whatsapp = getBodyValue(body, 'whatsapp');
-    const tipo = getBodyValue(body, 'tipo');
-    const status = getBodyValue(body, 'status');
-
-    if (cpf && cpf !== usuarios[idx].cpf && usuarios.some(u => u.cpf === cpf)) return res.status(409).json({ error: 'CPF jÃ¡ cadastrado' });
-    if (email && email !== usuarios[idx].email && usuarios.some(u => u.email === email)) return res.status(409).json({ error: 'Email jÃ¡ cadastrado' });
-
-    usuarios[idx] = { ...usuarios[idx], nomeCompleto: nomeCompleto || usuarios[idx].nomeCompleto, email: email || usuarios[idx].email, cpf: cpf || usuarios[idx].cpf, dataNascimento: dataNascimento || usuarios[idx].dataNascimento, whatsapp: whatsapp || usuarios[idx].whatsapp, tipo: tipo || usuarios[idx].tipo, status: status || usuarios[idx].status };
-
-    salvarUsuarios(usuarios);
-    return res.status(200).json({ message: 'Usuário atualizado com sucesso', usuario: withLowercaseKeys(usuarios[idx]) });
+  if (req.method === 'PUT') {
+    const { id } = req.query;
+    const body = req.body || {};
+    const updates = {};
+    if (body.nomeCompleto)   updates.nome_completo   = body.nomeCompleto;
+    if (body.email)          updates.email           = body.email;
+    if (body.cpf)            updates.cpf             = body.cpf;
+    if (body.dataNascimento) updates.data_nascimento = body.dataNascimento;
+    if (body.whatsapp)       updates.whatsapp        = body.whatsapp;
+    if (body.tipo)           updates.tipo            = body.tipo;
+    if (body.perfil)         updates.perfil          = body.perfil;
+    if (body.status)         updates.status          = body.status;
+    const { data, error } = await supabase.from('usuarios').update(updates).eq('id', id).select('id, nome_completo, email, cpf, tipo, perfil, status').single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ message: 'Usuário atualizado com sucesso', usuario: data });
   }
 
-  if (method === 'DELETE') {
-    const { id } = query;
-    const idx = usuarios.findIndex(u => u.id === parseInt(id));
-    if (idx === -1) return res.status(404).json({ error: 'Usuário não encontrado' });
-    const removed = usuarios.splice(idx, 1)[0];
-    salvarUsuarios(usuarios);
-    return res.status(200).json({ message: 'Usuário deletado com sucesso', usuario: withLowercaseKeys(removed) });
+  if (req.method === 'DELETE') {
+    const { id } = req.query;
+    const { error } = await supabase.from('usuarios').delete().eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ message: 'Usuário deletado com sucesso' });
   }
 
-  res.status(405).json({ error: 'Método não permitido' });
+  res.setHeader('Allow', ['GET', 'POST', 'PUT', 'DELETE']);
+  return res.status(405).json({ error: `Método ${req.method} não permitido` });
 }
+

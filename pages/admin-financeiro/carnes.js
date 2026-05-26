@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import AdminFinanceiroLayout from '@/components/AdminFinanceiro/Layout';
+import ModalBaixaManual from '@/components/AdminFinanceiro/ModalBaixaManual';
 
 export default function CarnesPage() {
   const [carnes, setCarnes] = useState([]);
@@ -13,6 +14,8 @@ export default function CarnesPage() {
   const [cancelandoParcela, setCancelandoParcela] = useState(false);
   const [modalConfirmar, setModalConfirmar] = useState(null); // { titulo, mensagem, onConfirm }
   const [modalRecibo, setModalRecibo] = useState(null); // ordemId
+  const [modalBaixaManual, setModalBaixaManual] = useState(null); // { parcela, carne }
+  const [baixandoParcela, setBaixandoParcela] = useState(false);
 
   const toggleParcela = (carneId, parcelaId) => {
     setSelectedParcelas(prev => {
@@ -51,6 +54,28 @@ export default function CarnesPage() {
         } finally { setCancelandoParcela(false); }
       },
     });
+  };
+
+  const handleBaixarManual = async (formData) => {
+    const { parcela } = modalBaixaManual;
+    setBaixandoParcela(true);
+    try {
+      const res = await fetch(`/api/admin-financeiro/parcelas/${parcela.id}/pagar`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Erro ao registrar baixa');
+      setModalBaixaManual(null);
+      if (data.aviso) alert('⚠️ ' + data.aviso);
+      await carregarCarnes();
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    } finally {
+      setBaixandoParcela(false);
+    }
   };
 
   const handleCancelarParcela = (carne, parcela) => {
@@ -386,11 +411,19 @@ export default function CarnesPage() {
                                             </button>
                                           )}
                                           {cancelavel && (
-                                            <button onClick={() => handleCancelarParcela(carne, parcela)} disabled={cancelandoParcela}
-                                              title="Cancelar parcela"
-                                              className="p-1.5 text-red-500 hover:bg-red-50 rounded transition disabled:opacity-40">
-                                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                            </button>
+                                            <>
+                                              <button
+                                                onClick={() => setModalBaixaManual({ parcela, carne })}
+                                                title="Baixar manualmente"
+                                                className="p-1.5 text-green-600 hover:bg-green-50 rounded transition">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                              </button>
+                                              <button onClick={() => handleCancelarParcela(carne, parcela)} disabled={cancelandoParcela}
+                                                title="Cancelar parcela"
+                                                className="p-1.5 text-red-500 hover:bg-red-50 rounded transition disabled:opacity-40">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                              </button>
+                                            </>
                                           )}
                                         </div>
                                       </td>
@@ -440,6 +473,15 @@ export default function CarnesPage() {
       )}
       {modalRecibo && (
         <ModalRecibo ordemId={modalRecibo} onClose={() => setModalRecibo(null)} />
+      )}
+      {modalBaixaManual && (
+        <ModalBaixaManual
+          parcela={modalBaixaManual.parcela}
+          numeroParcela={modalBaixaManual.parcela?.numero_parcela}
+          onConfirm={handleBaixarManual}
+          onClose={() => setModalBaixaManual(null)}
+          loading={baixandoParcela}
+        />
       )}
     </AdminFinanceiroLayout>
   );

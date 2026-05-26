@@ -1,6 +1,7 @@
 import formidable from 'formidable';
 import fs from 'fs';
 import path from 'path';
+import { requireAuth } from '../../lib/auth-server';
 
 export const config = {
   api: {
@@ -12,6 +13,9 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método não permitido' });
   }
+
+  const user = requireAuth(req, res);
+  if (!user) return;
 
   try {
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'fotos');

@@ -1,4 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
+import {
+  applyInstituicaoFilter,
+  hasPerfil,
+  requireAuth,
+  requirePerfil,
+  resolveInstituicaoId,
+} from '../../../lib/auth-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -158,12 +165,29 @@ const selectTurmas = `
 `;
 
 export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria', 'admin'])) {
+    return;
+  }
+
+  const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+
   try {
     if (req.method === 'GET') {
-      const { data, error } = await supabase
+      let query = supabase
         .from('turmas')
         .select(selectTurmas)
         .order('id', { ascending: false });
+
+      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+      if (!isGroupAdmin && !instituicaoId) {
+        return res.status(403).json({ error: 'Instituicao nao definida para o usuario atual' });
+      }
+      query = applyInstituicaoFilter(query, instituicaoId);
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Supabase GET turmas error:', error);
@@ -176,6 +200,14 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const body = req.body || {};
       const { payloadNormalizado, payloadLegado } = mapBodyToPayload(body);
+      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
+
+      if (!instituicaoId) {
+        return res.status(400).json({ error: 'Instituicao obrigatoria' });
+      }
+
+      payloadNormalizado.instituicao_id = instituicaoId;
+      payloadLegado.instituicao_id = instituicaoId;
 
       if (!payloadNormalizado.nome) {
         return res.status(400).json({ error: 'Nome é obrigatório' });

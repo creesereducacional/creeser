@@ -7,6 +7,7 @@ import {
   toBoolean,
   unsetDefaultFromInstitution
 } from '../../contratos/_shared';
+import { requireAuth, requirePerfil } from '../../../../lib/auth-server';
 
 const getBodyPadrao = (body) => {
   if (!Object.prototype.hasOwnProperty.call(body || {}, 'padrao')) return null;
@@ -21,6 +22,9 @@ const getBodyOrdem = (body) => {
 };
 
 export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'financeiro', 'admin'])) return;
   const { method } = req;
   const { id: instituicaoId } = req.query;
 

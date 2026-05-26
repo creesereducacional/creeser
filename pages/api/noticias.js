@@ -1,131 +1,76 @@
-import fs from 'fs';
-import path from 'path';
+import { createClient } from '@supabase/supabase-js';
+import { requireAuth, requirePerfil, resolveInstituicaoId, applyInstituicaoFilter } from '../../lib/auth-server';
 
-const noticiasFilePath = path.join(process.cwd(), 'data', 'noticias.json');
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
-const withLowercaseKeys = (obj) => {
-  if (!obj || typeof obj !== 'object') return obj;
-  const lowered = {};
-  Object.entries(obj).forEach(([key, value]) => {
-    lowered[key.toLowerCase()] = value;
-  });
-  return { ...obj, ...lowered };
-};
+export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'admin'])) return;
 
-const getBodyValue = (body, key) => {
-  if (!body) return undefined;
-  return body[key] ?? body[key.toLowerCase()];
-};
+  const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: true });
 
-// Função para ler notícias
-function lerNoticias() {
-  try {
-    if (!fs.existsSync(noticiasFilePath)) {
-      fs.writeFileSync(noticiasFilePath, JSON.stringify([], null, 2));
-      return [];
+  if (req.method === 'GET') {
+    const { id } = req.query;
+    if (id) {
+      const { data, error } = await supabase.from('noticias').select('*').eq('id', id).single();
+      if (error) return res.status(404).json({ error: 'Notícia não encontrada' });
+      return res.status(200).json(data);
     }
-    const data = fs.readFileSync(noticiasFilePath, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('Erro ao ler notícias:', error);
-    return [];
+    let query = supabase.from('noticias').select('*').order('data_criacao', { ascending: false });
+    query = applyInstituicaoFilter(query, instituicaoId);
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json(data);
   }
-}
 
-// Função para salvar notícias
-function salvarNoticias(noticias) {
-  try {
-    fs.writeFileSync(noticiasFilePath, JSON.stringify(noticias, null, 2));
-    return true;
-  } catch (error) {
-    console.error('Erro ao salvar notícias:', error);
-    return false;
+  if (req.method === 'POST') {
+    const body = req.body || {};
+    const instId = resolveInstituicaoId(req, authUser);
+    const { data, error } = await supabase.from('noticias').insert({
+      titulo:          body.titulo          || '',
+      resumo:          body.resumo          || null,
+      conteudo:        body.conteudo        || null,
+      imagem:          body.imagem          || '',
+      autor:           body.autor           || 'Admin',
+      categoria:       body.categoria       || 'Geral',
+      ativo:           body.ativo           !== false,
+      data_publicacao: body.dataPublicacao  || body.data_publicacao || new Date().toISOString(),
+      instituicao_id:  instId               || null,
+    }).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(201).json(data);
   }
-}
 
-export default function handler(req, res) {
-  const { method } = req;
-
-  try {
-    switch (method) {
-      case 'GET': {
-        const { id } = req.query;
-        const noticias = lerNoticias();
-        
-        if (id) {
-          const noticia = noticias.find(n => n.id === parseInt(id));
-          if (!noticia) {
-            return res.status(404).json({ error: 'Notícia não encontrada' });
-          }
-          return res.status(200).json(withLowercaseKeys(noticia));
-        }
-        
-        return res.status(200).json(noticias.map(withLowercaseKeys));
-      }
-
-      case 'POST': {
-        const noticias = lerNoticias();
-        const novaNoticia = {
-          id: Date.now(),
-          titulo: getBodyValue(req.body, 'titulo'),
-          resumo: getBodyValue(req.body, 'resumo'),
-          conteudo: getBodyValue(req.body, 'conteudo'),
-          imagem: getBodyValue(req.body, 'imagem') || '',
-          autor: getBodyValue(req.body, 'autor') || 'IGEPPS',
-          categoria: getBodyValue(req.body, 'categoria') || 'Geral',
-          ativo: getBodyValue(req.body, 'ativo') !== false,
-          dataCriacao: new Date().toISOString(),
-          dataPublicacao: getBodyValue(req.body, 'dataPublicacao') || new Date().toISOString()
-        };
-        noticias.unshift(novaNoticia); // Adiciona no início
-        salvarNoticias(noticias);
-        return res.status(201).json(withLowercaseKeys(novaNoticia));
-      }
-
-      case 'PUT': {
-        const { id } = req.body;
-        const noticias = lerNoticias();
-        const noticiaIndex = noticias.findIndex(n => n.id === id);
-        
-        if (noticiaIndex === -1) {
-          return res.status(404).json({ error: 'Notícia não encontrada' });
-        }
-
-        noticias[noticiaIndex] = {
-          ...noticias[noticiaIndex],
-          titulo: getBodyValue(req.body, 'titulo'),
-          resumo: getBodyValue(req.body, 'resumo'),
-          conteudo: getBodyValue(req.body, 'conteudo'),
-          imagem: getBodyValue(req.body, 'imagem') || noticias[noticiaIndex].imagem,
-          autor: getBodyValue(req.body, 'autor') || noticias[noticiaIndex].autor,
-          categoria: getBodyValue(req.body, 'categoria') || noticias[noticiaIndex].categoria,
-          ativo: getBodyValue(req.body, 'ativo') !== undefined ? getBodyValue(req.body, 'ativo') : noticias[noticiaIndex].ativo,
-          dataPublicacao: getBodyValue(req.body, 'dataPublicacao') || noticias[noticiaIndex].dataPublicacao
-        };
-
-        salvarNoticias(noticias);
-        return res.status(200).json(withLowercaseKeys(noticias[noticiaIndex]));
-      }
-
-      case 'DELETE': {
-        const { id } = req.query;
-        const noticias = lerNoticias();
-        const novasNoticias = noticias.filter(n => n.id !== parseInt(id));
-        
-        if (noticias.length === novasNoticias.length) {
-          return res.status(404).json({ error: 'Notícia não encontrada' });
-        }
-
-        salvarNoticias(novasNoticias);
-        return res.status(200).json({ message: 'Notícia excluída com sucesso' });
-      }
-
-      default:
-        res.setHeader('Allow', ['GET', 'POST', 'PUT', 'DELETE']);
-        return res.status(405).end(`Method ${method} Not Allowed`);
-    }
-  } catch (error) {
-    console.error('Erro na API de notícias:', error);
-    return res.status(500).json({ error: 'Erro interno do servidor' });
+  if (req.method === 'PUT') {
+    const body = req.body || {};
+    const { id } = body;
+    if (!id) return res.status(400).json({ error: 'ID é obrigatório para atualização' });
+    const { data, error } = await supabase.from('noticias').update({
+      titulo:          body.titulo          || '',
+      resumo:          body.resumo          || null,
+      conteudo:        body.conteudo        || null,
+      imagem:          body.imagem          || null,
+      autor:           body.autor           || null,
+      categoria:       body.categoria       || null,
+      ativo:           body.ativo           !== undefined ? body.ativo : true,
+      data_publicacao: body.dataPublicacao  || body.data_publicacao || null,
+    }).eq('id', id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json(data);
   }
+
+  if (req.method === 'DELETE') {
+    const { id } = req.query;
+    if (!id) return res.status(400).json({ error: 'ID é obrigatório' });
+    const { error } = await supabase.from('noticias').delete().eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ message: 'Notícia excluída com sucesso' });
+  }
+
+  res.setHeader('Allow', ['GET', 'POST', 'PUT', 'DELETE']);
+  return res.status(405).json({ error: `Método ${req.method} não permitido` });
 }

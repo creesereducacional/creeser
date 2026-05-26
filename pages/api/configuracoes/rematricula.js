@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import { requireAuth, requirePerfil } from '../../../lib/auth-server';
 
 const dataFile = path.join(process.cwd(), 'data', 'certificado-digital-config.json');
 
@@ -26,6 +27,10 @@ async function writeData(data) {
 }
 
 export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'admin'])) return;
+
   if (req.method === 'GET') {
     try {
       const data = await readData();

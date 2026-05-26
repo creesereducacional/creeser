@@ -21,37 +21,19 @@ export default function AdminDashboard() {
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
-    console.log('[ADMIN_DASHBOARD] Iniciando verificação...');
-    const usu = localStorage.getItem("usuario");
-    console.log('[ADMIN_DASHBOARD] Usuario encontrado:', !!usu);
-    
-    if (!usu) { 
-      console.log('[ADMIN_DASHBOARD] Nenhum usuario, redirecionando para /login');
-      router.push("/login"); 
-      return; 
-    }
-    
-    const u = JSON.parse(usu);
-    console.log('[ADMIN_DASHBOARD] Tipo do usuario:', u.tipo);
-    
-    if (u.tipo !== "admin") { 
-      console.log('[ADMIN_DASHBOARD] Usuario não é admin, tipo:', u.tipo);
-      if (u.tipo === "aluno") {
-        console.log('[ADMIN_DASHBOARD] Redirecionando para /aluno/dashboard');
-        router.push("/aluno/dashboard");
-      } else if (u.tipo === "professor") {
-        console.log('[ADMIN_DASHBOARD] Redirecionando para /professor/dashboard');
-        router.push("/professor/dashboard");
-      } else {
-        console.log('[ADMIN_DASHBOARD] Tipo desconhecido, redirecionando para /login');
-        router.push("/login");
-      }
-      return; 
-    }
-    
-    console.log('[ADMIN_DASHBOARD] Admin validado! Email:', u.email);
-    setUsuario(u);
-    carregarEstatisticas();
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then((res) => res.ok ? res.json() : Promise.reject())
+      .then(({ usuario: user }) => {
+        if (user.tipo !== 'admin') {
+          if (user.tipo === 'aluno') router.replace('/aluno/dashboard');
+          else if (user.tipo === 'professor') router.replace('/professor/dashboard');
+          else router.replace('/login');
+          return;
+        }
+        setUsuario(user);
+        carregarEstatisticas();
+      })
+      .catch(() => router.replace('/login'));
   }, [router]);
 
   const carregarEstatisticas = async () => {

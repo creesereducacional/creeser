@@ -21,6 +21,32 @@ export const PAPEIS = {
   MATRICULADOR: 'matriculador',
 };
 
+// ========================================
+// PERFIS ADMINISTRATIVOS
+// ========================================
+
+export const PERFIS = {
+  GRUPO_ADMIN: 'grupo_admin',
+  INSTITUICAO_ADMIN: 'instituicao_admin',
+  FINANCEIRO: 'financeiro',
+  COORDENADOR: 'coordenador',
+  SECRETARIA: 'secretaria',
+  PROFESSOR: 'professor',
+  ALUNO: 'aluno',
+};
+
+// ========================================
+// TIPOS DE INSTITUICAO
+// ========================================
+
+export const TIPOS_INSTITUICAO = {
+  FACULDADE: 'faculdade',
+  TECNICO: 'tecnico',
+  COLEGIO: 'colegio',
+  EAD: 'ead',
+  OUTRO: 'outro',
+};
+
 export const PAPEIS_LABELS = {
   [PAPEIS.ADMIN]: 'Administrador',
   [PAPEIS.PROFESSOR]: 'Professor',

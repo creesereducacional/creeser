@@ -1,185 +1,105 @@
-import fs from 'fs';
-import path from 'path';
-
-const emailsFilePath = path.join(process.cwd(), 'data', 'emails-enviados.json');
-
-const withLowercaseKeys = (obj) => {
-  if (!obj || typeof obj !== 'object') return obj;
-  const lowered = {};
-  Object.entries(obj).forEach(([key, value]) => {
-    lowered[key.toLowerCase()] = value;
-  });
-  return { ...obj, ...lowered };
-};
-
-// Função para ler histórico de e-mails
-function lerHistoricoEmails() {
-  try {
-    if (!fs.existsSync(emailsFilePath)) {
-      fs.writeFileSync(emailsFilePath, JSON.stringify([], null, 2));
-      return [];
-    }
-    const data = fs.readFileSync(emailsFilePath, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('Erro ao ler histórico:', error);
-    return [];
-  }
-}
-
-// Função para salvar histórico
-function salvarHistoricoEmails(emails) {
-  try {
-    fs.writeFileSync(emailsFilePath, JSON.stringify(emails, null, 2));
-    return true;
-  } catch (error) {
-    console.error('Erro ao salvar histórico:', error);
-    return false;
-  }
-}
-
-// Importar funções de e-mail
+import { createClient } from '@supabase/supabase-js';
+import { requireAuth, requirePerfil, resolveInstituicaoId, applyInstituicaoFilter } from '../../lib/auth-server';
 import { enviarEmailPersonalizado } from '../../lib/emailService';
 
-// Importar dados de alunos
-const alunosFilePath = path.join(process.cwd(), 'data', 'alunos.json');
-function lerAlunos() {
-  try {
-    if (!fs.existsSync(alunosFilePath)) {
-      return [];
-    }
-    const data = fs.readFileSync(alunosFilePath, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('Erro ao ler alunos:', error);
-    return [];
-  }
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 export default async function handler(req, res) {
-  const { method } = req;
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'admin'])) return;
 
-  try {
-    switch (method) {
-      case 'GET': {
-        // Retornar histórico de e-mails enviados
-        const historico = lerHistoricoEmails();
-        return res.status(200).json(historico.map(withLowercaseKeys));
-      }
+  const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: true });
 
-      case 'POST': {
-        const { destinatarios, assunto, mensagem, tipoDestinatarios } = req.body;
+  if (req.method === 'GET') {
+    let query = supabase.from('emails_enviados').select('*').order('created_at', { ascending: false }).limit(100);
+    query = applyInstituicaoFilter(query, instituicaoId);
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json(data);
+  }
 
-        if (!assunto || !mensagem) {
-          return res.status(400).json({ error: 'Assunto e mensagem são obrigatórios' });
-        }
+  if (req.method === 'POST') {
+    const { destinatarios, assunto, mensagem, tipoDestinatarios } = req.body;
 
-        let listaDestinatarios = [];
-        const alunos = lerAlunos();
+    if (!assunto || !mensagem) {
+      return res.status(400).json({ error: 'Assunto e mensagem são obrigatórios' });
+    }
 
-        // Definir destinatários baseado no tipo
-        switch (tipoDestinatarios) {
-          case 'todos':
-            listaDestinatarios = alunos
-              .filter(a => a.status === 'aprovado' && a.ativo)
-              .map(a => ({ email: a.email, nome: a.nomecompleto || a.nomeCompleto || a.nome }));
-            break;
+    // Buscar alunos do Supabase
+    let alunosQuery = supabase.from('alunos').select('email, nome_completo, nome, status, ativo');
+    alunosQuery = applyInstituicaoFilter(alunosQuery, resolveInstituicaoId(req, authUser));
+    const { data: alunos = [] } = await alunosQuery;
 
-          case 'ativos':
-            listaDestinatarios = alunos
-              .filter(a => a.status === 'aprovado' && a.ativo === true)
-              .map(a => ({ email: a.email, nome: a.nomecompleto || a.nomeCompleto || a.nome }));
-            break;
+    const getNome = (a) => a.nome_completo || a.nome || 'Aluno';
 
-          case 'inativos':
-            listaDestinatarios = alunos
-              .filter(a => a.status === 'aprovado' && a.ativo === false)
-              .map(a => ({ email: a.email, nome: a.nomecompleto || a.nomeCompleto || a.nome }));
-            break;
+    let listaDestinatarios = [];
+    switch (tipoDestinatarios) {
+      case 'todos':
+        listaDestinatarios = alunos.filter(a => a.status === 'aprovado' && a.ativo).map(a => ({ email: a.email, nome: getNome(a) }));
+        break;
+      case 'ativos':
+        listaDestinatarios = alunos.filter(a => a.status === 'aprovado' && a.ativo === true).map(a => ({ email: a.email, nome: getNome(a) }));
+        break;
+      case 'inativos':
+        listaDestinatarios = alunos.filter(a => a.status === 'aprovado' && a.ativo === false).map(a => ({ email: a.email, nome: getNome(a) }));
+        break;
+      case 'selecionados':
+        listaDestinatarios = (destinatarios || []).map(email => {
+          const aluno = alunos.find(a => a.email === email);
+          return { email, nome: aluno ? getNome(aluno) : 'Aluno' };
+        });
+        break;
+      default:
+        return res.status(400).json({ error: 'Tipo de destinatários inválido' });
+    }
 
-          case 'selecionados':
-            // destinatarios deve ser um array de emails
-            listaDestinatarios = destinatarios.map(email => {
-              const aluno = alunos.find(a => a.email === email);
-              return { email, nome: aluno?.nomecompleto || aluno?.nomeCompleto || aluno?.nome || 'Aluno' };
-            });
-            break;
+    if (listaDestinatarios.length === 0) {
+      return res.status(400).json({ error: 'Nenhum destinatário encontrado' });
+    }
 
-          default:
-            return res.status(400).json({ error: 'Tipo de destinatários inválido' });
-        }
+    const instIdEnvio = resolveInstituicaoId(req, authUser);
+    const resultados = { total: listaDestinatarios.length, sucesso: 0, falhas: 0, erros: [] };
 
-        if (listaDestinatarios.length === 0) {
-          return res.status(400).json({ error: 'Nenhum destinatário encontrado' });
-        }
-
-        // Enviar e-mails
-        const resultados = {
-          total: listaDestinatarios.length,
-          sucesso: 0,
-          falhas: 0,
-          erros: []
-        };
-
-        for (const destinatario of listaDestinatarios) {
-          try {
-            await enviarEmailPersonalizado(
-              destinatario.email,
-              destinatario.nome,
-              assunto,
-              mensagem
-            );
-            resultados.sucesso++;
-          } catch (error) {
-            resultados.falhas++;
-            resultados.erros.push({
-              email: destinatario.email,
-              erro: error.message
-            });
-          }
-        }
-
-        // Salvar no histórico
-        const historico = lerHistoricoEmails();
-        const novoEmail = {
-          id: Date.now(),
+    for (const dest of listaDestinatarios) {
+      try {
+        await enviarEmailPersonalizado(dest.email, dest.nome, assunto, mensagem);
+        await supabase.from('emails_enviados').insert({
+          instituicao_id: instIdEnvio || null,
+          destinatario: dest.email,
           assunto,
-          mensagem,
-          tipoDestinatarios,
-          totalDestinatarios: resultados.total,
-          enviados: resultados.sucesso,
-          falhas: resultados.falhas,
-          dataEnvio: new Date().toISOString(),
-          remetente: req.body.remetente || 'Admin'
-        };
-        historico.unshift(novoEmail); // Adiciona no início
-        
-        // Manter apenas os últimos 100 registros
-        if (historico.length > 100) {
-          historico.splice(100);
-        }
-        
-        salvarHistoricoEmails(historico);
-
-        return res.status(200).json({
-          success: true,
-          resultados,
-          historico: withLowercaseKeys(novoEmail)
+          corpo: mensagem,
+          status: 'ENVIADO',
+        });
+        resultados.sucesso++;
+      } catch (err) {
+        resultados.falhas++;
+        resultados.erros.push({ email: dest.email, erro: err.message });
+        await supabase.from('emails_enviados').insert({
+          instituicao_id: instIdEnvio || null,
+          destinatario: dest.email,
+          assunto,
+          corpo: mensagem,
+          status: 'FALHA',
+          erro: err.message,
         });
       }
-
-      case 'DELETE': {
-        // Limpar histórico
-        salvarHistoricoEmails([]);
-        return res.status(200).json({ success: true, message: 'Histórico limpo' });
-      }
-
-      default:
-        res.setHeader('Allow', ['GET', 'POST', 'DELETE']);
-        return res.status(405).end(`Method ${method} Not Allowed`);
     }
-  } catch (error) {
-    console.error('Erro na API de envio de e-mails:', error);
-    return res.status(500).json({ error: 'Erro interno do servidor' });
+
+    return res.status(200).json({ success: true, resultados });
   }
+
+  if (req.method === 'DELETE') {
+    let query = supabase.from('emails_enviados').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (instituicaoId) query = supabase.from('emails_enviados').delete().eq('instituicao_id', instituicaoId);
+    const { error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ success: true, message: 'Histórico limpo' });
+  }
+
+  res.setHeader('Allow', ['GET', 'POST', 'DELETE']);
+  return res.status(405).json({ error: `Método ${req.method} não permitido` });
 }

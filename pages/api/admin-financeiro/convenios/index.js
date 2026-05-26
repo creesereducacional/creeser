@@ -1,4 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
+import {
+  applyInstituicaoFilter,
+  hasPerfil,
+  requireAuth,
+  requirePerfil,
+  resolveInstituicaoId,
+} from '../../../../lib/auth-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -64,12 +71,29 @@ const getConvenioById = async (id) => {
 };
 
 export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'financeiro', 'admin'])) {
+    return;
+  }
+
+  const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+  const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+
+  if (!isGroupAdmin && !instituicaoId) {
+    return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
+  }
+
   if (req.method === 'GET') {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('financeiro_convenios')
         .select('id,nome,percentual,instituicao_id,cnpj,observacoes,ativo,created_at,updated_at,instituicoes(nome)')
         .order('created_at', { ascending: false });
+
+      query = applyInstituicaoFilter(query, instituicaoId);
+      const { data, error } = await query;
 
       if (error) throw error;
       return res.status(200).json((data || []).map((row) => withLowercaseKeys(mapRowToResponse(row))));
@@ -83,9 +107,7 @@ export default async function handler(req, res) {
     try {
       const nome = normalizeText(req.body?.nome);
       const percentual = parsePercentual(req.body?.percentual);
-      const instituicaoId = normalizeText(
-        req.body?.instituicaoId ?? req.body?.instituicao_id ?? req.body?.instituicao
-      );
+      const instituicaoIdPayload = resolveInstituicaoId(req, authUser, { allowAll: false });
       const cnpj = formatCnpj(req.body?.cnpj);
       const observacoes = normalizeText(req.body?.observacoes);
 
@@ -97,7 +119,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ message: 'Percentual deve ser um valor entre 0 e 100' });
       }
 
-      if (!instituicaoId) {
+      if (!instituicaoIdPayload) {
         return res.status(400).json({ message: 'Instituicao e obrigatoria' });
       }
 
@@ -108,7 +130,7 @@ export default async function handler(req, res) {
       const payload = {
         nome,
         percentual,
-        instituicao_id: instituicaoId,
+        instituicao_id: instituicaoIdPayload,
         cnpj,
         observacoes,
         ativo: req.body?.ativo !== false,

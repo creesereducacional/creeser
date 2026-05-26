@@ -1,4 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
+import {
+  applyInstituicaoFilter,
+  hasPerfil,
+  requireAuth,
+  requirePerfil,
+  resolveInstituicaoId,
+} from '../../../lib/auth-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -112,14 +119,31 @@ const supportsInformacoesAdicionaisColumns = async () => {
 };
 
 export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria', 'financeiro', 'comercial', 'admin'])) {
+    return;
+  }
+
+  const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+
   try {
     if (req.method === 'GET') {
       // Recuperar todos os alunos - selecionar todas as colunas
       // ⚠️ PostgreSQL converte para lowercase automaticamente
-      const { data, error } = await supabase
+      let query = supabase
         .from('alunos')
         .select('*')
         .order('id', { ascending: false });
+
+      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+      if (!isGroupAdmin && !instituicaoId) {
+        return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
+      }
+      query = applyInstituicaoFilter(query, instituicaoId);
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Supabase GET error:', error);
@@ -182,10 +206,16 @@ export default async function handler(req, res) {
         return null;
       };
       
+      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
+      if (!instituicaoId) {
+        return res.status(400).json({ message: 'Instituicao obrigatoria para criar aluno' });
+      }
+
       const alunoData = {
         // ===== IDENTIFICAÇÃO =====
         nome: toUppercase(formData.nome) || '',
         instituicao: toUppercase(formData.instituicao) || 'CREESER',
+        instituicao_id: instituicaoId,
         statusmatricula: toUppercase(formData.status) || 'ATIVO',
         datamatricula: formData.dataMatricula || new Date().toISOString().split('T')[0],
         cursoid: formData.curso ? parseInt(formData.curso) : null,

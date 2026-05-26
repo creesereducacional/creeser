@@ -43,9 +43,12 @@ export default function Login() {
 
       // Aguarda um pouco para garantir que localStorage foi salvo
       setTimeout(() => {
-        // Redireciona conforme tipo de usuário
-        console.log('[LOGIN] Redirecionando usuario tipo:', data.usuario.tipo);
-        if (data.usuario.tipo === "admin") {
+        // Redireciona conforme tipo/perfil de usuário
+        console.log('[LOGIN] Redirecionando usuario tipo:', data.usuario.tipo, 'perfil:', data.usuario.perfil);
+        const perfil = String(data.usuario.perfil || '').toLowerCase();
+        if (data.usuario.tipo === "admin" && perfil === "comercial") {
+          router.push("/comercial/dashboard");
+        } else if (data.usuario.tipo === "admin") {
           router.push("/admin/dashboard");
         } else if (data.usuario.tipo === "professor") {
           router.push("/professor/dashboard");

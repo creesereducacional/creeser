@@ -1,4 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
+import {
+  applyInstituicaoFilter,
+  hasPerfil,
+  requireAuth,
+  requirePerfil,
+  resolveInstituicaoId,
+} from '../../../lib/auth-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -108,17 +115,33 @@ const supportsInformacoesAdicionaisColumns = async () => {
 };
 
 export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria', 'financeiro', 'comercial', 'admin'])) {
+    return;
+  }
+
+  const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+
   try {
     const { id } = req.query;
 
     if (req.method === 'GET') {
       // Recuperar um aluno específico
       // ⚠️ PostgreSQL converte para lowercase automaticamente
-      const { data, error } = await supabase
+      let query = supabase
         .from('alunos')
         .select('*')
-        .eq('id', parseInt(id))
-        .single();
+        .eq('id', parseInt(id));
+
+      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+      if (!isGroupAdmin && !instituicaoId) {
+        return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
+      }
+      query = applyInstituicaoFilter(query, instituicaoId);
+
+      const { data, error } = await query.single();
 
       if (error || !data) {
         return res.status(404).json({ message: 'Aluno não encontrado' });
@@ -176,10 +199,16 @@ export default async function handler(req, res) {
 
       // ✅ MAPEAMENTO COMPLETO E DEFINITIVO (42 CAMPOS)
       // Referência: MAPEAMENTO_COMPLETO_ALUNOS.md
+      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
+      if (!instituicaoId) {
+        return res.status(400).json({ message: 'Instituicao obrigatoria para atualizar aluno' });
+      }
+
       const alunoData = {
         // ===== IDENTIFICAÇÃO =====
         nome: toUppercase(formData.nome) || '',
         instituicao: toUppercase(formData.instituicao) || 'CREESER',
+        instituicao_id: instituicaoId,
         statusmatricula: toUppercase(formData.status) || 'ATIVO',
         cursoid: formData.curso ? parseInt(formData.curso) : null,
         turmaid: formData.turma ? parseInt(formData.turma) : null,
@@ -308,11 +337,14 @@ export default async function handler(req, res) {
           delete alunoData.indicacao_quem;
         }
 
-        const { data, error } = await supabase
+        let updateQuery = supabase
           .from('alunos')
           .update(alunoData)
-          .eq('id', parseInt(id))
-          .select();
+          .eq('id', parseInt(id));
+
+        updateQuery = applyInstituicaoFilter(updateQuery, instituicaoId);
+
+        const { data, error } = await updateQuery.select();
 
         if (error) {
           console.error('❌ ERRO AO ATUALIZAR:', error.message);
@@ -331,10 +363,19 @@ export default async function handler(req, res) {
     } 
     else if (req.method === 'DELETE') {
       // Deletar aluno
-      const { error } = await supabase
+      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
+      if (!instituicaoId) {
+        return res.status(400).json({ message: 'Instituicao obrigatoria para excluir aluno' });
+      }
+
+      let deleteQuery = supabase
         .from('alunos')
         .delete()
         .eq('id', parseInt(id));
+
+      deleteQuery = applyInstituicaoFilter(deleteQuery, instituicaoId);
+
+      const { error } = await deleteQuery;
 
       if (error) throw error;
 

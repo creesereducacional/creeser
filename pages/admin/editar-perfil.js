@@ -21,51 +21,36 @@ export default function EditarPerfil() {
   const [message, setMessage] = useState({ type: '', text: '' });
 
   useEffect(() => {
-    // Carregar dados do usuário
-    const usuarioLogado = localStorage.getItem('usuario');
-    if (usuarioLogado) {
-      const userData = JSON.parse(usuarioLogado);
-      setUser(userData);
-      setFormData({
-        nome: userData.nome || '',
-        email: userData.email || '',
-        foto: null
-      });
-      setPreview(userData.foto || null);
-    } else {
-      router.push('/login');
-    }
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then((res) => res.ok ? res.json() : Promise.reject())
+      .then(({ usuario: userData }) => {
+        setUser(userData);
+        setFormData({
+          nome: userData.nome || '',
+          email: userData.email || '',
+          foto: null
+        });
+        setPreview(userData.foto || null);
+      })
+      .catch(() => router.replace('/login'));
   }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSenhaChange = (e) => {
     const { name, value } = e.target;
-    setSenhaData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setSenhaData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleFotoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      setFormData(prev => ({
-        ...prev,
-        foto: file
-      }));
-      
-      // Preview da foto
+      setFormData(prev => ({ ...prev, foto: file }));
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result);
-      };
+      reader.onloadend = () => { setPreview(reader.result); };
       reader.readAsDataURL(file);
     }
   };
@@ -90,14 +75,12 @@ export default function EditarPerfil() {
 
       if (response.ok) {
         const result = await response.json();
-        // Atualizar localStorage
         const usuarioAtualizado = {
           ...user,
           nome: formData.nome,
           email: formData.email,
           foto: preview
         };
-        localStorage.setItem('usuario', JSON.stringify(usuarioAtualizado));
         setUser(usuarioAtualizado);
         setMessage({ type: 'success', text: 'Perfil atualizado com sucesso!' });
       } else {

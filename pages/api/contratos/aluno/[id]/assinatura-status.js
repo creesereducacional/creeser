@@ -1,4 +1,5 @@
 import { supabase } from '../../_shared';
+import { requireAuth, requirePerfil } from '../../../../../lib/auth-server';
 
 const ASSINAFY_BASE_URL = process.env.ASSINAFY_BASE_URL || 'https://api.assinafy.com.br/v1';
 
@@ -74,6 +75,10 @@ const mapResponse = (row, extra = {}) => ({
 });
 
 export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'financeiro', 'secretaria', 'admin'])) return;
+
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
     return res.status(405).json({ error: 'Método não permitido' });

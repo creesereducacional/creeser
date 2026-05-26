@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { IncomingForm } from 'formidable';
+import { requireAuth, requirePerfil } from '../../lib/auth-server';
 
 export const config = {
   api: {
@@ -12,6 +13,10 @@ const slidesDirectory = path.join(process.cwd(), 'public', 'images', 'slider');
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
+    const user = requireAuth(req, res);
+    if (!user) return;
+    if (!requirePerfil(user, res, ['grupo_admin', 'instituicao_admin', 'admin'])) return;
+
     try {
       if (!fs.existsSync(slidesDirectory)) {
         fs.mkdirSync(slidesDirectory, { recursive: true });

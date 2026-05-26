@@ -5,8 +5,12 @@ import {
   supabase,
   unsetDefaultFromInstitution
 } from '../_shared';
+import { requireAuth, requirePerfil } from '../../../../lib/auth-server';
 
 export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'financeiro', 'admin'])) return;
   const { method } = req;
   const { id } = req.query;
 

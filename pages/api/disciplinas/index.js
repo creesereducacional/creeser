@@ -1,51 +1,44 @@
-import fs from 'fs';
-import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import { createClient } from '@supabase/supabase-js';
+import { requireAuth, requirePerfil, resolveInstituicaoId, applyInstituicaoFilter } from '../../../lib/auth-server';
 
-const dataPath = path.join(process.cwd(), 'data', 'disciplinas.json');
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
-const withLowercaseKeys = (obj) => {
-  if (!obj || typeof obj !== 'object') return obj;
-  const lowered = {};
-  Object.entries(obj).forEach(([key, value]) => {
-    lowered[key.toLowerCase()] = value;
-  });
-  return { ...obj, ...lowered };
-};
+export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'admin'])) return;
 
-const lerDisciplinas = () => {
-  try {
-    const data = fs.readFileSync(dataPath, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('Erro ao ler disciplinas:', error);
-    return [];
-  }
-};
+  const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: true });
 
-const salvarDisciplinas = (disciplinas) => {
-  try {
-    fs.writeFileSync(dataPath, JSON.stringify(disciplinas, null, 2), 'utf8');
-  } catch (error) {
-    console.error('Erro ao salvar disciplinas:', error);
-  }
-};
-
-export default function handler(req, res) {
   if (req.method === 'GET') {
-    const disciplinas = lerDisciplinas();
-    res.status(200).json(disciplinas.map(withLowercaseKeys));
-  } else if (req.method === 'POST') {
-    const disciplinas = lerDisciplinas();
-    const body = req.body || {};
-    const novaDisciplina = {
-      id: uuidv4(),
-      ...body,
-    };
-    disciplinas.push(novaDisciplina);
-    salvarDisciplinas(disciplinas);
-    res.status(201).json(withLowercaseKeys(novaDisciplina));
-  } else {
-    res.status(405).json({ erro: 'Método não permitido' });
+    let query = supabase.from('disciplinas').select('*').order('nome');
+    query = applyInstituicaoFilter(query, instituicaoId);
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json(data);
   }
+
+  if (req.method === 'POST') {
+    const body = req.body || {};
+    const instId = resolveInstituicaoId(req, authUser);
+    const { data, error } = await supabase.from('disciplinas').insert({
+      codigo:        body.codigo        || null,
+      nome:          body.nome,
+      curso:         body.curso         || null,
+      periodo:       body.periodo       || null,
+      carga_horaria: body.cargaHoraria  || body.carga_horaria || null,
+      matriz:        body.matriz        ?? true,
+      grade:         body.grade         || null,
+      situacao:      body.situacao      || 'ATIVO',
+      instituicao_id: instId            || null,
+    }).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(201).json(data);
+  }
+
+  res.setHeader('Allow', ['GET', 'POST']);
+  return res.status(405).json({ error: `Método ${req.method} não permitido` });
 }

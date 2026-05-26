@@ -1,4 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
+import {
+  applyInstituicaoFilter,
+  hasPerfil,
+  requireAuth,
+  requirePerfil,
+  resolveInstituicaoId,
+} from '../../../lib/auth-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -19,22 +26,41 @@ export default async function handler(req, res) {
   }
 
   try {
+    const authUser = requireAuth(req, res);
+    if (!authUser) return;
+    if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'financeiro', 'admin'])) {
+      return;
+    }
+
+    const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+    const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+
+    if (!isGroupAdmin && !instituicaoId) {
+      return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
+    }
+
     // 1. Total de alunos com pendências
-    const { data: parcelasPendentes } = await supabase
+    let parcelasPendentesQuery = supabase
       .from('financeiro_parcelas')
       .select('aluno_id, valor')
       .eq('status', 'pendente');
+
+    parcelasPendentesQuery = applyInstituicaoFilter(parcelasPendentesQuery, instituicaoId);
+    const { data: parcelasPendentes } = await parcelasPendentesQuery;
 
     const alunosComPendencias = new Set((parcelasPendentes || []).map(p => p.aluno_id)).size;
     const totalReceber = (parcelasPendentes || []).reduce((acc, p) => acc + (Number(p.valor) || 0), 0);
 
     // 2. Boletos vencidos
     const hoje = new Date().toISOString().split('T')[0];
-    const { data: parcelasVencidas } = await supabase
+    let parcelasVencidasQuery = supabase
       .from('financeiro_parcelas')
       .select('id, valor')
       .eq('status', 'pendente')
       .lt('data_vencimento', hoje);
+
+    parcelasVencidasQuery = applyInstituicaoFilter(parcelasVencidasQuery, instituicaoId);
+    const { data: parcelasVencidas } = await parcelasVencidasQuery;
 
     const qtdBoletosVencidos = (parcelasVencidas || []).length;
     const valorVencido = (parcelasVencidas || []).reduce((acc, p) => {
@@ -42,31 +68,43 @@ export default async function handler(req, res) {
     }, 0);
 
     // 4. Total de ordens (ordem_simples)
-    const { data: ordens } = await supabase
+    let ordensQuery = supabase
       .from('financeiro_ordens_pagamento')
       .select('id, valor_total')
       .eq('tipo', 'ordem_simples');
 
+    ordensQuery = applyInstituicaoFilter(ordensQuery, instituicaoId);
+    const { data: ordens } = await ordensQuery;
+
     // 5. Total de carnês (carne)
-    const { data: carnes } = await supabase
+    let carnesQuery = supabase
       .from('financeiro_ordens_pagamento')
       .select('id, valor_total')
       .eq('tipo', 'carne');
 
+    carnesQuery = applyInstituicaoFilter(carnesQuery, instituicaoId);
+    const { data: carnes } = await carnesQuery;
+
     // 6. Parcelas pagas (para calcular taxa de recebimento)
-    const { data: parcelasPagas } = await supabase
+    let parcelasPagasQuery = supabase
       .from('financeiro_parcelas')
       .select('id, valor')
       .eq('status', 'pago');
+
+    parcelasPagasQuery = applyInstituicaoFilter(parcelasPagasQuery, instituicaoId);
+    const { data: parcelasPagas } = await parcelasPagasQuery;
 
     const totalRecebido = (parcelasPagas || []).reduce((acc, p) => {
       return acc + (Number(p.valor) || 0);
     }, 0);
 
     // 7. Total de todas as parcelas (para calcular taxa)
-    const { data: todasParc } = await supabase
+    let todasParcQuery = supabase
       .from('financeiro_parcelas')
       .select('id, valor');
+
+    todasParcQuery = applyInstituicaoFilter(todasParcQuery, instituicaoId);
+    const { data: todasParc } = await todasParcQuery;
 
     const totalGerado = (todasParc || []).reduce((acc, p) => {
       return acc + (Number(p.valor) || 0);

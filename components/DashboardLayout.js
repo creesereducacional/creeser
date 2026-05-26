@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { filtrarMenuPorContexto } from '../utils/menu-permissoes';
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
@@ -11,46 +12,24 @@ export default function DashboardLayout({ children }) {
 
   useEffect(() => {
     setMounted(true);
-    // Carregar usuário do localStorage
-    const usuarioStorage = localStorage.getItem('usuario');
-    console.log('[DashboardLayout] Verificando usuario no localStorage:', { usuarioStorage: !!usuarioStorage });
-    
-    if (usuarioStorage) {
-      try {
-        const usuarioObj = JSON.parse(usuarioStorage);
-        console.log('[DashboardLayout] Usuario parseado com sucesso:', { 
-          email: usuarioObj.email,
-          tipo: usuarioObj.tipo 
-        });
-        setUser(usuarioObj);
-      } catch (e) {
-        console.error('[DashboardLayout] Erro ao parsear usuário:', e);
-      }
-    } else {
-      console.log('[DashboardLayout] Nenhum usuario encontrado no localStorage');
-    }
-  }, []);
-
-  useEffect(() => {
-    if (mounted && !user) {
-      console.log('[DashboardLayout] Usuario nao definido, redirecionando para login após 100ms');
-      // Pequeno delay para evitar conflitos de navegação
-      const timer = setTimeout(() => {
-        console.log('[DashboardLayout] Executando redirect para /login');
-        router.push('/login');
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [mounted, user, router]);
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.usuario) {
+          setUser(data.usuario);
+        } else {
+          router.push('/login');
+        }
+      })
+      .catch(() => router.push('/login'));
+  }, [router]);
 
   if (!mounted || !user) {
     return null;
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem('usuario');
-    localStorage.removeItem('token');
-    setUser(null);
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
     router.push('/login');
   };
 
@@ -65,6 +44,7 @@ export default function DashboardLayout({ children }) {
       icon: '👔',
       em_breve: false,
       secao: 'Estrutura Geral',
+      perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
       submenu: [
         { id: 'configuracoes', nome: 'Configurações', icon: '▪', url: '/admin/configuracoes', em_breve: false, completed: true },
         { id: 'solicitacoes', nome: 'Solicitações', icon: '▪', url: '/admin/configuracoes/solicitacoes', em_breve: false, completed: true },
@@ -84,6 +64,8 @@ export default function DashboardLayout({ children }) {
       icon: '⚖️',
       em_breve: true,
       secao: 'Administrativo',
+      perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
+      tiposInstituicao: ['faculdade'],
       submenu: [
         { id: 'gerenciar', nome: 'Gerenciar', icon: '▪', url: '#', em_breve: true },
         { id: 'atividades', nome: 'Atividades', icon: '▪', url: '#', em_breve: true },
@@ -97,6 +79,7 @@ export default function DashboardLayout({ children }) {
       icon: '📚',
       em_breve: false,
       secao: 'Pedagógico',
+      perfis: ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria'],
       submenu: [
         { id: 'ped-cursos', nome: 'Cursos', icon: '▪', url: '/admin/cursos', em_breve: false, completed: true },
         { id: 'ped-turmas', nome: 'Turmas', icon: '▪', url: '/admin/turmas', em_breve: false, completed: true },
@@ -119,6 +102,7 @@ export default function DashboardLayout({ children }) {
       icon: '📚',
       em_breve: false,
       secao: 'Módulo EAD',
+      perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
       submenu: [
         { id: 'ead-forum', nome: 'Fórum', icon: '▪', url: '/admin/forum', em_breve: false, completed: true },
         { id: 'ead-emails', nome: 'E-mails', icon: '▪', url: '/admin/emails', em_breve: false, completed: true },
@@ -134,6 +118,7 @@ export default function DashboardLayout({ children }) {
       icon: '💵',
       url: '/admin-financeiro',
       em_breve: false,
+      perfis: ['grupo_admin', 'instituicao_admin', 'financeiro'],
       secao: 'Administração'
     },
 
@@ -143,6 +128,8 @@ export default function DashboardLayout({ children }) {
       nome: 'Processo Seletivo', 
       icon: '📋', 
       em_breve: true, 
+      perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
+      tiposInstituicao: ['faculdade', 'tecnico'],
       secao: 'Administração',
       submenu: [
         { id: 'locais-prova', nome: 'Locais de Prova', icon: '▪', url: '#', em_breve: true },
@@ -155,6 +142,8 @@ export default function DashboardLayout({ children }) {
     { 
       id: 'cpa', 
       nome: 'CPA', 
+      perfis: ['grupo_admin', 'instituicao_admin'],
+      tiposInstituicao: ['faculdade'],
       icon: '🏠', 
       em_breve: true, 
       secao: 'Administração',
@@ -166,7 +155,9 @@ export default function DashboardLayout({ children }) {
 
     // Estágio
     { 
-      id: 'estagio', 
+      em_breve: true, 
+      perfis: ['grupo_admin', 'instituicao_admin'],
+      tiposInstituicao: ['faculdade'],
       nome: 'Estágio', 
       icon: '📊', 
       em_breve: true, 
@@ -179,7 +170,9 @@ export default function DashboardLayout({ children }) {
 
     // Contábil
     { 
-      id: 'contabil', 
+      em_breve: true, 
+      perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
+      tiposInstituicao: ['faculdade'],
       nome: 'Contábil', 
       icon: '📈', 
       em_breve: true, 
@@ -198,7 +191,8 @@ export default function DashboardLayout({ children }) {
 
     // Documentos
     { 
-      id: 'documentos', 
+      em_breve: true, 
+      perfis: ['grupo_admin', 'instituicao_admin', 'financeiro'],
       nome: 'Documentos', 
       icon: '📁', 
       em_breve: true, 
@@ -213,7 +207,8 @@ export default function DashboardLayout({ children }) {
 
     // Relatórios
     { 
-      id: 'relatorios', 
+      em_breve: true, 
+      perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
       nome: 'Relatórios', 
       icon: '📄', 
       em_breve: true, 
@@ -228,7 +223,8 @@ export default function DashboardLayout({ children }) {
 
     // Gráficos
     { 
-      id: 'graficos', 
+      em_breve: true, 
+      perfis: ['grupo_admin', 'instituicao_admin', 'financeiro', 'coordenador'],
       nome: 'Gráficos', 
       icon: '📊', 
       em_breve: true, 
@@ -240,7 +236,8 @@ export default function DashboardLayout({ children }) {
 
     // Eventos
     { 
-      id: 'eventos', 
+      em_breve: true, 
+      perfis: ['grupo_admin', 'instituicao_admin', 'financeiro', 'coordenador'],
       nome: 'Eventos', 
       icon: '💎', 
       em_breve: true, 
@@ -258,6 +255,8 @@ export default function DashboardLayout({ children }) {
       nome: 'Diploma Digital', 
       icon: '🎓', 
       em_breve: true, 
+      perfis: ['grupo_admin', 'instituicao_admin'],
+      tiposInstituicao: ['faculdade'],
       secao: 'Outras Funcionalidades',
       submenu: [
         { id: 'diploma-lote', nome: 'Lote', icon: '▪', url: '#', em_breve: true },
@@ -289,11 +288,13 @@ export default function DashboardLayout({ children }) {
     { id: 'integracao', nome: 'Integrações', icon: '🔗', url: '#', em_breve: true, secao: 'Outras Funcionalidades' },
 
     // Funcionários
-    { id: 'funcionarios', nome: 'Funcionários', icon: '👤', url: '/admin/funcionarios', em_breve: false, secao: 'Outras Funcionalidades', completed: true },
+    { id: 'funcionarios', nome: 'Funcionários', icon: '👤', url: '/admin/funcionarios', em_breve: false, secao: 'Outras Funcionalidades', completed: true, perfis: ['grupo_admin', 'instituicao_admin'] },
 
     // Usuários
-    { id: 'usuarios', nome: 'Usuários', icon: '👥', url: '/admin/usuarios', em_breve: false, secao: 'Outras Funcionalidades', completed: true },
+    { id: 'usuarios', nome: 'Usuários', icon: '👥', url: '/admin/usuarios', em_breve: false, secao: 'Outras Funcionalidades', completed: true, perfis: ['grupo_admin', 'instituicao_admin'] },
   ];
+
+  const menuFiltrado = filtrarMenuPorContexto(menuItems, user);
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -317,7 +318,7 @@ export default function DashboardLayout({ children }) {
         <nav className="py-0 px-3 space-y-0 flex-1 overflow-y-auto">
           {(() => {
             const secoes = {};
-            menuItems.forEach(item => {
+            menuFiltrado.forEach(item => {
               const secao = item.secao || 'Outros';
               if (!secoes[secao]) secoes[secao] = [];
               secoes[secao].push(item);

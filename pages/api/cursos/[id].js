@@ -1,4 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
+import {
+  applyInstituicaoFilter,
+  hasPerfil,
+  requireAuth,
+  requirePerfil,
+  resolveInstituicaoId,
+} from '../../../lib/auth-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -317,6 +324,15 @@ const mapCursoWithUnidades = async (curso) => {
 };
 
 export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria', 'admin'])) {
+    return;
+  }
+
+  const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+
   const id = parseInteger(req.query.id);
 
   if (id === null) {
@@ -325,11 +341,18 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      const { data, error } = await supabase
+      let query = supabase
         .from('cursos')
         .select('*')
-        .eq('id', id)
-        .maybeSingle();
+        .eq('id', id);
+
+      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+      if (!isGroupAdmin && !instituicaoId) {
+        return res.status(403).json({ error: 'Instituicao nao definida para o usuario atual', message: 'Instituicao nao definida para o usuario atual' });
+      }
+      query = applyInstituicaoFilter(query, instituicaoId);
+
+      const { data, error } = await query.maybeSingle();
 
       if (error) {
         console.error('Supabase GET curso error:', error);
@@ -347,6 +370,13 @@ export default async function handler(req, res) {
     if (req.method === 'PUT') {
       const body = req.body || {};
       const payload = mapBodyToPayload(body);
+      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
+
+      if (!instituicaoId) {
+        return res.status(400).json({ error: 'Instituicao e obrigatoria', message: 'Instituicao e obrigatoria' });
+      }
+
+      payload.instituicao_id = instituicaoId;
 
       if (!payload.nome) {
         return res.status(400).json({ error: 'Nome é obrigatório', message: 'Nome é obrigatório' });
@@ -358,10 +388,14 @@ export default async function handler(req, res) {
 
       const unidadeIds = await resolveUnidadeIdsFromBody(body);
 
-      const { data, error } = await supabase
+      let updateQuery = supabase
         .from('cursos')
         .update(payload)
-        .eq('id', id)
+        .eq('id', id);
+
+      updateQuery = applyInstituicaoFilter(updateQuery, instituicaoId);
+
+      const { data, error } = await updateQuery
         .select('*')
         .maybeSingle();
 
@@ -386,16 +420,25 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'DELETE') {
+      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
+      if (!instituicaoId) {
+        return res.status(400).json({ error: 'Instituicao e obrigatoria', message: 'Instituicao e obrigatoria' });
+      }
+
       try {
         await syncCursoUnidade(id, []);
       } catch (syncError) {
         console.error('Supabase curso_unidade cleanup error:', syncError);
       }
 
-      const { data, error } = await supabase
+      let deleteQuery = supabase
         .from('cursos')
         .delete()
-        .eq('id', id)
+        .eq('id', id);
+
+      deleteQuery = applyInstituicaoFilter(deleteQuery, instituicaoId);
+
+      const { data, error } = await deleteQuery
         .select('id')
         .maybeSingle();
 

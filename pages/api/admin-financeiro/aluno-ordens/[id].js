@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { applyInstituicaoFilter, hasPerfil, requireAuth, requirePerfil, resolveInstituicaoId } from '../../../../lib/auth-server';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -13,44 +14,79 @@ export default async function handler(req, res) {
   const { id } = req.query;
 
   try {
+    const authUser = requireAuth(req, res);
+    if (!authUser) return;
+    if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'financeiro', 'admin'])) {
+      return;
+    }
+
+    const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+    const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+
+    if (!isGroupAdmin && !instituicaoId) {
+      return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
+    }
+
+    if (instituicaoId) {
+      const { data: aluno } = await supabase
+        .from('alunos')
+        .select('id,instituicao_id')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (aluno?.instituicao_id && aluno.instituicao_id !== instituicaoId) {
+        return res.status(403).json({ message: 'Acesso negado' });
+      }
+    }
+
     const [{ data: ordens, error }, { data: carnesData, error: carnesError }] = await Promise.all([
-      supabase
-        .from('financeiro_ordens_pagamento')
-        .select(`
-          id,
-          tipo,
-          descricao,
-          referencia,
-          valor_total,
-          percentual_desconto,
-          valor_desconto,
-          quantidade_parcelas,
-          status,
-          efi_charge_id,
-          observacoes,
-          created_at,
-          updated_at,
-          financeiro_parcelas(id, numero_parcela, valor, data_vencimento, status, boleto_numero, boleto_url, efi_charge_id)
-        `)
-        .eq('aluno_id', id)
-        .eq('tipo', 'ordem_simples')
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('financeiro_ordens_pagamento')
-        .select(`
-          id,
-          descricao,
-          referencia,
-          valor_total,
-          quantidade_parcelas,
-          status,
-          efi_carnet_id,
-          created_at,
-          financeiro_parcelas(id, numero_parcela, valor, data_vencimento, status)
-        `)
-        .eq('aluno_id', id)
-        .eq('tipo', 'carne')
-        .order('created_at', { ascending: false }),
+      (async () => {
+        let query = supabase
+          .from('financeiro_ordens_pagamento')
+          .select(`
+            id,
+            tipo,
+            descricao,
+            referencia,
+            valor_total,
+            percentual_desconto,
+            valor_desconto,
+            quantidade_parcelas,
+            status,
+            efi_charge_id,
+            observacoes,
+            created_at,
+            updated_at,
+            financeiro_parcelas(id, numero_parcela, valor, data_vencimento, status, boleto_numero, boleto_url, efi_charge_id)
+          `)
+          .eq('aluno_id', id)
+          .eq('tipo', 'ordem_simples')
+          .order('created_at', { ascending: false });
+
+        query = applyInstituicaoFilter(query, instituicaoId);
+        return query;
+      })(),
+      (async () => {
+        let query = supabase
+          .from('financeiro_ordens_pagamento')
+          .select(`
+            id,
+            descricao,
+            referencia,
+            valor_total,
+            quantidade_parcelas,
+            status,
+            efi_carnet_id,
+            created_at,
+            financeiro_parcelas(id, numero_parcela, valor, data_vencimento, status)
+          `)
+          .eq('aluno_id', id)
+          .eq('tipo', 'carne')
+          .order('created_at', { ascending: false });
+
+        query = applyInstituicaoFilter(query, instituicaoId);
+        return query;
+      })(),
     ]);
 
     if (error) throw error;

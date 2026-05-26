@@ -1,4 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
+import {
+  applyInstituicaoFilter,
+  hasPerfil,
+  requireAuth,
+  requirePerfil,
+  resolveInstituicaoId,
+} from '../../../../lib/auth-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -10,8 +17,21 @@ export default async function handler(req, res) {
   }
 
   try {
+    const authUser = requireAuth(req, res);
+    if (!authUser) return;
+    if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'financeiro', 'admin'])) {
+      return;
+    }
+
+    const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+    const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+
+    if (!isGroupAdmin && !instituicaoId) {
+      return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
+    }
+
     // Buscar apenas ordens simples (tipo = 'ordem_simples')
-    const { data: ordens, error: ordensError } = await supabase
+    let query = supabase
       .from('financeiro_ordens_pagamento')
       .select(`
         id,
@@ -34,6 +54,10 @@ export default async function handler(req, res) {
       .eq('tipo', 'ordem_simples')
       .order('created_at', { ascending: false });
 
+    query = applyInstituicaoFilter(query, instituicaoId);
+
+    const { data: ordens, error: ordensError } = await query;
+
     if (ordensError) throw ordensError;
 
     // Normalizar resposta
@@ -47,7 +71,8 @@ export default async function handler(req, res) {
         data_vencimento: parcela.data_vencimento || null,
         status_parcela: parcela.status || o.status,
         cobranca: parcela.boleto_numero || parcela.efi_charge_id || o.efi_charge_id || '-',
-        parcela_id: parcela.id || null
+        parcela_id: parcela.id || null,
+        parcela_efi_charge_id: parcela.efi_charge_id || null
       };
     });
 

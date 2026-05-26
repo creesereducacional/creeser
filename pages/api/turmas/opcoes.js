@@ -1,4 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
+import {
+  hasPerfil,
+  requireAuth,
+  requirePerfil,
+  resolveInstituicaoId,
+} from '../../../lib/auth-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -101,8 +107,21 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { unidadeId, instituicaoId } = req.query;
-    const instituicaoIdNormalizado = normalizeText(instituicaoId);
+    const authUser = requireAuth(req, res);
+    if (!authUser) return;
+
+    if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria', 'admin'])) {
+      return;
+    }
+
+    const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+    const { unidadeId } = req.query;
+    const resolvedInstituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+    const instituicaoIdNormalizado = normalizeText(resolvedInstituicaoId);
+
+    if (!isGroupAdmin && !instituicaoIdNormalizado) {
+      return res.status(403).json({ error: 'Instituicao nao definida para o usuario atual' });
+    }
 
     let unidadesQuery = supabase
       .from('unidades')
@@ -114,12 +133,18 @@ export default async function handler(req, res) {
       unidadesQuery = unidadesQuery.eq('instituicao_id', instituicaoIdNormalizado);
     }
 
+    let instituicoesQuery = supabase
+      .from('instituicoes')
+      .select('id,nome,ativa')
+      .order('ordem', { ascending: true })
+      .order('nome', { ascending: true });
+
+    if (!isGroupAdmin && instituicaoIdNormalizado) {
+      instituicoesQuery = instituicoesQuery.eq('id', instituicaoIdNormalizado);
+    }
+
     const [instituicoesResp, unidadesResp, gradesResp] = await Promise.all([
-      supabase
-        .from('instituicoes')
-        .select('id,nome,ativa')
-        .order('ordem', { ascending: true })
-        .order('nome', { ascending: true }),
+      instituicoesQuery,
       unidadesQuery,
       supabase.from('grades').select('id,nome,cursoid').order('nome', { ascending: true }),
     ]);

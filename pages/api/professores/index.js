@@ -1,50 +1,43 @@
-import fs from 'fs';
-import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import { createClient } from '@supabase/supabase-js';
+import { hasPerfil, requireAuth, requirePerfil, resolveInstituicaoId, applyInstituicaoFilter } from '../../../lib/auth-server';
 
-const dataPath = path.join(process.cwd(), 'data', 'professores.json');
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
-const withLowercaseKeys = (obj) => {
-  if (!obj || typeof obj !== 'object') return obj;
-  const lowered = {};
-  Object.entries(obj).forEach(([key, value]) => {
-    lowered[key.toLowerCase()] = value;
-  });
-  return { ...obj, ...lowered };
-};
+export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria', 'admin'])) return;
 
-function lerProfessores() {
-  try {
-    const data = fs.readFileSync(dataPath, 'utf-8');
-    return JSON.parse(data);
-  } catch (error) {
-    return [];
+  const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+  const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+
+  if (!isGroupAdmin && !instituicaoId) {
+    return res.status(403).json({ error: 'Instituicao nao definida para o usuario atual' });
   }
-}
 
-function salvarProfessores(professores) {
-  fs.writeFileSync(dataPath, JSON.stringify(professores, null, 2), 'utf-8');
-}
-
-export default function handler(req, res) {
-  try {
-    if (req.method === 'GET') {
-      const professores = lerProfessores();
-      res.status(200).json(professores.map(withLowercaseKeys));
-    } else if (req.method === 'POST') {
-      const professores = lerProfessores();
-      const novoProfessor = {
-        id: uuidv4(),
-        ...req.body,
-        dataCriacao: new Date().toISOString()
-      };
-      professores.push(novoProfessor);
-      salvarProfessores(professores);
-      res.status(201).json(withLowercaseKeys(novoProfessor));
-    } else {
-      res.status(405).json({ message: 'Método não permitido' });
-    }
-  } catch (error) {
-    res.status(500).json({ message: 'Erro ao processar requisição', error: error.message });
+  if (req.method === 'GET') {
+    let query = supabase.from('professores').select('*').order('nome');
+    query = applyInstituicaoFilter(query, instituicaoId);
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json(data);
   }
+
+  if (req.method === 'POST') {
+    const instId = resolveInstituicaoId(req, authUser);
+    if (!instId) return res.status(400).json({ error: 'Instituicao obrigatoria para criar professor' });
+    const body = req.body || {};
+    const { data, error } = await supabase.from('professores').insert({
+      ...body,
+      instituicao_id: instId,
+    }).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(201).json(data);
+  }
+
+  res.setHeader('Allow', ['GET', 'POST']);
+  return res.status(405).json({ error: `Método ${req.method} não permitido` });
 }

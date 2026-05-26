@@ -1,60 +1,37 @@
-import fs from 'fs';
-import path from 'path';
+import { createClient } from '@supabase/supabase-js';
+import { requireAuth, requirePerfil } from '../../../lib/auth-server';
 
-const dataPath = path.join(process.cwd(), 'data', 'professores.json');
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
-const withLowercaseKeys = (obj) => {
-  if (!obj || typeof obj !== 'object') return obj;
-  const lowered = {};
-  Object.entries(obj).forEach(([key, value]) => {
-    lowered[key.toLowerCase()] = value;
-  });
-  return { ...obj, ...lowered };
-};
+export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria', 'admin'])) return;
 
-function lerProfessores() {
-  try {
-    const data = fs.readFileSync(dataPath, 'utf-8');
-    return JSON.parse(data);
-  } catch (error) {
-    return [];
+  const { id } = req.query;
+
+  if (req.method === 'GET') {
+    const { data, error } = await supabase.from('professores').select('*').eq('id', id).single();
+    if (error) return res.status(404).json({ error: 'Professor não encontrado' });
+    return res.status(200).json(data);
   }
-}
 
-function salvarProfessores(professores) {
-  fs.writeFileSync(dataPath, JSON.stringify(professores, null, 2), 'utf-8');
-}
-
-export default function handler(req, res) {
-  try {
-    const { id } = req.query;
-    const professores = lerProfessores();
-    const professorIndex = professores.findIndex(p => p.id === id);
-
-    if (professorIndex === -1) {
-      return res.status(404).json({ message: 'Professor não encontrado' });
-    }
-
-    if (req.method === 'GET') {
-      res.status(200).json(withLowercaseKeys(professores[professorIndex]));
-    } else if (req.method === 'PUT') {
-      professores[professorIndex] = {
-        ...professores[professorIndex],
-        ...req.body,
-        id: professores[professorIndex].id,
-        dataCriacao: professores[professorIndex].dataCriacao,
-        dataAtualizacao: new Date().toISOString()
-      };
-      salvarProfessores(professores);
-      res.status(200).json(withLowercaseKeys(professores[professorIndex]));
-    } else if (req.method === 'DELETE') {
-      professores.splice(professorIndex, 1);
-      salvarProfessores(professores);
-      res.status(200).json({ message: 'Professor deletado com sucesso' });
-    } else {
-      res.status(405).json({ message: 'Método não permitido' });
-    }
-  } catch (error) {
-    res.status(500).json({ message: 'Erro ao processar requisição', error: error.message });
+  if (req.method === 'PUT') {
+    const body = req.body || {};
+    const { data, error } = await supabase.from('professores').update(body).eq('id', id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json(data);
   }
+
+  if (req.method === 'DELETE') {
+    const { error } = await supabase.from('professores').delete().eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ message: 'Professor removido com sucesso' });
+  }
+
+  res.setHeader('Allow', ['GET', 'PUT', 'DELETE']);
+  return res.status(405).json({ error: `Método ${req.method} não permitido` });
 }

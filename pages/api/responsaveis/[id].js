@@ -7,8 +7,12 @@ import {
   supabase,
   syncResponsavelAlunos,
 } from './_shared';
+import { requireAuth, requirePerfil } from '../../../lib/auth-server';
 
 export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria', 'financeiro', 'comercial', 'admin'])) return;
   const id = parseResponsavelId(req.query.id);
 
   if (id === null) {

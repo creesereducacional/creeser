@@ -1,60 +1,46 @@
-import fs from 'fs';
-import path from 'path';
+import { createClient } from '@supabase/supabase-js';
+import { requireAuth, requirePerfil } from '../../../lib/auth-server';
 
-const dataPath = path.join(process.cwd(), 'data', 'disciplinas.json');
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
-const withLowercaseKeys = (obj) => {
-  if (!obj || typeof obj !== 'object') return obj;
-  const lowered = {};
-  Object.entries(obj).forEach(([key, value]) => {
-    lowered[key.toLowerCase()] = value;
-  });
-  return { ...obj, ...lowered };
-};
+export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'admin'])) return;
 
-const lerDisciplinas = () => {
-  try {
-    const data = fs.readFileSync(dataPath, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('Erro ao ler disciplinas:', error);
-    return [];
-  }
-};
-
-const salvarDisciplinas = (disciplinas) => {
-  try {
-    fs.writeFileSync(dataPath, JSON.stringify(disciplinas, null, 2), 'utf8');
-  } catch (error) {
-    console.error('Erro ao salvar disciplinas:', error);
-  }
-};
-
-export default function handler(req, res) {
   const { id } = req.query;
-  const disciplinas = lerDisciplinas();
-  const disciplinaIndex = disciplinas.findIndex(d => d.id === id);
 
   if (req.method === 'GET') {
-    if (disciplinaIndex === -1) {
-      return res.status(404).json({ erro: 'Disciplina não encontrada' });
-    }
-    res.status(200).json(withLowercaseKeys(disciplinas[disciplinaIndex]));
-  } else if (req.method === 'PUT') {
-    if (disciplinaIndex === -1) {
-      return res.status(404).json({ erro: 'Disciplina não encontrada' });
-    }
-    disciplinas[disciplinaIndex] = { ...disciplinas[disciplinaIndex], ...req.body };
-    salvarDisciplinas(disciplinas);
-    res.status(200).json(withLowercaseKeys(disciplinas[disciplinaIndex]));
-  } else if (req.method === 'DELETE') {
-    if (disciplinaIndex === -1) {
-      return res.status(404).json({ erro: 'Disciplina não encontrada' });
-    }
-    disciplinas.splice(disciplinaIndex, 1);
-    salvarDisciplinas(disciplinas);
-    res.status(200).json({ mensagem: 'Disciplina deletada com sucesso' });
-  } else {
-    res.status(405).json({ erro: 'Método não permitido' });
+    const { data, error } = await supabase.from('disciplinas').select('*').eq('id', id).single();
+    if (error) return res.status(404).json({ error: 'Disciplina não encontrada' });
+    return res.status(200).json(data);
   }
+
+  if (req.method === 'PUT') {
+    const body = req.body || {};
+    const { data, error } = await supabase.from('disciplinas').update({
+      codigo:        body.codigo        || null,
+      nome:          body.nome,
+      curso:         body.curso         || null,
+      periodo:       body.periodo       || null,
+      carga_horaria: body.cargaHoraria  || body.carga_horaria || null,
+      matriz:        body.matriz        ?? true,
+      grade:         body.grade         || null,
+      situacao:      body.situacao      || 'ATIVO',
+    }).eq('id', id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json(data);
+  }
+
+  if (req.method === 'DELETE') {
+    const { error } = await supabase.from('disciplinas').delete().eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ message: 'Disciplina removida com sucesso' });
+  }
+
+  res.setHeader('Allow', ['GET', 'PUT', 'DELETE']);
+  return res.status(405).json({ error: `Método ${req.method} não permitido` });
 }

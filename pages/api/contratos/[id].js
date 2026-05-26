@@ -7,6 +7,7 @@ import {
   toBoolean,
   unsetDefaultFromInstitution
 } from './_shared';
+import { hasPerfil, requireAuth, requirePerfil } from '../../../lib/auth-server';
 
 const fetchContrato = async (id) => {
   const { data, error } = await supabase
@@ -20,6 +21,11 @@ const fetchContrato = async (id) => {
 };
 
 export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'financeiro', 'admin'])) return;
+
+  const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
   const { method } = req;
   const { id } = req.query;
 
@@ -31,6 +37,14 @@ export default async function handler(req, res) {
     const contrato = await fetchContrato(id);
     if (!contrato) {
       return res.status(404).json({ error: 'Modelo de contrato não encontrado' });
+    }
+
+    // Verificar isolamento por instituição em operações de escrita
+    if (!isGroupAdmin && method !== 'GET') {
+      const userInstituicao = authUser.instituicao_id || authUser.instituicaoId || null;
+      if (userInstituicao && contrato.instituicao_id && contrato.instituicao_id !== userInstituicao) {
+        return res.status(403).json({ error: 'Acesso negado a este contrato' });
+      }
     }
 
     if (method === 'GET') {

@@ -13,6 +13,13 @@
 
 import { createClient } from '@supabase/supabase-js';
 import efi from '../../../../lib/efi-client';
+import {
+  applyInstituicaoFilter,
+  hasPerfil,
+  requireAuth,
+  requirePerfil,
+  resolveInstituicaoId,
+} from '../../../../lib/auth-server';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -20,6 +27,19 @@ const supabase = createClient(
 );
 
 export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'financeiro', 'admin'])) {
+    return;
+  }
+
+  const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+  req.instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+
+  if (!isGroupAdmin && !req.instituicaoId) {
+    return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
+  }
+
   if (req.method === 'POST') return criarCobranca(req, res);
   if (req.method === 'DELETE') return cancelarCobranca(req, res);
   return res.status(405).json({ message: 'Método não permitido' });
@@ -37,15 +57,17 @@ async function criarCobranca(req, res) {
     }
 
     // 1. Buscar parcela + aluno
-    const { data: parcela, error: parcelaErr } = await supabase
+    let parcelaQuery = supabase
       .from('financeiro_parcelas')
       .select(`
         id, ordem_pagamento_id, numero_parcela, valor, data_vencimento, status,
-        ordem:financeiro_ordens_pagamento!inner ( id, tipo, efi_charge_id ),
+        ordem:financeiro_ordens_pagamento!inner ( id, tipo, efi_charge_id, instituicao_id ),
         aluno:alunos!inner ( id, nome, cpf, email, data_nascimento, telefone_celular )
       `)
-      .eq('id', parcela_id)
-      .single();
+      .eq('id', parcela_id);
+
+    parcelaQuery = applyInstituicaoFilter(parcelaQuery, req.instituicaoId);
+    const { data: parcela, error: parcelaErr } = await parcelaQuery.single();
 
     if (parcelaErr || !parcela) {
       return res.status(404).json({ message: 'Parcela não encontrada.' });
@@ -131,8 +153,11 @@ async function criarCobranca(req, res) {
     const barcode = billet.barcode || billet.identifications?.barcode || null;
     const boletoUrl = billet.link || billet.pdf?.charge || null;
     // 4. Salvar na tabela financeiro_boletos
+    const instituicaoId = parcela?.ordem?.instituicao_id || req.instituicaoId || null;
+
     await supabase.from('financeiro_boletos').insert({
       parcela_id,
+      instituicao_id: instituicaoId,
       gateway: 'efi',
       boleto_id_gateway: String(chargeId),
       boleto_numero: barcode,
@@ -190,11 +215,13 @@ async function cancelarCobranca(req, res) {
     }
 
     // 1. Buscar ordem
-    const { data: ordem, error: ordemErr } = await supabase
+    let ordemQuery = supabase
       .from('financeiro_ordens_pagamento')
-      .select('id, tipo, status, efi_charge_id')
-      .eq('id', ordem_id)
-      .single();
+      .select('id, tipo, status, efi_charge_id, instituicao_id')
+      .eq('id', ordem_id);
+
+    ordemQuery = applyInstituicaoFilter(ordemQuery, req.instituicaoId);
+    const { data: ordem, error: ordemErr } = await ordemQuery.single();
 
     if (ordemErr || !ordem) {
       return res.status(404).json({ message: 'Ordem não encontrada.' });

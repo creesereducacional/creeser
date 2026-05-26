@@ -3,6 +3,7 @@ import {
   isMissingContratoSchemaError,
   supabase
 } from '../_shared';
+import { requireAuth, requirePerfil, hasPerfil, resolveInstituicaoId, applyInstituicaoFilter } from '../../../../lib/auth-server';
 
 const isMissingTableError = (error) => {
   const message = String(error?.message || '').toLowerCase();
@@ -82,7 +83,25 @@ const replacePlaceholders = (template, placeholdersMap) => {
   return html;
 };
 
-const findInstituicaoDoAluno = async (aluno) => {
+const findInstituicaoPorId = async (instituicaoId) => {
+  if (!instituicaoId) return null;
+
+  const { data, error } = await supabase
+    .from('instituicoes')
+    .select('*')
+    .eq('id', instituicaoId)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') return null;
+    throw error;
+  }
+
+  return data || null;
+};
+
+// Fallback para registros legados sem instituicao_id preenchido
+const findInstituicaoPorNome = async (aluno) => {
   const instituicaoNome = asText(aluno?.instituicao);
 
   if (!instituicaoNome) return null;
@@ -203,10 +222,17 @@ const findResponsavelDoAluno = async (alunoId) => {
 };
 
 export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'financeiro', 'secretaria', 'comercial', 'admin'])) return;
+
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
     return res.status(405).json({ error: 'Método não permitido' });
   }
+
+  const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+  const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: true });
 
   try {
     const alunoId = parseId(req.query?.id);
@@ -214,17 +240,28 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'ID do aluno inválido' });
     }
 
-    const { data: aluno, error: alunoError } = await supabase
+    let alunoQuery = supabase
       .from('alunos')
       .select('*')
-      .eq('id', alunoId)
-      .single();
+      .eq('id', alunoId);
+
+    // grupo_admin sem instituicao_id específica acessa qualquer aluno;
+    // demais perfis são limitados à própria instituição
+    if (!isGroupAdmin || instituicaoId) {
+      alunoQuery = applyInstituicaoFilter(alunoQuery, instituicaoId);
+    }
+
+    const { data: aluno, error: alunoError } = await alunoQuery.single();
 
     if (alunoError || !aluno) {
       return res.status(404).json({ error: 'Aluno não encontrado' });
     }
 
-    const instituicao = await findInstituicaoDoAluno(aluno);
+    // Resolver instituição: preferir UUID (instituicao_id) sobre campo texto legado
+    const instituicao =
+      (await findInstituicaoPorId(aluno.instituicao_id)) ||
+      (await findInstituicaoPorNome(aluno));
+
     if (!instituicao) {
       return res.status(404).json({
         error: 'Instituição do aluno não encontrada. Verifique o cadastro da instituição no aluno.'

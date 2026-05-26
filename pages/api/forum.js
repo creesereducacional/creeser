@@ -1,164 +1,120 @@
-import fs from 'fs';
-import path from 'path';
+import { createClient } from '@supabase/supabase-js';
+import { requireAuth, requirePerfil, resolveInstituicaoId, applyInstituicaoFilter } from '../../lib/auth-server';
 
-const forumPath = path.join(process.cwd(), 'data', 'forum.json');
-const cursosPath = path.join(process.cwd(), 'data', 'cursos.json');
-const professoresPath = path.join(process.cwd(), 'data', 'professores.json');
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
-const withLowercaseKeys = (obj) => {
-  if (!obj || typeof obj !== 'object') return obj;
-  const lowered = {};
-  Object.entries(obj).forEach(([key, value]) => {
-    lowered[key.toLowerCase()] = value;
-  });
-  return { ...obj, ...lowered };
-};
+export default async function handler(req, res) {
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'professor', 'aluno', 'admin'])) return;
 
-const normalizeTopico = (topico) => {
-  if (!topico) return topico;
-  const respostas = (topico.respostas || []).map(withLowercaseKeys);
-  return { ...withLowercaseKeys(topico), respostas };
-};
+  const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: true });
 
-const getBodyValue = (body, key) => {
-  if (!body) return undefined;
-  return body[key] ?? body[key.toLowerCase()];
-};
+  if (req.method === 'GET') {
+    const { cursoId } = req.query;
+    let query = supabase
+      .from('forum_topicos')
+      .select('*, forum_respostas(*)')
+      .order('fixado', { ascending: false })
+      .order('data_ultima_resposta', { ascending: false });
 
-// Criar arquivo se não existir
-if (!fs.existsSync(forumPath)) {
-  fs.writeFileSync(forumPath, JSON.stringify([], null, 2));
-}
+    query = applyInstituicaoFilter(query, instituicaoId);
+    if (cursoId) query = query.eq('curso_id', cursoId);
 
-export default function handler(req, res) {
-  try {
-    let topicos = JSON.parse(fs.readFileSync(forumPath, 'utf8'));
-    const cursos = JSON.parse(fs.readFileSync(cursosPath, 'utf8'));
-    const professores = JSON.parse(fs.readFileSync(professoresPath, 'utf8'));
-
-    if (req.method === 'GET') {
-      const { cursoId } = req.query;
-      
-      // Se cursoId for fornecido, retorna apenas tópicos daquele curso
-      if (cursoId) {
-        const topicosFiltrados = topicos.filter(t => t.cursoId === parseInt(cursoId));
-        return res.status(200).json(topicosFiltrados.map(normalizeTopico));
-      }
-      
-      // Retorna todos os tópicos com informações de curso
-      const topicosComInfo = topicos.map(topico => {
-        const curso = cursos.find(c => c.id === topico.cursoId);
-        return normalizeTopico({
-          ...topico,
-          cursoTitulo: curso?.titulo || 'Curso não encontrado'
-        });
-      });
-      
-      return res.status(200).json(topicosComInfo);
-    }
-
-    if (req.method === 'POST') {
-      const cursoId = getBodyValue(req.body, 'cursoId');
-      const autorId = getBodyValue(req.body, 'autorId');
-      const autorNome = getBodyValue(req.body, 'autorNome');
-      const autorTipo = getBodyValue(req.body, 'autorTipo');
-      const titulo = getBodyValue(req.body, 'titulo');
-      const conteudo = getBodyValue(req.body, 'conteudo');
-
-      if (!cursoId || !autorId || !titulo || !conteudo) {
-        return res.status(400).json({ erro: 'Campos obrigatórios faltando' });
-      }
-
-      const novoTopico = {
-        id: Date.now(),
-        cursoId: parseInt(cursoId),
-        autorId,
-        autorNome,
-        autorTipo, // 'aluno', 'professor' ou 'admin'
-        titulo,
-        conteudo,
-        respostas: [],
-        visualizacoes: 0,
-        fixado: false,
-        fechado: false,
-        dataCriacao: new Date().toISOString(),
-        dataUltimaResposta: new Date().toISOString()
-      };
-
-      topicos.push(novoTopico);
-      fs.writeFileSync(forumPath, JSON.stringify(topicos, null, 2));
-      
-      return res.status(201).json(normalizeTopico(novoTopico));
-    }
-
-    if (req.method === 'PUT') {
-      const { id } = req.query;
-      const { acao, ...dados } = req.body;
-      
-      const topicoIndex = topicos.findIndex(t => t.id === parseInt(id));
-
-      if (topicoIndex === -1) {
-        return res.status(404).json({ erro: 'Tópico não encontrado' });
-      }
-
-      // Diferentes ações
-      if (acao === 'responder') {
-        const novaResposta = {
-          id: Date.now(),
-          autorId: getBodyValue(dados, 'autorId'),
-          autorNome: getBodyValue(dados, 'autorNome'),
-          autorTipo: getBodyValue(dados, 'autorTipo'),
-          conteudo: getBodyValue(dados, 'conteudo'),
-          dataCriacao: new Date().toISOString()
-        };
-
-        topicos[topicoIndex].respostas.push(novaResposta);
-        topicos[topicoIndex].dataUltimaResposta = new Date().toISOString();
-      } else if (acao === 'fixar') {
-        topicos[topicoIndex].fixado = !topicos[topicoIndex].fixado;
-      } else if (acao === 'fechar') {
-        topicos[topicoIndex].fechado = !topicos[topicoIndex].fechado;
-      } else if (acao === 'visualizar') {
-        topicos[topicoIndex].visualizacoes += 1;
-      } else {
-        // Atualização geral
-        topicos[topicoIndex] = {
-          ...topicos[topicoIndex],
-          ...dados,
-          dataAtualizacao: new Date().toISOString()
-        };
-      }
-
-      fs.writeFileSync(forumPath, JSON.stringify(topicos, null, 2));
-      
-      return res.status(200).json(normalizeTopico(topicos[topicoIndex]));
-    }
-
-    if (req.method === 'DELETE') {
-      const { id, respostaId } = req.query;
-      
-      if (respostaId) {
-        // Deletar uma resposta específica
-        const topicoIndex = topicos.findIndex(t => t.id === parseInt(id));
-        if (topicoIndex !== -1) {
-          topicos[topicoIndex].respostas = topicos[topicoIndex].respostas.filter(
-            r => r.id !== parseInt(respostaId)
-          );
-        }
-      } else {
-        // Deletar o tópico inteiro
-        topicos = topicos.filter(t => t.id !== parseInt(id));
-      }
-      
-      fs.writeFileSync(forumPath, JSON.stringify(topicos, null, 2));
-      
-      return res.status(200).json({ mensagem: 'Excluído com sucesso' });
-    }
-
-    return res.status(405).json({ erro: 'Método não permitido' });
-
-  } catch (error) {
-    console.error('Erro na API do fórum:', error);
-    return res.status(500).json({ erro: 'Erro interno do servidor' });
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json(data);
   }
+
+  if (req.method === 'POST') {
+    const body = req.body || {};
+    const instId = resolveInstituicaoId(req, authUser);
+
+    if (!body.cursoId && !body.curso_id) return res.status(400).json({ error: 'cursoId é obrigatório' });
+    if (!body.autorId && !body.autor_id) return res.status(400).json({ error: 'autorId é obrigatório' });
+    if (!body.titulo || !body.conteudo) return res.status(400).json({ error: 'titulo e conteudo são obrigatórios' });
+
+    const { data, error } = await supabase.from('forum_topicos').insert({
+      instituicao_id:        instId || null,
+      curso_id:              body.cursoId  || body.curso_id,
+      autor_id:              body.autorId  || body.autor_id,
+      autor_nome:            body.autorNome || body.autor_nome || null,
+      autor_tipo:            body.autorTipo || body.autor_tipo || null,
+      titulo:                body.titulo,
+      conteudo:              body.conteudo,
+      visualizacoes:         0,
+      fixado:                false,
+      fechado:               false,
+      data_ultima_resposta:  new Date().toISOString(),
+    }).select('*, forum_respostas(*)').single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(201).json(data);
+  }
+
+  if (req.method === 'PUT') {
+    const { id } = req.query;
+    const { acao, ...dados } = req.body || {};
+
+    if (acao === 'responder') {
+      const { data, error } = await supabase.from('forum_respostas').insert({
+        topico_id:  id,
+        autor_id:   dados.autorId  || dados.autor_id  || null,
+        autor_nome: dados.autorNome || dados.autor_nome || null,
+        autor_tipo: dados.autorTipo || dados.autor_tipo || null,
+        conteudo:   dados.conteudo,
+      }).select().single();
+      if (error) return res.status(500).json({ error: error.message });
+      // Atualizar data_ultima_resposta
+      await supabase.from('forum_topicos').update({ data_ultima_resposta: new Date().toISOString() }).eq('id', id);
+      return res.status(200).json(data);
+    }
+
+    if (acao === 'fixar') {
+      const { data: current } = await supabase.from('forum_topicos').select('fixado').eq('id', id).single();
+      const { data, error } = await supabase.from('forum_topicos').update({ fixado: !current?.fixado }).eq('id', id).select().single();
+      if (error) return res.status(500).json({ error: error.message });
+      return res.status(200).json(data);
+    }
+
+    if (acao === 'fechar') {
+      const { data: current } = await supabase.from('forum_topicos').select('fechado').eq('id', id).single();
+      const { data, error } = await supabase.from('forum_topicos').update({ fechado: !current?.fechado }).eq('id', id).select().single();
+      if (error) return res.status(500).json({ error: error.message });
+      return res.status(200).json(data);
+    }
+
+    if (acao === 'visualizar') {
+      const { data: current } = await supabase.from('forum_topicos').select('visualizacoes').eq('id', id).single();
+      const { data, error } = await supabase.from('forum_topicos').update({ visualizacoes: (current?.visualizacoes || 0) + 1 }).eq('id', id).select().single();
+      if (error) return res.status(500).json({ error: error.message });
+      return res.status(200).json(data);
+    }
+
+    // Atualização geral
+    const updates = {};
+    if (dados.titulo)   updates.titulo   = dados.titulo;
+    if (dados.conteudo) updates.conteudo = dados.conteudo;
+    const { data, error } = await supabase.from('forum_topicos').update(updates).eq('id', id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json(data);
+  }
+
+  if (req.method === 'DELETE') {
+    const { id, respostaId } = req.query;
+    if (respostaId) {
+      const { error } = await supabase.from('forum_respostas').delete().eq('id', respostaId);
+      if (error) return res.status(500).json({ error: error.message });
+    } else {
+      await supabase.from('forum_respostas').delete().eq('topico_id', id);
+      const { error } = await supabase.from('forum_topicos').delete().eq('id', id);
+      if (error) return res.status(500).json({ error: error.message });
+    }
+    return res.status(200).json({ mensagem: 'Excluído com sucesso' });
+  }
+
+  res.setHeader('Allow', ['GET', 'POST', 'PUT', 'DELETE']);
+  return res.status(405).json({ error: `Método ${req.method} não permitido` });
 }

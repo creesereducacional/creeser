@@ -1,126 +1,82 @@
 import fs from 'fs';
 import path from 'path';
+import { createClient } from '@supabase/supabase-js';
+import { requireAuth, requirePerfil } from '../../lib/auth-server';
 
-const sliderDataPath = path.join(process.cwd(), 'data', 'slider.json');
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
 const slidesDirectory = path.join(process.cwd(), 'public', 'images', 'slider');
 
-const withLowercaseKeys = (obj) => {
-  if (!obj || typeof obj !== 'object') return obj;
-  const lowered = {};
-  Object.entries(obj).forEach(([key, value]) => {
-    lowered[key.toLowerCase()] = value;
-  });
-  return { ...obj, ...lowered };
-};
-
-const getBodyValue = (body, key) => {
-  if (!body) return undefined;
-  return body[key] ?? body[key.toLowerCase()];
-};
-
-function getSliderData() {
-  if (!fs.existsSync(sliderDataPath)) {
-    return [];
+export default async function handler(req, res) {
+  // GET é público
+  if (req.method !== 'GET') {
+    const authUser = requireAuth(req, res);
+    if (!authUser) return;
+    if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin'])) return;
   }
-  const fileContent = fs.readFileSync(sliderDataPath, 'utf-8');
-  return JSON.parse(fileContent);
-}
 
-export default function handler(req, res) {
   if (req.method === 'GET') {
-    try {
-      const sliderInfo = getSliderData(); // Info from slider.json
-
-      if (!fs.existsSync(slidesDirectory)) {
-        return res.status(200).json([]);
-      }
-
-      const imageFiles = fs.readdirSync(slidesDirectory)
-        .filter(fileName => /\.(jpg|jpeg|png|gif)$/i.test(fileName));
-
-      const slides = imageFiles.map((fileName, index) => {
-        const slideData = sliderInfo.find(s => s.fileName === fileName);
-        return {
-          id: index + 1,
-          url: `/images/slider/${fileName}`,
-          nome: fileName,
-          titulo: slideData?.title || `Slide ${index + 1}`,
-          descricao: slideData?.description || `Descrição do slide ${index + 1}.`
-        };
-      });
-
-      console.log('API /api/slider - Slides encontrados:', slides);
-      res.status(200).json(slides.map(withLowercaseKeys));
-    } catch (error) {
-      console.error('Erro ao listar slides:', error);
-      res.status(500).json({ error: 'Erro ao buscar imagens do slider.' });
+    if (!fs.existsSync(slidesDirectory)) {
+      return res.status(200).json([]);
     }
-  } else if (req.method === 'POST') { // Adicionando o método POST para salvar os metadados
-    try {
-        const fileName = getBodyValue(req.body, 'fileName');
-        const title = getBodyValue(req.body, 'title');
-        const description = getBodyValue(req.body, 'description');
+    const imageFiles = fs.readdirSync(slidesDirectory)
+      .filter(f => /\.(jpg|jpeg|png|gif)$/i.test(f));
 
-        if (!fileName || !title) {
-            return res.status(400).json({ error: 'Nome do arquivo e título são obrigatórios.' });
-        }
+    const { data: metaRows = [] } = await supabase.from('slider').select('*');
 
-        const sliderInfo = getSliderData();
-        
-        const existingSlideIndex = sliderInfo.findIndex(s => s.fileName === fileName);
+    const slides = imageFiles.map((fileName, index) => {
+      const meta = metaRows.find(m => m.file_name === fileName);
+      return {
+        id:       meta?.id || index + 1,
+        url:      `/images/slider/${fileName}`,
+        nome:     fileName,
+        titulo:   meta?.title       || `Slide ${index + 1}`,
+        descricao: meta?.description || `Descrição do slide ${index + 1}.`,
+      };
+    });
 
-        if (existingSlideIndex > -1) {
-            // Atualiza o slide existente
-            sliderInfo[existingSlideIndex] = { fileName, title, description };
-        } else {
-            // Adiciona um novo slide
-            sliderInfo.push({ fileName, title, description });
-        }
-
-        fs.writeFileSync(sliderDataPath, JSON.stringify(sliderInfo, null, 2));
-
-        res.status(200).json({ success: true, message: 'Dados do slide salvos com sucesso.' });
-
-    } catch (error) {
-        console.error('Erro ao salvar dados do slide:', error);
-        res.status(500).json({ error: 'Erro ao salvar dados do slide.' });
-    }
-  } else if (req.method === 'DELETE') {
-    try {
-      const fileName = getBodyValue(req.body, 'fileName');
-      const deleteAll = getBodyValue(req.body, 'deleteAll');
-
-      if (!fileName) {
-        return res.status(400).json({ error: 'Nome do arquivo é obrigatório.' });
-      }
-
-      const filePath = path.join(slidesDirectory, fileName);
-
-      // Verifica se o arquivo existe
-      if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ error: 'Arquivo não encontrado.' });
-      }
-
-      // Deleta o arquivo de imagem
-      fs.unlinkSync(filePath);
-
-      // Se deleteAll for true, remove também os metadados do slider.json
-      if (deleteAll) {
-        let sliderInfo = getSliderData();
-        sliderInfo = sliderInfo.filter(s => s.fileName !== fileName);
-        fs.writeFileSync(sliderDataPath, JSON.stringify(sliderInfo, null, 2));
-        res.status(200).json({ success: true, message: 'Slide deletado completamente com sucesso.' });
-      } else {
-        res.status(200).json({ success: true, message: 'Imagem deletada com sucesso. O registro de título e descrição foi mantido.' });
-      }
-
-    } catch (error) {
-      console.error('Erro ao deletar imagem:', error);
-      res.status(500).json({ error: 'Erro ao deletar imagem.' });
-    }
+    return res.status(200).json(slides);
   }
-  else {
-    res.setHeader('Allow', ['GET', 'POST', 'DELETE']);
-    res.status(405).end(`Método ${req.method} não permitido.`);
+
+  if (req.method === 'POST') {
+    const body = req.body || {};
+    const fileName   = body.fileName   || body.file_name;
+    const title      = body.title;
+    const description = body.description;
+
+    if (!fileName || !title) {
+      return res.status(400).json({ error: 'Nome do arquivo e título são obrigatórios.' });
+    }
+
+    const { error } = await supabase.from('slider').upsert(
+      { file_name: fileName, title, description },
+      { onConflict: 'file_name' }
+    );
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(200).json({ success: true, message: 'Dados do slide salvos com sucesso.' });
   }
+
+  if (req.method === 'DELETE') {
+    const body = req.body || {};
+    const fileName = body.fileName || body.file_name;
+
+    if (!fileName) {
+      return res.status(400).json({ error: 'Nome do arquivo é obrigatório.' });
+    }
+
+    const filePath = path.join(slidesDirectory, fileName);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Arquivo não encontrado.' });
+    }
+    fs.unlinkSync(filePath);
+
+    await supabase.from('slider').delete().eq('file_name', fileName);
+    return res.status(200).json({ success: true, message: 'Slide excluído com sucesso.' });
+  }
+
+  res.setHeader('Allow', ['GET', 'POST', 'DELETE']);
+  return res.status(405).json({ error: `Método ${req.method} não permitido` });
 }

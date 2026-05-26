@@ -1,4 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
+import {
+  applyInstituicaoFilter,
+  hasPerfil,
+  requireAuth,
+  requirePerfil,
+  resolveInstituicaoId,
+} from '../../../lib/auth-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -10,8 +17,21 @@ export default async function handler(req, res) {
   }
 
   try {
+    const authUser = requireAuth(req, res);
+    if (!authUser) return;
+    if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'financeiro', 'admin'])) {
+      return;
+    }
+
+    const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+    const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+
+    if (!isGroupAdmin && !instituicaoId) {
+      return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
+    }
+
     // Buscar todos os alunos com dados financeiros
-    const { data: alunos, error: alunosError } = await supabase
+    let alunosQuery = supabase
       .from('alunos')
       .select(
         `id,
@@ -31,29 +51,41 @@ export default async function handler(req, res) {
       )
       .order('nome', { ascending: true });
 
+    alunosQuery = applyInstituicaoFilter(alunosQuery, instituicaoId);
+    const { data: alunos, error: alunosError } = await alunosQuery;
+
     if (alunosError) throw alunosError;
 
     // Buscar turmas
-    const { data: turmas, error: turmasError } = await supabase
+    let turmasQuery = supabase
       .from('turmas')
       .select('id, nome')
       .order('nome', { ascending: true });
 
+    turmasQuery = applyInstituicaoFilter(turmasQuery, instituicaoId);
+    const { data: turmas, error: turmasError } = await turmasQuery;
+
     if (turmasError) throw turmasError;
 
     // Buscar cursos
-    const { data: cursos, error: cursosError } = await supabase
+    let cursosQuery = supabase
       .from('cursos')
       .select('id, nome')
       .order('nome', { ascending: true });
+
+    cursosQuery = applyInstituicaoFilter(cursosQuery, instituicaoId);
+    const { data: cursos, error: cursosError } = await cursosQuery;
 
     if (cursosError) throw cursosError;
 
     // Buscar resumo financeiro por aluno (parcelas)
     const hoje = new Date().toISOString().split('T')[0];
-    const { data: parcelas } = await supabase
+    let parcelasQuery = supabase
       .from('financeiro_parcelas')
       .select('valor, status, data_vencimento, financeiro_ordens_pagamento!inner(aluno_id)');
+
+    parcelasQuery = applyInstituicaoFilter(parcelasQuery, instituicaoId);
+    const { data: parcelas } = await parcelasQuery;
 
     // Agregar por aluno_id
     const resumoFinanceiro = {};
