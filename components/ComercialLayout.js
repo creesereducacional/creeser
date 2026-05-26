@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 
@@ -55,17 +56,27 @@ export default function ComercialLayout({ children, titulo }) {
         <div className="p-6 border-b border-teal-600 flex items-center justify-between">
           {sidebarOpen ? (
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-white to-teal-100 rounded-lg flex items-center justify-center shadow-lg font-bold text-teal-700 text-lg">
-                C
-              </div>
+              <Image
+                src="/images/logo_creeser.png"
+                alt="CREESER"
+                width={36}
+                height={36}
+                className="rounded-lg object-contain bg-white p-0.5"
+              />
               <div>
                 <h2 className="text-white font-bold text-sm">CREESER</h2>
                 <p className="text-teal-200 text-xs">Comercial</p>
               </div>
             </div>
           ) : (
-            <div className="w-10 h-10 bg-gradient-to-br from-white to-teal-100 rounded-lg flex items-center justify-center shadow-lg font-bold text-teal-700 mx-auto text-lg">
-              C
+            <div className="mx-auto">
+              <Image
+                src="/images/logo_creeser.png"
+                alt="CREESER"
+                width={36}
+                height={36}
+                className="rounded-lg object-contain bg-white p-0.5"
+              />
             </div>
           )}
           <button
