@@ -272,13 +272,13 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
         if (!efiRes.ok) {
           const efiBody = await efiRes.json();
           setSucesso('✅ Ordem criada, mas falha no boleto EFI: ' + (efiBody.message || 'erro desconhecido'));
-          setTimeout(() => { onSalvo(); onSuccess(); }, 3000);
+          setTimeout(() => { onSalvo(); onSuccess(); onClose(); }, 2000);
           return;
         }
       }
 
       setSucesso('✅ Ordem e boleto EFI criados com sucesso!');
-      setTimeout(() => { onSalvo(); onSuccess(); }, 1500);
+      setTimeout(() => { onSalvo(); onSuccess(); onClose(); }, 800);
     } catch (e) { setErro(e.message); } finally { setSalvando(false); }
   };
 
@@ -428,13 +428,13 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
         if (!efiRes.ok) {
           const efiBody = await efiRes.json();
           setSucesso('✅ Carnê criado, mas falha no EFI: ' + (efiBody.message || 'erro desconhecido'));
-          setTimeout(() => { onSalvo(); onSuccess(); }, 3000);
+          setTimeout(() => { onSalvo(); onSuccess(); onClose(); }, 2000);
           return;
         }
       }
 
       setSucesso('✅ Carnê e boletos EFI criados com sucesso!');
-      setTimeout(() => { onSalvo(); onSuccess(); }, 1500);
+      setTimeout(() => { onSalvo(); onSuccess(); onClose(); }, 800);
     } catch (e) { setErro(e.message); } finally { setSalvando(false); }
   };
 
