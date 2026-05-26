@@ -33,21 +33,22 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     const body = req.body || {};
     const instId = resolveInstituicaoId(req, authUser);
-    const { nomeCompleto, email, senha, cpf, dataNascimento, whatsapp, tipo, perfil } = body;
-    if (!nomeCompleto || !email || !senha || !cpf || !dataNascimento || !whatsapp || !tipo) {
-      return res.status(400).json({ error: 'Todos os campos são obrigatórios' });
+    const { nomeCompleto, email, senha, cpf, dataNascimento, whatsapp, tipo, perfil, status } = body;
+    if (!nomeCompleto || !email || !senha || !tipo) {
+      return res.status(400).json({ error: 'Nome, email, senha e tipo são obrigatórios' });
     }
+    const perfilResolvido = perfil || (tipo === 'admin' ? 'instituicao_admin' : tipo);
     const { data, error } = await supabase.from('usuarios').insert({
       nomecompleto:    nomeCompleto,
       email,
       senha,
-      cpf,
-      datanascimento:  dataNascimento,
-      whatsapp,
+      cpf:             cpf || null,
+      datanascimento:  dataNascimento || null,
+      whatsapp:        whatsapp || null,
       tipo,
-      perfil:          perfil || (tipo === 'admin' ? 'instituicao_admin' : tipo),
+      perfil:          perfilResolvido,
       instituicao_id:  instId || null,
-      status:          'ativo',
+      status:          status || 'ativo',
     }).select('id, nomecompleto, email, cpf, tipo, perfil, status, instituicao_id').single();
     if (error) {
       if (error.code === '23505') return res.status(409).json({ error: 'CPF ou email já cadastrado' });

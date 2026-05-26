@@ -1,485 +1,383 @@
-﻿/**
- * @file components/AdminUsuarios.js
- * @description Módulo de administração de usuários do sistema - REFATORADO
- * @author CREESER Development
- * @date 2025-01-22
- * 
- * ✅ REFACTORED: Usa componentes reutilizáveis, hooks customizados, e padrões de engenharia
- * 
- * Funcionalidades:
- * - Listar todos os usuários
- * - Criar novo usuário
- * - Editar usuário existente
- * - Deletar usuário
- * - Alterar status (ativo/inativo)
- */
+﻿import { useState, useCallback, useEffect } from 'react';
 
-import { useCallback, useState } from 'react';
-import { useApiData } from '@/hooks/useApiData';
-import { useFormData } from '@/hooks/useFormData';
-import Botao from '@/components/ui/Botao';
-import Cartao from '@/components/ui/Cartao';
-import { Carregando } from '@/components/ui/Carregando';
-import ConfirmModal from './ConfirmModal';
-import ClienteAPI from '@/utils/api';
-import { validarRequerido, validarEmail } from '@/utils/validacoes';
+const PERFIS = [
+  { value: 'grupo_admin',       label: 'Admin Geral (Grupo)' },
+  { value: 'instituicao_admin', label: 'Admin Instituicao' },
+  { value: 'financeiro',        label: 'Financeiro' },
+  { value: 'secretaria',        label: 'Secretaria' },
+  { value: 'comercial',         label: 'Comercial' },
+  { value: 'professor',         label: 'Professor' },
+  { value: 'aluno',             label: 'Aluno' },
+];
 
-/**
- * Máscaras de formatação para campos
- */
-const mascaras = {
-  cpf: (value) => {
-    return value
-      .replace(/\D/g, '')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d{1,2})/, '$1-$2')
-      .replace(/(-\d{2})\d+?$/, '$1');
-  },
-  whatsapp: (value) => {
-    return value
-      .replace(/\D/g, '')
-      .replace(/(\d{2})(\d)/, '($1) $2')
-      .replace(/(\d{5})(\d)/, '$1-$2')
-      .replace(/(-\d{4})\d+?$/, '$1');
-  }
+const TIPOS = [
+  { value: 'admin',     label: 'Admin' },
+  { value: 'usuario',   label: 'Usuario' },
+  { value: 'professor', label: 'Professor' },
+  { value: 'aluno',     label: 'Aluno' },
+];
+
+const FORM_INICIAL = {
+  nomeCompleto: '',
+  email: '',
+  senha: '',
+  tipo: 'usuario',
+  perfil: 'secretaria',
+  status: 'ativo',
+  whatsapp: '',
 };
 
-/**
- * Componente principal de administração de usuários
- * 
- * Responsabilidades:
- * - Gerenciar lista de usuários do sistema
- * - Criar, editar e deletar usuários
- * - Alterar status de usuários
- * 
- * @returns {JSX.Element} Interface de administração de usuários
- */
+function labelPerfil(perfil) {
+  return PERFIS.find(p => p.value === perfil)?.label || perfil || '-';
+}
+
+function labelTipo(tipo) {
+  if (!tipo) return '-';
+  return tipo.charAt(0).toUpperCase() + tipo.slice(1);
+}
+
 export default function AdminUsuarios() {
-  // ========================================
-  // ESTADO LOCAL
-  // ========================================
+  const [usuarios, setUsuarios] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState('');
+  const [form, setForm] = useState(FORM_INICIAL);
+  const [editandoId, setEditandoId] = useState(null);
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [erroForm, setErroForm] = useState('');
+  const [confirmacao, setConfirmacao] = useState(null);
 
-  const [usuarioSelecionado, setUsuarioSelecionado] = useState(null);
-  const [mostrarFormulario, setMostrarFormulario] = useState(false);
-  const [modal, setModal] = useState({
-    visivel: false,
-    titulo: '',
-    mensagem: '',
-    onConfirmar: null,
-    tipo: 'confirm'
-  });
-
-  // ========================================
-  // FETCH DE DADOS
-  // ========================================
-
-  const { data: usuarios, loading, erro, refetch } = useApiData('/api/usuarios');
-
-  // ========================================
-  // GERENCIAMENTO DE FORMULÁRIO
-  // ========================================
-
-  const { valores, erros, carregando, handleChange: handleChangeBase, handleSubmit, resetar } =
-    useFormData(
-      {
-        nomeCompleto: '',
-        email: '',
-        senha: '',
-        cpf: '',
-        dataNascimento: '',
-        whatsapp: '',
-        tipo: 'aluno',
-        status: 'ativo'
-      },
-      async (valores) => {
-        try {
-          if (!validarRequerido(valores.nomeCompleto)) {
-            throw new Error('Nome completo é obrigatório');
-          }
-          if (!validarEmail(valores.email)) {
-            throw new Error('Email é inválido');
-          }
-          if (!validarRequerido(valores.senha)) {
-            throw new Error('Senha é obrigatória');
-          }
-
-          if (usuarioSelecionado?.id) {
-            // Editar usuário
-            await ClienteAPI.put(`/api/usuarios/${usuarioSelecionado.id}`, valores);
-            mostrarMensagem('Usuário atualizado com sucesso!', 'sucesso');
-          } else {
-            // Criar usuário
-            await ClienteAPI.post('/api/usuarios', valores);
-            mostrarMensagem('Usuário criado com sucesso!', 'sucesso');
-          }
-
-          fecharFormulario();
-          refetch();
-        } catch (erro) {
-          mostrarMensagem(erro.message || 'Erro ao salvar usuário', 'erro');
-        }
+  const buscarUsuarios = useCallback(async () => {
+    try {
+      setCarregando(true);
+      setErro('');
+      const res = await fetch('/api/usuarios', { credentials: 'include' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Erro ${res.status}`);
       }
-    );
-
-  // Wrapper para handleChange que aplica máscaras
-  const handleChange = useCallback(
-    (e) => {
-      const { name, value } = e.target;
-      let maskedValue = value;
-      
-      if (name === 'cpf' && mascaras.cpf) {
-        maskedValue = mascaras.cpf(value);
-      } else if (name === 'whatsapp' && mascaras.whatsapp) {
-        maskedValue = mascaras.whatsapp(value);
-      }
-      
-      handleChangeBase({
-        target: { name, value: maskedValue }
-      });
-    },
-    [handleChangeBase]
-  );
-
-  // ========================================
-  // FUNÇÕES AUXILIARES
-  // ========================================
-
-  const mostrarMensagem = useCallback((mensagem, tipo = 'info') => {
-    setModal({
-      visivel: true,
-      titulo: tipo === 'sucesso' ? '✅ Sucesso!' : '❌ Erro',
-      mensagem,
-      onConfirmar: null,
-      tipo: 'info'
-    });
+      const data = await res.json();
+      setUsuarios(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setCarregando(false);
+    }
   }, []);
 
-  const pedirConfirmacao = useCallback(
-    (titulo, mensagem, onConfirmar, tipo = 'confirm') => {
-      setModal({
-        visivel: true,
-        titulo,
-        mensagem,
-        onConfirmar,
-        tipo
-      });
-    },
-    []
-  );
+  useEffect(() => { buscarUsuarios(); }, [buscarUsuarios]);
 
-  const fecharFormulario = useCallback(() => {
-    setMostrarFormulario(false);
-    setUsuarioSelecionado(null);
-    resetar();
-  }, [resetar]);
+  const abrirNovo = () => {
+    setForm(FORM_INICIAL);
+    setEditandoId(null);
+    setErroForm('');
+    setMostrarForm(true);
+  };
 
-  const abrirFormulario = useCallback((usuario = null) => {
-    if (usuario) {
-      setUsuarioSelecionado(usuario);
-      Object.keys(usuario).forEach((chave) => {
-        if (chave !== 'id' && chave !== 'senha') {
-          handleChangeBase({
-            target: { name: chave, value: usuario[chave] || '' }
-          });
-        }
+  const abrirEditar = (u) => {
+    setForm({
+      nomeCompleto: u.nomecompleto || u.nomeCompleto || '',
+      email:        u.email || '',
+      senha:        '',
+      tipo:         u.tipo || 'usuario',
+      perfil:       u.perfil || 'secretaria',
+      status:       u.status || 'ativo',
+      whatsapp:     u.whatsapp || '',
+    });
+    setEditandoId(u.id);
+    setErroForm('');
+    setMostrarForm(true);
+  };
+
+  const fecharForm = () => {
+    setMostrarForm(false);
+    setEditandoId(null);
+    setErroForm('');
+  };
+
+  const handleChange = (e) => {
+    setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErroForm('');
+    if (!form.nomeCompleto.trim()) return setErroForm('Nome e obrigatorio');
+    if (!form.email.trim()) return setErroForm('Email e obrigatorio');
+    if (!editandoId && !form.senha.trim()) return setErroForm('Senha e obrigatoria para novo usuario');
+
+    setSalvando(true);
+    try {
+      const payload = {
+        nomeCompleto: form.nomeCompleto.trim(),
+        email:        form.email.trim(),
+        tipo:         form.tipo,
+        perfil:       form.perfil,
+        status:       form.status,
+        whatsapp:     form.whatsapp || '',
+      };
+      if (form.senha.trim()) payload.senha = form.senha.trim();
+
+      const url    = editandoId ? `/api/usuarios?id=${editandoId}` : '/api/usuarios';
+      const method = editandoId ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
       });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `Erro ${res.status}`);
+
+      fecharForm();
+      buscarUsuarios();
+    } catch (e) {
+      setErroForm(e.message);
+    } finally {
+      setSalvando(false);
     }
-    setMostrarFormulario(true);
-  }, [handleChangeBase]);
+  };
 
-  const deletarUsuario = useCallback(
-    (usuario) => {
-      const nomeUsuario = usuario.nomecompleto || usuario.nomeCompleto || usuario.nome || 'este usuário';
-      pedirConfirmacao(
-        'Deletar Usuário',
-        `Deseja deletar "${nomeUsuario}"? Esta ação não pode ser desfeita.`,
-        async () => {
-          try {
-            await ClienteAPI.delete(`/api/usuarios/${usuario.id}`);
-            mostrarMensagem('Usuário deletado com sucesso!', 'sucesso');
-            refetch();
-          } catch (erro) {
-            mostrarMensagem('Erro ao deletar usuário', 'erro');
-          }
-        },
-        'delete'
-      );
-    },
-    [pedirConfirmacao, mostrarMensagem, refetch]
-  );
+  const alternarStatus = async (u) => {
+    const novoStatus = u.status === 'ativo' ? 'inativo' : 'ativo';
+    try {
+      const res = await fetch(`/api/usuarios?id=${u.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: novoStatus }),
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        throw new Error(b.error || `Erro ${res.status}`);
+      }
+      buscarUsuarios();
+    } catch (e) {
+      alert('Erro ao alterar status: ' + e.message);
+    }
+  };
 
-  const alternarStatus = useCallback(
-    (usuario) => {
-      const nomeUsuario = usuario.nomecompleto || usuario.nomeCompleto || usuario.nome || 'este usuário';
-      const novoStatus = usuario.status === 'ativo' ? 'inativo' : 'ativo';
-      pedirConfirmacao(
-        novoStatus === 'ativo' ? 'Ativar Usuário' : 'Inativar Usuário',
-        `Deseja ${novoStatus === 'ativo' ? 'ativar' : 'inativar'} "${nomeUsuario}"?`,
-        async () => {
-          try {
-            await ClienteAPI.put(`/api/usuarios/${usuario.id}`, {
-              ...usuario,
-              status: novoStatus
-            });
-            mostrarMensagem(`Usuário ${novoStatus === 'ativo' ? 'ativado' : 'inativado'} com sucesso!`, 'sucesso');
-            refetch();
-          } catch (erro) {
-            mostrarMensagem('Erro ao alterar status', 'erro');
+  const excluirUsuario = (u) => {
+    setConfirmacao({
+      mensagem: `Excluir "${u.nomecompleto || u.email}"? Esta acao nao pode ser desfeita.`,
+      onConfirmar: async () => {
+        setConfirmacao(null);
+        try {
+          const res = await fetch(`/api/usuarios?id=${u.id}`, {
+            method: 'DELETE',
+            credentials: 'include',
+          });
+          if (!res.ok) {
+            const b = await res.json().catch(() => ({}));
+            throw new Error(b.error || `Erro ${res.status}`);
           }
+          buscarUsuarios();
+        } catch (e) {
+          alert('Erro ao excluir: ' + e.message);
         }
-      );
-    },
-    [pedirConfirmacao, mostrarMensagem, refetch]
-  );
-
-  // ========================================
-  // RENDER
-  // ========================================
-
-  if (loading) {
-    return <Carregando mensagem="Carregando usuários..." />;
-  }
+      },
+    });
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+    <div className="space-y-6 p-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Gerenciar Usuários</h1>
-          <p className="text-sm text-gray-600 mt-2">Total: {usuarios?.length || 0} usuários</p>
+          <h1 className="text-2xl font-bold text-gray-800">Gerenciar Usuarios</h1>
+          <p className="text-sm text-gray-500 mt-1">Total: {usuarios.length} usuario{usuarios.length !== 1 ? 's' : ''}</p>
         </div>
-        <Botao
-          variant="primario"
-          onClick={() => {
-            if (mostrarFormulario) {
-              fecharFormulario();
-            } else {
-              abrirFormulario();
-            }
-          }}
+        <button
+          onClick={mostrarForm ? fecharForm : abrirNovo}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 transition-colors"
         >
-          {mostrarFormulario ? '✕ Cancelar' : '+ Novo Usuário'}
-        </Botao>
+          {mostrarForm ? 'x Cancelar' : '+ Novo Usuario'}
+        </button>
       </div>
 
       {erro && (
-        <Cartao className="p-4 bg-red-50 border border-red-200">
-          <p className="text-red-700">{erro.toString()}</p>
-        </Cartao>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
+          {erro}
+        </div>
       )}
 
-      {mostrarFormulario && (
-        <Cartao className="p-6">
-          <h2 className="text-xl font-bold mb-6">
-            {usuarioSelecionado ? '✏️ Editar Usuário' : '➕ Novo Usuário'}
+      {mostrarForm && (
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+          <h2 className="text-lg font-bold text-gray-800 mb-5">
+            {editandoId ? 'Editar Usuario' : 'Novo Usuario'}
           </h2>
+
+          {erroForm && (
+            <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">
+              {erroForm}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
-              <label className="block text-sm font-semibold mb-2">Nome Completo *</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Nome Completo *</label>
               <input
                 name="nomeCompleto"
-                value={valores.nomeCompleto}
+                value={form.nomeCompleto}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                placeholder="Nome completo"
               />
-              {erros.nomeCompleto && <p className="text-red-600 text-xs mt-1">{erros.nomeCompleto}</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-semibold mb-2">Email *</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Email *</label>
               <input
                 name="email"
                 type="email"
-                value={valores.email}
+                value={form.email}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                placeholder="email@exemplo.com"
               />
-              {erros.email && <p className="text-red-600 text-xs mt-1">{erros.email}</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-semibold mb-2">
-                Senha {usuarioSelecionado ? '(deixe em branco para não alterar)' : '*'}
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                {editandoId ? 'Nova Senha (deixe em branco para manter)' : 'Senha Inicial *'}
               </label>
               <input
                 name="senha"
                 type="password"
-                value={valores.senha}
+                value={form.senha}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                required={!usuarioSelecionado}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                placeholder={editandoId ? 'Deixe em branco para nao alterar' : 'Senha inicial'}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold mb-2">CPF *</label>
-              <input
-                name="cpf"
-                value={valores.cpf}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                placeholder="000.000.000-00"
-                maxLength="14"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold mb-2">Data de Nascimento *</label>
-              <input
-                name="dataNascimento"
-                type="date"
-                value={valores.dataNascimento}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold mb-2">WhatsApp *</label>
-              <input
-                name="whatsapp"
-                value={valores.whatsapp}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                placeholder="(00) 00000-0000"
-                maxLength="15"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold mb-2">Tipo *</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Tipo</label>
               <select
                 name="tipo"
-                value={valores.tipo}
+                value={form.tipo}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
               >
-                <option value="aluno">Aluno</option>
-                <option value="professor">Professor</option>
-                <option value="admin">Admin</option>
+                {TIPOS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold mb-2">Status *</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Perfil de Acesso</label>
+              <select
+                name="perfil"
+                value={form.perfil}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                {PERFIS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">WhatsApp</label>
+              <input
+                name="whatsapp"
+                value={form.whatsapp}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                placeholder="(00) 00000-0000"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Status</label>
               <select
                 name="status"
-                value={valores.status}
+                value={form.status}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
               >
                 <option value="ativo">Ativo</option>
                 <option value="inativo">Inativo</option>
               </select>
             </div>
 
-            <div className="md:col-span-2 flex gap-3">
-              <Botao variant="primario" type="submit" carregando={carregando}>
-                {usuarioSelecionado ? 'Atualizar Usuário' : 'Criar Usuário'}
-              </Botao>
-              <Botao variant="secundario" onClick={fecharFormulario}>
+            <div className="md:col-span-2 flex gap-3 pt-2">
+              <button
+                type="submit"
+                disabled={salvando}
+                className="px-5 py-2 bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 disabled:opacity-50 transition-colors"
+              >
+                {salvando ? 'Salvando...' : editandoId ? 'Atualizar' : 'Criar Usuario'}
+              </button>
+              <button
+                type="button"
+                onClick={fecharForm}
+                className="px-5 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+              >
                 Cancelar
-              </Botao>
+              </button>
             </div>
           </form>
-        </Cartao>
+        </div>
       )}
 
-      {!usuarios || usuarios.length === 0 ? (
-        <Cartao className="p-12 text-center">
-          <p className="text-gray-500 text-lg">Nenhum usuário cadastrado</p>
-        </Cartao>
+      {carregando ? (
+        <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
+          <p className="text-gray-500">Carregando usuarios...</p>
+        </div>
+      ) : usuarios.length === 0 ? (
+        <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
+          <p className="text-gray-500 text-lg">Nenhum usuario cadastrado</p>
+        </div>
       ) : (
-        <Cartao className="overflow-hidden">
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs md:text-sm font-semibold text-gray-700">
-                    Nome
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs md:text-sm font-semibold text-gray-700">
-                    Email
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs md:text-sm font-semibold text-gray-700">
-                    CPF
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs md:text-sm font-semibold text-gray-700">
-                    Tipo
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs md:text-sm font-semibold text-gray-700">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs md:text-sm font-semibold text-gray-700">
-                    Ações
-                  </th>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Nome</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Email</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700 hidden md:table-cell">Perfil</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700 hidden sm:table-cell">Tipo</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700">Status</th>
+                  <th className="px-4 py-3 text-center font-semibold text-gray-700">Acoes</th>
                 </tr>
               </thead>
               <tbody>
-                {usuarios.map((usuario, index) => (
+                {usuarios.map((u, i) => (
                   <tr
-                    key={usuario.id}
-                    className={`border-b border-gray-200 ${
-                      index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                    } hover:bg-blue-50 transition ${
-                      usuario.status === 'inativo' ? 'bg-red-50' : ''
-                    }`}
+                    key={u.id}
+                    className={`border-b border-gray-100 hover:bg-blue-50 transition-colors ${i % 2 === 1 ? 'bg-gray-50' : 'bg-white'}`}
                   >
-                    <td className="px-4 py-3 text-xs md:text-sm font-semibold text-gray-800">
-                      {usuario.nomecompleto || usuario.nomeCompleto || usuario.nome}
+                    <td className="px-4 py-3 font-medium text-gray-800">
+                      {u.nomecompleto || u.nomeCompleto || '-'}
                     </td>
-                    <td className="px-4 py-3 text-xs md:text-sm text-gray-600">
-                      {usuario.email}
-                    </td>
-                    <td className="px-4 py-3 text-xs md:text-sm text-gray-600">
-                      {usuario.cpf}
-                    </td>
-                    <td className="px-4 py-3 text-xs md:text-sm text-gray-600">
-                      {usuario.tipo.charAt(0).toUpperCase() + usuario.tipo.slice(1)}
-                    </td>
-                    <td className="px-4 py-3 text-xs md:text-sm">
-                      <span
-                        className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
-                          usuario.status === 'ativo'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}
-                      >
-                        {usuario.status === 'ativo' ? 'Ativo' : 'Inativo'}
+                    <td className="px-4 py-3 text-gray-600">{u.email}</td>
+                    <td className="px-4 py-3 text-gray-600 hidden md:table-cell">{labelPerfil(u.perfil)}</td>
+                    <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">{labelTipo(u.tipo)}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${u.status === 'ativo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {u.status === 'ativo' ? 'Ativo' : 'Inativo'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-4 py-3">
                       <div className="flex justify-center gap-2 flex-wrap">
-                        <Botao
-                          tamanho="pequeno"
-                          variant="primario"
-                          onClick={() => abrirFormulario(usuario)}
-                          title="Editar"
+                        <button
+                          onClick={() => abrirEditar(u)}
+                          className="px-3 py-1 bg-teal-600 text-white rounded text-xs font-semibold hover:bg-teal-700 transition-colors"
                         >
                           Editar
-                        </Botao>
-                        <Botao
-                          tamanho="pequeno"
-                          variant={usuario.status === 'ativo' ? 'secundario' : 'sucesso'}
-                          onClick={() => alternarStatus(usuario)}
-                          title={usuario.status === 'ativo' ? 'Inativar' : 'Ativar'}
+                        </button>
+                        <button
+                          onClick={() => alternarStatus(u)}
+                          className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${u.status === 'ativo' ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' : 'bg-green-100 text-green-800 hover:bg-green-200'}`}
                         >
-                          {usuario.status === 'ativo' ? 'Inativar' : 'Ativar'}
-                        </Botao>
-                        <Botao
-                          tamanho="pequeno"
-                          variant="perigo"
-                          onClick={() => deletarUsuario(usuario)}
-                          title="Excluir"
+                          {u.status === 'ativo' ? 'Inativar' : 'Ativar'}
+                        </button>
+                        <button
+                          onClick={() => excluirUsuario(u)}
+                          className="px-3 py-1 bg-red-600 text-white rounded text-xs font-semibold hover:bg-red-700 transition-colors"
                         >
                           Excluir
-                        </Botao>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -487,36 +385,31 @@ export default function AdminUsuarios() {
               </tbody>
             </table>
           </div>
-        </Cartao>
+        </div>
       )}
 
-      <ConfirmModal
-        isOpen={modal.visivel}
-        title={modal.titulo}
-        message={modal.mensagem}
-        type={modal.tipo}
-        onConfirm={() => {
-          if (modal.onConfirmar) {
-            modal.onConfirmar();
-          }
-          setModal({
-            visivel: false,
-            titulo: '',
-            mensagem: '',
-            onConfirmar: null,
-            tipo: 'confirm'
-          });
-        }}
-        onClose={() =>
-          setModal({
-            visivel: false,
-            titulo: '',
-            mensagem: '',
-            onConfirmar: null,
-            tipo: 'confirm'
-          })
-        }
-      />
+      {confirmacao && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-800 mb-3">Confirmar exclusao</h3>
+            <p className="text-gray-600 mb-6">{confirmacao.mensagem}</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmacao(null)}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmacao.onConfirmar}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors"
+              >
+                Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
