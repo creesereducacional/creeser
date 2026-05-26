@@ -48,7 +48,12 @@ export default function ConfirmarTurmaPage() {
   }, []);
 
   const handleAtivar = async (aluno) => {
-    if (!window.confirm(`Confirmar ativação de "${aluno.nome}"? Esta ação mudará o status para ATIVO.`)) return;
+    const turmaId = turmasSel[aluno.id] || aluno.turmaid;
+    if (!turmaId) {
+      setMsg({ tipo: 'erro', texto: `"${aluno.nome}": selecione uma turma antes de ativar.` });
+      return;
+    }
+    if (!window.confirm(`Confirmar ativação de "${aluno.nome}" na turma selecionada? Esta ação mudará o status para ATIVO.`)) return;
 
     setAtivando(aluno.id);
     setMsg(null);
@@ -59,7 +64,7 @@ export default function ConfirmarTurmaPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           aluno_id: aluno.id,
-          turmaid: turmasSel[aluno.id] || undefined,
+          turmaid: turmaId,
         }),
       });
       const data = await res.json();

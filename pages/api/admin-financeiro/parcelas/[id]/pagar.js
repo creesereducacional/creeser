@@ -170,7 +170,10 @@ export default async function handler(req, res) {
         if (todasPagas) {
           await supabase
             .from('alunos')
-            .update({ statusmatricula: 'AGUARDANDO_FORMACAO_TURMA' })
+            .update({
+              statusmatricula: 'AGUARDANDO_FORMACAO_TURMA',
+              data_pagamento_matricula: dataPagamentoStr,
+            })
             .eq('id', parcela.aluno_id)
             .eq('statusmatricula', 'AGUARDANDO_PAGAMENTO_MATRICULA');
         }

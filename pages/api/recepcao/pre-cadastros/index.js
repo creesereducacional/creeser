@@ -14,7 +14,7 @@ const supabase = createClient(
 
 const PERFIS_PERMITIDOS = ['recepcao', 'grupo_admin', 'instituicao_admin', 'admin', 'financeiro'];
 
-const STATUS_LISTADOS = ['PRE_CADASTRO', 'AGUARDANDO_PAGAMENTO_MATRICULA', 'AGUARDANDO_FORMACAO_TURMA', 'ATIVO', 'CANCELADO', 'PERDIDO'];
+const STATUS_LISTADOS = ['PRE_CADASTRO', 'AGUARDANDO_PAGAMENTO_MATRICULA', 'AGUARDANDO_FORMACAO_TURMA', 'ATIVO', 'DESISTENTE', 'CANCELADO'];
 
 export default async function handler(req, res) {
   const authUser = requireAuth(req, res);
@@ -79,6 +79,7 @@ export default async function handler(req, res) {
       instituicao_id:   efetivInstituicaoId,
       captado_por_id:   authUser.id,
       statusmatricula,
+      data_captacao:    new Date().toISOString().slice(0, 10),
       ...(cursoid             ? { cursoid: Number(cursoid) }                   : {}),
       ...(turmaid             ? { turmaid: Number(turmaid) }                   : {}),
       ...(valor_matricula     ? { valor_matricula: Number(valor_matricula) }   : {}),

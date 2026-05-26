@@ -1,12 +1,15 @@
 /**
- * PATCH /api/alunos/ativar
+ * PATCH /api/alunos/desistir
  *
- * Confirma a formação de turma e ativa o aluno.
- * Transição: AGUARDANDO_FORMACAO_TURMA → ATIVO
+ * Marca aluno como DESISTENTE (antes do ATIVO) ou CANCELADO (após ter sido ATIVO).
  *
- * Body: { aluno_id }
+ * Transições permitidas:
+ *   PRE_CADASTRO | AGUARDANDO_PAGAMENTO_MATRICULA | AGUARDANDO_FORMACAO_TURMA → DESISTENTE
+ *   ATIVO → CANCELADO
  *
- * Perfis permitidos: grupo_admin, instituicao_admin, admin
+ * Body: { aluno_id, motivo? }
+ *
+ * Perfis: grupo_admin, instituicao_admin, admin, financeiro
  */
 import { createClient } from '@supabase/supabase-js';
 import {
@@ -21,7 +24,10 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const PERFIS_PERMITIDOS = ['grupo_admin', 'instituicao_admin', 'admin'];
+const PERFIS_PERMITIDOS = ['grupo_admin', 'instituicao_admin', 'admin', 'financeiro'];
+
+const STATUS_ANTES_ATIVO  = ['PRE_CADASTRO', 'AGUARDANDO_PAGAMENTO_MATRICULA', 'AGUARDANDO_FORMACAO_TURMA'];
+const STATUS_APOS_ATIVO   = ['ATIVO'];
 
 export default async function handler(req, res) {
   if (req.method !== 'PATCH') {
@@ -35,60 +41,50 @@ export default async function handler(req, res) {
   const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
   const instituicaoId = resolveInstituicaoId(req, authUser);
 
-  const { aluno_id, turmaid } = req.body || {};
+  const { aluno_id, motivo } = req.body || {};
 
   if (!aluno_id) {
     return res.status(400).json({ error: 'aluno_id é obrigatório.' });
   }
 
-  // Buscar aluno para validar isolamento e status atual
   const { data: aluno, error: findError } = await supabase
     .from('alunos')
-    .select('id, nome, statusmatricula, instituicao_id, turmaid')
+    .select('id, nome, statusmatricula, instituicao_id')
     .eq('id', aluno_id)
     .maybeSingle();
 
   if (findError) return res.status(500).json({ error: findError.message });
-  if (!aluno) return res.status(404).json({ error: 'Aluno não encontrado.' });
+  if (!aluno)   return res.status(404).json({ error: 'Aluno não encontrado.' });
 
   // Isolamento multi-tenant
   if (!isGroupAdmin && aluno.instituicao_id && aluno.instituicao_id !== instituicaoId) {
     return res.status(403).json({ error: 'Acesso negado: aluno pertence a outra instituição.' });
   }
 
-  // Validar status — só pode ativar quem está AGUARDANDO_FORMACAO_TURMA
-  if (aluno.statusmatricula !== 'AGUARDANDO_FORMACAO_TURMA') {
+  let novoStatus;
+  if (STATUS_ANTES_ATIVO.includes(aluno.statusmatricula)) {
+    novoStatus = 'DESISTENTE';
+  } else if (STATUS_APOS_ATIVO.includes(aluno.statusmatricula)) {
+    novoStatus = 'CANCELADO';
+  } else {
     return res.status(422).json({
-      error: `Aluno está com status "${aluno.statusmatricula}". Apenas alunos com status AGUARDANDO_FORMACAO_TURMA podem ser ativados.`,
-    });
-  }
-
-  // Validar turma — obrigatório para ativar
-  const turmaFinal = turmaid ? Number(turmaid) : aluno.turmaid;
-  if (!turmaFinal) {
-    return res.status(422).json({
-      error: 'Não é possível ativar aluno sem turma vinculada. Selecione uma turma antes de confirmar.',
+      error: `Status "${aluno.statusmatricula}" não permite esta transição. Aluno já está ${aluno.statusmatricula}.`,
     });
   }
 
   const agora = new Date().toISOString();
-  const updateData = {
-    statusmatricula: 'ATIVO',
-    data_matricula: agora.slice(0, 10),
-    data_ativacao:  agora.slice(0, 10),
-    turmaid: turmaFinal,
-  };
 
   const { data: atualizado, error: updateError } = await supabase
     .from('alunos')
-    .update(updateData)
+    .update({
+      statusmatricula: novoStatus,
+      ...(motivo ? { observacoes_adicionais: String(motivo).slice(0, 1000) } : {}),
+    })
     .eq('id', aluno_id)
-    .select('id, nome, statusmatricula, data_matricula')
+    .select('id, nome, statusmatricula')
     .single();
 
-  if (updateError) {
-    return res.status(500).json({ error: updateError.message });
-  }
+  if (updateError) return res.status(500).json({ error: updateError.message });
 
   // Auditoria silenciosa
   try {
@@ -96,17 +92,17 @@ export default async function handler(req, res) {
       aluno_id,
       instituicao_id: aluno.instituicao_id || null,
       usuario_id: authUser.id ? Number(authUser.id) : null,
-      acao: 'ativar_aluno',
+      acao: novoStatus === 'DESISTENTE' ? 'marcar_desistente' : 'marcar_cancelado',
       dados_extras: {
-        status_anterior: 'AGUARDANDO_FORMACAO_TURMA',
-        status_novo: 'ATIVO',
-        ...(turmaid ? { turmaid_novo: Number(turmaid) } : {}),
+        status_anterior: aluno.statusmatricula,
+        status_novo: novoStatus,
+        motivo: motivo || null,
       },
     });
   } catch (_) { /* não bloqueia */ }
 
   return res.status(200).json({
-    mensagem: `Aluno "${atualizado.nome}" ativado com sucesso.`,
+    mensagem: `Aluno "${atualizado.nome}" marcado como ${novoStatus}.`,
     aluno: atualizado,
   });
 }

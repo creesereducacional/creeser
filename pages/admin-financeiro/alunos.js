@@ -842,6 +842,100 @@ function ModalRecibo({ ordem, onClose }) {
   );
 }
 
+function ModalContrato({ aluno, onClose }) {
+  const [enviando, setEnviando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+  const [erro, setErro] = useState(null);
+
+  const handleAssinarDigital = async () => {
+    setEnviando(true);
+    setErro(null);
+    setResultado(null);
+    try {
+      const res = await fetch(`/api/contratos/aluno/${aluno.id}/assinar-digital`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        if (res.status === 422 && json?.error?.includes('configur')) {
+          setErro('Assinatura digital não configurada para esta instituição. Configure as variáveis ASSINAFY nas configurações.');
+        } else {
+          setErro(json?.error || 'Erro ao enviar para assinatura digital.');
+        }
+      } else {
+        setResultado(json?.mensagem || 'Documento enviado com sucesso para assinatura digital.');
+      }
+    } catch (e) {
+      setErro('Erro de conexão. Tente novamente.');
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <h3 className="text-base font-bold text-gray-800">Contrato — {aluno.nome}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-3">
+          <button
+            onClick={() => window.open(`/admin/alunos/contrato/${aluno.id}?autoprint=1`, '_blank')}
+            className="w-full flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition text-sm font-medium text-gray-700">
+            <svg className="w-5 h-5 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Imprimir Contrato
+          </button>
+
+          <button
+            onClick={handleAssinarDigital}
+            disabled={enviando}
+            className="w-full flex items-center gap-3 px-4 py-3 bg-blue-600 rounded-lg hover:bg-blue-700 transition text-sm font-medium text-white disabled:opacity-60">
+            {enviando ? (
+              <svg className="w-5 h-5 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            )}
+            {enviando ? 'Enviando...' : 'Enviar para Assinatura Digital'}
+          </button>
+
+          {resultado && (
+            <div className="px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
+              {resultado}
+            </div>
+          )}
+          {erro && (
+            <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+              {erro}
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end px-6 py-4 border-t bg-gray-50 rounded-b-xl">
+          <button onClick={onClose}
+            className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AlunosFinanceiroPage() {
   const router = useRouter();
   const [alunos, setAlunos] = useState([]);
@@ -861,6 +955,7 @@ export default function AlunosFinanceiroPage() {
   const [modalExcluir, setModalExcluir] = useState(null);
   const [modalHistorico, setModalHistorico] = useState(null);
   const [modalRecibo, setModalRecibo] = useState(null);
+  const [modalContrato, setModalContrato] = useState(null);
   const [selectedFaturas, setSelectedFaturas] = useState(new Set());
   const [deletandoLote, setDeletandoLote] = useState(false);
 
@@ -1034,9 +1129,18 @@ export default function AlunosFinanceiroPage() {
   const formataValor = (v) => Number(v||0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const formataData = (d) => { if (!d) return '-'; try { return new Date(d).toLocaleDateString('pt-BR'); } catch { return '-'; } };
 
-  const StatusBadge = ({ status }) => (
-    <span className={`px-2 py-1 rounded text-xs font-semibold ${{ ATIVO: 'bg-green-100 text-green-800', INATIVO: 'bg-red-100 text-red-800' }[status] || 'bg-gray-100 text-gray-800'}`}>{status}</span>
-  );
+  const StatusBadge = ({ status }) => {
+    const cfg = {
+      ATIVO:                          { cls: 'bg-green-100 text-green-800',   label: 'Ativo' },
+      INATIVO:                        { cls: 'bg-red-100 text-red-800',       label: 'Inativo' },
+      PRE_CADASTRO:                   { cls: 'bg-gray-100 text-gray-700',     label: 'Pré-Cadastro' },
+      AGUARDANDO_PAGAMENTO_MATRICULA: { cls: 'bg-purple-100 text-purple-800', label: 'Ag. Pgto Matrícula' },
+      AGUARDANDO_FORMACAO_TURMA:      { cls: 'bg-indigo-100 text-indigo-800', label: 'Ag. Formação Turma' },
+      DESISTENTE:                     { cls: 'bg-orange-100 text-orange-800', label: 'Desistente' },
+      CANCELADO:                      { cls: 'bg-red-100 text-red-800',       label: 'Cancelado' },
+    }[status] || { cls: 'bg-gray-100 text-gray-800', label: status || '—' };
+    return <span className={`px-2 py-1 rounded text-xs font-semibold ${cfg.cls}`}>{cfg.label}</span>;
+  };
 
   const StatusOrdemBadge = ({ status }) => {
     const cores = { pendente: 'bg-yellow-100 text-yellow-800', pago: 'bg-green-100 text-green-800', vencido: 'bg-orange-100 text-orange-800', cancelado: 'bg-red-100 text-red-800', ativo: 'bg-blue-100 text-blue-800' };
@@ -1085,9 +1189,14 @@ export default function AlunosFinanceiroPage() {
               className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500" />
             <select value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}
               className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500">
-              <option value="ATIVO">Status: Ativo</option>
-              <option value="INATIVO">Status: Inativo</option>
               <option value="">Todos os Status</option>
+              <option value="ATIVO">Ativo</option>
+              <option value="PRE_CADASTRO">Pré-Cadastro</option>
+              <option value="AGUARDANDO_PAGAMENTO_MATRICULA">Ag. Pagamento Matrícula</option>
+              <option value="AGUARDANDO_FORMACAO_TURMA">Ag. Formação de Turma</option>
+              <option value="DESISTENTE">Desistente</option>
+              <option value="CANCELADO">Cancelado</option>
+              <option value="INATIVO">Inativo</option>
             </select>
             <select value={filtroTurma} onChange={e => setFiltroTurma(e.target.value)}
               className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500">
@@ -1154,6 +1263,10 @@ export default function AlunosFinanceiroPage() {
                             <button onClick={() => setModalCarne(aluno)} title="Criar Carnê"
                               className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition">
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                            </button>
+                            <button onClick={() => setModalContrato(aluno)} title="Contrato"
+                              className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                             </button>
                           </div>
                         </td>
@@ -1525,6 +1638,9 @@ export default function AlunosFinanceiroPage() {
       )}
       {modalRecibo && (
         <ModalRecibo ordem={modalRecibo} onClose={() => setModalRecibo(null)} />
+      )}
+      {modalContrato && (
+        <ModalContrato aluno={modalContrato} onClose={() => setModalContrato(null)} />
       )}
       {modalConfirmarAluno && (
         <ModalConfirmar

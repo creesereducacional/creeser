@@ -189,7 +189,10 @@ async function atualizarParcelaEOrdem(parcelaId, statusLocal, statusEFI, evento,
           if (ordemInfo?.tipo === 'matricula' && ordemInfo?.aluno_id) {
             await supabase
               .from('alunos')
-              .update({ statusmatricula: 'AGUARDANDO_FORMACAO_TURMA' })
+              .update({
+                statusmatricula: 'AGUARDANDO_FORMACAO_TURMA',
+                data_pagamento_matricula: evento.received_by_bank_at || new Date().toISOString().slice(0, 10),
+              })
               .eq('id', ordemInfo.aluno_id)
               .eq('statusmatricula', 'AGUARDANDO_PAGAMENTO_MATRICULA');
           }

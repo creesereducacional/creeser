@@ -78,6 +78,7 @@ export default async function handler(req, res) {
     instituicao_id: lead.instituicao_id,
     captado_por_id: lead.captado_por_id || authUser.id,
     statusmatricula: 'PRE_CADASTRO',
+    data_captacao: new Date().toISOString().slice(0, 10),
     ...(cursoid           ? { cursoid: Number(cursoid) }                 : {}),
     ...(turmaid           ? { turmaid: Number(turmaid) }                 : {}),
     ...(plano_financeiro  ? { plano_financeiro }                         : {}),
