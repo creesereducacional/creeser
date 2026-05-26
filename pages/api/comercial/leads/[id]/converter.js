@@ -79,7 +79,7 @@ export default async function handler(req, res) {
     telefone_celular: lead.whatsapp || lead.telefone || null,
     instituicao_id: lead.instituicao_id,
     captado_por_id: lead.captado_por_id || authUser.id,
-    statusmatricula: 'AGUARDANDO_PAGAMENTO',
+    statusmatricula: 'AGUARDANDO_ORDEM_PAGAMENTO',
     ...(cursoid           ? { cursoid: Number(cursoid) }                 : {}),
     ...(turmaid           ? { turmaid: Number(turmaid) }                 : {}),
     ...(plano_financeiro  ? { plano_financeiro }                         : {}),
