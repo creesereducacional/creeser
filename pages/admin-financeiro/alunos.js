@@ -391,7 +391,7 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
     percentual_desconto: '',
     vencimento_desconto: '',
     quantidade_parcelas: aluno.qtd_parcelas || 12,
-    periodo: '',
+    periodo: 'Período Único',
     data_vencimento: vencimentoStr,
   });
   const [salvando, setSalvando] = useState(false);
@@ -517,9 +517,14 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
                 className={inputCls} placeholder="Parcelas" />
             </FieldGroup>
             <FieldGroup label="Período">
-              <input type="text" value={form.periodo}
+              <select value={form.periodo}
                 onChange={e => set('periodo', e.target.value)}
-                className={inputCls} />
+                className={inputCls + ' cursor-pointer'}>
+                <option value="Período Único">Período Único</option>
+                {Array.from({ length: 20 }, (_, i) => i + 1).map(n => (
+                  <option key={n} value={`${n}º Período`}>{n}º Período</option>
+                ))}
+              </select>
             </FieldGroup>
 
             {/* Descrição — linha inteira */}

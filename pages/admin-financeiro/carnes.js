@@ -337,6 +337,10 @@ export default function CarnesPage() {
                           <p className="font-semibold text-gray-900">{carne.descricao || '-'}</p>
                         </div>
                         <div>
+                          <p className="text-gray-600">Período</p>
+                          <p className="font-semibold text-gray-900">{carne.referencia || 'Período Único'}</p>
+                        </div>
+                        <div>
                           <p className="text-gray-600">Data Criação</p>
                           <p className="font-semibold text-gray-900">{formataData(carne.created_at)}</p>
                         </div>
@@ -566,7 +570,7 @@ function gerarHTMLRecibo(dados) {
   <div class="item"><label>Curso</label><span>${dados.curso.nome}</span></div>
   <div class="item"><label>Turma</label><span>${dados.turma.nome}</span></div>
   <div class="item full"><label>Descrição</label><span>${dados.descricao}</span></div>
-  ${dados.referencia ? `<div class="item"><label>Referência</label><span>${dados.referencia}</span></div>` : ''}
+  <div class="item"><label>Período</label><span>${dados.referencia || 'Período Único'}</span></div>
   <div class="item"><label>Vencimento</label><span>${fmtData(dados.data_vencimento)}</span></div>
 </div>
 <div class="valor-box">
@@ -643,9 +647,7 @@ function ModalRecibo({ ordemId, onClose }) {
                   <div><span className="font-semibold text-gray-500">Curso:</span> <span className="text-gray-800">{dados.curso.nome}</span></div>
                   <div><span className="font-semibold text-gray-500">Turma:</span> <span className="text-gray-800">{dados.turma.nome}</span></div>
                   <div className="col-span-2"><span className="font-semibold text-gray-500">Descrição:</span> <span className="text-gray-800">{dados.descricao}</span></div>
-                  {dados.referencia && (
-                    <div><span className="font-semibold text-gray-500">Referência:</span> <span className="text-gray-800">{dados.referencia}</span></div>
-                  )}
+                  <div><span className="font-semibold text-gray-500">Período:</span> <span className="text-gray-800">{dados.referencia || 'Período Único'}</span></div>
                   <div><span className="font-semibold text-gray-500">Vencimento:</span> <span className="text-gray-800">{fmtData(dados.data_vencimento)}</span></div>
                 </div>
                 <div className="text-center pt-2 border-t border-emerald-200">
