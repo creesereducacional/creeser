@@ -49,24 +49,38 @@ export default function ComercialLayout({ children, titulo }) {
     <div className="flex h-screen bg-gray-100 overflow-hidden">
       {/* ── Sidebar ────────────────────────────────────────────────── */}
       <aside
-        className={`${sidebarOpen ? 'w-56' : 'w-14'} bg-indigo-900 text-white flex flex-col transition-all duration-300 flex-shrink-0`}
+        className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gradient-to-b from-teal-700 to-teal-900 shadow-2xl text-white flex flex-col transition-all duration-300 flex-shrink-0`}
       >
-        {/* Logo/título */}
-        <div className="flex items-center justify-between p-4 border-b border-indigo-700">
-          {sidebarOpen && (
-            <span className="font-bold text-base tracking-wide">Comercial</span>
+        {/* Logo CREESER */}
+        <div className="p-6 border-b border-teal-600 flex items-center justify-between">
+          {sidebarOpen ? (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-white to-teal-100 rounded-lg flex items-center justify-center shadow-lg font-bold text-teal-700 text-lg">
+                C
+              </div>
+              <div>
+                <h2 className="text-white font-bold text-sm">CREESER</h2>
+                <p className="text-teal-200 text-xs">Comercial</p>
+              </div>
+            </div>
+          ) : (
+            <div className="w-10 h-10 bg-gradient-to-br from-white to-teal-100 rounded-lg flex items-center justify-center shadow-lg font-bold text-teal-700 mx-auto text-lg">
+              C
+            </div>
           )}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-1 rounded hover:bg-indigo-700 transition-colors ml-auto"
+            className="p-2 hover:bg-teal-600 rounded-lg transition-colors text-teal-100"
             title={sidebarOpen ? 'Recolher' : 'Expandir'}
           >
-            <span className="text-xs">{sidebarOpen ? '◀' : '▶'}</span>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
           </button>
         </div>
 
         {/* Navegação */}
-        <nav className="flex-1 py-3 overflow-y-auto">
+        <nav className="flex-1 p-4 overflow-y-auto space-y-1">
           {MENU_ITEMS.map(item => {
             const ativo =
               item.href === '/comercial/leads/novo'
@@ -74,32 +88,34 @@ export default function ComercialLayout({ children, titulo }) {
                 : router.pathname.startsWith(item.href) && item.href !== '/comercial/leads/novo';
 
             return (
-              <Link key={item.href} href={item.href}>
-                <div
-                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${
-                    ativo ? 'bg-indigo-700 text-white' : 'text-indigo-200 hover:bg-indigo-800 hover:text-white'
-                  }`}
-                  title={!sidebarOpen ? item.label : undefined}
-                >
-                  <span className="text-lg flex-shrink-0">{item.icon}</span>
-                  {sidebarOpen && <span className="text-sm font-medium">{item.label}</span>}
-                </div>
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  ativo
+                    ? 'bg-teal-600 text-white shadow-lg font-semibold'
+                    : 'text-gray-300 hover:bg-teal-700/40 hover:text-white'
+                }`}
+                title={!sidebarOpen ? item.label : undefined}
+              >
+                <span className="text-xl min-w-[24px] flex items-center justify-center flex-shrink-0">{item.icon}</span>
+                {sidebarOpen && <span>{item.label}</span>}
               </Link>
             );
           })}
         </nav>
 
         {/* Footer da sidebar */}
-        <div className="p-4 border-t border-indigo-700">
+        <div className="p-4 border-t border-teal-600">
           {sidebarOpen && (
-            <div className="text-xs text-indigo-300 mb-2 truncate" title={user.nome}>
+            <div className="text-xs text-teal-200 mb-3 truncate" title={user.nome}>
               {user.nome}
             </div>
           )}
           <button
             onClick={handleLogout}
-            className={`flex items-center gap-2 text-indigo-300 hover:text-white text-sm transition-colors ${
-              !sidebarOpen ? 'justify-center w-full' : ''
+            className={`flex items-center gap-2 text-teal-300 hover:text-white text-sm transition-colors w-full ${
+              !sidebarOpen ? 'justify-center' : ''
             }`}
             title="Sair"
           >
@@ -112,12 +128,20 @@ export default function ComercialLayout({ children, titulo }) {
       {/* ── Conteúdo principal ─────────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="bg-white shadow-sm px-6 py-3 flex items-center justify-between flex-shrink-0">
-          <h1 className="text-base font-semibold text-gray-800">
+        <header className="bg-white shadow-sm px-6 py-4 flex items-center justify-between flex-shrink-0">
+          <h1 className="text-lg font-bold text-gray-800">
             {titulo || 'Portal Comercial'}
           </h1>
-          <div className="text-sm text-gray-500">
-            Olá, <span className="font-medium text-gray-700">{user.nome?.split(' ')[0]}</span>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-gray-500">
+              Olá, <span className="font-semibold text-gray-700">{user.nome?.split(' ')[0]}</span>
+            </span>
+            <button
+              onClick={handleLogout}
+              className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition-colors"
+            >
+              Sair
+            </button>
           </div>
         </header>
 

@@ -9,12 +9,12 @@ const CORES_STATUS = {
   perdido:     'bg-red-100 text-red-800',
 };
 
-function CardStat({ label, valor, cor = 'bg-white', icone }) {
+function CardStat({ label, valor, cor = 'bg-white', icone, destaque = false }) {
   return (
-    <div className={`${cor} rounded-xl shadow-sm p-5 flex flex-col gap-1`}>
-      <div className="text-2xl">{icone}</div>
-      <div className="text-2xl font-bold text-gray-800">{valor}</div>
-      <div className="text-sm text-gray-500">{label}</div>
+    <div className={`${cor} rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col gap-2 ${destaque ? 'ring-2 ring-teal-400' : ''}`}>
+      <div className="text-3xl">{icone}</div>
+      <div className="text-3xl font-bold text-gray-800">{valor}</div>
+      <div className="text-sm text-gray-500 font-medium">{label}</div>
     </div>
   );
 }
@@ -54,7 +54,7 @@ export default function ComercialDashboard() {
             <CardStat icone="🎯" label="Total de Leads" valor={stats.totalLeads} />
             <CardStat icone="📞" label="Interessados" valor={stats.interessado} />
             <CardStat icone="🎓" label="Matriculados" valor={stats.matriculado} />
-            <CardStat icone="📈" label="Taxa de Conversão" valor={`${stats.taxaConversao}%`} cor="bg-indigo-50" />
+            <CardStat icone="📈" label="Taxa de Conversão" valor={`${stats.taxaConversao}%`} cor="bg-teal-50" destaque />
           </div>
 
           {/* Pipeline de leads */}
@@ -83,7 +83,7 @@ export default function ComercialDashboard() {
           <div className="bg-white rounded-xl shadow-sm p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold text-gray-700">Últimas Matrículas Captadas</h2>
-              <a href="/comercial/matriculas" className="text-sm text-indigo-600 hover:underline">
+              <a href="/comercial/matriculas" className="text-sm text-teal-600 hover:text-teal-800 font-medium hover:underline">
                 Ver todas →
               </a>
             </div>
