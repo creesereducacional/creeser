@@ -228,12 +228,14 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
   const [sucesso, setSucesso] = useState('');
+  const [tipoDesconto, setTipoDesconto] = useState('%');
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   const valorFinal = () => {
     const v = Number(form.valor) || 0;
-    return v - v * ((Number(form.percentual_desconto) || 0) / 100);
+    if (tipoDesconto === '%') return Math.max(0, v - v * ((Number(form.percentual_desconto) || 0) / 100));
+    return Math.max(0, v - (Number(form.percentual_desconto) || 0));
   };
 
   const handleSubmit = async (e) => {
@@ -243,6 +245,8 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
     setSalvando(true); setErro('');
     try {
       const qtd = Number(form.quantidade_parcelas) || 1;
+      const pctDesc = tipoDesconto === '%' ? (Number(form.percentual_desconto) || 0) : 0;
+      const valDesc = tipoDesconto === 'R$' ? (Number(form.percentual_desconto) || 0) : Number(form.valor) * (pctDesc / 100);
       const res = await fetch('/api/admin-financeiro/ordens/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -251,8 +255,8 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
           descricao: form.descricao.trim(),
           referencia: form.categoria || null,
           valor_total: Number(form.valor),
-          percentual_desconto: Number(form.percentual_desconto) || 0,
-          valor_desconto: Number(form.valor) * ((Number(form.percentual_desconto) || 0) / 100),
+          percentual_desconto: pctDesc,
+          valor_desconto: valDesc,
           quantidade_parcelas: qtd,
           data_vencimento_primeira: form.data_vencimento,
           criado_por: 'financeiro',
@@ -308,10 +312,15 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
             </FieldGroup>
             <div className="flex items-stretch rounded-lg border border-teal-300 bg-teal-50 focus-within:border-teal-500">
               <span className="px-3 py-2 text-xs font-semibold text-teal-700 bg-teal-100 border-r border-teal-300 flex items-center rounded-l-lg flex-shrink-0">Desconto</span>
-              <input type="number" step="0.01" min="0" max="100" value={form.percentual_desconto}
+              <input type="number" step="0.01" min="0" max={tipoDesconto === '%' ? 100 : undefined} value={form.percentual_desconto}
                 onChange={e => set('percentual_desconto', e.target.value)}
                 className={inputCls} placeholder="0" />
-              <span className="px-3 py-2 text-xs font-semibold text-teal-700 bg-teal-100 border-l border-teal-300 flex items-center rounded-r-lg flex-shrink-0">%</span>
+              <button type="button"
+                onClick={() => { setTipoDesconto(t => t === '%' ? 'R$' : '%'); set('percentual_desconto', ''); }}
+                className="px-3 py-2 text-xs font-bold text-teal-700 bg-teal-100 border-l border-teal-300 flex items-center rounded-r-lg flex-shrink-0 hover:bg-teal-200 transition-colors select-none min-w-[2.5rem] justify-center"
+                title="Clique para alternar entre % e R$">
+                {tipoDesconto}
+              </button>
             </div>
 
             {/* Vencimento | Vencimento do Desconto */}
@@ -389,7 +398,12 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
   const [sucesso, setSucesso] = useState('');
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
-  const valorFinal = () => { const v = Number(form.valor) || 0; return v - v * ((Number(form.percentual_desconto) || 0) / 100); };
+  const [tipoDesconto, setTipoDesconto] = useState('%');
+  const valorFinal = () => {
+    const v = Number(form.valor) || 0;
+    if (tipoDesconto === '%') return Math.max(0, v - v * ((Number(form.percentual_desconto) || 0) / 100));
+    return Math.max(0, v - (Number(form.percentual_desconto) || 0));
+  };
   const valorParcela = () => valorFinal() / (Number(form.quantidade_parcelas) || 1);
 
   const handleSubmit = async (e) => {
@@ -398,6 +412,8 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
     if (!form.data_vencimento) return setErro('Data do primeiro vencimento é obrigatória');
     setSalvando(true); setErro('');
     try {
+      const pctDesc = tipoDesconto === '%' ? (Number(form.percentual_desconto) || 0) : 0;
+      const valDesc = tipoDesconto === 'R$' ? (Number(form.percentual_desconto) || 0) : Number(form.valor) * (pctDesc / 100);
       const res = await fetch('/api/admin-financeiro/ordens/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -406,8 +422,8 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
           descricao: form.descricao.trim() || 'MENSALIDADE',
           referencia: form.periodo.trim() || null,
           valor_total: Number(form.valor),
-          percentual_desconto: Number(form.percentual_desconto) || 0,
-          valor_desconto: Number(form.valor) * ((Number(form.percentual_desconto) || 0) / 100),
+          percentual_desconto: pctDesc,
+          valor_desconto: valDesc,
           quantidade_parcelas: Number(form.quantidade_parcelas),
           intervalo_dias: 30,
           data_vencimento_primeira: form.data_vencimento,
@@ -464,10 +480,15 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
             </FieldGroup>
             <div className="flex items-stretch rounded-lg border border-teal-300 bg-teal-50 focus-within:border-teal-500">
               <span className="px-3 py-2 text-xs font-semibold text-teal-700 bg-teal-100 border-r border-teal-300 flex items-center rounded-l-lg flex-shrink-0">Desconto</span>
-              <input type="number" step="0.01" min="0" max="100" value={form.percentual_desconto}
+              <input type="number" step="0.01" min="0" max={tipoDesconto === '%' ? 100 : undefined} value={form.percentual_desconto}
                 onChange={e => set('percentual_desconto', e.target.value)}
                 className={inputCls} placeholder="0" />
-              <span className="px-3 py-2 text-xs font-semibold text-teal-700 bg-teal-100 border-l border-teal-300 flex items-center rounded-r-lg flex-shrink-0">%</span>
+              <button type="button"
+                onClick={() => { setTipoDesconto(t => t === '%' ? 'R$' : '%'); set('percentual_desconto', ''); }}
+                className="px-3 py-2 text-xs font-bold text-teal-700 bg-teal-100 border-l border-teal-300 flex items-center rounded-r-lg flex-shrink-0 hover:bg-teal-200 transition-colors select-none min-w-[2.5rem] justify-center"
+                title="Clique para alternar entre % e R$">
+                {tipoDesconto}
+              </button>
             </div>
 
             {/* 1º Vencimento | Vencimento do Desconto */}
