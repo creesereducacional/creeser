@@ -911,14 +911,16 @@ export default function CadastroAluno() {
 
               <div>
                 <label className="text-xs font-medium text-teal-600 mb-1 block">Nacionalidade</label>
-                <input
-                  type="text"
+                <select
                   name="nacionalidade"
                   value={formData.nacionalidade}
                   onChange={handleInputChange}
-                  placeholder="Ex: Brasileiro"
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                />
+                >
+                  <option value="">Selecione</option>
+                  <option value="BRASILEIRA">BRASILEIRA</option>
+                  <option value="ESTRANGEIRA">ESTRANGEIRA</option>
+                </select>
               </div>
             </div>
           </div>
