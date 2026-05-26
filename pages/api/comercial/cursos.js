@@ -24,8 +24,8 @@ export default async function handler(req, res) {
 
   let query = supabase
     .from('cursos')
-    .select('id, nome, nivel_ensino, grau_conferido, carga_horaria, instituicao_id')
-    .eq('status', 'ativo')
+    .select('id, nome, nivelensino, grauconferido, cargahoraria, instituicao_id')
+    .or('situacao.eq.ATIVO,situacao.is.null')
     .order('nome');
 
   if (instituicaoId) query = applyInstituicaoFilter(query, instituicaoId);
