@@ -2,14 +2,24 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import ComercialLayout from '@/components/ComercialLayout';
 
-const STATUS_OPCOES = ['', 'novo', 'contatado', 'interessado', 'matriculado', 'perdido'];
+const STATUS_OPCOES = ['', 'novo', 'contatado', 'interessado', 'pre_matricula', 'matriculado', 'perdido'];
 
 const BADGES = {
-  novo:        'bg-blue-100 text-blue-700',
-  contatado:   'bg-yellow-100 text-yellow-700',
-  interessado: 'bg-orange-100 text-orange-700',
-  matriculado: 'bg-green-100 text-green-700',
-  perdido:     'bg-red-100 text-red-700',
+  novo:          'bg-blue-100 text-blue-700',
+  contatado:     'bg-yellow-100 text-yellow-700',
+  interessado:   'bg-orange-100 text-orange-700',
+  pre_matricula: 'bg-purple-100 text-purple-700',
+  matriculado:   'bg-green-100 text-green-700',
+  perdido:       'bg-red-100 text-red-700',
+};
+
+const LABELS_STATUS = {
+  novo:          'Novo',
+  contatado:     'Contatado',
+  interessado:   'Interessado',
+  pre_matricula: 'Pré-Matrícula',
+  matriculado:   'Matriculado',
+  perdido:       'Perdido',
 };
 
 export default function MeusLeads() {
@@ -39,7 +49,7 @@ export default function MeusLeads() {
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-bold text-gray-800">Meus Leads</h2>
         <Link href="/comercial/leads/novo">
-          <button className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-2 rounded-lg font-medium transition-colors">
+          <button className="bg-teal-600 hover:bg-teal-700 text-white text-sm px-4 py-2 rounded-lg font-medium transition-colors">
             + Novo Lead
           </button>
         </Link>
@@ -52,17 +62,18 @@ export default function MeusLeads() {
           placeholder="Buscar por nome ou telefone..."
           value={busca}
           onChange={e => setBusca(e.target.value)}
-          className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
         />
         <select
           value={filtroStatus}
           onChange={e => setFiltroStatus(e.target.value)}
-          className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
         >
           <option value="">Todos os status</option>
           <option value="novo">Novo</option>
           <option value="contatado">Contatado</option>
           <option value="interessado">Interessado</option>
+          <option value="pre_matricula">Pré-Matrícula</option>
           <option value="matriculado">Matriculado</option>
           <option value="perdido">Perdido</option>
         </select>
@@ -99,8 +110,8 @@ export default function MeusLeads() {
                   </td>
                   <td className="px-4 py-3 text-gray-500">{lead.curso_interesse || '—'}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${BADGES[lead.status] || ''}`}>
-                      {lead.status}
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${BADGES[lead.status] || 'bg-gray-100 text-gray-600'}`}>
+                      {LABELS_STATUS[lead.status] || lead.status}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-gray-400">
@@ -108,7 +119,7 @@ export default function MeusLeads() {
                   </td>
                   <td className="px-4 py-3">
                     <Link href={`/comercial/leads/${lead.id}`}>
-                      <span className="text-indigo-600 hover:underline cursor-pointer">Ver</span>
+                      <span className="text-teal-600 hover:text-teal-800 hover:underline cursor-pointer text-xs font-medium">Ver Detalhes</span>
                     </Link>
                   </td>
                 </tr>

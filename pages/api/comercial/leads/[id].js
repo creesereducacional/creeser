@@ -13,7 +13,7 @@ const supabase = createClient(
 );
 
 const PERFIS_PERMITIDOS = ['grupo_admin', 'instituicao_admin', 'admin', 'financeiro', 'comercial'];
-const STATUS_VALIDOS = ['novo', 'contatado', 'interessado', 'matriculado', 'perdido'];
+const STATUS_VALIDOS = ['novo', 'contatado', 'interessado', 'pre_matricula', 'matriculado', 'perdido'];
 
 async function registrarAuditoria(leadId, usuarioId, acao, dadosAnteriores, dadosNovos) {
   try {
@@ -65,6 +65,10 @@ export default async function handler(req, res) {
     }
     if (status !== undefined && !STATUS_VALIDOS.includes(status)) {
       return res.status(400).json({ error: `Status inválido. Valores: ${STATUS_VALIDOS.join(', ')}` });
+    }
+    // Comercial puro não pode marcar como matriculado manualmente
+    if (status === 'matriculado' && isComercialPuro(authUser)) {
+      return res.status(403).json({ error: 'Somente financeiro ou administrador pode confirmar matrícula.' });
     }
 
     const updates = { updated_at: new Date().toISOString() };

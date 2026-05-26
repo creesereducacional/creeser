@@ -6,11 +6,21 @@ import ComercialLayout from '@/components/ComercialLayout';
 const ORIGENS = ['', 'Instagram', 'Facebook', 'WhatsApp', 'Indicação', 'Site', 'Evento', 'Outros'];
 
 const BADGES = {
-  novo:        'bg-blue-100 text-blue-700',
-  contatado:   'bg-yellow-100 text-yellow-700',
-  interessado: 'bg-orange-100 text-orange-700',
-  matriculado: 'bg-green-100 text-green-700',
-  perdido:     'bg-red-100 text-red-700',
+  novo:          'bg-blue-100 text-blue-700',
+  contatado:     'bg-yellow-100 text-yellow-700',
+  interessado:   'bg-orange-100 text-orange-700',
+  pre_matricula: 'bg-purple-100 text-purple-700',
+  matriculado:   'bg-green-100 text-green-700',
+  perdido:       'bg-red-100 text-red-700',
+};
+
+const LABELS_STATUS = {
+  novo:          'Novo',
+  contatado:     'Contatado',
+  interessado:   'Interessado',
+  pre_matricula: 'Pré-Matrícula',
+  matriculado:   'Matriculado',
+  perdido:       'Perdido',
 };
 
 export default function DetalharLead() {
@@ -93,9 +103,9 @@ export default function DetalharLead() {
       const data = await res.json();
       if (!res.ok) { setErro(data.error || 'Erro na conversão.'); return; }
 
-      setSucesso(`${data.mensagem} Aluno criado: ${data.aluno_nome} (ID: ${data.aluno_id})`);
-      setLead(l => ({ ...l, status: 'matriculado', aluno_convertido_id: data.aluno_id }));
-      setForm(f => ({ ...f, status: 'matriculado' }));
+      setSucesso(data.mensagem);
+      setLead(l => ({ ...l, status: 'pre_matricula', aluno_convertido_id: data.aluno_id }));
+      setForm(f => ({ ...f, status: 'pre_matricula' }));
       setConfirmarConversao(false);
     } catch {
       setErro('Erro de conexão.');
@@ -131,30 +141,54 @@ export default function DetalharLead() {
               <div className="flex items-start justify-between">
                 <div>
                   <h2 className="text-lg font-bold text-gray-800">{lead.nome}</h2>
-                  <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${BADGES[lead.status] || ''}`}>
-                    {lead.status}
+                  <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${BADGES[lead.status] || 'bg-gray-100 text-gray-600'}`}>
+                    {LABELS_STATUS[lead.status] || lead.status}
                   </span>
                 </div>
-                {lead.status !== 'matriculado' && (
+                {lead.status !== 'pre_matricula' && lead.status !== 'matriculado' && (
                   <div className="flex gap-2">
                     {!editando && (
                       <button
                         onClick={() => setEditando(true)}
-                        className="text-sm border border-indigo-300 text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors"
+                        className="text-sm border border-teal-300 text-teal-600 hover:bg-teal-50 px-3 py-1.5 rounded-lg transition-colors"
                       >
                         Editar
                       </button>
                     )}
                     <button
                       onClick={() => setConfirmarConversao(true)}
-                      className="text-sm bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg transition-colors"
+                      className="text-sm bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg transition-colors"
                     >
-                      🎓 Converter em Aluno
+                      🎓 Criar Pré-Matrícula
                     </button>
                   </div>
                 )}
+                {lead.status === 'pre_matricula' && !editando && (
+                  <button
+                    onClick={() => setEditando(true)}
+                    className="text-sm border border-teal-300 text-teal-600 hover:bg-teal-50 px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    Editar
+                  </button>
+                )}
               </div>
             </div>
+
+            {/* Card de Pré-Matrícula */}
+            {lead.status === 'pre_matricula' && lead.aluno_convertido_id && (
+              <div className="bg-purple-50 border border-purple-200 rounded-xl p-5 mb-4">
+                <div className="flex items-start gap-3">
+                  <div className="text-2xl">🎓</div>
+                  <div>
+                    <h3 className="font-semibold text-purple-800 mb-1">Pré-Matrícula Criada</h3>
+                    <p className="text-sm text-purple-700 mb-2">
+                      A matrícula será confirmada somente após complementação cadastral e confirmação de pagamento pela secretaria/financeiro.
+                    </p>
+                    <p className="text-xs text-purple-500">Cód. aluno: {lead.aluno_convertido_id}</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Modal de confirmação de conversão */}
             {confirmarConversao && (
@@ -162,16 +196,15 @@ export default function DetalharLead() {
                 <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
                   <h3 className="font-bold text-gray-800 mb-2">Converter em Aluno</h3>
                   <p className="text-sm text-gray-600 mb-4">
-                    O lead <strong>{lead.nome}</strong> será cadastrado como aluno. Um registro mínimo será criado
-                    e poderá ser completado pela secretaria.
+                    O lead <strong>{lead.nome}</strong> será cadastrado como pré-matrícula. A matrícula só será confirmada após complementação cadastral e pagamento.
                   </p>
                   <div className="flex gap-3">
                     <button
                       onClick={handleConverter}
                       disabled={convertendo}
-                      className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white py-2 rounded-lg text-sm font-medium"
+                      className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white py-2 rounded-lg text-sm font-medium"
                     >
-                      {convertendo ? 'Convertendo...' : 'Confirmar'}
+                      {convertendo ? 'Criando...' : 'Confirmar Pré-Matrícula'}
                     </button>
                     <button
                       onClick={() => setConfirmarConversao(false)}
@@ -194,7 +227,7 @@ export default function DetalharLead() {
                     value={form.nome || ''}
                     onChange={set('nome')}
                     disabled={!editando}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:bg-gray-50 disabled:text-gray-500"
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 disabled:bg-gray-50 disabled:text-gray-500"
                   />
                 </div>
 
@@ -228,7 +261,7 @@ export default function DetalharLead() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Origem</label>
                     {editando ? (
                       <select value={form.origem || ''} onChange={set('origem')}
-                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300">
                         {ORIGENS.map(o => <option key={o} value={o}>{o || 'Não informado'}</option>)}
                       </select>
                     ) : (
@@ -240,7 +273,7 @@ export default function DetalharLead() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                     {editando ? (
                       <select value={form.status || 'novo'} onChange={set('status')}
-                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300">
                         <option value="novo">Novo</option>
                         <option value="contatado">Contatado</option>
                         <option value="interessado">Interessado</option>
@@ -263,7 +296,7 @@ export default function DetalharLead() {
                 {editando && (
                   <div className="flex gap-3 pt-2">
                     <button type="submit" disabled={salvando}
-                      className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white px-5 py-2 rounded-lg text-sm font-medium">
+                      className="bg-teal-600 hover:bg-teal-700 disabled:bg-teal-300 text-white px-5 py-2 rounded-lg text-sm font-medium">
                       {salvando ? 'Salvando...' : 'Salvar'}
                     </button>
                     <button type="button" onClick={() => { setEditando(false); setForm({ ...lead }); }}

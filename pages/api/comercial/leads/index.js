@@ -14,7 +14,7 @@ const supabase = createClient(
 
 const PERFIS_PERMITIDOS = ['grupo_admin', 'instituicao_admin', 'admin', 'financeiro', 'comercial'];
 
-const STATUS_VALIDOS = ['novo', 'contatado', 'interessado', 'matriculado', 'perdido'];
+const STATUS_VALIDOS = ['novo', 'contatado', 'interessado', 'pre_matricula', 'matriculado', 'perdido'];
 
 async function registrarAuditoria(leadId, usuarioId, acao, dadosAnteriores, dadosNovos) {
   try {

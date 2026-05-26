@@ -40,8 +40,8 @@ export default async function handler(req, res) {
   if (findError) return res.status(500).json({ error: findError.message });
   if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
 
-  if (lead.status === 'matriculado') {
-    return res.status(400).json({ error: 'Este lead já foi convertido em aluno anteriormente' });
+  if (lead.status === 'pre_matricula' || lead.status === 'matriculado') {
+    return res.status(400).json({ error: 'Este lead já foi convertido em pré-matrícula ou matrícula' });
   }
 
   // Criar aluno com dados mínimos do lead
@@ -51,7 +51,7 @@ export default async function handler(req, res) {
     telefone_celular: lead.whatsapp || lead.telefone || null,
     instituicao_id: lead.instituicao_id,
     captado_por_id: lead.captado_por_id,
-    statusmatricula: 'ATIVO',
+    statusmatricula: 'AGUARDANDO_PAGAMENTO',
   };
 
   const { data: aluno, error: alunoError } = await supabase
@@ -64,11 +64,11 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: `Erro ao criar aluno: ${alunoError.message}` });
   }
 
-  // Atualizar lead: status = matriculado + vínculo com o aluno
+  // Atualizar lead: status = pre_matricula + vínculo com o aluno
   const { error: updateError } = await supabase
     .from('leads')
     .update({
-      status: 'matriculado',
+      status: 'pre_matricula',
       aluno_convertido_id: aluno.id,
       updated_at: new Date().toISOString(),
     })
@@ -87,13 +87,13 @@ export default async function handler(req, res) {
       usuario_id: authUser.id,
       acao: 'conversao',
       dados_anteriores: { status: lead.status },
-      dados_novos: { status: 'matriculado', aluno_id: aluno.id, aluno_nome: aluno.nome },
+      dados_novos: { status: 'pre_matricula', aluno_id: aluno.id, aluno_nome: aluno.nome },
     });
   } catch (_) {}
 
   return res.status(200).json({
     aluno_id: aluno.id,
     aluno_nome: aluno.nome,
-    mensagem: 'Lead convertido em aluno com sucesso. Complete o cadastro na tela de Alunos.',
+    mensagem: 'Pré-matrícula criada com sucesso. A matrícula será confirmada após complementação cadastral e confirmação de pagamento.',
   });
 }
