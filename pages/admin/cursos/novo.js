@@ -130,9 +130,14 @@ export default function CadastroCurso() {
     const { name, value, type, checked } = e.target;
 
     if (name === 'instituicaoId') {
+      const nomeInst = (instituicoes.find(i => String(i.id) === String(value))?.nome || '').toUpperCase();
+      const ehInove = nomeInst.includes('INOVE');
+
       setFormData(prev => ({
         ...prev,
-        instituicaoId: value
+        instituicaoId: value,
+        nivelEnsino: ehInove ? 'Técnico e Profissionalizante' : '',
+        grauConferido: ehInove ? 'Técnico' : '',
       }));
 
       setUnidadeDisponivelId('');
@@ -158,6 +163,42 @@ export default function CadastroCurso() {
       return instituicaoId === String(formData.instituicaoId);
     });
   }, [formData.instituicaoId, unidadesDisponiveis]);
+
+  // Opções de Nível de Ensino e Grau Conferido filtradas por instituição
+  const instituicaoSelecionada = useMemo(
+    () => instituicoes.find(i => String(i.id) === String(formData.instituicaoId)),
+    [formData.instituicaoId, instituicoes]
+  );
+
+  const isInoveTecnico = useMemo(() => {
+    const nome = (instituicaoSelecionada?.nome || '').toUpperCase();
+    return nome.includes('INOVE');
+  }, [instituicaoSelecionada]);
+
+  const opcoesNivelEnsino = useMemo(() => {
+    if (isInoveTecnico) {
+      return [{ value: 'Técnico e Profissionalizante', label: 'Nível Técnico e Profissionalizante' }];
+    }
+    return [
+      { value: 'Fundamental', label: 'Ensino Fundamental' },
+      { value: 'Médio', label: 'Ensino Médio' },
+      { value: 'Superior', label: 'Ensino Superior' },
+      { value: 'Pós-Graduação', label: 'Pós-Graduação' },
+      { value: 'Técnico e Profissionalizante', label: 'Nível Técnico e Profissionalizante' },
+    ];
+  }, [isInoveTecnico]);
+
+  const opcoesGrauConferido = useMemo(() => {
+    if (isInoveTecnico) {
+      return [{ value: 'Técnico', label: 'TÉCNICO' }];
+    }
+    return [
+      { value: 'Diploma', label: 'Diploma' },
+      { value: 'Certificado', label: 'Certificado' },
+      { value: 'Atestado', label: 'Atestado' },
+      { value: 'Técnico', label: 'TÉCNICO' },
+    ];
+  }, [isInoveTecnico]);
 
   const adicionarUnidade = () => {
     if (unidadeDisponivelId && !unidadesSelecionadas.includes(unidadeDisponivelId)) {
@@ -355,10 +396,9 @@ export default function CadastroCurso() {
                     className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                   >
                     <option value="">Selecione</option>
-                    <option value="Fundamental">Ensino Fundamental</option>
-                    <option value="Médio">Ensino Médio</option>
-                    <option value="Superior">Ensino Superior</option>
-                    <option value="Pós-Graduação">Pós-Graduação</option>
+                    {opcoesNivelEnsino.map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -397,9 +437,9 @@ export default function CadastroCurso() {
                     className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                   >
                     <option value="">Selecione</option>
-                    <option value="Diploma">Diploma</option>
-                    <option value="Certificado">Certificado</option>
-                    <option value="Atestado">Atestado</option>
+                    {opcoesGrauConferido.map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
                   </select>
                 </div>
               </div>
