@@ -12,7 +12,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const PERFIS_PERMITIDOS = ['grupo_admin', 'instituicao_admin', 'admin', 'financeiro', 'comercial'];
+const PERFIS_PERMITIDOS = ['grupo_admin', 'instituicao_admin', 'admin', 'financeiro', 'comercial', 'comercial_master', 'comercial_operador'];
 
 const STATUS_VALIDOS = ['novo', 'contatado', 'interessado', 'pre_matricula', 'matriculado', 'perdido'];
 
@@ -28,8 +28,25 @@ async function registrarAuditoria(leadId, usuarioId, acao, dadosAnteriores, dado
   } catch (_) { /* auditoria não deve bloquear a operação */ }
 }
 
-const isComercialPuro = (user) =>
-  hasPerfil(user, ['comercial']) && !hasPerfil(user, ['grupo_admin', 'instituicao_admin', 'admin']);
+// Operador só vê seus próprios leads
+const isOperador = (user) =>
+  hasPerfil(user, ['comercial_operador']) &&
+  !hasPerfil(user, ['grupo_admin', 'instituicao_admin', 'admin', 'comercial_master']);
+
+// Master (inclui legacy 'comercial') vê equipe — não é admin-level
+const isMasterRestrito = (user) =>
+  hasPerfil(user, ['comercial_master']) &&
+  !hasPerfil(user, ['grupo_admin', 'instituicao_admin', 'admin']);
+
+// Obtém IDs dos operadores vinculados ao master
+async function getEquipeIds(masterId) {
+  const { data } = await supabase
+    .from('usuarios')
+    .select('id')
+    .eq('comercial_master_id', masterId)
+    .eq('perfil', 'comercial_operador');
+  return (data || []).map(o => o.id);
+}
 
 export default async function handler(req, res) {
   const authUser = requireAuth(req, res);
@@ -50,10 +67,16 @@ export default async function handler(req, res) {
 
     query = applyInstituicaoFilter(query, instituicaoId);
 
-    // Comercial puro vê apenas os próprios leads
-    if (isComercialPuro(authUser)) {
+    if (isOperador(authUser)) {
+      // Operador: apenas seus próprios leads
       query = query.eq('captado_por_id', authUser.id);
+    } else if (isMasterRestrito(authUser)) {
+      // Master: próprios leads + leads dos operadores vinculados
+      const operadorIds = await getEquipeIds(Number(authUser.id));
+      const todosIds = [Number(authUser.id), ...operadorIds];
+      query = query.in('captado_por_id', todosIds);
     }
+    // Admin-level: vê todos da instituição (sem filtro adicional)
 
     const { status } = req.query;
     if (status && STATUS_VALIDOS.includes(status)) {

@@ -3,7 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 
-const MENU_ITEMS = [
+const MENU_BASE = [
   { href: '/comercial/dashboard',  icon: '📊', label: 'Dashboard' },
   { href: '/comercial/leads',      icon: '🎯', label: 'Meus Leads' },
   { href: '/comercial/leads/novo', icon: '➕', label: 'Novo Lead' },
@@ -11,8 +11,13 @@ const MENU_ITEMS = [
   { href: '/comercial/comissoes',  icon: '💰', label: 'Comissões' },
 ];
 
+const MENU_EQUIPE = { href: '/comercial/equipe', icon: '👥', label: 'Equipe Comercial' };
+
 // Perfis que têm acesso ao módulo comercial
-const PERFIS_COMERCIAL = ['comercial', 'grupo_admin', 'instituicao_admin', 'admin'];
+const PERFIS_COMERCIAL = ['comercial', 'comercial_master', 'comercial_operador', 'grupo_admin', 'instituicao_admin', 'admin'];
+
+// Perfis que veem o menu Equipe
+const PERFIS_EQUIPE = ['comercial', 'comercial_master', 'grupo_admin', 'instituicao_admin', 'admin'];
 
 export default function ComercialLayout({ children, titulo }) {
   const router = useRouter();
@@ -46,6 +51,19 @@ export default function ComercialLayout({ children, titulo }) {
       </div>
     );
   }
+
+  const perfilAtual = String(user.perfil || user.tipo || '').toLowerCase();
+  const podeVerEquipe = PERFIS_EQUIPE.includes(perfilAtual);
+  const menuItems = podeVerEquipe ? [...MENU_BASE, MENU_EQUIPE] : MENU_BASE;
+
+  const perfilLabel = {
+    comercial_master: '⭐ Master Comercial',
+    comercial:        '⭐ Master Comercial',
+    comercial_operador: 'Operador Comercial',
+    grupo_admin:      'Grupo Admin',
+    instituicao_admin: 'Admin Instituição',
+    admin:            'Administrador',
+  }[perfilAtual] || perfilAtual;
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
@@ -93,7 +111,7 @@ export default function ComercialLayout({ children, titulo }) {
 
         {/* Navegação */}
         <nav className="flex-1 p-4 overflow-y-auto space-y-1">
-          {MENU_ITEMS.map(item => {
+          {menuItems.map(item => {
             const ativo =
               item.href === '/comercial/leads/novo'
                 ? router.pathname === item.href
@@ -120,8 +138,9 @@ export default function ComercialLayout({ children, titulo }) {
         {/* Footer da sidebar */}
         <div className="p-4 border-t border-teal-600">
           {sidebarOpen && (
-            <div className="text-xs text-teal-200 mb-3 truncate" title={user.nome}>
-              {user.nome}
+            <div className="mb-2">
+              <div className="text-xs text-teal-200 truncate" title={user.nome}>{user.nome}</div>
+              <div className="text-xs text-teal-400 mt-0.5">{perfilLabel}</div>
             </div>
           )}
           <button
