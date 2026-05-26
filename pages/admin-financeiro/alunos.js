@@ -315,12 +315,13 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
               <input type="number" step="0.01" min="0" max={tipoDesconto === '%' ? 100 : undefined} value={form.percentual_desconto}
                 onChange={e => set('percentual_desconto', e.target.value)}
                 className={inputCls} placeholder="0" />
-              <button type="button"
-                onClick={() => { setTipoDesconto(t => t === '%' ? 'R$' : '%'); set('percentual_desconto', ''); }}
-                className="px-3 py-2 text-xs font-bold text-teal-700 bg-teal-100 border-l border-teal-300 flex items-center rounded-r-lg flex-shrink-0 hover:bg-teal-200 transition-colors select-none min-w-[2.5rem] justify-center"
-                title="Clique para alternar entre % e R$">
-                {tipoDesconto}
-              </button>
+              <select
+                value={tipoDesconto}
+                onChange={e => { setTipoDesconto(e.target.value); set('percentual_desconto', ''); }}
+                className="px-2 py-2 text-xs font-bold text-teal-700 bg-teal-100 border-l border-teal-300 rounded-r-lg flex-shrink-0 focus:outline-none cursor-pointer">
+                <option value="%">%</option>
+                <option value="R$">R$</option>
+              </select>
             </div>
 
             {/* Vencimento | Vencimento do Desconto */}
@@ -483,12 +484,13 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
               <input type="number" step="0.01" min="0" max={tipoDesconto === '%' ? 100 : undefined} value={form.percentual_desconto}
                 onChange={e => set('percentual_desconto', e.target.value)}
                 className={inputCls} placeholder="0" />
-              <button type="button"
-                onClick={() => { setTipoDesconto(t => t === '%' ? 'R$' : '%'); set('percentual_desconto', ''); }}
-                className="px-3 py-2 text-xs font-bold text-teal-700 bg-teal-100 border-l border-teal-300 flex items-center rounded-r-lg flex-shrink-0 hover:bg-teal-200 transition-colors select-none min-w-[2.5rem] justify-center"
-                title="Clique para alternar entre % e R$">
-                {tipoDesconto}
-              </button>
+              <select
+                value={tipoDesconto}
+                onChange={e => { setTipoDesconto(e.target.value); set('percentual_desconto', ''); }}
+                className="px-2 py-2 text-xs font-bold text-teal-700 bg-teal-100 border-l border-teal-300 rounded-r-lg flex-shrink-0 focus:outline-none cursor-pointer">
+                <option value="%">%</option>
+                <option value="R$">R$</option>
+              </select>
             </div>
 
             {/* 1º Vencimento | Vencimento do Desconto */}
