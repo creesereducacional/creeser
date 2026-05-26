@@ -4,6 +4,7 @@ import {
   requireAuth,
   requirePerfil,
 } from '../../../../../lib/auth-server';
+import { tentarCriarComissao } from '../../../../../lib/comissoes-helper';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -176,6 +177,15 @@ export default async function handler(req, res) {
             })
             .eq('id', parcela.aluno_id)
             .eq('statusmatricula', 'AGUARDANDO_PAGAMENTO_MATRICULA');
+
+          // Gerar comissão automaticamente (não crítico)
+          await tentarCriarComissao(supabase, {
+            ordemId:       parcela.ordem_pagamento_id,
+            alunoId:       parcela.aluno_id,
+            instituicaoId: parcela.instituicao_id || null,
+            dataPagamento: dataPagamentoStr,
+            parcelaId:     id,
+          });
         }
       }
     } catch (_) {

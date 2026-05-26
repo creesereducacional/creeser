@@ -20,6 +20,7 @@ const MENU_ITEMS = [
   { href: '/admin-financeiro/ordens', label: 'Ordens', icon: '📄', habilitado: true },
   { href: '/admin-financeiro/carnes', label: 'Carnês', icon: '📋', habilitado: true },
   { href: '/admin-financeiro/convenios', label: 'Convênios', icon: '🤝', habilitado: true },
+  { href: '/admin-financeiro/comissoes', label: 'Comissões', icon: '💰', habilitado: true },
   { href: '#', label: 'Relatórios', icon: '📈', habilitado: false },
 ];
 

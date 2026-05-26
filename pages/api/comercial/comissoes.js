@@ -3,6 +3,7 @@ import {
   requireAuth,
   requirePerfil,
   hasPerfil,
+  resolveInstituicaoId,
 } from '../../../lib/auth-server';
 
 const supabase = createClient(
@@ -10,10 +11,27 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const PERFIS_PERMITIDOS = ['grupo_admin', 'instituicao_admin', 'admin', 'financeiro', 'comercial'];
+const PERFIS_PERMITIDOS = [
+  'grupo_admin', 'instituicao_admin', 'admin', 'financeiro',
+  'comercial', 'comercial_master', 'comercial_operador',
+];
 
-const isComercialPuro = (user) =>
-  hasPerfil(user, ['comercial']) && !hasPerfil(user, ['grupo_admin', 'instituicao_admin', 'admin', 'financeiro']);
+const isOperador = (user) =>
+  hasPerfil(user, ['comercial_operador']) &&
+  !hasPerfil(user, ['grupo_admin', 'instituicao_admin', 'admin', 'comercial_master']);
+
+const isMasterRestrito = (user) =>
+  hasPerfil(user, ['comercial', 'comercial_master']) &&
+  !hasPerfil(user, ['grupo_admin', 'instituicao_admin', 'admin', 'financeiro']);
+
+async function getEquipeIds(masterId) {
+  const { data: operadores = [] } = await supabase
+    .from('usuarios')
+    .select('id')
+    .eq('comercial_master_id', masterId)
+    .eq('perfil', 'comercial_operador');
+  return [masterId, ...operadores.map(o => o.id)];
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Método não permitido' });
@@ -22,36 +40,41 @@ export default async function handler(req, res) {
   if (!authUser) return;
   if (!requirePerfil(authUser, res, PERFIS_PERMITIDOS)) return;
 
+  const instituicaoId = resolveInstituicaoId(req, authUser);
+
   try {
     let query = supabase
-      .from('comercial_comissoes')
+      .from('comissoes_comerciais')
       .select(`
-        id, comercial_id, aluno_id, lead_id, ordem_id,
-        valor_base, valor_comissao, percentual_comissao,
-        status, created_at, data_liberacao, data_repasse,
-        alunos(nome, email),
-        leads(nome, curso_interesse)
+        id, valor_base, valor_comissao, tipo_comissao, percentual,
+        status, data_credito, data_repasse, created_at,
+        aluno:alunos!aluno_id(nome, email),
+        captado_por:usuarios!captado_por_id(id, nomecompleto)
       `)
-      .order('created_at', { ascending: false });
+      .order('data_credito', { ascending: false });
 
-    // Comercial puro só vê as próprias comissões
-    if (isComercialPuro(authUser)) {
-      query = query.eq('comercial_id', authUser.id);
-    } else if (hasPerfil(authUser, ['financeiro', 'instituicao_admin', 'admin'])) {
-      // Admin/financeiro pode filtrar por comercial_id via query param
-      if (req.query.comercial_id) {
-        query = query.eq('comercial_id', req.query.comercial_id);
-      }
+    if (instituicaoId) {
+      query = query.eq('instituicao_id', instituicaoId);
+    }
+
+    if (isOperador(authUser)) {
+      query = query.eq('captado_por_id', authUser.id);
+    } else if (isMasterRestrito(authUser)) {
+      const equipeIds = await getEquipeIds(Number(authUser.id));
+      query = query.in('captado_por_id', equipeIds);
+    }
+
+    if (req.query.status) {
+      query = query.eq('status', req.query.status);
     }
 
     const { data, error } = await query;
 
     if (error) {
-      // Tabela ainda não existe no banco → retornar array vazio com aviso
       if (error.code === '42P01' || String(error.message).includes('does not exist')) {
         return res.status(200).json({
           comissoes: [],
-          aviso: 'Tabela comercial_comissoes não criada. Execute a migration SQL.',
+          aviso: 'Tabela não criada. Execute a migration 20260527_comissoes_comerciais.sql.',
         });
       }
       return res.status(500).json({ error: error.message });

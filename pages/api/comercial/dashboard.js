@@ -56,6 +56,13 @@ export default async function handler(req, res) {
     if (error) return res.status(500).json({ error: error.message });
 
     const s = calcularStats(leads);
+
+    // Comissões do operador
+    const { data: comissoesOp = [] } = await supabase
+      .from('comissoes_comerciais')
+      .select('valor_comissao, status')
+      .eq('captado_por_id', authUser.id);
+
     return res.status(200).json({
       tipo: 'operador',
       totalLeads: s.total,
@@ -66,6 +73,11 @@ export default async function handler(req, res) {
       perdido: s.perdido,
       taxaConversao: s.taxaConversao,
       totalMatriculas: s.matriculado,
+      comissoes: {
+        pendente:  comissoesOp.filter(c => c.status === 'PENDENTE_REPASSE').reduce((sum, c) => sum + Number(c.valor_comissao || 0), 0),
+        repassado: comissoesOp.filter(c => c.status === 'REPASSADO').reduce((sum, c) => sum + Number(c.valor_comissao || 0), 0),
+        total:     comissoesOp.filter(c => c.status !== 'CANCELADO').reduce((sum, c) => sum + Number(c.valor_comissao || 0), 0),
+      },
     });
   }
 
@@ -98,6 +110,19 @@ export default async function handler(req, res) {
     const meuLeads = leadsEquipe.filter(l => l.captado_por_id === masterId);
     const sMeu = calcularStats(meuLeads);
 
+    const { data: comissoesEquipe = [] } = await supabase
+      .from('comissoes_comerciais')
+      .select('captado_por_id, valor_comissao, status')
+      .in('captado_por_id', todosIds);
+
+    const comissoesPorUser = {};
+    for (const c of comissoesEquipe) {
+      const uid = c.captado_por_id;
+      if (!comissoesPorUser[uid]) comissoesPorUser[uid] = { total: 0, pendente: 0 };
+      if (c.status !== 'CANCELADO') comissoesPorUser[uid].total += Number(c.valor_comissao || 0);
+      if (c.status === 'PENDENTE_REPASSE') comissoesPorUser[uid].pendente += Number(c.valor_comissao || 0);
+    }
+
     // 5. Ranking da equipe
     const ranking = todosIds.map(uid => {
       const isMe = uid === masterId;
@@ -106,6 +131,7 @@ export default async function handler(req, res) {
         : (operadores.find(o => o.id === uid)?.nomecompleto || `Operador #${uid}`);
       const leads = leadsEquipe.filter(l => l.captado_por_id === uid);
       const s = calcularStats(leads);
+      const comissoes = comissoesPorUser[uid] || { total: 0, pendente: 0 };
       return {
         id: uid,
         nome,
@@ -113,8 +139,10 @@ export default async function handler(req, res) {
         totalLeads: s.total,
         matriculados: s.matriculado,
         taxaConversao: s.taxaConversao,
+        valorComissao: comissoes.total,
+        comissaoPendente: comissoes.pendente,
       };
-    }).sort((a, b) => b.matriculados - a.matriculados);
+    }).sort((a, b) => b.valorComissao - a.valorComissao || b.matriculados - a.matriculados);
 
     return res.status(200).json({
       tipo: 'master',
@@ -136,6 +164,12 @@ export default async function handler(req, res) {
       // Equipe
       totalOperadores: operadores.length,
       ranking,
+      // Resumo de comissões da equipe
+      comissoes: {
+        pendente:  comissoesEquipe.filter(c => c.status === 'PENDENTE_REPASSE').reduce((s, c) => s + Number(c.valor_comissao || 0), 0),
+        repassado: comissoesEquipe.filter(c => c.status === 'REPASSADO').reduce((s, c) => s + Number(c.valor_comissao || 0), 0),
+        total:     comissoesEquipe.filter(c => c.status !== 'CANCELADO').reduce((s, c) => s + Number(c.valor_comissao || 0), 0),
+      },
     });
   }
 

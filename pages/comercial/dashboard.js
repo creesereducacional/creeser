@@ -122,6 +122,7 @@ export default function ComercialDashboard() {
                       <th className="pb-2 font-medium text-right">Leads</th>
                       <th className="pb-2 font-medium text-right">Matrículas</th>
                       <th className="pb-2 font-medium text-right">Conversão</th>
+                      <th className="pb-2 font-medium text-right">Comissões</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -137,10 +138,51 @@ export default function ComercialDashboard() {
                         <td className="py-2 text-right">
                           <span className="text-teal-700 font-semibold">{r.taxaConversao}%</span>
                         </td>
+                        <td className="py-2 text-right text-xs">
+                          {r.valorComissao > 0 ? (
+                            <span className="font-semibold text-teal-700">
+                              {Number(r.valorComissao).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* Cards de comissões (master e operador) */}
+          {stats.comissoes && (
+            <div className="bg-white rounded-xl shadow-sm p-5 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-semibold text-gray-700">💰 {isMaster ? 'Comissões da Equipe' : 'Minhas Comissões'}</h2>
+                <a href="/comercial/comissoes" className="text-sm text-teal-600 hover:text-teal-800 font-medium hover:underline">
+                  Ver detalhes →
+                </a>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-yellow-50 rounded-xl p-4 text-center">
+                  <div className="text-xs text-gray-500 mb-1">Pendente Repasse</div>
+                  <div className="text-lg font-bold text-yellow-700">
+                    {Number(stats.comissoes.pendente || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </div>
+                </div>
+                <div className="bg-green-50 rounded-xl p-4 text-center">
+                  <div className="text-xs text-gray-500 mb-1">Já Repassado</div>
+                  <div className="text-lg font-bold text-green-700">
+                    {Number(stats.comissoes.repassado || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </div>
+                </div>
+                <div className="bg-teal-50 rounded-xl p-4 text-center">
+                  <div className="text-xs text-gray-500 mb-1">Total Acumulado</div>
+                  <div className="text-lg font-bold text-teal-700">
+                    {Number(stats.comissoes.total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </div>
+                </div>
               </div>
             </div>
           )}

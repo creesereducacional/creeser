@@ -24,6 +24,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import efi from '../../../../lib/efi-client';
+import { tentarCriarComissao } from '../../../../lib/comissoes-helper';
 
 // Desabilitar parser padrão — EFI envia multipart/form-data ou x-www-form-urlencoded
 export const config = { api: { bodyParser: false } };
@@ -187,14 +188,23 @@ async function atualizarParcelaEOrdem(parcelaId, statusLocal, statusEFI, evento,
             .maybeSingle();
 
           if (ordemInfo?.tipo === 'matricula' && ordemInfo?.aluno_id) {
+            const dataPgto = evento.received_by_bank_at || new Date().toISOString().slice(0, 10);
             await supabase
               .from('alunos')
               .update({
                 statusmatricula: 'AGUARDANDO_FORMACAO_TURMA',
-                data_pagamento_matricula: evento.received_by_bank_at || new Date().toISOString().slice(0, 10),
+                data_pagamento_matricula: dataPgto,
               })
               .eq('id', ordemInfo.aluno_id)
               .eq('statusmatricula', 'AGUARDANDO_PAGAMENTO_MATRICULA');
+
+            // Gerar comissão automaticamente (não crítico)
+            await tentarCriarComissao(supabase, {
+              ordemId:       ordemId,
+              alunoId:       ordemInfo.aluno_id,
+              dataPagamento: dataPgto,
+              parcelaId:     parcelaId,
+            });
           }
         } catch (_) { /* não bloqueia */ }
       }
