@@ -24,11 +24,19 @@ export default function AdminDashboard() {
     fetch('/api/auth/me', { credentials: 'include' })
       .then((res) => res.ok ? res.json() : Promise.reject())
       .then(({ usuario: user }) => {
-        if (user.tipo !== 'admin') {
-          if (user.tipo === 'aluno') router.replace('/aluno/dashboard');
-          else if (user.tipo === 'professor') router.replace('/professor/dashboard');
-          else router.replace('/login');
-          return;
+        const tipoUser   = (user.tipo   || '').toLowerCase();
+        const perfilUser = (user.perfil || '').toLowerCase();
+        // Redireciona perfis que não pertencem ao painel admin
+        if (tipoUser === 'aluno')   { router.replace('/aluno/dashboard'); return; }
+        if (tipoUser === 'professor') { router.replace('/professor/dashboard'); return; }
+        if (perfilUser === 'comercial' || perfilUser === 'comercial_master') {
+          router.replace('/comercial/dashboard'); return;
+        }
+        if (perfilUser === 'financeiro' || perfilUser === 'financeiro_admin') {
+          router.replace('/admin-financeiro'); return;
+        }
+        if (perfilUser === 'recepcao' || tipoUser === 'recepcao') {
+          router.replace('/recepcao/dashboard'); return;
         }
         setUsuario(user);
         carregarEstatisticas();
