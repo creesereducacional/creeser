@@ -74,6 +74,7 @@ export default function PreCadastrosIndex() {
                   <th className="px-4 py-3 text-left font-semibold text-gray-600">Telefone</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-600">Cadastrado em</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-600">Acoes</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -89,8 +90,18 @@ export default function PreCadastrosIndex() {
                     </td>
                     <td className="px-4 py-3 text-gray-400 text-xs">
                       {a.datacriacao ? new Date(a.datacriacao).toLocaleDateString('pt-BR') : '—'}
-                    </td>
-                  </tr>
+                    </td>                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          <Link href={`/recepcao/pre-cadastros/${a.id}`}
+                            className="px-2.5 py-1 rounded border border-blue-400 text-blue-700 hover:bg-blue-50 text-xs font-medium transition-colors">
+                            Visualizar
+                          </Link>
+                          <Link href={`/recepcao/pre-cadastros/${a.id}`}
+                            className="px-2.5 py-1 rounded border border-gray-400 text-gray-600 hover:bg-gray-50 text-xs font-medium transition-colors">
+                            Editar
+                          </Link>
+                        </div>
+                      </td>                  </tr>
                 ))}
               </tbody>
             </table>

@@ -96,6 +96,17 @@ export default async function handler(req, res) {
 
     if (alunoError) return res.status(500).json({ error: alunoError.message });
 
+    // Auditoria
+    try {
+      await supabase.from('recepcao_auditoria').insert({
+        aluno_id:   aluno.id,
+        usuario_id: authUser.id,
+        acao:       'CRIAR_PRE_CADASTRO',
+        dados:      JSON.stringify({ nome: aluno.nome, statusmatricula: aluno.statusmatricula }),
+        data_hora:  new Date().toISOString(),
+      });
+    } catch (_) { /* nao bloqueia */ }
+
     return res.status(201).json({
       id: aluno.id,
       nome: aluno.nome,

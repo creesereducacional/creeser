@@ -5,6 +5,7 @@ const PERFIS = [
   { value: 'instituicao_admin', label: 'Admin Instituicao' },
   { value: 'financeiro',        label: 'Financeiro' },
   { value: 'secretaria',        label: 'Secretaria' },
+  { value: 'recepcao',          label: 'Recepcao' },
   { value: 'comercial',         label: 'Comercial' },
   { value: 'professor',         label: 'Professor' },
   { value: 'aluno',             label: 'Aluno' },
