@@ -13,10 +13,10 @@ const STATUS_CONFIG = {
 
 function Card({ label, valor, sub, cor }) {
   return (
-    <div className={`bg-white rounded-2xl shadow-sm border p-5 flex flex-col gap-1 ${cor}`}>
+    <div className={`bg-white rounded-2xl shadow-sm border p-4 flex flex-col gap-1 ${cor}`}>
       <p className="text-xs font-semibold uppercase tracking-wide opacity-70">{label}</p>
-      <p className="text-3xl font-bold">{valor ?? '—'}</p>
-      {sub && <p className="text-xs opacity-60">{sub}</p>}
+      <p className="text-xl sm:text-2xl font-bold">{valor ?? '—'}</p>
+      {sub && <p className="text-xs opacity-60 leading-snug">{sub}</p>}
     </div>
   );
 }

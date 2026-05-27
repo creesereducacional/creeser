@@ -64,7 +64,7 @@ export default function DashboardFinanceiro() {
         )}
 
         {/* ── Cards operacionais ────────────────────────────────── */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
           <DashboardCard icon="✅" label="Total Recebido"    valor={fmtValor(dados.totalRecebido)}    cor="border-green-500"  bgIcon="bg-green-50"  loading={loading} />
           <DashboardCard icon="📈" label="A Receber"         valor={fmtValor(dados.totalAReceber)}    cor="border-cyan-500"   bgIcon="bg-cyan-50"   loading={loading} href="/admin-financeiro/carnes" />
           <DashboardCard icon="🚨" label="Parcelas Vencidas" valor={dados.boletosVencidos}            cor="border-red-500"    bgIcon="bg-red-50"    loading={loading} href="/admin-financeiro/carnes" />

@@ -16,6 +16,11 @@ export default function RecepcaoLayout({ children, titulo }) {
   const [user, setUser] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  // Auto-collapse sidebar em telas menores que 1024px
+  useEffect(() => {
+    if (window.innerWidth < 1024) setSidebarOpen(false);
+  }, []);
+
   useEffect(() => {
     fetch('/api/auth/me', { credentials: 'include' })
       .then(r => (r.ok ? r.json() : null))

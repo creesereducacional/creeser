@@ -10,6 +10,11 @@ export default function DashboardLayout({ children }) {
   const [expandedSubmenus, setExpandedSubmenus] = useState({});
   const [user, setUser] = useState(null);
 
+  // Auto-collapse sidebar em telas menores que 1024px
+  useEffect(() => {
+    if (window.innerWidth < 1024) setSidebarOpen(false);
+  }, []);
+
   useEffect(() => {
     setMounted(true);
     fetch('/api/auth/me', { credentials: 'include' })

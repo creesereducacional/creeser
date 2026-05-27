@@ -13,12 +13,12 @@ export default function DashboardCard({
 }) {
   const inner = (
     <div
-      className={`bg-white rounded-2xl shadow-sm p-5 border-l-4 ${cor} hover:shadow-md transition-all duration-200 h-full`}
+      className={`bg-white rounded-2xl shadow-sm p-3 sm:p-4 border-l-4 ${cor} hover:shadow-md transition-all duration-200 h-full`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
-        <span className={`text-2xl p-2 rounded-xl ${bgIcon || 'bg-gray-50'}`}>{icon}</span>
+        <span className={`text-xl p-1.5 rounded-xl ${bgIcon || 'bg-gray-50'} flex-shrink-0`}>{icon}</span>
         <span
-          className={`text-3xl font-bold text-gray-800 tabular-nums leading-none mt-1 ${
+          className={`text-lg sm:text-xl font-bold text-gray-800 tabular-nums leading-tight text-right break-all ${
             loading ? 'opacity-30' : ''
           }`}
         >

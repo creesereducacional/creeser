@@ -8,6 +8,11 @@ export default function ProfessorLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [user, setUser] = useState(null);
 
+  // Auto-collapse sidebar em telas menores que 1024px
+  useEffect(() => {
+    if (window.innerWidth < 1024) setSidebarOpen(false);
+  }, []);
+
   useEffect(() => {
     setMounted(true);
     // Carregar usuário do localStorage

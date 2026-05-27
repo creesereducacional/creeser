@@ -266,21 +266,21 @@ export default function CarnesPage() {
 
         {/* RESUMO */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="bg-white border border-l-4 border-l-blue-500 rounded-2xl shadow-sm p-4">
+          <div className="bg-white border border-l-4 border-l-blue-500 rounded-2xl shadow-sm p-3 sm:p-4">
             <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Total de Carnês</p>
-            <p className="text-3xl font-bold text-gray-800 mt-1">{resumo.total}</p>
+            <p className="text-xl sm:text-2xl font-bold text-gray-800 mt-1">{resumo.total}</p>
           </div>
-          <div className="bg-white border border-l-4 border-l-green-500 rounded-2xl shadow-sm p-4">
+          <div className="bg-white border border-l-4 border-l-green-500 rounded-2xl shadow-sm p-3 sm:p-4">
             <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Ativos</p>
-            <p className="text-3xl font-bold text-gray-800 mt-1">{resumo.ativas}</p>
+            <p className="text-xl sm:text-2xl font-bold text-gray-800 mt-1">{resumo.ativas}</p>
           </div>
-          <div className="bg-white border border-l-4 border-l-teal-500 rounded-2xl shadow-sm p-4">
+          <div className="bg-white border border-l-4 border-l-teal-500 rounded-2xl shadow-sm p-3 sm:p-4">
             <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Valor Total</p>
-            <p className="text-xl font-bold text-gray-800 mt-1">{formataValor(resumo.valor_total)}</p>
+            <p className="text-lg sm:text-xl font-bold text-gray-800 mt-1">{formataValor(resumo.valor_total)}</p>
           </div>
-          <div className="bg-white border border-l-4 border-l-red-500 rounded-2xl shadow-sm p-4">
+          <div className="bg-white border border-l-4 border-l-red-500 rounded-2xl shadow-sm p-3 sm:p-4">
             <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Cancelados</p>
-            <p className="text-3xl font-bold text-gray-800 mt-1">{resumo.canceladas}</p>
+            <p className="text-xl sm:text-2xl font-bold text-gray-800 mt-1">{resumo.canceladas}</p>
           </div>
         </div>
 

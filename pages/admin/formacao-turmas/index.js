@@ -336,10 +336,10 @@ export default function FormacaoTurmas() {
         {/* Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {cards.map(c => (
-            <div key={c.label} className={`bg-white rounded-2xl shadow-sm p-5 border-l-4 ${c.cor}`}>
+            <div key={c.label} className={`bg-white rounded-2xl shadow-sm p-3 sm:p-4 border-l-4 ${c.cor}`}>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-2xl">{c.icon}</span>
-                <span className="text-3xl font-bold text-gray-800">{carregando ? '…' : c.valor}</span>
+                <span className="text-xl">{c.icon}</span>
+                <span className="text-xl sm:text-2xl font-bold text-gray-800">{carregando ? '…' : c.valor}</span>
               </div>
               <p className="text-xs text-gray-500 leading-tight">{c.label}</p>
             </div>

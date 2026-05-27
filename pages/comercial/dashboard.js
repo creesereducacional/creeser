@@ -49,7 +49,7 @@ export default function ComercialDashboard() {
           )}
 
           {/* Cards de resumo */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
             <DashboardCard icon="🎯" label={isMaster ? 'Leads da Equipe' : 'Meus Leads'}        valor={stats.totalLeads}                        cor="border-blue-500"   bgIcon="bg-blue-50"   loading={carregando} href="/comercial/leads" />
             <DashboardCard icon="🆕" label="Novos"                                               valor={stats.novo || 0}                         cor="border-cyan-500"   bgIcon="bg-cyan-50"   loading={carregando} />
             <DashboardCard icon="📋" label="Pré-Matrículas"                                      valor={stats.pre_matricula || 0}                 cor="border-purple-500" bgIcon="bg-purple-50" loading={carregando} href="/comercial/matriculas" />
@@ -63,16 +63,16 @@ export default function ComercialDashboard() {
             <div className="mb-6">
               <h2 className="font-semibold text-gray-600 text-sm mb-3">📌 Meus Números (Pessoal)</h2>
               <div className="grid grid-cols-3 gap-3">
-                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 text-center">
-                  <div className="text-2xl font-bold text-gray-800">{stats.meus.totalLeads}</div>
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 sm:p-4 text-center">
+                  <div className="text-xl sm:text-2xl font-bold text-gray-800">{stats.meus.totalLeads}</div>
                   <div className="text-xs text-gray-500 mt-1">Meus Leads</div>
                 </div>
-                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 text-center">
-                  <div className="text-2xl font-bold text-green-700">{stats.meus.matriculado}</div>
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 sm:p-4 text-center">
+                  <div className="text-xl sm:text-2xl font-bold text-green-700">{stats.meus.matriculado}</div>
                   <div className="text-xs text-gray-500 mt-1">Minhas Matrículas</div>
                 </div>
-                <div className="bg-teal-50 rounded-xl border border-teal-100 shadow-sm p-4 text-center">
-                  <div className="text-2xl font-bold text-teal-700">{stats.meus.taxaConversao}%</div>
+                <div className="bg-teal-50 rounded-xl border border-teal-100 shadow-sm p-3 sm:p-4 text-center">
+                  <div className="text-xl sm:text-2xl font-bold text-teal-700">{stats.meus.taxaConversao}%</div>
                   <div className="text-xs text-gray-500 mt-1">Minha Conversão</div>
                 </div>
               </div>
