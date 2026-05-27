@@ -2,10 +2,10 @@ import { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 
 const STATUS_FORMACAO = {
-  EM_FORMACAO:      { label: 'Em Formacao',        cor: 'bg-yellow-100 text-yellow-800 border-yellow-300',  dot: 'bg-yellow-400' },
-  PRONTA_PARA_ABRIR:{ label: 'Pronta para Abrir',  cor: 'bg-green-100  text-green-800  border-green-300',   dot: 'bg-green-500'  },
-  ATIVA:            { label: 'Ativa',              cor: 'bg-blue-100   text-blue-800   border-blue-300',    dot: 'bg-blue-500'   },
-  ENCERRADA:        { label: 'Encerrada',          cor: 'bg-gray-100   text-gray-500   border-gray-300',    dot: 'bg-gray-400'   },
+  EM_FORMACAO:       { label: 'Em Formação',       cor: 'bg-yellow-100 text-yellow-800 border-yellow-300', dot: 'bg-yellow-400', borda: 'border-l-yellow-400', fundo: 'bg-yellow-50'  },
+  PRONTA_PARA_ABRIR: { label: 'Pronta para Abrir', cor: 'bg-green-100 text-green-800 border-green-300',   dot: 'bg-green-500',  borda: 'border-l-green-500',  fundo: 'bg-green-50'   },
+  ATIVA:             { label: 'Ativa',             cor: 'bg-blue-100 text-blue-800 border-blue-300',      dot: 'bg-blue-500',   borda: 'border-l-blue-500',   fundo: 'bg-blue-50'    },
+  ENCERRADA:         { label: 'Encerrada',         cor: 'bg-gray-100 text-gray-500 border-gray-300',      dot: 'bg-gray-400',   borda: 'border-l-gray-300',   fundo: 'bg-gray-50'    },
 };
 
 const sf = (status) => STATUS_FORMACAO[status] || STATUS_FORMACAO.EM_FORMACAO;
@@ -117,83 +117,161 @@ function ModalConfigurar({ turma, onClose, onSave }) {
   );
 }
 
+function TurmaCard({ t, podeAbrirTurma, onConfigurar, onAbrirTurma }) {
+  const st = sf(t.status_formacao);
+  return (
+    <div className={`bg-white rounded-2xl shadow-sm border-l-4 ${st.borda} overflow-hidden hover:shadow-md transition-shadow flex flex-col`}>
+      {/* Header do card */}
+      <div className={`px-4 py-3 ${st.fundo} border-b border-black/5`}>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h3 className="font-bold text-gray-900 text-sm leading-snug truncate" title={t.nome}>{t.nome}</h3>
+            <p className="text-xs text-gray-500 mt-0.5 truncate">{t.cursoNome || '—'}</p>
+          </div>
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border flex-shrink-0 ${st.cor}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
+            {st.label}
+          </span>
+        </div>
+      </div>
+      {/* Body do card */}
+      <div className="px-4 py-3 flex flex-col gap-3 flex-1">
+        <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+          <div>
+            <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Unidade</p>
+            <p className="text-xs font-medium text-gray-700 truncate mt-0.5" title={t.unidadeNome}>{t.unidadeNome || '—'}</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Data Prevista</p>
+            <p className="text-xs font-medium text-gray-700 mt-0.5">
+              {t.data_prevista_inicio
+                ? new Date(t.data_prevista_inicio + 'T12:00:00').toLocaleDateString('pt-BR')
+                : '—'}
+            </p>
+          </div>
+          <div className="col-span-2">
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">Alunos</p>
+              <span className="text-xs font-bold text-gray-800 tabular-nums">
+                {t.qtd_atual}<span className="text-gray-400 font-normal"> / {t.qtd_minima_alunos}</span>
+              </span>
+            </div>
+            <ProgressBar pct={t.percentual} />
+          </div>
+        </div>
+        {/* Botões */}
+        <div className="flex gap-2 pt-1 border-t border-gray-100 mt-auto">
+          <button
+            onClick={() => onConfigurar(t)}
+            className="flex-1 px-2 py-1.5 rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50 text-xs font-medium transition-colors"
+          >
+            ⚙️ Configurar
+          </button>
+          {t.status_formacao === 'PRONTA_PARA_ABRIR' && podeAbrirTurma && (
+            <button
+              onClick={() => onAbrirTurma(t)}
+              className="flex-1 px-2 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-bold transition-colors shadow-sm"
+            >
+              🚀 Abrir Turma
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ModalAbrirTurma({ turma, alunos, carregandoAlunos, abrindo, onClose, onConfirmar }) {
   if (!turma) return null;
+  const nAlunos = alunos.length;
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
-        <div className="p-5 border-b flex-shrink-0">
-          <h2 className="font-bold text-gray-800 text-base">Abrir Turma — Confirmacao</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Esta acao ativara todos os alunos aguardando formacao desta turma.</p>
-        </div>
-        <div className="p-5 space-y-4 overflow-y-auto">
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-xs text-gray-400 mb-0.5">Turma</p>
-              <p className="font-semibold text-gray-800">{turma.nome}</p>
-            </div>
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-xs text-gray-400 mb-0.5">Curso</p>
-              <p className="font-semibold text-gray-800">{turma.cursoNome || '—'}</p>
-            </div>
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-xs text-gray-400 mb-0.5">Unidade</p>
-              <p className="font-semibold text-gray-800">{turma.unidadeNome || '—'}</p>
-            </div>
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-xs text-gray-400 mb-0.5">Data Prevista</p>
-              <p className="font-semibold text-gray-800">
-                {turma.data_prevista_inicio
-                  ? new Date(turma.data_prevista_inicio + 'T12:00:00').toLocaleDateString('pt-BR')
-                  : '—'}
-              </p>
-            </div>
-            <div className="bg-green-50 border border-green-200 rounded-xl p-3">
-              <p className="text-xs text-green-600 mb-0.5">Alunos Atuais</p>
-              <p className="font-bold text-green-700 text-lg">{turma.qtd_atual}</p>
-            </div>
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-xs text-gray-400 mb-0.5">Meta Minima</p>
-              <p className="font-semibold text-gray-700 text-lg">{turma.qtd_minima_alunos}</p>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="p-5 border-b flex-shrink-0 bg-green-50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center text-xl flex-shrink-0">🚀</div>
+            <div className="min-w-0">
+              <h2 className="font-bold text-gray-800 text-base">Abrir Turma — Confirmação</h2>
+              <p className="text-sm text-gray-500 mt-0.5 truncate">{turma.nome}</p>
             </div>
           </div>
-
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Alunos que serao ativados ({carregandoAlunos ? '...' : alunos.length})
-            </p>
-            {carregandoAlunos ? (
-              <div className="text-center py-4 text-gray-400 text-sm">Carregando...</div>
-            ) : alunos.length === 0 ? (
-              <div className="text-center py-4 text-gray-400 text-sm">Nenhum aluno encontrado.</div>
-            ) : (
-              <div className="space-y-1 max-h-44 overflow-y-auto">
-                {alunos.map(a => (
-                  <div key={a.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 text-sm">
-                    <span className="font-medium text-gray-800">{a.nome}</span>
-                    <span className="text-gray-400 text-xs">{a.cpf || '—'}</span>
-                  </div>
-                ))}
+        </div>
+        {/* Destaque: quantos alunos serão ativados */}
+        <div className="px-5 pt-5 flex-shrink-0">
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-4 flex items-center gap-4">
+            <div className="text-center flex-shrink-0">
+              <div className="text-4xl font-black text-green-700 tabular-nums leading-none">
+                {carregandoAlunos ? '…' : nAlunos}
               </div>
-            )}
-          </div>
-
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
-            Esta acao ira ativar <strong>{alunos.length} aluno(s)</strong> e marcar a turma como <strong>ATIVA</strong>. Nao e possivel desfazer.
+              <div className="text-xs text-green-600 font-semibold mt-1 leading-tight">alunos serão<br/>ativados</div>
+            </div>
+            <div className="flex-1 grid grid-cols-2 gap-2">
+              <div className="bg-white rounded-xl p-2.5">
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide">Curso</p>
+                <p className="font-semibold text-gray-800 text-xs truncate mt-0.5">{turma.cursoNome || '—'}</p>
+              </div>
+              <div className="bg-white rounded-xl p-2.5">
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide">Unidade</p>
+                <p className="font-semibold text-gray-800 text-xs truncate mt-0.5">{turma.unidadeNome || '—'}</p>
+              </div>
+              <div className="bg-white rounded-xl p-2.5">
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide">Atual / Meta</p>
+                <p className="font-semibold text-gray-800 text-xs mt-0.5 tabular-nums">{turma.qtd_atual} / {turma.qtd_minima_alunos}</p>
+              </div>
+              <div className="bg-white rounded-xl p-2.5">
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide">Data Prevista</p>
+                <p className="font-semibold text-gray-800 text-xs mt-0.5">
+                  {turma.data_prevista_inicio
+                    ? new Date(turma.data_prevista_inicio + 'T12:00:00').toLocaleDateString('pt-BR')
+                    : '—'}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
-
-        <div className="px-5 pb-5 flex gap-3 flex-shrink-0 border-t pt-4">
+        {/* Lista de alunos */}
+        <div className="px-5 pt-4 pb-2 flex-1 overflow-y-auto min-h-0">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            Lista de alunos que serão ativados ({carregandoAlunos ? '...' : nAlunos})
+          </p>
+          {carregandoAlunos ? (
+            <div className="text-center py-6 text-gray-400 text-sm">Carregando...</div>
+          ) : nAlunos === 0 ? (
+            <div className="text-center py-6 text-gray-400 text-sm">Nenhum aluno encontrado.</div>
+          ) : (
+            <div className="rounded-xl border border-gray-100 overflow-hidden divide-y divide-gray-50">
+              {alunos.map((a, i) => (
+                <div key={a.id} className="flex items-center gap-3 px-3 py-2 text-sm bg-white hover:bg-gray-50">
+                  <span className="text-xs text-gray-300 w-5 tabular-nums text-right flex-shrink-0">{i + 1}</span>
+                  <span className="font-medium text-gray-800 flex-1 min-w-0 truncate">{a.nome}</span>
+                  <span className="text-gray-400 text-xs flex-shrink-0">{a.cpf || '—'}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {/* Alerta de irreversibilidade */}
+        <div className="px-5 pt-2 pb-2 flex-shrink-0">
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-start gap-2.5">
+            <span className="text-base flex-shrink-0 mt-0.5">⚠️</span>
+            <p className="text-sm text-red-800">
+              <strong>Ação irreversível.</strong> Ao confirmar, <strong>{nAlunos} aluno(s)</strong> serão ativados e a turma passará para <strong>ATIVA</strong>. Esta operação não pode ser desfeita.
+            </p>
+          </div>
+        </div>
+        {/* Ações */}
+        <div className="px-5 pb-5 pt-3 flex gap-3 flex-shrink-0 border-t">
           <button onClick={onClose} disabled={abrindo}
             className="flex-1 border border-gray-300 text-gray-600 rounded-xl py-2.5 text-sm font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50">
             Cancelar
           </button>
           <button
             onClick={onConfirmar}
-            disabled={abrindo || carregandoAlunos || alunos.length === 0}
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors disabled:opacity-50"
+            disabled={abrindo || carregandoAlunos || nAlunos === 0}
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-xl py-2.5 text-sm font-bold transition-colors disabled:opacity-50 shadow-sm"
           >
-            {abrindo ? 'Abrindo...' : `Confirmar — Ativar ${alunos.length} Aluno(s)`}
+            {abrindo ? 'Ativando...' : `✅ Ativar ${nAlunos} Aluno(s)`}
           </button>
         </div>
       </div>
@@ -256,20 +334,15 @@ export default function FormacaoTurmas() {
   }), [lista, filtroInstituicao, filtroCurso, filtroSituacao, filtroNome]);
 
   // Cards
-  const emFormacao   = lista.filter(t => t.status_formacao === 'EM_FORMACAO').length;
-  const prontas      = lista.filter(t => t.status_formacao === 'PRONTA_PARA_ABRIR').length;
-  const encerradas   = lista.filter(t => t.status_formacao === 'ENCERRADA').length;
-  const alunosTotal  = lista.reduce((acc, t) => acc + (t.qtd_atual || 0), 0);
+  const emFormacao       = lista.filter(t => t.status_formacao === 'EM_FORMACAO').length;
+  const prontas          = lista.filter(t => t.status_formacao === 'PRONTA_PARA_ABRIR').length;
+  const ativas           = lista.filter(t => t.status_formacao === 'ATIVA').length;
+  const alunosAguardando = lista
+    .filter(t => ['EM_FORMACAO', 'PRONTA_PARA_ABRIR'].includes(t.status_formacao))
+    .reduce((acc, t) => acc + (t.qtd_atual || 0), 0);
 
   const podeAbrirTurma = ['grupo_admin', 'instituicao_admin', 'coordenador']
     .includes(user?.perfil || user?.tipo || '');
-
-  const cards = [
-    { label: 'Turmas em Formacao',         valor: emFormacao,  icon: '🔶', cor: 'border-yellow-500' },
-    { label: 'Alunos Aguardando Formacao', valor: alunosTotal, icon: '👥', cor: 'border-blue-500'   },
-    { label: 'Turmas Prontas p/ Abrir',    valor: prontas,     icon: '✅', cor: 'border-green-500'  },
-    { label: 'Turmas Encerradas',          valor: encerradas,  icon: '📦', cor: 'border-gray-400'   },
-  ];
 
   function handleSaveModal(turmaId, updated) {
     setLista(prev => prev.map(t => t.id === turmaId
@@ -327,23 +400,42 @@ export default function FormacaoTurmas() {
     <DashboardLayout>
       <div className="space-y-6 p-6">
 
-        {/* Cabecalho */}
+        {/* Cabeçalho */}
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Formacao de Turmas</h1>
-          <p className="text-sm text-gray-500 mt-1">Monitore e gerencie turmas em processo de formacao.</p>
+          <h1 className="text-2xl font-bold text-gray-800">Formação de Turmas</h1>
+          <p className="text-sm text-gray-500 mt-1">Painel operacional — coordenação e secretaria.</p>
         </div>
 
-        {/* Cards */}
+        {/* KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {cards.map(c => (
-            <div key={c.label} className={`bg-white rounded-2xl shadow-sm p-3 sm:p-4 border-l-4 ${c.cor}`}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xl">{c.icon}</span>
-                <span className="text-xl sm:text-2xl font-bold text-gray-800">{carregando ? '…' : c.valor}</span>
-              </div>
-              <p className="text-xs text-gray-500 leading-tight">{c.label}</p>
+          <div className="bg-white rounded-2xl shadow-sm p-3 sm:p-4 border-l-4 border-yellow-400">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xl">🔶</span>
+              <span className="text-xl sm:text-2xl font-bold text-gray-800">{carregando ? '…' : emFormacao}</span>
             </div>
-          ))}
+            <p className="text-xs text-gray-500 leading-tight font-medium">Em Formação</p>
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm p-3 sm:p-4 border-l-4 border-green-500">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xl">✅</span>
+              <span className="text-xl sm:text-2xl font-bold text-gray-800">{carregando ? '…' : prontas}</span>
+            </div>
+            <p className="text-xs text-gray-500 leading-tight font-medium">Prontas para Abrir</p>
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm p-3 sm:p-4 border-l-4 border-blue-500">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xl">🎓</span>
+              <span className="text-xl sm:text-2xl font-bold text-gray-800">{carregando ? '…' : ativas}</span>
+            </div>
+            <p className="text-xs text-gray-500 leading-tight font-medium">Turmas Ativas</p>
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm p-3 sm:p-4 border-l-4 border-purple-400">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xl">👥</span>
+              <span className="text-xl sm:text-2xl font-bold text-gray-800">{carregando ? '…' : alunosAguardando}</span>
+            </div>
+            <p className="text-xs text-gray-500 leading-tight font-medium">Alunos Aguardando</p>
+          </div>
         </div>
 
         {/* Filtros */}
@@ -396,86 +488,36 @@ export default function FormacaoTurmas() {
           </div>
         )}
 
-        {/* Tabela */}
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b flex items-center justify-between">
-            <h2 className="font-semibold text-gray-800 text-sm">
-              Turmas{filtrada.length !== lista.length ? ` (${filtrada.length} de ${lista.length})` : ` (${lista.length})`}
-            </h2>
+        {/* Grid de Turmas */}
+        {carregando ? (
+          <div className="py-16 text-center text-gray-400 text-sm">Carregando turmas...</div>
+        ) : filtrada.length === 0 ? (
+          <div className="py-12 text-center">
+            <div className="text-4xl mb-3">📋</div>
+            <p className="text-gray-500 text-sm">Nenhuma turma encontrada para os filtros selecionados.</p>
           </div>
-
-          {carregando ? (
-            <div className="py-16 text-center text-gray-400 text-sm">Carregando...</div>
-          ) : filtrada.length === 0 ? (
-            <div className="py-16 text-center text-gray-400 text-sm">Nenhuma turma encontrada.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[900px]">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-600">Turma</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-600">Curso</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-600">Unidade</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-600">Data Prevista</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-600">Meta</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-600 min-w-[140px]">Progresso</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-600">Situacao</th>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-600">Acoes</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filtrada.map(t => {
-                    const st = sf(t.status_formacao);
-                    return (
-                      <tr key={t.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3 font-medium text-gray-900">{t.nome}</td>
-                        <td className="px-4 py-3 text-gray-500">{t.cursoNome || '—'}</td>
-                        <td className="px-4 py-3 text-gray-500">{t.unidadeNome || '—'}</td>
-                        <td className="px-4 py-3 text-gray-400 text-xs">
-                          {t.data_prevista_inicio
-                            ? new Date(t.data_prevista_inicio + 'T12:00:00').toLocaleDateString('pt-BR')
-                            : '—'}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="font-semibold text-gray-700">{t.qtd_atual}</span>
-                          <span className="text-gray-400"> / </span>
-                          <span className="text-gray-500">{t.qtd_minima_alunos}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <ProgressBar pct={t.percentual} />
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${st.cor}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
-                            {st.label}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              onClick={() => setTurmaConfig(t)}
-                              className="px-2.5 py-1 rounded border border-blue-400 text-blue-700 hover:bg-blue-50 text-xs font-medium transition-colors"
-                            >
-                              Configurar
-                            </button>
-                            {t.status_formacao === 'PRONTA_PARA_ABRIR' && podeAbrirTurma && (
-                              <button
-                                onClick={() => handleVerAlunos(t)}
-                                className="px-2.5 py-1 rounded border border-green-500 text-green-700 hover:bg-green-50 text-xs font-semibold transition-colors"
-                              >
-                                Abrir Turma
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+        ) : (
+          <>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-500">
+                {filtrada.length !== lista.length
+                  ? `${filtrada.length} de ${lista.length} turmas`
+                  : `${lista.length} turma${lista.length !== 1 ? 's' : ''}`}
+              </p>
             </div>
-          )}
-        </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {filtrada.map(t => (
+                <TurmaCard
+                  key={t.id}
+                  t={t}
+                  podeAbrirTurma={podeAbrirTurma}
+                  onConfigurar={setTurmaConfig}
+                  onAbrirTurma={handleVerAlunos}
+                />
+              ))}
+            </div>
+          </>
+        )}
 
         {/* Legenda */}
         <div className="flex flex-wrap gap-3 text-xs">
