@@ -25,7 +25,7 @@ function StatusBadge({ status }) {
 // ── Modal: Criar Operador ──────────────────────────────────────────────────
 
 function ModalCriar({ onClose, onSalvo }) {
-  const [form, setForm] = useState({ nomeCompleto: '', email: '', whatsapp: '', senha_inicial: '' });
+  const [form, setForm] = useState({ nomeCompleto: '', email: '', whatsapp: '', senha_inicial: '', confirmar_senha: '' });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState(null);
 
@@ -34,6 +34,10 @@ function ModalCriar({ onClose, onSalvo }) {
     setErro(null);
     if (!form.nomeCompleto.trim() || !form.email.trim() || !form.senha_inicial.trim()) {
       setErro('Nome, email e senha são obrigatórios.');
+      return;
+    }
+    if (form.senha_inicial !== form.confirmar_senha) {
+      setErro('As senhas não coincidem.');
       return;
     }
     setSalvando(true);
@@ -91,9 +95,22 @@ function ModalCriar({ onClose, onSalvo }) {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Senha Inicial *</label>
-              <input type="text" value={form.senha_inicial} onChange={e => setForm(f => ({ ...f, senha_inicial: e.target.value }))}
+              <input type="password" value={form.senha_inicial} onChange={e => setForm(f => ({ ...f, senha_inicial: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-teal-500"
                 placeholder="Senha que o operador usará no primeiro acesso" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Repetir Senha *</label>
+              <input type="password" value={form.confirmar_senha} onChange={e => setForm(f => ({ ...f, confirmar_senha: e.target.value }))}
+                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-teal-500 ${
+                  form.confirmar_senha && form.confirmar_senha !== form.senha_inicial
+                    ? 'border-red-400 bg-red-50'
+                    : 'border-gray-300'
+                }`}
+                placeholder="Repita a senha" />
+              {form.confirmar_senha && form.confirmar_senha !== form.senha_inicial && (
+                <p className="text-xs text-red-500 mt-1">As senhas não coincidem.</p>
+              )}
               <p className="text-xs text-gray-400 mt-1">Compartilhe esta senha com o operador após criar.</p>
             </div>
           </div>
