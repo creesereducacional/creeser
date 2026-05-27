@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import ComercialLayout from '@/components/ComercialLayout';
 
@@ -18,7 +18,7 @@ const LABELS_STATUS = {
   novo:          'Novo',
   contatado:     'Contatado',
   interessado:   'Interessado',
-  pre_matricula: 'PrÃ©-MatrÃ­cula',
+  pre_matricula: 'Pré-Matrícula',
   matriculado:   'Matriculado',
   desistente:    'Desistente',
   perdido:       'Perdido',
@@ -34,13 +34,13 @@ function limparNumero(n) {
 function gerarLinkWhatsApp(lead) {
   let numero = limparNumero(lead.whatsapp) || limparNumero(lead.telefone);
   if (!numero) return null;
-  // Adiciona cÃ³digo do paÃ­s se necessÃ¡rio (<=11 dÃ­gitos = sem DDI)
+  // Adiciona código do país se necessário (<=11 dígitos = sem DDI)
   if (numero.length <= 11) numero = '55' + numero;
   const curso = lead.curso_interesse
     ? `no curso ${lead.curso_interesse}`
     : 'em nossos cursos';
   const msg = encodeURIComponent(
-    `OlÃ¡, ${lead.nome}! Tudo bem? Aqui Ã© da equipe comercial do Grupo Creeser Educacional. Vi seu interesse ${curso}. Posso te passar mais informaÃ§Ãµes e ajudar com sua prÃ©-matrÃ­cula?`
+    `Olá, ${lead.nome}! Tudo bem? Aqui é da equipe comercial do Grupo Creeser Educacional. Vi seu interesse ${curso}. Posso te passar mais informações e ajudar com sua pré-matrícula?`
   );
   return `https://wa.me/${numero}?text=${msg}`;
 }
@@ -99,7 +99,7 @@ export default function MeusLeads() {
       setLeads(prev => prev.map(l => l.id === modalStatus.id ? { ...l, status: novoStatus } : l));
       setModalStatus(null);
     } catch {
-      setErroStatus('Erro de conexÃ£o.');
+      setErroStatus('Erro de conexão.');
     } finally {
       setSalvandoStatus(false);
     }
@@ -127,7 +127,7 @@ export default function MeusLeads() {
   function abrirWhatsApp(lead) {
     const link = gerarLinkWhatsApp(lead);
     if (!link) {
-      alert('Este lead nÃ£o possui nÃºmero de telefone ou WhatsApp cadastrado.');
+      alert('Este lead não possui número de telefone ou WhatsApp cadastrado.');
       return;
     }
     window.open(link, '_blank', 'noopener,noreferrer');
@@ -162,7 +162,7 @@ export default function MeusLeads() {
           <option value="novo">Novo</option>
           <option value="contatado">Contatado</option>
           <option value="interessado">Interessado</option>
-          <option value="pre_matricula">PrÃ©-MatrÃ­cula</option>
+          <option value="pre_matricula">Pré-Matrícula</option>
           <option value="matriculado">Matriculado</option>
           <option value="desistente">Desistente</option>
         </select>
@@ -175,7 +175,7 @@ export default function MeusLeads() {
         ) : leadsFiltrados.length === 0 ? (
           <div className="py-16 text-center text-gray-400">
             {leads.length === 0
-              ? 'Nenhum lead cadastrado ainda. Clique em "+ Novo Lead" para comeÃ§ar.'
+              ? 'Nenhum lead cadastrado ainda. Clique em "+ Novo Lead" para começar.'
               : 'Nenhum lead encontrado com esses filtros.'}
           </div>
         ) : (
@@ -188,7 +188,7 @@ export default function MeusLeads() {
                 <th className="px-4 py-3 text-left">Curso</th>
                 <th className="px-4 py-3 text-left">Status</th>
                 <th className="px-4 py-3 text-left">Data</th>
-                <th className="px-4 py-3 text-left">AÃ§Ãµes</th>
+                <th className="px-4 py-3 text-left">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -196,16 +196,16 @@ export default function MeusLeads() {
                 <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 font-medium text-gray-800">{lead.nome}</td>
                   <td className="px-4 py-3 text-gray-500">
-                    {lead.whatsapp || lead.telefone || lead.email || 'â€”'}
+                    {lead.whatsapp || lead.telefone || lead.email || '—'}
                   </td>
-                  <td className="px-4 py-3 text-gray-500">{lead.curso_interesse || 'â€”'}</td>
+                  <td className="px-4 py-3 text-gray-500">{lead.curso_interesse || '—'}</td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${BADGES[lead.status] || 'bg-gray-100 text-gray-600'}`}>
                       {LABELS_STATUS[lead.status] || lead.status}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-gray-400">
-                    {lead.created_at ? new Date(lead.created_at).toLocaleDateString('pt-BR') : 'â€”'}
+                    {lead.created_at ? new Date(lead.created_at).toLocaleDateString('pt-BR') : '—'}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -252,7 +252,7 @@ export default function MeusLeads() {
         {leadsFiltrados.length} lead{leadsFiltrados.length !== 1 ? 's' : ''} exibido{leadsFiltrados.length !== 1 ? 's' : ''}
       </div>
 
-      {/* â”€â”€ Modal: Alterar Status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* Modal: Alterar Status */}
       {modalStatus && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
@@ -268,11 +268,11 @@ export default function MeusLeads() {
               {STATUS_MANUAIS.map(s => (
                 <option key={s} value={s}>{LABELS_STATUS[s]}</option>
               ))}
-              <option value="matriculado" disabled>Matriculado (automÃ¡tico)</option>
+              <option value="matriculado" disabled>Matriculado (automático)</option>
             </select>
 
             <p className="text-xs text-amber-600 bg-amber-50 rounded p-2 mb-3">
-              O status &quot;Matriculado&quot; Ã© definido automaticamente apÃ³s confirmaÃ§Ã£o do fluxo financeiro/acadÃªmico.
+              O status &quot;Matriculado&quot; é definido automaticamente após confirmação do fluxo financeiro/acadêmico.
             </p>
 
             {erroStatus && (
@@ -299,13 +299,13 @@ export default function MeusLeads() {
         </div>
       )}
 
-      {/* â”€â”€ Modal: Desativar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* Modal: Desativar */}
       {modalDesativar && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
             <h3 className="font-bold text-gray-800 mb-2">Desativar lead?</h3>
             <p className="text-sm text-gray-600 mb-4">
-              O lead <strong>{modalDesativar.nome}</strong> serÃ¡ marcado como <em>Desistente</em>. Esta aÃ§Ã£o pode ser revertida alterando o status.
+              O lead <strong>{modalDesativar.nome}</strong> será marcado como <em>Desistente</em>. Esta ação pode ser revertida alterando o status.
             </p>
             {desativando ? (
               <div className="text-center text-gray-400 text-sm py-2">Aguarde...</div>
