@@ -12,8 +12,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const PERFIS_PERMITIDOS = ['grupo_admin', 'instituicao_admin', 'admin', 'financeiro', 'comercial'];
-const STATUS_VALIDOS = ['novo', 'contatado', 'interessado', 'pre_matricula', 'matriculado', 'perdido'];
+const PERFIS_PERMITIDOS = ['grupo_admin', 'instituicao_admin', 'admin', 'financeiro', 'comercial', 'comercial_master', 'comercial_operador'];
+const STATUS_VALIDOS = ['novo', 'contatado', 'interessado', 'pre_matricula', 'matriculado', 'perdido', 'desistente'];
 
 async function registrarAuditoria(leadId, usuarioId, acao, dadosAnteriores, dadosNovos) {
   try {
@@ -27,8 +27,22 @@ async function registrarAuditoria(leadId, usuarioId, acao, dadosAnteriores, dado
   } catch (_) { /* auditoria não deve bloquear a operação */ }
 }
 
-const isComercialPuro = (user) =>
-  hasPerfil(user, ['comercial']) && !hasPerfil(user, ['grupo_admin', 'instituicao_admin', 'admin']);
+const isOperador = (user) =>
+  hasPerfil(user, ['comercial_operador']) &&
+  !hasPerfil(user, ['grupo_admin', 'instituicao_admin', 'admin', 'comercial_master']);
+
+const isMasterRestrito = (user) =>
+  (hasPerfil(user, ['comercial_master']) || hasPerfil(user, ['comercial'])) &&
+  !hasPerfil(user, ['grupo_admin', 'instituicao_admin', 'admin']);
+
+async function getEquipeIds(masterId) {
+  const { data } = await supabase
+    .from('usuarios')
+    .select('id')
+    .eq('comercial_master_id', masterId)
+    .eq('perfil', 'comercial_operador');
+  return (data || []).map(o => o.id);
+}
 
 export default async function handler(req, res) {
   const authUser = requireAuth(req, res);
@@ -40,11 +54,15 @@ export default async function handler(req, res) {
 
   const instituicaoId = resolveInstituicaoId(req, authUser);
 
-  // Buscar o lead com filtro de instituição + isolamento do comercial
+  // Buscar o lead com filtro de instituição + isolamento por perfil
   let selectQuery = supabase.from('leads').select('*').eq('id', id);
   selectQuery = applyInstituicaoFilter(selectQuery, instituicaoId);
-  if (isComercialPuro(authUser)) {
+  if (isOperador(authUser)) {
     selectQuery = selectQuery.eq('captado_por_id', authUser.id);
+  } else if (isMasterRestrito(authUser)) {
+    const operadorIds = await getEquipeIds(Number(authUser.id));
+    const todosIds = [Number(authUser.id), ...operadorIds];
+    selectQuery = selectQuery.in('captado_por_id', todosIds);
   }
 
   const { data: lead, error: findError } = await selectQuery.maybeSingle();
@@ -66,9 +84,9 @@ export default async function handler(req, res) {
     if (status !== undefined && !STATUS_VALIDOS.includes(status)) {
       return res.status(400).json({ error: `Status inválido. Valores: ${STATUS_VALIDOS.join(', ')}` });
     }
-    // Comercial puro não pode marcar como matriculado manualmente
-    if (status === 'matriculado' && isComercialPuro(authUser)) {
-      return res.status(403).json({ error: 'Somente financeiro ou administrador pode confirmar matrícula.' });
+    // Operador e master não podem marcar como matriculado manualmente
+    if (status === 'matriculado' && (isOperador(authUser) || isMasterRestrito(authUser))) {
+      return res.status(403).json({ error: 'Status "Matriculado" é definido automaticamente após confirmação do fluxo financeiro/acadêmico.' });
     }
 
     const updates = { updated_at: new Date().toISOString() };
