@@ -128,7 +128,7 @@ export default function DetalharLead() {
 
   return (
     <ComercialLayout titulo="Detalhar Lead">
-      <div className="max-w-xl">
+      <div className="max-w-xl w-full mx-auto">
         <div className="flex items-center gap-3 mb-6">
           <Link href="/comercial/leads">
             <span className="text-gray-400 hover:text-gray-600 cursor-pointer text-sm">← Meus Leads</span>
