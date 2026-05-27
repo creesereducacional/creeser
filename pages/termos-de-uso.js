@@ -8,10 +8,10 @@ export default function TermosDeUso() {
     {
       id: 'aceitacao',
       titulo: '1. Aceitação dos Termos',
-      conteudo: `Ao acessar e usar a plataforma EAD IGEPPS, você concorda em cumprir estes Termos de Uso. 
+      conteudo: `Ao acessar e usar a plataforma CREESER Educacional, você concorda em cumprir estes Termos de Uso. 
 Se não concordar com qualquer parte destes termos, não use a plataforma.
 
-Estes termos constituem um acordo vinculante entre você e a IGEPPS Academy.`
+Estes termos constituem um acordo vinculante entre você e a CREESER Educacional.`
     },
     {
       id: 'licenca',
@@ -33,7 +33,7 @@ Você NÃO pode:
     {
       id: 'conteudo',
       titulo: '3. Propriedade de Conteúdo',
-      conteudo: `Todo conteúdo (vídeos, aulas, documentos, imagens) é propriedade intelectual da IGEPPS ou de seus criadores.
+      conteudo: `Todo conteúdo (vídeos, aulas, documentos, imagens) é propriedade intelectual da CREESER Educacional ou de seus criadores.
 
 Você recebe direito de acesso limitado apenas para fins educacionais pessoais.
 
@@ -78,11 +78,11 @@ Notificaremos sobre suspensão quando possível.`
 Condições:
 • Certificado é documento pessoal e intransferível
 • Não pode ser vendido ou compartilhado
-• IGEPPS pode revogar certificado se fraude detectada
+• CREESER pode revogar certificado se fraude detectada
 • Certificado representa apenas aprovação no curso
 • Não substitui qualificação profissional oficial
 
-A IGEPPS não garante aceitação de certificados por terceiros.`
+A CREESER Educacional não garante aceitação de certificados por terceiros.`
     },
     {
       id: 'limitacao',
@@ -102,7 +102,7 @@ Você usa por sua conta e risco.`
     {
       id: 'indenizacao',
       titulo: '8. Indenização',
-      conteudo: `Você concorda em indenizar e defender a IGEPPS de:
+      conteudo: `Você concorda em indenizar e defender a CREESER Educacional de:
 
 • Reivindicações por violação destes termos
 • Violação de direitos de terceiros
@@ -127,7 +127,7 @@ O uso continuado após alterações constitui aceitação dos novos termos.`
       titulo: '10. Rescisão',
       conteudo: `Você pode encerrar sua conta a qualquer momento acessando as configurações de perfil.
 
-A IGEPPS pode rescindir sua conta por qualquer motivo com aviso prévio.
+A CREESER Educacional pode rescindir sua conta por qualquer motivo com aviso prévio.
 
 Após rescisão:
 • Você perde acesso a toda a plataforma
@@ -150,7 +150,7 @@ Você concorda em submeter-se à jurisdição brasileira.`
       titulo: '12. Contato',
       conteudo: `Se tiver dúvidas sobre estes Termos de Uso, entre em contato:
 
-Email: suporte@igepps.com.br
+Email: suporte@creeser.com.br
 Horário: Segunda a Sexta, 8h às 18h (Horário de Brasília)
 
 Tempo de resposta: Até 2 dias úteis`
@@ -168,7 +168,7 @@ Tempo de resposta: Até 2 dias úteis`
             </button>
           </Link>
           <h1 className="text-4xl font-bold">Termos de Uso</h1>
-          <p className="text-blue-100 mt-2">IGEPPS Academy - Condições de Uso da Plataforma</p>
+          <p className="text-blue-100 mt-2">CREESER Educacional - Condições de Uso da Plataforma</p>
         </div>
       </header>
 
@@ -235,7 +235,7 @@ Tempo de resposta: Até 2 dias úteis`
           <div className="bg-green-50 rounded-lg p-8 mt-12 border border-green-200">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">✓ Você Concorda?</h2>
             <p className="text-gray-700 mb-6">
-              Ao usar a plataforma EAD IGEPPS, você confirma que:
+              Ao usar a plataforma CREESER Educacional, você confirma que:
             </p>
             <ul className="space-y-2 text-gray-700 mb-6">
               <li className="flex items-center gap-2">
@@ -264,10 +264,10 @@ Tempo de resposta: Até 2 dias úteis`
             </p>
             <div className="bg-white p-4 rounded border border-blue-200">
               <p className="font-semibold text-gray-800">📧 Email:</p>
-              <p className="text-blue-600 mb-4">termos@igepps.com.br</p>
+              <p className="text-blue-600 mb-4">termos@creeser.com.br</p>
               
               <p className="font-semibold text-gray-800">📅 Última Atualização:</p>
-              <p className="text-gray-700">09 de dezembro de 2025</p>
+              <p className="text-gray-700">27 de maio de 2026</p>
             </div>
           </div>
 
@@ -294,7 +294,7 @@ Tempo de resposta: Até 2 dias úteis`
       <footer className="bg-gray-900 text-gray-400 py-8 mt-16">
         <div className="container mx-auto px-4 text-center">
           <p className="text-sm">
-            © 2025 IGEPPS Academy. Todos os direitos reservados. | 
+            © 2026 CREESER Educacional. Todos os direitos reservados. | 
             <Link href="/politica-privacidade" className="text-blue-400 hover:text-blue-300 mx-1">Privacidade</Link> | 
             <Link href="/termos-de-uso" className="text-blue-400 hover:text-blue-300 mx-1">Termos</Link>
           </p>

@@ -8,7 +8,7 @@ export default function PoliticaPrivacidade() {
     {
       id: 'introducao',
       titulo: '1. Introdução',
-      conteudo: `A presente Política de Privacidade foi elaborada para informar sobre como a EAD IGEPPS coleta, utiliza, armazena e protege os dados pessoais dos usuários, em conformidade com a Lei Geral de Proteção de Dados (LGPD - Lei nº 13.709/2018).`
+      conteudo: `A presente Política de Privacidade foi elaborada para informar sobre como a CREESER Educacional coleta, utiliza, armazena e protege os dados pessoais dos usuários, em conformidade com a Lei Geral de Proteção de Dados (LGPD - Lei nº 13.709/2018).`
     },
     {
       id: 'dados-coletados',
@@ -107,7 +107,7 @@ Após a exclusão da conta, dados serão deletados em até 30 dias, salvo quando
       titulo: '10. Alterações na Política',
       conteudo: `Esta Política pode ser atualizada periodicamente. Notificaremos sobre mudanças significativas por email ou aviso destacado no site. O uso continuado do serviço após alterações constitui aceitação das novas condições.
 
-Última atualização: 09 de dezembro de 2025`
+Última atualização: 27 de maio de 2026`
     }
   ];
 
@@ -122,7 +122,7 @@ Após a exclusão da conta, dados serão deletados em até 30 dias, salvo quando
             </button>
           </Link>
           <h1 className="text-4xl font-bold">Política de Privacidade</h1>
-          <p className="text-blue-100 mt-2">IGEPPS Academy - Lei Geral de Proteção de Dados (LGPD)</p>
+          <p className="text-blue-100 mt-2">CREESER Educacional - Lei Geral de Proteção de Dados (LGPD)</p>
         </div>
       </header>
 
@@ -193,7 +193,7 @@ Após a exclusão da conta, dados serão deletados em até 30 dias, salvo quando
             </p>
             <div className="bg-white p-4 rounded border border-blue-200">
               <p className="font-semibold text-gray-800">📧 Email:</p>
-              <p className="text-blue-600 mb-4">privacidade@igepps.com.br</p>
+              <p className="text-blue-600 mb-4">privacidade@creeser.com.br</p>
               
               <p className="font-semibold text-gray-800">⏱️ Tempo de Resposta:</p>
               <p className="text-gray-700">Até 15 dias úteis para solicitudes LGPD</p>
@@ -223,7 +223,7 @@ Após a exclusão da conta, dados serão deletados em até 30 dias, salvo quando
       <footer className="bg-gray-900 text-gray-400 py-8 mt-16">
         <div className="container mx-auto px-4 text-center">
           <p className="text-sm">
-            © 2025 IGEPPS Academy. Todos os direitos reservados. | 
+            © 2026 CREESER Educacional. Todos os direitos reservados. | 
             <Link href="/politica-privacidade" className="text-blue-400 hover:text-blue-300 mx-1">Privacidade</Link> | 
             <Link href="/termos-de-uso" className="text-blue-400 hover:text-blue-300 mx-1">Termos</Link>
           </p>

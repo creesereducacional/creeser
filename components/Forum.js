@@ -23,7 +23,7 @@ export default function Forum({ usuario }) {
     try {
       const response = await fetch('/api/cursos');
       const data = await response.json();
-      setCursos(data.filter(c => c.ativo));
+      setCursos(Array.isArray(data) ? data.filter(c => c.ativo) : []);
     } catch (error) {
       console.error('Erro ao carregar cursos:', error);
     }
@@ -33,7 +33,7 @@ export default function Forum({ usuario }) {
     try {
       const response = await fetch('/api/professores');
       const data = await response.json();
-      setProfessores(data);
+      setProfessores(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Erro ao carregar professores:', error);
     }
@@ -44,7 +44,7 @@ export default function Forum({ usuario }) {
       const url = cursoId ? `/api/forum?cursoId=${cursoId}` : '/api/forum';
       const response = await fetch(url);
       const data = await response.json();
-      setTopicos(data);
+      setTopicos(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Erro ao carregar tópicos:', error);
     }

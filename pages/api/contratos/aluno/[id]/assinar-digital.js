@@ -508,6 +508,14 @@ export default async function handler(req, res) {
       last_synced_at: new Date().toISOString()
     });
 
+    // Atualizar status_contrato do aluno para ENVIADO_ASSINATURA
+    try {
+      await supabase.from('alunos').update({
+        status_contrato:    'ENVIADO_ASSINATURA',
+        data_envio_contrato: new Date().toISOString(),
+      }).eq('id', assinaturaContext.alunoId);
+    } catch (_) { /* coluna pode ainda nao existir — nao bloqueia */ }
+
     return res.status(200).json({
       status: 'ok',
       provider: 'assinafy',

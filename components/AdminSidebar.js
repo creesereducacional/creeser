@@ -27,6 +27,8 @@ const MENU_ITEMS = [
   // Financeiro
   { id: 'financeiro-modulo', href: '/admin-financeiro', icon: '💵', label: 'Financeiro', secao: 'Financeiro', perfis: ['grupo_admin', 'instituicao_admin', 'financeiro'] },
   { id: 'contratos', href: '/admin/contratos', icon: '📄', label: 'Contratos', secao: 'Financeiro', perfis: ['grupo_admin', 'instituicao_admin', 'financeiro'] },
+  { id: 'contratos-dashboard', href: '/admin/contratos/dashboard', icon: '📊', label: 'Dashboard Contratos', secao: 'Financeiro', perfis: ['grupo_admin', 'instituicao_admin', 'financeiro', 'secretaria', 'coordenador'] },
+  { id: 'contratos-relatorio', href: '/admin/contratos/relatorio', icon: '📋', label: 'Relatório Contratos', secao: 'Financeiro', perfis: ['grupo_admin', 'instituicao_admin', 'financeiro', 'secretaria', 'coordenador'] },
 
   // Comercial (painel de gestão — apenas admins)
   { id: 'campanhas', href: '/admin/campanhas', icon: '📣', label: 'Campanhas', secao: 'Comercial', perfis: ['grupo_admin', 'instituicao_admin'] },
@@ -54,6 +56,7 @@ const MENU_ITEMS = [
       { id: 'anos-letivos', href: '/admin/anos-letivos', label: 'Anos Letivos' },
       { id: 'calendario-aulas', href: '#', label: 'Calendário de Aulas', perfis: ['grupo_admin'] },
       { id: 'contas-bancarias', href: '#', label: 'Contas Bancárias', perfis: ['grupo_admin'] },
+      { id: 'go-live-checklist', href: '/admin/go-live-checklist', label: '🚀 Go-Live Checklist', perfis: ['grupo_admin', 'instituicao_admin'] },
     ],
   },
 ];

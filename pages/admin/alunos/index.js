@@ -160,6 +160,16 @@ export default function ListagemAlunos() {
     setSearchCPF('');
   };
 
+  const marcarContratoGerado = async (alunoId) => {
+    try {
+      await fetch(`/api/contratos/aluno/${alunoId}/marcar-gerado`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      setAlunos(prev => prev.map(a => a.id === alunoId ? { ...a, status_contrato: 'GERADO' } : a));
+    } catch (_) {}
+  };
+
   const abrirContratoAluno = (alunoId) => {
     if (!alunoId) {
       alert('Aluno não identificado para gerar contrato');
@@ -441,6 +451,7 @@ export default function ListagemAlunos() {
                     <th className="text-left px-4 py-3 text-xs font-semibold text-teal-800 border-r border-teal-300">Turma</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-teal-800 border-r border-teal-300">Matrícula</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-teal-800 border-r border-teal-300">Nome</th>
+                    <th className="text-center px-4 py-3 text-xs font-semibold text-teal-800 border-r border-teal-300">Contrato</th>
                     <th className="text-center px-4 py-3 text-xs font-semibold text-teal-800">Ações</th>
                   </tr>
                 </thead>
@@ -452,6 +463,52 @@ export default function ListagemAlunos() {
                       <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{aluno.turmaid || '—'}</td>
                       <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{aluno.numero_id || '—'}</td>
                       <td className="px-4 py-3 text-sm text-gray-800 font-semibold border-r border-gray-200">{aluno.nome}</td>
+                      <td className="px-4 py-3 border-r border-gray-200">
+                        {/* Badge status_contrato */}
+                        {(() => {
+                          const sc = aluno.status_contrato || 'NAO_GERADO';
+                          const BADGE = {
+                            NAO_GERADO:         'bg-gray-100 text-gray-500 border-gray-300',
+                            GERADO:             'bg-blue-100 text-blue-700 border-blue-300',
+                            ENVIADO_ASSINATURA: 'bg-yellow-100 text-yellow-700 border-yellow-300',
+                            ASSINADO:           'bg-green-100 text-green-700 border-green-300',
+                            RECUSADO:           'bg-red-100 text-red-700 border-red-300',
+                            EXPIRADO:           'bg-orange-100 text-orange-700 border-orange-300',
+                          };
+                          const LABEL = {
+                            NAO_GERADO:         'Não Gerado',
+                            GERADO:             'Gerado',
+                            ENVIADO_ASSINATURA: 'Enviado',
+                            ASSINADO:           'Assinado',
+                            RECUSADO:           'Recusado',
+                            EXPIRADO:           'Expirado',
+                          };
+                          return (
+                            <div className="flex flex-col gap-1.5">
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold border ${BADGE[sc] || 'bg-gray-100 text-gray-500 border-gray-200'}`}>
+                                {LABEL[sc] || sc}
+                              </span>
+                              <div className="flex gap-1 flex-wrap">
+                                <button
+                                  onClick={() => { abrirContratoAluno(aluno.id); marcarContratoGerado(aluno.id); }}
+                                  className="px-1.5 py-0.5 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+                                  title="Gerar contrato"
+                                >Gerar</button>
+                                <button
+                                  onClick={() => iniciarAssinaturaDigital(aluno.id)}
+                                  className="px-1.5 py-0.5 text-xs rounded border border-blue-300 text-blue-600 hover:bg-blue-50 transition-colors"
+                                  title="Enviar para Assinafy"
+                                >Assinafy</button>
+                                <button
+                                  onClick={() => consultarAssinaturaDigital(aluno.id)}
+                                  className="px-1.5 py-0.5 text-xs rounded border border-teal-300 text-teal-600 hover:bg-teal-50 transition-colors"
+                                  title="Ver status da assinatura"
+                                >Status</button>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </td>
                       <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-1 flex-wrap">
                           <Link href={`/admin/alunos/${aluno.id}`}>
