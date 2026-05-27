@@ -71,27 +71,24 @@ export default function ComercialLayout({ children, titulo }) {
       <aside
         className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gradient-to-b from-teal-700 to-teal-900 shadow-2xl text-white flex flex-col transition-all duration-300 flex-shrink-0`}
       >
-        {/* Logo CREESER */}
-        <div className="p-6 border-b border-teal-600 flex items-center justify-between">
+        {/* Logo */}
+        <div className="px-4 py-5 border-b border-teal-600 flex items-center justify-between">
           {sidebarOpen ? (
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col items-center gap-1.5 flex-1">
               <Image
                 src="/images/logo_creeser.png"
-                alt="CREESER"
-                width={36}
-                height={36}
-                className="rounded-lg object-contain bg-white p-0.5"
+                alt="Logo"
+                width={60}
+                height={60}
+                className="rounded-xl object-contain bg-white p-1"
               />
-              <div>
-                <h2 className="text-white font-bold text-sm">CREESER</h2>
-                <p className="text-teal-200 text-xs">Comercial</p>
-              </div>
+              <p className="text-teal-200 text-xs font-medium tracking-wide">Comercial</p>
             </div>
           ) : (
             <div className="mx-auto">
               <Image
                 src="/images/logo_creeser.png"
-                alt="CREESER"
+                alt="Logo"
                 width={36}
                 height={36}
                 className="rounded-lg object-contain bg-white p-0.5"
@@ -112,10 +109,14 @@ export default function ComercialLayout({ children, titulo }) {
         {/* Navegação */}
         <nav className="flex-1 p-4 overflow-y-auto space-y-1">
           {menuItems.map(item => {
-            const ativo =
-              item.href === '/comercial/leads/novo'
-                ? router.pathname === item.href
-                : router.pathname.startsWith(item.href) && item.href !== '/comercial/leads/novo';
+            const ativo = (() => {
+              // /comercial/leads não deve ativar ao estar em /comercial/leads/novo
+              if (item.href === '/comercial/leads') {
+                return router.pathname === '/comercial/leads' ||
+                  (router.pathname.startsWith('/comercial/leads/') && router.pathname !== '/comercial/leads/novo');
+              }
+              return router.pathname === item.href;
+            })();
 
             return (
               <Link
@@ -145,12 +146,14 @@ export default function ComercialLayout({ children, titulo }) {
           )}
           <button
             onClick={handleLogout}
-            className={`flex items-center gap-2 text-teal-300 hover:text-white text-sm transition-colors w-full ${
+            className={`flex items-center gap-2 bg-red-600/20 hover:bg-red-600/50 text-red-300 hover:text-white text-sm font-medium transition-colors w-full px-3 py-2 rounded-lg ${
               !sidebarOpen ? 'justify-center' : ''
             }`}
             title="Sair"
           >
-            <span>🚪</span>
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
             {sidebarOpen && <span>Sair</span>}
           </button>
         </div>

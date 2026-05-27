@@ -90,7 +90,8 @@ export default function MeusLeads() {
               : 'Nenhum lead encontrado com esses filtros.'}
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[600px]">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
               <tr>
                 <th className="px-4 py-3 text-left">Nome</th>
@@ -118,14 +119,26 @@ export default function MeusLeads() {
                     {lead.created_at ? new Date(lead.created_at).toLocaleDateString('pt-BR') : '—'}
                   </td>
                   <td className="px-4 py-3">
-                    <Link href={`/comercial/leads/${lead.id}`}>
-                      <span className="text-teal-600 hover:text-teal-800 hover:underline cursor-pointer text-xs font-medium">Ver Detalhes</span>
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link href={`/comercial/leads/${lead.id}`}>
+                        <span className="inline-block px-3 py-1 rounded-lg border border-teal-500 text-teal-700 hover:bg-teal-50 text-xs font-medium cursor-pointer transition-colors">
+                          Detalhes
+                        </span>
+                      </Link>
+                      {lead.status === 'interessado' && (
+                        <Link href={`/comercial/leads/${lead.id}`}>
+                          <span className="inline-block px-3 py-1 rounded-lg bg-purple-100 text-purple-700 hover:bg-purple-200 text-xs font-medium cursor-pointer transition-colors">
+                            Pré-Matrícula
+                          </span>
+                        </Link>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
