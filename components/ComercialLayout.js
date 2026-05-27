@@ -25,19 +25,30 @@ export default function ComercialLayout({ children, titulo }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
+    // Cache local: evita flash ao navegar entre páginas
+    try {
+      const cached = sessionStorage.getItem('comercial_user');
+      if (cached) setUser(JSON.parse(cached));
+    } catch (_) {}
+
     fetch('/api/auth/me', { credentials: 'include' })
       .then(r => (r.ok ? r.json() : null))
       .then(data => {
-        if (!data?.usuario) { router.replace('/login'); return; }
+        if (!data?.usuario) {
+          try { sessionStorage.removeItem('comercial_user'); } catch (_) {}
+          router.replace('/login');
+          return;
+        }
         const perfil = String(data.usuario.perfil || data.usuario.tipo || '').toLowerCase();
         if (!PERFIS_COMERCIAL.includes(perfil)) {
           router.replace('/admin/dashboard');
           return;
         }
+        try { sessionStorage.setItem('comercial_user', JSON.stringify(data.usuario)); } catch (_) {}
         setUser(data.usuario);
       })
       .catch(() => router.replace('/login'));
-  }, [router]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
@@ -74,24 +85,26 @@ export default function ComercialLayout({ children, titulo }) {
         {/* Logo */}
         <div className="px-4 py-5 border-b border-teal-600 flex items-center justify-between">
           {sidebarOpen ? (
-            <div className="flex flex-col items-center gap-1.5 flex-1">
-              <Image
-                src="/images/logo_creeser.png"
-                alt="Logo"
-                width={60}
-                height={60}
-                className="rounded-xl object-contain bg-white p-1"
-              />
+            <div className="flex flex-col items-center gap-2 flex-1 min-w-0">
+              <div className="relative w-full max-w-[160px] h-[42px] mx-auto">
+                <Image
+                  src="/images/logo_creeser.png"
+                  alt="CREESER"
+                  fill
+                  className="object-contain"
+                  priority
+                />
+              </div>
               <p className="text-teal-200 text-xs font-medium tracking-wide">Comercial</p>
             </div>
           ) : (
-            <div className="mx-auto">
+            <div className="relative mx-auto w-10 h-8">
               <Image
                 src="/images/logo_creeser.png"
-                alt="Logo"
-                width={36}
-                height={36}
-                className="rounded-lg object-contain bg-white p-0.5"
+                alt="CREESER"
+                fill
+                className="object-contain"
+                priority
               />
             </div>
           )}

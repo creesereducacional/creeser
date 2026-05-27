@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import ComercialLayout from '@/components/ComercialLayout';
 
 function CardStat({ label, valor, cor = 'bg-white', icone, destaque = false }) {
@@ -109,9 +110,9 @@ export default function ComercialDashboard() {
             <div className="bg-white rounded-xl shadow-sm p-5 mb-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold text-gray-700">🏆 Ranking da Equipe</h2>
-                <a href="/comercial/equipe" className="text-sm text-teal-600 hover:text-teal-800 font-medium hover:underline">
+                <Link href="/comercial/equipe" className="text-sm text-teal-600 hover:text-teal-800 font-medium hover:underline">
                   Gerenciar Equipe →
-                </a>
+                </Link>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -160,9 +161,9 @@ export default function ComercialDashboard() {
             <div className="bg-white rounded-xl shadow-sm p-5 mb-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold text-gray-700">💰 {isMaster ? 'Comissões da Equipe' : 'Minhas Comissões'}</h2>
-                <a href="/comercial/comissoes" className="text-sm text-teal-600 hover:text-teal-800 font-medium hover:underline">
+                <Link href="/comercial/comissoes" className="text-sm text-teal-600 hover:text-teal-800 font-medium hover:underline">
                   Ver detalhes →
-                </a>
+                </Link>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-yellow-50 rounded-xl p-4 text-center">
@@ -191,9 +192,9 @@ export default function ComercialDashboard() {
           <div className="bg-white rounded-xl shadow-sm p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold text-gray-700">Últimas Matrículas Captadas</h2>
-              <a href="/comercial/matriculas" className="text-sm text-teal-600 hover:text-teal-800 font-medium hover:underline">
+              <Link href="/comercial/matriculas" className="text-sm text-teal-600 hover:text-teal-800 font-medium hover:underline">
                 Ver todas →
-              </a>
+              </Link>
             </div>
             {matriculas.length === 0 ? (
               <p className="text-sm text-gray-400 py-4 text-center">Nenhuma matrícula captada ainda.</p>

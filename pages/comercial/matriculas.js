@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import ComercialLayout from '@/components/ComercialLayout';
 
 const BADGES_MATRICULA = {
@@ -151,10 +152,10 @@ export default function MinhasMatriculas() {
                       {aluno.created_at ? new Date(aluno.created_at).toLocaleDateString('pt-BR') : '—'}
                     </td>
                     <td className="px-4 py-3">
-                      <a href={`/comercial/leads`}
+                      <Link href="/comercial/leads"
                         className="text-xs text-teal-600 hover:underline">
                         Ver Lead
-                      </a>
+                      </Link>
                     </td>
                   </tr>
                 );
