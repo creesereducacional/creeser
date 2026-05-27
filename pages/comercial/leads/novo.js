@@ -33,14 +33,36 @@ export default function NovoLead() {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState(null);
   const [emailTocado, setEmailTocado] = useState(false);
-  const [cursos, setCursos] = useState([]);
 
+  const [instituicoes, setInstituicoes] = useState([]);
+  const [instituicaoId, setInstituicaoId] = useState('');
+  const [cursos, setCursos] = useState([]);
+  const [loadingCursos, setLoadingCursos] = useState(false);
+
+  // 1. Carrega instituições ao montar
   useEffect(() => {
-    fetch('/api/comercial/cursos', { credentials: 'include' })
+    fetch('/api/comercial/instituicoes', { credentials: 'include' })
       .then(r => r.ok ? r.json() : [])
-      .then(data => setCursos(Array.isArray(data) ? data : []))
+      .then(data => {
+        const lista = Array.isArray(data) ? data : [];
+        setInstituicoes(lista);
+        if (lista.length > 0) setInstituicaoId(String(lista[0].id));
+      })
       .catch(() => {});
   }, []);
+
+  // 2. Carrega cursos quando a instituição muda
+  useEffect(() => {
+    if (!instituicaoId) return;
+    setLoadingCursos(true);
+    setCursos([]);
+    setForm(f => ({ ...f, curso_id: '', curso_interesse: '' }));
+    fetch(`/api/comercial/cursos?instituicao_id=${instituicaoId}`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setCursos(Array.isArray(data) ? data : []))
+      .catch(() => {})
+      .finally(() => setLoadingCursos(false));
+  }, [instituicaoId]);
 
   const set = (campo) => (e) => setForm(f => ({ ...f, [campo]: e.target.value }));
 
@@ -166,32 +188,48 @@ export default function NovoLead() {
             )}
           </div>
 
+          {/* Instituição (visível sempre; desabilitado se apenas uma) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Instituição</label>
+            <select
+              value={instituicaoId}
+              onChange={e => setInstituicaoId(e.target.value)}
+              disabled={instituicoes.length <= 1}
+              className={`${inputBase} ${instituicoes.length <= 1 ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
+            >
+              {instituicoes.length === 0 && (
+                <option value="">Carregando...</option>
+              )}
+              {instituicoes.map(i => (
+                <option key={i.id} value={String(i.id)}>{i.nome}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Curso de Interesse */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Curso de Interesse</label>
-            {cursos.length > 0 ? (
-              <select
-                value={form.curso_id}
-                onChange={setCurso}
-                className={inputBase}
-              >
-                <option value="">Selecione o curso de interesse</option>
-                {cursos.map(c => (
-                  <option key={c.id} value={String(c.id)}>
-                    {c.nome}{c.nivelensino ? ` — ${c.nivelensino}` : ''}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                type="text"
-                value={form.curso_interesse}
-                onChange={set('curso_interesse')}
-                placeholder="Carregando cursos..."
-                className={inputBase}
-                readOnly={cursos.length === 0}
-              />
-            )}
+            <select
+              value={form.curso_id}
+              onChange={setCurso}
+              disabled={loadingCursos || cursos.length === 0}
+              className={`${inputBase} ${loadingCursos || cursos.length === 0 ? 'text-gray-400' : ''}`}
+            >
+              {loadingCursos ? (
+                <option value="">Carregando cursos...</option>
+              ) : cursos.length === 0 ? (
+                <option value="">Nenhum curso disponível</option>
+              ) : (
+                <>
+                  <option value="">Selecione o curso de interesse</option>
+                  {cursos.map(c => (
+                    <option key={c.id} value={String(c.id)}>
+                      {c.nome}{c.nivelensino ? ` — ${c.nivelensino}` : ''}
+                    </option>
+                  ))}
+                </>
+              )}
+            </select>
           </div>
 
           {/* Origem e Status */}
