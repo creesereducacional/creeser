@@ -152,24 +152,6 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <p className="text-center text-gray-600 text-xs font-semibold uppercase tracking-wider mb-4">Dados de Acesso</p>
-          <div className="space-y-2 text-sm">
-            <div className="bg-teal-50 border-l-4 border-teal-600 p-3 rounded-r">
-              <p className="font-bold text-teal-900">👤 Admin:</p>
-              <p className="text-teal-800 text-xs font-mono mt-1">admin@creeser.com / admin123</p>
-            </div>
-            <div className="bg-blue-50 border-l-4 border-blue-600 p-3 rounded-r">
-              <p className="font-bold text-blue-900">👨‍🏫 Professor:</p>
-              <p className="text-blue-800 text-xs font-mono mt-1">professor@creeser.com / prof123</p>
-            </div>
-            <div className="bg-purple-50 border-l-4 border-purple-600 p-3 rounded-r">
-              <p className="font-bold text-purple-900">👨‍🎓 Aluno:</p>
-              <p className="text-purple-800 text-xs font-mono mt-1">aluno@creeser.com / aluno123</p>
-            </div>
-          </div>
-        </div>
-
         <div className="mt-6 text-center text-xs text-gray-500">
           <p>Sistema de Gerenciamento Educacional</p>
           <p>© 2024 CREESER Educacional</p>
