@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import ComercialLayout from '@/components/ComercialLayout';
+import DashboardCard from '@/components/recepcao/DashboardCard';
 
 const BADGES_STATUS = {
   PENDENTE_REPASSE: 'bg-yellow-100 text-yellow-700',
@@ -77,27 +78,22 @@ export default function Comissoes() {
       )}
 
       {/* Cards de resumo */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
         {[
-          { status: 'PENDENTE_REPASSE', label: 'Pendentes',  color: 'text-yellow-600' },
-          { status: 'REPASSADO',        label: 'Repassadas', color: 'text-green-600'  },
-          { status: 'CANCELADO',        label: 'Canceladas', color: 'text-red-500'    },
-        ].map(({ status, label, color }) => {
+          { status: 'PENDENTE_REPASSE', icon: '⏳', label: 'Pendentes',  cor: 'border-yellow-400', bg: 'bg-yellow-50' },
+          { status: 'REPASSADO',        icon: '✅', label: 'Repassadas', cor: 'border-green-500',  bg: 'bg-green-50'  },
+          { status: 'CANCELADO',        icon: '❌', label: 'Canceladas', cor: 'border-red-400',    bg: 'bg-red-50'    },
+        ].map(({ status, icon, label, cor, bg }) => {
           const qtd   = comissoes.filter(c => c.status === status).length;
-          const valor = comissoes
-            .filter(c => c.status === status)
-            .reduce((s, c) => s + Number(c.valor_comissao || 0), 0);
+          const valor = comissoes.filter(c => c.status === status).reduce((s, c) => s + Number(c.valor_comissao || 0), 0);
           return (
-            <button
-              key={status}
-              onClick={() => setFiltroStatus(filtroStatus === status ? '' : status)}
-              className={`bg-white rounded-xl shadow-sm p-4 text-left border-2 transition-colors ${
-                filtroStatus === status ? 'border-teal-400' : 'border-transparent hover:border-gray-200'
-              }`}
-            >
-              <p className="text-xs text-gray-500 mb-1">{label}</p>
-              <p className={`text-2xl font-bold ${color}`}>{qtd}</p>
-              <p className="text-xs text-gray-400 mt-1">{fmtMoeda(valor)}</p>
+            <button key={status} onClick={() => setFiltroStatus(filtroStatus === status ? '' : status)}
+              className={`text-left border-2 rounded-2xl transition-all ${
+                filtroStatus === status ? 'border-teal-400 shadow-md' : 'border-transparent'
+              }`}>
+              <DashboardCard icon={icon} label={label} valor={qtd} cor={cor} bgIcon={bg}
+                sub={valor > 0 ? Number(valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : undefined}
+                loading={carregando} />
             </button>
           );
         })}

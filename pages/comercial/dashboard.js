@@ -1,16 +1,10 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import ComercialLayout from '@/components/ComercialLayout';
+import DashboardCard from '@/components/recepcao/DashboardCard';
 
-function CardStat({ label, valor, cor = 'bg-white', icone, destaque = false }) {
-  return (
-    <div className={`${cor} rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col gap-2 ${destaque ? 'ring-2 ring-teal-400' : ''}`}>
-      <div className="text-3xl">{icone}</div>
-      <div className="text-3xl font-bold text-gray-800">{valor}</div>
-      <div className="text-sm text-gray-500 font-medium">{label}</div>
-    </div>
-  );
-}
+const fmtMoeda = (v) =>
+  v != null ? Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—';
 
 export default function ComercialDashboard() {
   const [stats, setStats] = useState(null);
@@ -55,11 +49,13 @@ export default function ComercialDashboard() {
           )}
 
           {/* Cards de resumo */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <CardStat icone="🎯" label={isMaster ? 'Leads da Equipe' : 'Total de Leads'} valor={stats.totalLeads} />
-            <CardStat icone="📞" label="Interessados" valor={stats.interessado} />
-            <CardStat icone="🎓" label={isMaster ? 'Matrículas da Equipe' : 'Matriculados'} valor={stats.matriculado} />
-            <CardStat icone="📈" label="Taxa de Conversão" valor={`${stats.taxaConversao}%`} cor="bg-teal-50" destaque />
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+            <DashboardCard icon="🎯" label={isMaster ? 'Leads da Equipe' : 'Meus Leads'}        valor={stats.totalLeads}                        cor="border-blue-500"   bgIcon="bg-blue-50"   loading={carregando} href="/comercial/leads" />
+            <DashboardCard icon="🆕" label="Novos"                                               valor={stats.novo || 0}                         cor="border-cyan-500"   bgIcon="bg-cyan-50"   loading={carregando} />
+            <DashboardCard icon="📋" label="Pré-Matrículas"                                      valor={stats.pre_matricula || 0}                 cor="border-purple-500" bgIcon="bg-purple-50" loading={carregando} href="/comercial/matriculas" />
+            <DashboardCard icon="🎓" label={isMaster ? 'Matrículas da Equipe' : 'Matriculados'}  valor={stats.matriculado}                        cor="border-green-500"  bgIcon="bg-green-50"  loading={carregando} />
+            <DashboardCard icon="💰" label="Comissão Pendente"                                   valor={fmtMoeda(stats.comissoes?.pendente || 0)} cor="border-yellow-500" bgIcon="bg-yellow-50" loading={carregando} href="/comercial/comissoes" />
+            <DashboardCard icon="📈" label="Taxa de Conversão"                                   valor={`${stats.taxaConversao || 0}%`}           cor="border-teal-500"   bgIcon="bg-teal-50"   loading={carregando} />
           </div>
 
           {/* Cards extras para master: meus números */}
@@ -83,25 +79,43 @@ export default function ComercialDashboard() {
             </div>
           )}
 
-          {/* Pipeline de leads */}
-          <div className="bg-white rounded-xl shadow-sm p-5 mb-6">
-            <h2 className="font-semibold text-gray-700 mb-4">Pipeline de Leads</h2>
-            <div className="flex flex-wrap gap-3">
-              {[
-                { label: 'Novos', key: 'novo', cor: 'bg-blue-500' },
-                { label: 'Contatados', key: 'contatado', cor: 'bg-yellow-500' },
-                { label: 'Interessados', key: 'interessado', cor: 'bg-orange-500' },
-                { label: 'Matriculados', key: 'matriculado', cor: 'bg-green-500' },
-                { label: 'Perdidos', key: 'perdido', cor: 'bg-red-400' },
-              ].map(({ label, key, cor }) => (
-                <div key={key} className="flex items-center gap-2 bg-gray-50 rounded-lg px-4 py-3 min-w-[110px]">
-                  <div className={`w-3 h-3 rounded-full ${cor}`} />
-                  <div>
-                    <div className="text-lg font-bold text-gray-800">{stats[key]}</div>
-                    <div className="text-xs text-gray-500">{label}</div>
+          {/* Pipeline visual de Leads */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-gray-700">Pipeline de Leads</h2>
+              <Link href="/comercial/leads" className="text-xs text-teal-600 hover:underline">Ver todos →</Link>
+            </div>
+            <div className="overflow-x-auto pb-1">
+              <div className="flex items-center gap-1 min-w-max">
+                {[
+                  { label: 'Novos',        key: 'novo',          bg: 'bg-blue-50',   border: 'border-blue-200',   text: 'text-blue-700',   dot: 'bg-blue-500' },
+                  { label: 'Contatados',   key: 'contatado',     bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-700', dot: 'bg-yellow-500' },
+                  { label: 'Interessados', key: 'interessado',   bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', dot: 'bg-orange-500' },
+                  { label: 'Pré-Matr.',    key: 'pre_matricula', bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', dot: 'bg-purple-500' },
+                  { label: 'Matriculados', key: 'matriculado',   bg: 'bg-green-50',  border: 'border-green-200',  text: 'text-green-700',  dot: 'bg-green-500' },
+                ].map((step, idx, arr) => (
+                  <div key={step.key} className="flex items-center gap-1">
+                    <div className={`flex flex-col items-center px-4 py-3 rounded-xl min-w-[88px] border ${
+                      (stats[step.key] || 0) > 0 ? `${step.bg} ${step.border}` : 'bg-gray-50 border-gray-200'
+                    }`}>
+                      <div className={`w-2 h-2 rounded-full ${step.dot} mb-1`} />
+                      <div className={`text-xl font-bold ${(stats[step.key] || 0) > 0 ? step.text : 'text-gray-400'}`}>
+                        {stats[step.key] || 0}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5 text-center">{step.label}</div>
+                    </div>
+                    {idx < arr.length - 1 && <span className="text-gray-300 text-lg leading-none">›</span>}
+                  </div>
+                ))}
+                <div className="flex items-center gap-1">
+                  <span className="text-gray-200 mx-1 font-light text-lg">|</span>
+                  <div className="flex flex-col items-center px-4 py-3 rounded-xl min-w-[88px] border border-red-200 bg-red-50">
+                    <div className="w-2 h-2 rounded-full bg-red-400 mb-1" />
+                    <div className={`text-xl font-bold ${(stats.perdido || 0) > 0 ? 'text-red-500' : 'text-gray-400'}`}>{stats.perdido || 0}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">Desistentes</div>
                   </div>
                 </div>
-              ))}
+              </div>
             </div>
           </div>
 

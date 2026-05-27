@@ -1,38 +1,55 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import RecepcaoLayout from '@/components/RecepcaoLayout';
+import StatusBadge from '@/components/recepcao/StatusBadge';
 
-const STATUS_PREVISTO = {
-  PRE_CADASTRO: {
-    label: 'Pré-Cadastro',
-    desc: 'O aluno será cadastrado como Pré-Cadastro. O financeiro gerará a cobrança da matrícula e o status avançará automaticamente.',
-    cor: 'bg-gray-100 text-gray-700 border-gray-300',
-  },
-};
+// ── Máscaras ─────────────────────────────────────────────────────────
+function maskCPF(v) {
+  return v.replace(/\D/g,'')
+    .replace(/(\d{3})(\d)/,'$1.$2')
+    .replace(/(\d{3})(\d)/,'$1.$2')
+    .replace(/(\d{3})(\d{1,2})$/,'$1-$2')
+    .slice(0,14);
+}
+function maskPhone(v) {
+  return v.replace(/\D/g,'')
+    .replace(/(\d{2})(\d)/,'($1) $2')
+    .replace(/(\d{5})(\d)/,'$1-$2')
+    .slice(0,15);
+}
+
+const STEPS = [
+  { n: 1, label: 'Dados Pessoais',      icon: '👤' },
+  { n: 2, label: 'Curso de Interesse',  icon: '📚' },
+  { n: 3, label: 'Confirmação',         icon: '✅' },
+];
+
+const inputCls = 'w-full px-3 py-2.5 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white transition-colors';
+const inputOk  = 'border-gray-300';
+const inputErr = 'border-red-400 bg-red-50';
+const labelCls = 'block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1';
 
 export default function NovoPrecadastro() {
   const router = useRouter();
 
+  const [etapa, setEtapa] = useState(1);
+
   const [form, setForm] = useState({
-    nome: '',
-    cpf: '',
-    email: '',
-    telefone_celular: '',
-    cursoid: '',
-    turmaid: '',
-    observacoes_adicionais: '',
+    nome: '', cpf: '', email: '', telefone_celular: '',
+    cursoid: '', turmaid: '', observacoes_adicionais: '',
   });
+  const [erros, setErros] = useState({});
 
-  const [instituicoes, setInstituicoes]       = useState([]);
-  const [instSel, setInstSel]                 = useState('');
-  const [cursos, setCursos]                   = useState([]);
-  const [turmas, setTurmas]                   = useState([]);
-  const [carregandoCursos, setCarregandoCursos] = useState(false);
-  const [carregandoTurmas, setCarregandoTurmas] = useState(false);
-  const [salvando, setSalvando]               = useState(false);
-  const [erro, setErro]                       = useState(null);
+  const [instituicoes, setInstituicoes]           = useState([]);
+  const [instSel, setInstSel]                     = useState('');
+  const [cursos, setCursos]                       = useState([]);
+  const [turmas, setTurmas]                       = useState([]);
+  const [carregandoCursos, setCarregandoCursos]   = useState(false);
+  const [carregandoTurmas, setCarregandoTurmas]   = useState(false);
+  const [salvando, setSalvando]                   = useState(false);
+  const [erro, setErro]                           = useState(null);
 
-  // Carregar instituições
+  // Carregar instituições (lógica original inalterada)
   useEffect(() => {
     fetch('/api/comercial/instituicoes', { credentials: 'include' })
       .then(r => r.json())
@@ -44,7 +61,7 @@ export default function NovoPrecadastro() {
       .catch(() => {});
   }, []);
 
-  // Carregar cursos
+  // Carregar cursos (lógica original inalterada)
   useEffect(() => {
     if (!instSel) { setCursos([]); return; }
     setCarregandoCursos(true);
@@ -55,7 +72,7 @@ export default function NovoPrecadastro() {
       .finally(() => setCarregandoCursos(false));
   }, [instSel]);
 
-  // Carregar turmas
+  // Carregar turmas (lógica original inalterada)
   useEffect(() => {
     if (!form.cursoid) { setTurmas([]); set('turmaid', ''); return; }
     setCarregandoTurmas(true);
@@ -66,163 +83,285 @@ export default function NovoPrecadastro() {
       .finally(() => setCarregandoTurmas(false));
   }, [form.cursoid, instSel]);
 
-  const set = (campo, valor) => setForm(f => ({ ...f, [campo]: valor }));
+  const set = (campo, valor) => {
+    setForm(f => ({ ...f, [campo]: valor }));
+    if (erros[campo]) setErros(e => ({ ...e, [campo]: null }));
+  };
 
-  // Status sempre PRE_CADASTRO ao criar — financeiro avança depois
-  const statusPrevisto = 'PRE_CADASTRO';
+  function validarEtapa1() {
+    const e = {};
+    if (!form.nome.trim()) e.nome = 'Nome é obrigatório.';
+    if (form.cpf && form.cpf.replace(/\D/g,'').length !== 11) e.cpf = 'CPF inválido (11 dígitos).';
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'E-mail inválido.';
+    setErros(e);
+    return Object.keys(e).length === 0;
+  }
 
+  function avancar() {
+    if (etapa === 1 && !validarEtapa1()) return;
+    setEtapa(s => Math.min(s + 1, 3));
+  }
+
+  // Submit (lógica original inalterada)
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.nome?.trim()) { setErro('Nome é obrigatório.'); return; }
-    setSalvando(true);
-    setErro(null);
+    setSalvando(true); setErro(null);
     try {
       const res = await fetch('/api/recepcao/pre-cadastros', {
-        method: 'POST',
-        credentials: 'include',
+        method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, instituicao_id: instSel || undefined }),
       });
       const data = await res.json();
       if (!res.ok) { setErro(data.error || 'Erro ao salvar.'); return; }
       router.push('/recepcao/pre-cadastros');
-    } catch {
-      setErro('Erro de conexão.');
-    } finally {
-      setSalvando(false);
-    }
+    } catch { setErro('Erro de conexão.'); }
+    finally { setSalvando(false); }
   };
 
-  const inputCls = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300';
-  const labelCls = 'block text-sm font-medium text-gray-700 mb-1';
-  const sp = STATUS_PREVISTO[statusPrevisto];
+  const instNome   = instituicoes.find(i => i.id === instSel)?.nome || '—';
+  const cursoNome  = cursos.find(c => String(c.id) === String(form.cursoid))?.nome || '—';
+  const turmaNome  = turmas.find(t => String(t.id) === String(form.turmaid))?.nome || 'Sem turma (provisório)';
 
   return (
     <RecepcaoLayout titulo="Novo Pré-Cadastro">
-      <form onSubmit={handleSubmit} className="max-w-2xl space-y-5">
+      <div className="max-w-2xl mx-auto space-y-5">
 
-        {/* Status previsto */}
-        <div className={`flex flex-col gap-0.5 px-4 py-3 rounded-xl text-sm border ${sp.cor}`}>
-          <span className="font-semibold">Status ao cadastrar: {sp.label}</span>
-          <span className="text-xs opacity-80">{sp.desc}</span>
+        {/* ── Indicador de etapas ─────────────────────────────────── */}
+        <div className="bg-white rounded-2xl shadow-sm px-6 py-4">
+          <div className="flex items-center">
+            {STEPS.map((s, i) => {
+              const ativo      = etapa === s.n;
+              const concluido  = etapa > s.n;
+              return (
+                <div key={s.n} className="flex items-center flex-1">
+                  <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all
+                      ${concluido ? 'bg-green-500 text-white' : ativo ? 'bg-blue-600 text-white ring-4 ring-blue-100' : 'bg-gray-100 text-gray-400'}`}>
+                      {concluido ? '✓' : s.icon}
+                    </div>
+                    <span className={`text-xs font-medium hidden sm:block ${ativo ? 'text-blue-700' : concluido ? 'text-green-600' : 'text-gray-400'}`}>
+                      {s.label}
+                    </span>
+                  </div>
+                  {i < STEPS.length - 1 && (
+                    <div className={`flex-1 h-0.5 mx-2 rounded-full ${etapa > s.n ? 'bg-green-400' : 'bg-gray-200'}`} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
+        {/* ── Status preview ─────────────────────────────────────── */}
+        <div className="flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-2xl text-sm">
+          <span className="text-blue-700 font-semibold">Status ao cadastrar:</span>
+          <StatusBadge status="PRE_CADASTRO" size="md" />
+          <span className="text-blue-500 text-xs ml-auto hidden sm:block">
+            O financeiro avança o status após pagamento
+          </span>
+        </div>
+
+        {/* ── Alerta de erro geral ──────────────────────────────── */}
         {erro && (
-          <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">{erro}</div>
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">{erro}</div>
         )}
 
-        {/* Dados básicos */}
-        <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
-          <h2 className="font-semibold text-gray-800 border-b pb-2">Dados Básicos</h2>
-          <div>
-            <label className={labelCls}>Nome completo *</label>
-            <input className={inputCls} value={form.nome}
-              onChange={e => set('nome', e.target.value)}
-              placeholder="Nome do aluno" required />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>CPF</label>
-              <input className={inputCls} value={form.cpf}
-                onChange={e => set('cpf', e.target.value)}
-                placeholder="000.000.000-00" />
-            </div>
-            <div>
-              <label className={labelCls}>Telefone / WhatsApp</label>
-              <input className={inputCls} value={form.telefone_celular}
-                onChange={e => set('telefone_celular', e.target.value)}
-                placeholder="(00) 00000-0000" />
-            </div>
-          </div>
-          <div>
-            <label className={labelCls}>E-mail</label>
-            <input type="email" className={inputCls} value={form.email}
-              onChange={e => set('email', e.target.value)}
-              placeholder="email@exemplo.com" />
-          </div>
-        </div>
+        <form onSubmit={handleSubmit}>
 
-        {/* Instituição — só mostrar se houver mais de uma */}
-        {instituicoes.length > 1 && (
-          <div className="bg-white rounded-2xl shadow-sm p-6 space-y-3">
-            <h2 className="font-semibold text-gray-800 border-b pb-2">Instituição</h2>
-            <div>
-              <label className={labelCls}>Unidade</label>
-              <select value={instSel}
-                onChange={e => { setInstSel(e.target.value); set('cursoid', ''); set('turmaid', ''); }}
-                className={inputCls}>
-                <option value="">— Selecione a instituição —</option>
-                {instituicoes.map(i => <option key={i.id} value={i.id}>{i.nome}</option>)}
-              </select>
-            </div>
-          </div>
-        )}
+          {/* ── Etapa 1: Dados Pessoais ──────────────────────────── */}
+          {etapa === 1 && (
+            <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
+              <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wide pb-2 border-b">👤 Dados Pessoais</h2>
 
-        {/* Curso e turma */}
-        <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
-          <h2 className="font-semibold text-gray-800 border-b pb-2">Curso de Interesse</h2>
+              <div>
+                <label className={labelCls}>Nome completo *</label>
+                <input
+                  className={`${inputCls} ${erros.nome ? inputErr : inputOk}`}
+                  value={form.nome}
+                  onChange={e => set('nome', e.target.value)}
+                  placeholder="Nome completo do aluno"
+                  autoFocus
+                />
+                {erros.nome && <p className="text-xs text-red-600 mt-1">{erros.nome}</p>}
+              </div>
 
-          <div>
-            <label className={labelCls}>Curso {carregandoCursos ? '(carregando…)' : ''}</label>
-            <select value={form.cursoid}
-              onChange={e => { set('cursoid', e.target.value); set('turmaid', ''); }}
-              disabled={!instSel}
-              className={inputCls + (!instSel ? ' opacity-50' : '')}>
-              <option value="">— Selecione o curso —</option>
-              {cursos.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-            </select>
-            {!instSel && (
-              <p className="text-xs text-gray-400 mt-1">Selecione a instituição primeiro.</p>
-            )}
-          </div>
+              <div>
+                <label className={labelCls}>CPF</label>
+                <input
+                  className={`${inputCls} ${erros.cpf ? inputErr : inputOk}`}
+                  value={form.cpf}
+                  onChange={e => set('cpf', maskCPF(e.target.value))}
+                  placeholder="000.000.000-00"
+                  maxLength={14}
+                />
+                {erros.cpf && <p className="text-xs text-red-600 mt-1">{erros.cpf}</p>}
+              </div>
 
-          {form.cursoid && (
-            <div>
-              <label className={labelCls}>
-                Turma {carregandoTurmas ? '(carregando…)' : turmas.length === 0 ? '(nenhuma turma ativa)' : ''}
-              </label>
-              <select value={form.turmaid}
-                onChange={e => set('turmaid', e.target.value)}
-                disabled={turmas.length === 0 || carregandoTurmas}
-                className={inputCls + (turmas.length === 0 ? ' opacity-50' : '')}>
-                <option value="">— Sem turma (pré-cadastro provisório) —</option>
-                {turmas.map(t => (
-                  <option key={t.id} value={t.id}>
-                    {t.nome}{t.turno ? ` — ${t.turno}` : ''}
-                    {t.mensalidade ? ` | R$ ${Number(t.mensalidade).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}
-                  </option>
-                ))}
-              </select>
-              {turmas.length === 0 && !carregandoTurmas && (
-                <p className="text-xs text-amber-600 mt-1">
-                  ⚠️ Nenhuma turma ativa para este curso. O aluno poderá ser vinculado a uma turma futuramente.
-                </p>
-              )}
+              <div>
+                <label className={labelCls}>Telefone / WhatsApp</label>
+                <input
+                  className={`${inputCls} ${erros.telefone_celular ? inputErr : inputOk}`}
+                  value={form.telefone_celular}
+                  onChange={e => set('telefone_celular', maskPhone(e.target.value))}
+                  placeholder="(00) 00000-0000"
+                  maxLength={15}
+                />
+                {erros.telefone_celular && <p className="text-xs text-red-600 mt-1">{erros.telefone_celular}</p>}
+              </div>
+
+              <div>
+                <label className={labelCls}>E-mail</label>
+                <input
+                  type="email"
+                  className={`${inputCls} ${erros.email ? inputErr : inputOk}`}
+                  value={form.email}
+                  onChange={e => set('email', e.target.value)}
+                  placeholder="email@exemplo.com"
+                />
+                {erros.email && <p className="text-xs text-red-600 mt-1">{erros.email}</p>}
+              </div>
             </div>
           )}
-        </div>
 
-        {/* Observações */}
-        <div className="bg-white rounded-2xl shadow-sm p-6 space-y-3">
-          <h2 className="font-semibold text-gray-800 border-b pb-2">Observações</h2>
-          <textarea rows={3} className={inputCls + ' resize-none'}
-            value={form.observacoes_adicionais}
-            onChange={e => set('observacoes_adicionais', e.target.value)}
-            placeholder="Observações sobre este pré-cadastro (opcional)…" />
-        </div>
+          {/* ── Etapa 2: Curso de Interesse ─────────────────────── */}
+          {etapa === 2 && (
+            <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
+              <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wide pb-2 border-b">📚 Curso de Interesse</h2>
 
-        {/* Ações */}
-        <div className="flex items-center justify-between">
-          <button type="button" onClick={() => router.back()}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">
-            ← Cancelar
-          </button>
-          <button type="submit" disabled={salvando || !instSel}
-            className="px-6 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors">
-            {salvando ? 'Salvando…' : '✅ Criar Pré-Cadastro'}
-          </button>
-        </div>
-      </form>
+              {instituicoes.length > 1 && (
+                <div>
+                  <label className={labelCls}>Unidade</label>
+                  <select
+                    value={instSel}
+                    onChange={e => { setInstSel(e.target.value); set('cursoid', ''); set('turmaid', ''); }}
+                    className={`${inputCls} ${inputOk}`}
+                  >
+                    <option value="">— Selecione a instituição —</option>
+                    {instituicoes.map(i => <option key={i.id} value={i.id}>{i.nome}</option>)}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className={labelCls}>Curso {carregandoCursos && '(carregando…)'}</label>
+                <select
+                  value={form.cursoid}
+                  onChange={e => { set('cursoid', e.target.value); set('turmaid', ''); }}
+                  disabled={!instSel || carregandoCursos}
+                  className={`${inputCls} ${inputOk} ${!instSel ? 'opacity-50' : ''}`}
+                >
+                  <option value="">— Selecione o curso —</option>
+                  {cursos.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                </select>
+                {!instSel && <p className="text-xs text-gray-400 mt-1">Selecione a instituição primeiro.</p>}
+              </div>
+
+              {form.cursoid && (
+                <div>
+                  <label className={labelCls}>
+                    Turma {carregandoTurmas ? '(carregando…)' : turmas.length === 0 ? '(nenhuma turma ativa)' : ''}
+                  </label>
+                  <select
+                    value={form.turmaid}
+                    onChange={e => set('turmaid', e.target.value)}
+                    disabled={carregandoTurmas}
+                    className={`${inputCls} ${inputOk}`}
+                  >
+                    <option value="">— Sem turma (pré-cadastro provisório) —</option>
+                    {turmas.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.nome}{t.turno ? ` — ${t.turno}` : ''}
+                        {t.mensalidade ? ` | R$ ${Number(t.mensalidade).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {turmas.length === 0 && !carregandoTurmas && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      ⚠️ Nenhuma turma ativa. O aluno será vinculado futuramente.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div>
+                <label className={labelCls}>Observações</label>
+                <textarea
+                  rows={3}
+                  className={`${inputCls} ${inputOk} resize-none`}
+                  value={form.observacoes_adicionais}
+                  onChange={e => set('observacoes_adicionais', e.target.value)}
+                  placeholder="Observações sobre este pré-cadastro (opcional)…"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* ── Etapa 3: Confirmação ─────────────────────────────── */}
+          {etapa === 3 && (
+            <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
+              <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wide pb-2 border-b">✅ Confirmar Dados</h2>
+              <div className="space-y-3 text-sm">
+                {[
+                  { label: 'Nome',            val: form.nome || '—' },
+                  { label: 'CPF',             val: form.cpf || '—' },
+                  { label: 'Telefone',        val: form.telefone_celular || '—' },
+                  { label: 'E-mail',          val: form.email || '—' },
+                  { label: 'Curso',           val: cursoNome },
+                  { label: 'Turma',           val: turmaNome },
+                  { label: 'Unidade',         val: instNome },
+                ].map(item => (
+                  <div key={item.label} className="flex items-start gap-2">
+                    <span className="text-gray-400 w-24 flex-shrink-0">{item.label}</span>
+                    <span className="font-medium text-gray-800">{item.val}</span>
+                  </div>
+                ))}
+                {form.observacoes_adicionais && (
+                  <div className="pt-2 border-t">
+                    <span className="text-xs text-gray-400 block mb-1">Observações</span>
+                    <p className="text-gray-700 text-sm whitespace-pre-wrap">{form.observacoes_adicionais}</p>
+                  </div>
+                )}
+              </div>
+              <div className="mt-2 pt-3 border-t flex items-center gap-2 text-xs text-gray-500">
+                <span>Status:</span>
+                <StatusBadge status="PRE_CADASTRO" size="sm" />
+              </div>
+            </div>
+          )}
+
+          {/* ── Navegação entre etapas ───────────────────────────── */}
+          <div className="flex items-center justify-between mt-4">
+            <button
+              type="button"
+              onClick={() => etapa > 1 ? setEtapa(e => e - 1) : router.back()}
+              className="px-4 py-2.5 text-sm border border-gray-300 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors font-medium"
+            >
+              ← {etapa > 1 ? 'Voltar' : 'Cancelar'}
+            </button>
+
+            {etapa < 3 ? (
+              <button
+                type="button"
+                onClick={avancar}
+                disabled={etapa === 2 && !instSel}
+                className="px-6 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                Próximo →
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={salvando}
+                className="px-6 py-2.5 bg-green-600 text-white text-sm font-bold rounded-xl hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
+              >
+                {salvando ? 'Cadastrando…' : '✅ Confirmar Pré-Cadastro'}
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
     </RecepcaoLayout>
   );
 }

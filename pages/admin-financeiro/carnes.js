@@ -159,28 +159,38 @@ export default function CarnesPage() {
   };
 
   const StatusBadge = ({ status }) => {
-    const cores = {
-      'ativo': 'bg-green-100 text-green-800',
-      'cancelado': 'bg-red-100 text-red-800',
-      'encerrado': 'bg-gray-100 text-gray-800'
+    const cfg = {
+      ativo:     { cls: 'bg-green-100 text-green-800 border border-green-200',  dot: 'bg-green-500',  label: 'Ativo' },
+      cancelado: { cls: 'bg-red-100 text-red-700 border border-red-200',         dot: 'bg-red-500',    label: 'Cancelado' },
+      encerrado: { cls: 'bg-gray-100 text-gray-700 border border-gray-200',      dot: 'bg-gray-400',   label: 'Encerrado' },
+      pago:      { cls: 'bg-blue-100 text-blue-800 border border-blue-200',      dot: 'bg-blue-500',   label: 'Pago' },
+      parcial:   { cls: 'bg-yellow-100 text-yellow-800 border border-yellow-200', dot: 'bg-yellow-500', label: 'Parcial' },
     };
+    const c = cfg[status] || { cls: 'bg-gray-100 text-gray-600 border border-gray-200', dot: 'bg-gray-400', label: status };
     return (
-      <span className={`px-2 py-1 rounded text-xs font-semibold ${cores[status] || 'bg-gray-100 text-gray-800'}`}>
-        {status}
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${c.cls}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${c.dot} flex-shrink-0`} />
+        {c.label}
       </span>
     );
   };
 
-  const StatusParcelaBadge = ({ status }) => {
-    const cores = {
-      'pendente': 'bg-amber-100 text-amber-800',
-      'pago': 'bg-green-100 text-green-800',
-      'vencido': 'bg-red-100 text-red-800',
-      'cancelado': 'bg-gray-100 text-gray-800'
+  const today = new Date().toISOString().slice(0, 10);
+
+  const StatusParcelaBadge = ({ status, dataVencimento }) => {
+    const venceHoje = status === 'pendente' && dataVencimento && dataVencimento.slice(0, 10) === today;
+    const cfg = {
+      pago:      { cls: 'bg-green-100 text-green-800 border border-green-200',   label: 'Pago' },
+      pendente:  venceHoje
+               ? { cls: 'bg-yellow-100 text-yellow-800 border border-yellow-300', label: 'Vence hoje' }
+               : { cls: 'bg-blue-50 text-blue-700 border border-blue-200',        label: 'Pendente' },
+      vencido:   { cls: 'bg-red-100 text-red-700 border border-red-200',          label: 'Vencido' },
+      cancelado: { cls: 'bg-gray-100 text-gray-500 border border-gray-200',       label: 'Cancelado' },
     };
+    const c = cfg[status] || { cls: 'bg-gray-100 text-gray-600 border border-gray-200', label: status };
     return (
-      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${cores[status] || 'bg-gray-100 text-gray-800'}`}>
-        {status}
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${c.cls}`}>
+        {c.label}
       </span>
     );
   };
@@ -220,8 +230,18 @@ export default function CarnesPage() {
   if (loading) {
     return (
       <AdminFinanceiroLayout>
-        <div className="flex items-center justify-center h-96">
-          <p className="text-lg text-gray-600">Carregando carnês...</p>
+        <div className="space-y-3 p-4">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="border border-gray-200 rounded-2xl p-5 animate-pulse">
+              <div className="flex items-center gap-4">
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-1/3" />
+                  <div className="h-3 bg-gray-100 rounded w-1/4" />
+                </div>
+                <div className="h-6 bg-gray-200 rounded-full w-16" />
+              </div>
+            </div>
+          ))}
         </div>
       </AdminFinanceiroLayout>
     );
@@ -233,51 +253,54 @@ export default function CarnesPage() {
         {/* HEADER */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Carnês de Pagamento</h2>
-            <p className="text-gray-600">Gestão de múltiplas parcelas por aluno</p>
+            <h2 className="text-xl font-bold text-gray-900">Carnês de Pagamento</h2>
+            <p className="text-sm text-gray-500 mt-0.5">Gestão de múltiplas parcelas por aluno</p>
           </div>
           <Link
             href="/admin-financeiro/alunos"
-            className="px-6 py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-semibold transition"
+            className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-semibold transition text-sm shadow-sm"
           >
             ➕ Novo Carnê
           </Link>
         </div>
 
         {/* RESUMO */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-700 font-semibold">Total de Carnês</p>
-            <p className="text-3xl font-bold text-blue-900 mt-1">{resumo.total}</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-white border border-l-4 border-l-blue-500 rounded-2xl shadow-sm p-4">
+            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Total de Carnês</p>
+            <p className="text-3xl font-bold text-gray-800 mt-1">{resumo.total}</p>
           </div>
-          <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
-            <p className="text-sm text-green-700 font-semibold">Ativos</p>
-            <p className="text-3xl font-bold text-green-900 mt-1">{resumo.ativas}</p>
+          <div className="bg-white border border-l-4 border-l-green-500 rounded-2xl shadow-sm p-4">
+            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Ativos</p>
+            <p className="text-3xl font-bold text-gray-800 mt-1">{resumo.ativas}</p>
           </div>
-          <div className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-4">
-            <p className="text-sm text-orange-700 font-semibold">Valor Total</p>
-            <p className="text-2xl font-bold text-orange-900 mt-1">{formataValor(resumo.valor_total)}</p>
+          <div className="bg-white border border-l-4 border-l-teal-500 rounded-2xl shadow-sm p-4">
+            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Valor Total</p>
+            <p className="text-xl font-bold text-gray-800 mt-1">{formataValor(resumo.valor_total)}</p>
           </div>
-          <div className="bg-gradient-to-br from-red-50 to-pink-50 border border-red-200 rounded-lg p-4">
-            <p className="text-sm text-red-700 font-semibold">Cancelados</p>
-            <p className="text-3xl font-bold text-red-900 mt-1">{resumo.canceladas}</p>
+          <div className="bg-white border border-l-4 border-l-red-500 rounded-2xl shadow-sm p-4">
+            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Cancelados</p>
+            <p className="text-3xl font-bold text-gray-800 mt-1">{resumo.canceladas}</p>
           </div>
         </div>
 
         {/* FILTROS */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <input
-              type="text"
-              placeholder="🔍 Nome ou CPF do aluno..."
-              value={filtroAluno}
-              onChange={(e) => setFiltroAluno(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-cyan-500"
-            />
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+              <input
+                type="text"
+                placeholder="Nome ou CPF do aluno..."
+                value={filtroAluno}
+                onChange={(e) => setFiltroAluno(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+              />
+            </div>
             <select
               value={filtroStatus}
               onChange={(e) => setFiltroStatus(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-cyan-500"
+              className="px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
             >
               <option value="">Todos os Status</option>
               <option value="ativo">Ativo</option>
@@ -286,69 +309,100 @@ export default function CarnesPage() {
             </select>
             <button
               onClick={carregarCarnes}
-              className="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold transition"
+              className="px-4 py-2.5 bg-teal-50 border border-teal-200 text-teal-700 rounded-xl font-semibold text-sm hover:bg-teal-100 transition"
             >
               🔄 Atualizar
             </button>
           </div>
         </div>
 
-        {/* TABELA */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+        {/* LISTA DE CARNÊS */}
+        <div className="space-y-3">
           {carnesFiltrados.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              <p className="text-lg">Nenhum carnê encontrado</p>
+            <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center text-gray-400">
+              <p className="text-4xl mb-3">📋</p>
+              <p className="font-semibold text-gray-600">Nenhum carnê encontrado</p>
+              <p className="text-sm mt-1">{filtroAluno || filtroStatus ? 'Tente ajustar os filtros.' : 'Crie o primeiro carnê para um aluno.'}</p>
             </div>
           ) : (
-            <div className="space-y-2 p-4">
-              {carnesFiltrados.map((carne) => (
-                <div key={carne.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                  {/* CABEÇALHO DO CARNÊ */}
+            carnesFiltrados.map((carne) => {
+              const parcelasTotal   = carne.parcelas?.length || carne.quantidade_parcelas || 0;
+              const parcelasPagas   = carne.parcelas?.filter(p => p.status === 'pago').length || 0;
+              const parcelasVencidas = carne.parcelas?.filter(p => p.status === 'vencido').length || 0;
+              const parcelasPendentes = parcelasTotal - parcelasPagas - (carne.parcelas?.filter(p => p.status === 'cancelado').length || 0);
+              const progresso = parcelasTotal > 0 ? Math.round((parcelasPagas / parcelasTotal) * 100) : 0;
+
+              return (
+                <div key={carne.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                  {/* ── Cabeçalho clicável */}
                   <button
                     onClick={() => setExpandidoId(expandidoId === carne.id ? null : carne.id)}
-                    className="w-full px-6 py-4 bg-gray-50 hover:bg-gray-100 transition text-left flex items-center justify-between"
+                    className="w-full px-5 py-4 hover:bg-gray-50 transition text-left"
                   >
-                    <div className="flex-1">
-                      <p className="font-bold text-gray-900">{carne.aluno_nome}</p>
-                      <p className="text-sm text-gray-600">{carne.descricao}</p>
-                    </div>
                     <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="font-semibold text-gray-900">{formataValor(carne.valor_total)}</p>
-                        <p className="text-xs text-gray-600">{carne.quantidade_parcelas}x</p>
+                      {/* Avatar */}
+                      <div className="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center text-teal-700 font-bold text-sm flex-shrink-0">
+                        {(carne.aluno_nome || '?')[0].toUpperCase()}
                       </div>
-                      <StatusBadge status={carne.status} />
-                      <span className="text-xl text-gray-400">
-                        {expandidoId === carne.id ? '▼' : '▶'}
-                      </span>
+
+                      {/* Info principal */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-bold text-gray-900 text-sm">{carne.aluno_nome}</p>
+                          <StatusBadge status={carne.status} />
+                          {parcelasVencidas > 0 && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 border border-red-200 rounded-full text-xs font-semibold">
+                              ⚠️ {parcelasVencidas} vencida{parcelasVencidas > 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                          {carne.aluno_cpf && <span>CPF {carne.aluno_cpf}</span>}
+                          {carne.descricao && <span className="truncate max-w-[200px]">{carne.descricao}</span>}
+                          {carne.referencia && <span>📅 {carne.referencia}</span>}
+                        </div>
+                      </div>
+
+                      {/* Métricas de parcelas */}
+                      <div className="hidden sm:flex flex-col items-end gap-1 flex-shrink-0">
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="px-1.5 py-0.5 bg-green-100 text-green-700 rounded font-medium">{parcelasPagas} pagas</span>
+                          <span className="text-gray-300">/</span>
+                          <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded font-medium">{parcelasPendentes > 0 ? parcelasPendentes + ' pend.' : ''}</span>
+                          <span className="text-gray-500 font-semibold">{parcelasTotal}x</span>
+                        </div>
+                        <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${progresso === 100 ? 'bg-green-500' : 'bg-teal-500'}`}
+                            style={{ width: `${progresso}%` }}
+                          />
+                        </div>
+                        <p className="font-bold text-gray-800 text-sm">{formataValor(carne.valor_total)}</p>
+                      </div>
+
+                      <span className={`text-gray-400 transition-transform ${expandidoId === carne.id ? 'rotate-90' : ''}`}>›</span>
                     </div>
                   </button>
 
-                  {/* DETALHES EXPANDIDOS */}
+                  {/* ── Detalhes expandidos */}
                   {expandidoId === carne.id && (
-                    <div className="px-6 py-4 bg-white border-t border-gray-200 space-y-4">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div className="px-5 py-4 bg-gray-50 border-t border-gray-200 space-y-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                         <div>
-                          <p className="text-gray-600">CPF</p>
-                          <p className="font-semibold text-gray-900">{carne.aluno_cpf}</p>
+                          <p className="text-xs text-gray-500 font-medium">CPF</p>
+                          <p className="font-semibold text-gray-900">{carne.aluno_cpf || '—'}</p>
                         </div>
                         <div>
-                          <p className="text-gray-600">Descrição</p>
-                          <p className="font-semibold text-gray-900">{carne.descricao || '-'}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-600">Período</p>
+                          <p className="text-xs text-gray-500 font-medium">Período</p>
                           <p className="font-semibold text-gray-900">{carne.referencia || 'Período Único'}</p>
                         </div>
                         <div>
-                          <p className="text-gray-600">Data Criação</p>
-                          <p className="font-semibold text-gray-900">{formataData(carne.created_at)}</p>
+                          <p className="text-xs text-gray-500 font-medium">Valor/Parcela</p>
+                          <p className="font-semibold text-gray-900">{formataValor((carne.valor_total || 0) / (carne.quantidade_parcelas || 1))}</p>
                         </div>
                         <div>
-                          <p className="text-gray-600">Valor/Parcela</p>
-                          <p className="font-semibold text-gray-900">
-                            {formataValor(carne.valor_total / carne.quantidade_parcelas)}
-                          </p>
+                          <p className="text-xs text-gray-500 font-medium">Criado em</p>
+                          <p className="font-semibold text-gray-900">{formataData(carne.created_at)}</p>
                         </div>
                       </div>
 
@@ -404,7 +458,7 @@ export default function CarnesPage() {
                                       <td className="px-2 py-2 text-gray-900 font-semibold">{parcela.numero_parcela}</td>
                                       <td className="px-2 py-2 text-gray-600">{formataData(parcela.data_vencimento)}</td>
                                       <td className="px-2 py-2 text-gray-900 font-semibold text-right">{formataValor(parcela.valor)}</td>
-                                      <td className="px-2 py-2"><StatusParcelaBadge status={parcela.status} /></td>
+                                      <td className="px-2 py-2.5"><StatusParcelaBadge status={parcela.status} dataVencimento={parcela.data_vencimento} /></td>
                                       <td className="px-2 py-2 text-center">
                                         <div className="flex items-center justify-center gap-1">
                                           {parcela.status === 'pago' && (
@@ -440,18 +494,12 @@ export default function CarnesPage() {
                         </div>
                       )}
 
-                      {/* BOTÕES */}
+                      {/* BOTÕES DE AÇÃO DO CARNÊ */}
                       <div className="flex gap-2 pt-4 border-t border-gray-200">
-                        <Link
-                          href={`/admin-financeiro/carne/${carne.id}`}
-                          className="flex-1 px-3 py-2 bg-cyan-100 text-cyan-700 rounded hover:bg-cyan-200 font-semibold text-center transition text-sm"
-                        >
-                          Detalhes
-                        </Link>
                         <button
                           onClick={() => handleGerarBoletos(carne)}
                           disabled={gerandoId === carne.id}
-                          className="flex-1 px-3 py-2 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 font-semibold transition text-sm disabled:opacity-50"
+                          className="flex-1 px-3 py-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl hover:bg-blue-100 font-semibold transition text-sm disabled:opacity-50"
                         >
                           {gerandoId === carne.id
                             ? '⏳ Aguarde...'
@@ -461,8 +509,8 @@ export default function CarnesPage() {
                     </div>
                   )}
                 </div>
-              ))}
-            </div>
+              );
+            })
           )}
         </div>
       </div>
@@ -482,6 +530,7 @@ export default function CarnesPage() {
         <ModalBaixaManual
           parcela={modalBaixaManual.parcela}
           numeroParcela={modalBaixaManual.parcela?.numero_parcela}
+          alunoNome={modalBaixaManual.carne?.aluno_nome}
           onConfirm={handleBaixarManual}
           onClose={() => setModalBaixaManual(null)}
           loading={baixandoParcela}

@@ -332,8 +332,8 @@ export default function EquipeComericalPage() {
           <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">{erro}</div>
         )}
 
-        {/* Tabela de operadores */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        {/* Cards de operadores */}
+        <div>
           {carregando ? (
             <div className="flex items-center justify-center h-40 text-gray-400 text-sm">Carregando...</div>
           ) : operadores.length === 0 ? (
@@ -346,64 +346,79 @@ export default function EquipeComericalPage() {
               </button>
             </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr className="text-left text-gray-500">
-                  <th className="px-6 py-3 font-semibold">Nome</th>
-                  <th className="px-6 py-3 font-semibold">E-mail</th>
-                  <th className="px-6 py-3 font-semibold">WhatsApp</th>
-                  <th className="px-6 py-3 font-semibold text-center">Status</th>
-                  <th className="px-6 py-3 font-semibold text-center">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {operadores.map(op => (
-                  <tr key={op.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-gray-800">{op.nomecompleto}</td>
-                    <td className="px-6 py-4 text-gray-600">{op.email || '—'}</td>
-                    <td className="px-6 py-4 text-gray-600">{op.whatsapp || '—'}</td>
-                    <td className="px-6 py-4 text-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {operadores.map(op => (
+              <div key={op.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow p-5">
+                <div className="flex items-start gap-3">
+                  {/* Avatar */}
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg flex-shrink-0 ${
+                    op.status === 'ativo' ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-400'
+                  }`}>
+                    {(op.nomecompleto || '?')[0].toUpperCase()}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-bold text-gray-800 truncate text-sm">{op.nomecompleto}</p>
                       <StatusBadge status={op.status} />
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-center gap-2">
-                        {/* Editar */}
-                        <button onClick={() => setModalEditar(op)}
-                          title="Editar"
-                          className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg transition">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-                        {/* Ativar / Desativar */}
-                        <button
-                          onClick={() => handleToggleStatus(op)}
-                          disabled={aguardando[op.id]}
-                          title={op.status === 'ativo' ? 'Desativar' : 'Ativar'}
-                          className={`p-1.5 rounded-lg transition disabled:opacity-50 ${
-                            op.status === 'ativo'
-                              ? 'text-orange-600 hover:bg-orange-50'
-                              : 'text-green-600 hover:bg-green-50'
-                          }`}>
-                          {op.status === 'ativo' ? (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                            </svg>
-                          ) : (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          )}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                    <p className="text-xs text-gray-500 truncate mt-0.5">{op.email || '—'}</p>
+                    {op.whatsapp && <p className="text-xs text-gray-400">{op.whatsapp}</p>}
+                  </div>
+
+                  {/* Ações */}
+                  <div className="flex gap-1 flex-shrink-0">
+                    <button onClick={() => setModalEditar(op)}
+                      title="Editar"
+                      className="p-2 text-teal-600 hover:bg-teal-50 rounded-xl transition">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => handleToggleStatus(op)}
+                      disabled={aguardando[op.id]}
+                      title={op.status === 'ativo' ? 'Desativar' : 'Ativar'}
+                      className={`p-2 rounded-xl transition disabled:opacity-50 ${
+                        op.status === 'ativo' ? 'text-orange-600 hover:bg-orange-50' : 'text-green-600 hover:bg-green-50'
+                      }`}>
+                      {op.status === 'ativo' ? (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Stats do operador se disponíveis */}
+                {(op.totalLeads != null || op.matriculados != null) && (
+                  <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-100">
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-gray-800">{op.totalLeads ?? '—'}</p>
+                      <p className="text-xs text-gray-400">Leads</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-green-700">{op.matriculados ?? '—'}</p>
+                      <p className="text-xs text-gray-400">Matrículas</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-teal-700">{op.taxaConversao != null ? `${op.taxaConversao}%` : '—'}</p>
+                      <p className="text-xs text-gray-400">Conversão</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
           )}
         </div>
 

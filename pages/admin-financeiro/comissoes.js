@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import AdminFinanceiroLayout from '@/components/AdminFinanceiro/Layout';
+import DashboardCard from '@/components/recepcao/DashboardCard';
 
 const STATUS_BADGE = {
   PENDENTE_REPASSE: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
@@ -295,31 +296,11 @@ export default function AdminComissoes() {
 
         {/* Cards de resumo */}
         {resumo && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <CardResumo
-              label="Comissões Pendentes"
-              count={resumo.pendentes}
-              valor={resumo.valorPendente}
-              cor="border-yellow-200"
-            />
-            <CardResumo
-              label="Valor Pendente"
-              count="—"
-              valor={resumo.valorPendente}
-              cor="border-yellow-200"
-            />
-            <CardResumo
-              label="Comissões Repassadas"
-              count={resumo.repassadas}
-              valor={resumo.valorRepassado}
-              cor="border-green-200"
-            />
-            <CardResumo
-              label="Valor Repassado"
-              count="—"
-              valor={resumo.valorRepassado}
-              cor="border-green-200"
-            />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <DashboardCard icon="⏳" label="Pend. de Repasse"   valor={resumo.pendentes}              cor="border-yellow-400" bgIcon="bg-yellow-50" loading={carregando} />
+            <DashboardCard icon="💰" label="Valor Pendente"     valor={fmtMoeda(resumo.valorPendente)}  cor="border-yellow-500" bgIcon="bg-yellow-50" loading={carregando} />
+            <DashboardCard icon="✅" label="Repassadas"         valor={resumo.repassadas}             cor="border-green-500"  bgIcon="bg-green-50"  loading={carregando} />
+            <DashboardCard icon="💵" label="Valor Repassado"    valor={fmtMoeda(resumo.valorRepassado)} cor="border-green-600"  bgIcon="bg-green-50"  loading={carregando} />
           </div>
         )}
 

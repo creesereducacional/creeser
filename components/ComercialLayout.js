@@ -151,10 +151,21 @@ export default function ComercialLayout({ children, titulo }) {
 
         {/* Footer da sidebar */}
         <div className="p-4 border-t border-teal-600">
-          {sidebarOpen && (
-            <div className="mb-2">
-              <div className="text-xs text-teal-200 truncate" title={user.nome}>{user.nome}</div>
-              <div className="text-xs text-teal-400 mt-0.5">{perfilLabel}</div>
+          {sidebarOpen ? (
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                {(user.nome || '?')[0].toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-teal-100 truncate">{(user.nome || '').split(' ')[0]}</div>
+                <div className="text-xs text-teal-400">{perfilLabel}</div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-center mb-2">
+              <div className="w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold text-sm">
+                {(user.nome || '?')[0].toUpperCase()}
+              </div>
             </div>
           )}
           <button
