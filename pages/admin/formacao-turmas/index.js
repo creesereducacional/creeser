@@ -117,11 +117,101 @@ function ModalConfigurar({ turma, onClose, onSave }) {
   );
 }
 
+function ModalAbrirTurma({ turma, alunos, carregandoAlunos, abrindo, onClose, onConfirmar }) {
+  if (!turma) return null;
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        <div className="p-5 border-b flex-shrink-0">
+          <h2 className="font-bold text-gray-800 text-base">Abrir Turma — Confirmacao</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Esta acao ativara todos os alunos aguardando formacao desta turma.</p>
+        </div>
+        <div className="p-5 space-y-4 overflow-y-auto">
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-xs text-gray-400 mb-0.5">Turma</p>
+              <p className="font-semibold text-gray-800">{turma.nome}</p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-xs text-gray-400 mb-0.5">Curso</p>
+              <p className="font-semibold text-gray-800">{turma.cursoNome || '—'}</p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-xs text-gray-400 mb-0.5">Unidade</p>
+              <p className="font-semibold text-gray-800">{turma.unidadeNome || '—'}</p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-xs text-gray-400 mb-0.5">Data Prevista</p>
+              <p className="font-semibold text-gray-800">
+                {turma.data_prevista_inicio
+                  ? new Date(turma.data_prevista_inicio + 'T12:00:00').toLocaleDateString('pt-BR')
+                  : '—'}
+              </p>
+            </div>
+            <div className="bg-green-50 border border-green-200 rounded-xl p-3">
+              <p className="text-xs text-green-600 mb-0.5">Alunos Atuais</p>
+              <p className="font-bold text-green-700 text-lg">{turma.qtd_atual}</p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-xs text-gray-400 mb-0.5">Meta Minima</p>
+              <p className="font-semibold text-gray-700 text-lg">{turma.qtd_minima_alunos}</p>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Alunos que serao ativados ({carregandoAlunos ? '...' : alunos.length})
+            </p>
+            {carregandoAlunos ? (
+              <div className="text-center py-4 text-gray-400 text-sm">Carregando...</div>
+            ) : alunos.length === 0 ? (
+              <div className="text-center py-4 text-gray-400 text-sm">Nenhum aluno encontrado.</div>
+            ) : (
+              <div className="space-y-1 max-h-44 overflow-y-auto">
+                {alunos.map(a => (
+                  <div key={a.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 text-sm">
+                    <span className="font-medium text-gray-800">{a.nome}</span>
+                    <span className="text-gray-400 text-xs">{a.cpf || '—'}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+            Esta acao ira ativar <strong>{alunos.length} aluno(s)</strong> e marcar a turma como <strong>ATIVA</strong>. Nao e possivel desfazer.
+          </div>
+        </div>
+
+        <div className="px-5 pb-5 flex gap-3 flex-shrink-0 border-t pt-4">
+          <button onClick={onClose} disabled={abrindo}
+            className="flex-1 border border-gray-300 text-gray-600 rounded-xl py-2.5 text-sm font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50">
+            Cancelar
+          </button>
+          <button
+            onClick={onConfirmar}
+            disabled={abrindo || carregandoAlunos || alunos.length === 0}
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-xl py-2.5 text-sm font-semibold transition-colors disabled:opacity-50"
+          >
+            {abrindo ? 'Abrindo...' : `Confirmar — Ativar ${alunos.length} Aluno(s)`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function FormacaoTurmas() {
   const [lista, setLista]               = useState([]);
   const [carregando, setCarregando]     = useState(true);
   const [erro, setErro]                 = useState(null);
   const [turmaConfig, setTurmaConfig]   = useState(null);
+  const [user, setUser]                 = useState(null);
+  const [turmaAbrir, setTurmaAbrir]     = useState(null);
+  const [alunosModal, setAlunosModal]   = useState([]);
+  const [carregandoAlunos, setCarregandoAlunos] = useState(false);
+  const [abrindo, setAbrindo]           = useState(false);
+  const [msgSucesso, setMsgSucesso]     = useState(null);
 
   // Filtros
   const [filtroInstituicao, setFiltroInstituicao] = useState('');
@@ -137,6 +227,13 @@ export default function FormacaoTurmas() {
       .then(data => setLista(Array.isArray(data) ? data : []))
       .catch(e => setErro(String(e)))
       .finally(() => setCarregando(false));
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.usuario) setUser(data.usuario); })
+      .catch(() => {});
   }, []);
 
   // Opcoes unicas para filtros
@@ -164,6 +261,9 @@ export default function FormacaoTurmas() {
   const encerradas   = lista.filter(t => t.status_formacao === 'ENCERRADA').length;
   const alunosTotal  = lista.reduce((acc, t) => acc + (t.qtd_atual || 0), 0);
 
+  const podeAbrirTurma = ['grupo_admin', 'instituicao_admin', 'coordenador']
+    .includes(user?.perfil || user?.tipo || '');
+
   const cards = [
     { label: 'Turmas em Formacao',         valor: emFormacao,  icon: '🔶', cor: 'border-yellow-500' },
     { label: 'Alunos Aguardando Formacao', valor: alunosTotal, icon: '👥', cor: 'border-blue-500'   },
@@ -185,6 +285,42 @@ export default function FormacaoTurmas() {
       : t
     ));
     setTurmaConfig(null);
+  }
+
+  async function handleVerAlunos(turma) {
+    setTurmaAbrir(turma);
+    setAlunosModal([]);
+    setCarregandoAlunos(true);
+    try {
+      const res = await fetch(`/api/formacao-turmas/${turma.id}?incluirAlunos=1`, { credentials: 'include' });
+      const data = await res.json();
+      setAlunosModal(Array.isArray(data.alunos) ? data.alunos : []);
+    } catch (_) {}
+    finally { setCarregandoAlunos(false); }
+  }
+
+  async function handleConfirmarAbertura() {
+    if (!turmaAbrir) return;
+    setAbrindo(true);
+    try {
+      const res = await fetch(`/api/formacao-turmas/${turmaAbrir.id}/abrir`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Erro ao abrir turma.'); return; }
+      setMsgSucesso(data.mensagem || 'Turma aberta com sucesso!');
+      setLista(prev => prev.map(t =>
+        t.id === turmaAbrir.id ? { ...t, status_formacao: 'ATIVA' } : t
+      ));
+      setTurmaAbrir(null);
+      setTimeout(() => setMsgSucesso(null), 8000);
+    } catch {
+      alert('Erro de conexao.');
+    } finally {
+      setAbrindo(false);
+    }
   }
 
   return (
@@ -253,6 +389,13 @@ export default function FormacaoTurmas() {
           <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">{erro}</div>
         )}
 
+        {/* Sucesso */}
+        {msgSucesso && (
+          <div className="bg-green-50 border border-green-300 rounded-xl px-4 py-3 text-sm text-green-800 font-medium flex items-center gap-2">
+            <span>✅</span> {msgSucesso}
+          </div>
+        )}
+
         {/* Tabela */}
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b flex items-center justify-between">
@@ -308,12 +451,22 @@ export default function FormacaoTurmas() {
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <button
-                            onClick={() => setTurmaConfig(t)}
-                            className="px-2.5 py-1 rounded border border-blue-400 text-blue-700 hover:bg-blue-50 text-xs font-medium transition-colors"
-                          >
-                            Configurar
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => setTurmaConfig(t)}
+                              className="px-2.5 py-1 rounded border border-blue-400 text-blue-700 hover:bg-blue-50 text-xs font-medium transition-colors"
+                            >
+                              Configurar
+                            </button>
+                            {t.status_formacao === 'PRONTA_PARA_ABRIR' && podeAbrirTurma && (
+                              <button
+                                onClick={() => handleVerAlunos(t)}
+                                className="px-2.5 py-1 rounded border border-green-500 text-green-700 hover:bg-green-50 text-xs font-semibold transition-colors"
+                              >
+                                Abrir Turma
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -334,6 +487,18 @@ export default function FormacaoTurmas() {
           ))}
         </div>
       </div>
+
+      {/* Modal abrir turma */}
+      {turmaAbrir && (
+        <ModalAbrirTurma
+          turma={turmaAbrir}
+          alunos={alunosModal}
+          carregandoAlunos={carregandoAlunos}
+          abrindo={abrindo}
+          onClose={() => setTurmaAbrir(null)}
+          onConfirmar={handleConfirmarAbertura}
+        />
+      )}
 
       {/* Modal de configuracao */}
       {turmaConfig && (
