@@ -16,6 +16,7 @@ const MENU_ITEMS = [
   { id: 'alunos', href: '/admin/alunos', icon: '📚', label: 'Alunos', secao: 'Pedagógico', perfis: ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria', 'financeiro'] },
   { id: 'responsaveis', href: '/admin/responsaveis', icon: '👨‍👩‍👦', label: 'Responsáveis', secao: 'Pedagógico', perfis: ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria', 'financeiro'] },
   { id: 'turmas', href: '/admin/turmas', icon: '🏫', label: 'Turmas', secao: 'Pedagógico', perfis: ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria'] },
+  { id: 'formacao-turmas', href: '/admin/formacao-turmas', icon: '🔶', label: 'Formação de Turmas', secao: 'Pedagógico', perfis: ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria'] },
   { id: 'cursos', href: '/admin/cursos', icon: '📖', label: 'Cursos', secao: 'Pedagógico', perfis: ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria'] },
   { id: 'disciplinas', href: '/admin/disciplinas', icon: '📝', label: 'Disciplinas', secao: 'Pedagógico', perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'] },
   { id: 'grades', href: '/admin/disciplinas/grades', icon: '🗂️', label: 'Grades Curriculares', secao: 'Pedagógico', perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'] },
