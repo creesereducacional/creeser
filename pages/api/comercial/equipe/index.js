@@ -61,7 +61,14 @@ export default async function handler(req, res) {
     }
 
     const { data, error } = await query;
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      // Nunca expor erro SQL bruto ao cliente
+      console.error('[equipe/GET] Supabase error:', error.message);
+      if (error.message?.includes('comercial_master_id')) {
+        return res.status(500).json({ error: 'Configuração pendente: execute a migration do módulo comercial no banco de dados.' });
+      }
+      return res.status(500).json({ error: 'Erro interno ao carregar equipe.' });
+    }
     return res.status(200).json(data || []);
   }
 

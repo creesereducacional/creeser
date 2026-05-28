@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import ComercialLayout from '@/components/ComercialLayout';
+import PageHeader from '@/components/ui/PageHeader';
 
 const ORIGENS = ['', 'Instagram', 'Facebook', 'WhatsApp', 'Indicação', 'Site', 'Evento', 'Outros'];
 
@@ -116,12 +117,15 @@ export default function NovoLead() {
   return (
     <ComercialLayout titulo="Novo Lead">
       <div className="max-w-xl w-full mx-auto">
-        <div className="flex items-center gap-3 mb-6">
-          <Link href="/comercial/leads">
-            <span className="text-gray-400 hover:text-gray-600 cursor-pointer">← Voltar</span>
-          </Link>
-          <h2 className="text-xl font-bold text-gray-800">Novo Lead</h2>
-        </div>
+        <PageHeader
+          icon="🎯"
+          title="Novo Lead"
+          breadcrumbs={[
+            { label: 'Dashboard', href: '/comercial/dashboard' },
+            { label: 'Meus Leads', href: '/comercial/leads' },
+            { label: 'Novo Lead' }
+          ]}
+        />
 
         {erro && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700 mb-4">{erro}</div>

@@ -79,33 +79,23 @@ export default function RecepcaoDashboard() {
             </Link>
           }
         />
-        {/* ── CTA + Busca ─────────────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-          <Link
-            href="/recepcao/pre-cadastros/novo"
-            className="flex items-center justify-center gap-2.5 px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-base shadow-md hover:shadow-lg transition-all duration-150 flex-shrink-0"
+        {/* ── Busca ─────────────────────────────────────────────── */}
+        <form onSubmit={handleBusca} className="flex gap-2">
+          <input
+            ref={buscaRef}
+            type="text"
+            placeholder="Buscar por nome, CPF ou telefone…"
+            value={busca}
+            onChange={e => setBusca(e.target.value)}
+            className="flex-1 px-4 py-3 border border-gray-300 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white shadow-sm"
+          />
+          <button
+            type="submit"
+            className="px-4 py-3 bg-white border border-gray-300 rounded-2xl text-sm text-gray-600 hover:bg-gray-50 shadow-sm transition-colors font-medium"
           >
-            <span className="text-xl">➕</span>
-            Novo Pré-Cadastro
-          </Link>
-
-          <form onSubmit={handleBusca} className="flex-1 flex gap-2">
-            <input
-              ref={buscaRef}
-              type="text"
-              placeholder="Buscar por nome, CPF ou telefone…"
-              value={busca}
-              onChange={e => setBusca(e.target.value)}
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white shadow-sm"
-            />
-            <button
-              type="submit"
-              className="px-4 py-3 bg-white border border-gray-300 rounded-2xl text-sm text-gray-600 hover:bg-gray-50 shadow-sm transition-colors font-medium"
-            >
-              🔍
-            </button>
-          </form>
-        </div>
+            🔍
+          </button>
+        </form>
 
         {/* ── Cards de métricas ───────────────────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">

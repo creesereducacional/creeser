@@ -99,12 +99,6 @@ export default function PreCadastrosIndex() {
               </button>
             )}
           </div>
-          <Link
-            href="/recepcao/pre-cadastros/novo"
-            className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-2xl hover:bg-blue-700 transition-colors shadow-sm"
-          >
-            ➕ Novo Pré-Cadastro
-          </Link>
         </div>
 
         {/* ── Filtros rápidos (tabs) ─────────────────────────────── */}

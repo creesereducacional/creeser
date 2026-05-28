@@ -52,7 +52,7 @@ export default function AdminFinanceiroLayout({ children }) {
             </Link>
           </div>
 
-          <nav className="flex flex-wrap gap-2">
+          <nav className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
             {MENU_ITEMS.map((item) => {
               if (!item.habilitado) {
                 return (

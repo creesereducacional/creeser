@@ -178,103 +178,159 @@ export default function MeusLeads() {
         </select>
       </div>
 
-      {/* Tabela */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        {carregando ? (
+      {/* Lista de leads */}
+      {carregando ? (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <SkeletonTable rows={6} cols={5} />
-        ) : leadsFiltrados.length === 0 ? (
-          <EmptyState
-            icon="🎯"
-            title={leads.length === 0 ? 'Nenhum lead cadastrado' : 'Nenhum resultado encontrado'}
-            description={leads.length === 0 ? 'Adicione seu primeiro lead para começar a trabalhar o funil.' : 'Ajuste os filtros para ver mais leads.'}
-            action={leads.length === 0 ? { label: '+ Novo Lead', href: '/comercial/leads/novo', variant: 'primary' } : undefined}
-          />
-        ) : (
-          <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[700px]">
-            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-              <tr>
-                <th className="px-4 py-3 text-left">Lead</th>
-                <th className="px-4 py-3 text-left">Contato</th>
-                <th className="px-4 py-3 text-left">Curso</th>
-                <th className="px-4 py-3 text-left">Status</th>
-                <th className="px-4 py-3 text-left">Data</th>
-                {leadsFiltrados.some(l => l.captado_por) && <th className="px-4 py-3 text-left">Operador</th>}
-                <th className="px-4 py-3 text-left">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {leadsFiltrados.map(lead => (
-                <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold text-xs flex-shrink-0">
-                        {(lead.nome || '?')[0].toUpperCase()}
-                      </div>
-                      <span className="font-medium text-gray-800">{lead.nome}</span>
+        </div>
+      ) : leadsFiltrados.length === 0 ? (
+        <EmptyState
+          icon="🎯"
+          title={leads.length === 0 ? 'Nenhum lead cadastrado' : 'Nenhum resultado encontrado'}
+          description={leads.length === 0 ? 'Adicione seu primeiro lead para começar a trabalhar o funil.' : 'Ajuste os filtros para ver mais leads.'}
+          action={leads.length === 0 ? { label: '+ Novo Lead', href: '/comercial/leads/novo', variant: 'primary' } : undefined}
+        />
+      ) : (
+        <>
+          {/* Cards — mobile/tablet (<lg) */}
+          <div className="lg:hidden space-y-3">
+            {leadsFiltrados.map(lead => (
+              <div key={lead.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold text-sm flex-shrink-0">
+                      {(lead.nome || '?')[0].toUpperCase()}
                     </div>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500">
-                    {lead.whatsapp || lead.telefone || lead.email || '—'}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 max-w-[140px] truncate">{lead.curso_interesse || '—'}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${
-                      {
-                        novo:          'bg-blue-50 text-blue-700 border-blue-200',
-                        contatado:     'bg-yellow-50 text-yellow-700 border-yellow-200',
-                        interessado:   'bg-orange-50 text-orange-700 border-orange-200',
-                        pre_matricula: 'bg-purple-50 text-purple-700 border-purple-200',
-                        matriculado:   'bg-green-50 text-green-700 border-green-200',
-                        desistente:    'bg-red-50 text-red-600 border-red-200',
-                        perdido:       'bg-red-50 text-red-600 border-red-200',
-                      }[lead.status] || 'bg-gray-50 text-gray-600 border-gray-200'
-                    }`}>
-                      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
-                      {LABELS_STATUS[lead.status] || lead.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-gray-400 text-xs">
-                    {lead.created_at ? new Date(lead.created_at).toLocaleDateString('pt-BR') : '—'}
-                  </td>
-                  {leadsFiltrados.some(l => l.captado_por) && (
-                    <td className="px-4 py-3 text-xs text-gray-500">
-                      {lead.captado_por?.nomecompleto || '—'}
-                    </td>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-800 truncate" title={lead.nome}>{lead.nome}</p>
+                      <p className="text-xs text-gray-400 truncate">{lead.whatsapp || lead.telefone || lead.email || '—'}</p>
+                    </div>
+                  </div>
+                  <span className={`flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${
+                    {
+                      novo:          'bg-blue-50 text-blue-700 border-blue-200',
+                      contatado:     'bg-yellow-50 text-yellow-700 border-yellow-200',
+                      interessado:   'bg-orange-50 text-orange-700 border-orange-200',
+                      pre_matricula: 'bg-purple-50 text-purple-700 border-purple-200',
+                      matriculado:   'bg-green-50 text-green-700 border-green-200',
+                      desistente:    'bg-red-50 text-red-600 border-red-200',
+                    }[lead.status] || 'bg-gray-50 text-gray-600 border-gray-200'
+                  }`}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
+                    {LABELS_STATUS[lead.status] || lead.status}
+                  </span>
+                </div>
+                {lead.curso_interesse && (
+                  <p className="text-xs text-gray-500 mb-3">📚 {lead.curso_interesse}</p>
+                )}
+                <div className="flex items-center gap-2 border-t border-gray-100 pt-3">
+                  <Link href={`/comercial/leads/${lead.id}`}
+                    className="flex-1 text-center px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-lg text-xs font-semibold transition-colors">
+                    👁 Detalhes
+                  </Link>
+                  <button onClick={() => abrirModalStatus(lead)}
+                    className="flex-1 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold transition-colors">
+                    ✏️ Status
+                  </button>
+                  <button onClick={() => abrirWhatsApp(lead)}
+                    className="flex-1 px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg text-xs font-semibold transition-colors">
+                    💬 WhatsApp
+                  </button>
+                  {lead.status !== 'desistente' && (
+                    <button onClick={() => setModalDesativar(lead)}
+                      className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg text-xs font-semibold transition-colors">
+                      ✕
+                    </button>
                   )}
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      {/* Detalhes */}
-                      <Link href={`/comercial/leads/${lead.id}`}
-                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200 transition" title="Detalhes">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                      </Link>
-                      {/* Status */}
-                      <button onClick={() => abrirModalStatus(lead)}
-                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition" title="Alterar Status">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                      </button>
-                      {/* WhatsApp */}
-                      <button onClick={() => abrirWhatsApp(lead)}
-                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 transition" title="Enviar WhatsApp">
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                      </button>
-                      {/* Desativar */}
-                      {lead.status !== 'desistente' && (
-                        <button onClick={() => setModalDesativar(lead)}
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 border border-red-200 transition" title="Desativar">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                </div>
+              </div>
+            ))}
           </div>
-        )}
-      </div>
+
+          {/* Tabela — desktop (>=lg) */}
+          <div className="hidden lg:block bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[700px]">
+                <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Lead</th>
+                    <th className="px-4 py-3 text-left">Contato</th>
+                    <th className="px-4 py-3 text-left">Curso</th>
+                    <th className="px-4 py-3 text-left">Status</th>
+                    <th className="px-4 py-3 text-left">Data</th>
+                    {leadsFiltrados.some(l => l.captado_por) && <th className="px-4 py-3 text-left">Operador</th>}
+                    <th className="px-4 py-3 text-left">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {leadsFiltrados.map(lead => (
+                    <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold text-xs flex-shrink-0">
+                            {(lead.nome || '?')[0].toUpperCase()}
+                          </div>
+                          <span className="font-medium text-gray-800" title={lead.nome}>{lead.nome}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-gray-500">
+                        {lead.whatsapp || lead.telefone || lead.email || '—'}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 max-w-[140px] truncate" title={lead.curso_interesse}>{lead.curso_interesse || '—'}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${
+                          {
+                            novo:          'bg-blue-50 text-blue-700 border-blue-200',
+                            contatado:     'bg-yellow-50 text-yellow-700 border-yellow-200',
+                            interessado:   'bg-orange-50 text-orange-700 border-orange-200',
+                            pre_matricula: 'bg-purple-50 text-purple-700 border-purple-200',
+                            matriculado:   'bg-green-50 text-green-700 border-green-200',
+                            desistente:    'bg-red-50 text-red-600 border-red-200',
+                            perdido:       'bg-red-50 text-red-600 border-red-200',
+                          }[lead.status] || 'bg-gray-50 text-gray-600 border-gray-200'
+                        }`}>
+                          <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
+                          {LABELS_STATUS[lead.status] || lead.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-400 text-xs">
+                        {lead.created_at ? new Date(lead.created_at).toLocaleDateString('pt-BR') : '—'}
+                      </td>
+                      {leadsFiltrados.some(l => l.captado_por) && (
+                        <td className="px-4 py-3 text-xs text-gray-500">
+                          {lead.captado_por?.nomecompleto || '—'}
+                        </td>
+                      )}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1">
+                          <Link href={`/comercial/leads/${lead.id}`}
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200 transition" title="Detalhes">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                          </Link>
+                          <button onClick={() => abrirModalStatus(lead)}
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition" title="Alterar Status">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                          </button>
+                          <button onClick={() => abrirWhatsApp(lead)}
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 transition" title="Enviar WhatsApp">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                          </button>
+                          {lead.status !== 'desistente' && (
+                            <button onClick={() => setModalDesativar(lead)}
+                              className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 border border-red-200 transition" title="Desativar">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
 
       <div className="mt-3 text-xs text-gray-400 text-right">
         {leadsFiltrados.length} lead{leadsFiltrados.length !== 1 ? 's' : ''} exibido{leadsFiltrados.length !== 1 ? 's' : ''}

@@ -319,8 +319,14 @@ export default function EquipeComericalPage() {
         )}
 
         {erro && (
-          <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">{erro}</div>
-        )}
+            <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 flex items-start gap-2">
+              <span className="text-amber-500 text-base">⚠️</span>
+              <div>
+                <p className="font-semibold">Não foi possível carregar a equipe</p>
+                <p className="text-xs mt-0.5 text-amber-700">{erro}</p>
+              </div>
+            </div>
+          )}
 
         {/* Cards de operadores */}
         <div>
