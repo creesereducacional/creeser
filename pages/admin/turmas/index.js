@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import DashboardLayout from '../../../components/DashboardLayout';
+import PageHeader from '@/components/ui/PageHeader';
+import EmptyState   from '@/components/ui/EmptyState';
+import { SkeletonTable } from '@/components/ui/LoadingSkeleton';
 
 export default function ListagemTurmas() {
   const [turmas, setTurmas] = useState([]);
@@ -84,12 +87,19 @@ export default function ListagemTurmas() {
     <DashboardLayout>
       <div className="p-4 md:p-6 max-w-7xl mx-auto">
         {/* Cabeçalho */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div className="flex items-center gap-2">
-            <span className="text-3xl">📚</span>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Gerenciar Turmas</h1>
-          </div>
-        </div>
+        <PageHeader
+          icon="📚"
+          title="Gerenciar Turmas"
+          subtitle={`${filtradas.length} turma${filtradas.length !== 1 ? 's' : ''} encontrada${filtradas.length !== 1 ? 's' : ''}`}
+          breadcrumbs={[{ label: 'Admin', href: '/admin/dashboard' }, { label: 'Turmas' }]}
+          actions={
+            <Link href="/admin/turmas/novo">
+              <button className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-xl transition-colors">
+                + Nova Turma
+              </button>
+            </Link>
+          }
+        />
 
         {/* Abas - Listar e Inserir */}
         <div className="mb-6 flex gap-2 border-b border-gray-200">
@@ -170,9 +180,14 @@ export default function ListagemTurmas() {
           </div>
 
           {loading ? (
-            <div className="p-6 text-center text-gray-500">Carregando...</div>
+            <SkeletonTable rows={5} cols={6} />
           ) : filtradas.length === 0 ? (
-            <div className="p-6 text-center text-gray-500">Nenhuma turma encontrada</div>
+            <EmptyState
+              icon="📚"
+              title="Nenhuma turma encontrada"
+              description="Ajuste os filtros ou crie uma nova turma."
+              action={{ label: '+ Nova Turma', href: '/admin/turmas/novo', variant: 'primary' }}
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import StatusBadge from '@/components/recepcao/StatusBadge';
 import DashboardCard from '@/components/recepcao/DashboardCard';
 import EmptyState from '@/components/recepcao/EmptyState';
+import PageHeader from '@/components/ui/PageHeader';
 
 function isHoje(dateStr) {
   if (!dateStr) return false;
@@ -65,7 +66,19 @@ export default function RecepcaoDashboard() {
   return (
     <RecepcaoLayout titulo="Dashboard — Recepção">
       <div className="space-y-6">
-
+        {/* ── Header ────────────────────────────────────────────────── */}
+        <PageHeader
+          icon="📊"
+          title="Dashboard de Recepção"
+          subtitle={`${lista.length} registro${lista.length !== 1 ? 's' : ''} no total`}
+          actions={
+            <Link href="/recepcao/pre-cadastros/novo">
+              <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors">
+                + Novo Pré-Cadastro
+              </button>
+            </Link>
+          }
+        />
         {/* ── CTA + Busca ─────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
           <Link

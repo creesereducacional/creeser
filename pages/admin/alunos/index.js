@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import DashboardLayout from '@/components/DashboardLayout';
 import Link from 'next/link';
+import PageHeader from '@/components/ui/PageHeader';
 
 export default function ListagemAlunos() {
   const router = useRouter();
@@ -255,12 +256,19 @@ export default function ListagemAlunos() {
     <DashboardLayout>
       <div className="max-w-7xl mx-auto">
         {/* Cabeçalho */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div className="flex items-center gap-2">
-            <span className="text-3xl">👨‍🎓</span>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Gerenciar Alunos</h1>
-          </div>
-        </div>
+        <PageHeader
+          icon="👨‍🎓"
+          title="Gerenciar Alunos"
+          subtitle={loading ? 'Carregando...' : `${filteredAlunos.length} aluno${filteredAlunos.length !== 1 ? 's' : ''} encontrado${filteredAlunos.length !== 1 ? 's' : ''}`}
+          breadcrumbs={[{ label: 'Admin', href: '/admin/dashboard' }, { label: 'Alunos' }]}
+          actions={
+            <Link href="/admin/alunos/novo">
+              <button className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-xl transition-colors">
+                + Novo Aluno
+              </button>
+            </Link>
+          }
+        />
 
         {/* Abas - Listar, Inserir e Importação */}
         <div className="mb-6 flex gap-2 border-b border-gray-200">

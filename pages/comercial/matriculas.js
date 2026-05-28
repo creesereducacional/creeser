@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import ComercialLayout from '@/components/ComercialLayout';
+import PageHeader from '@/components/ui/PageHeader';
+import EmptyState   from '@/components/ui/EmptyState';
+import { SkeletonTable } from '@/components/ui/LoadingSkeleton';
 
 const BADGES_MATRICULA = {
   AGUARDANDO_PAGAMENTO: 'bg-yellow-100 text-yellow-700',
@@ -46,12 +49,11 @@ export default function MinhasMatriculas() {
 
   return (
     <ComercialLayout titulo="Minhas Matrículas">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-gray-800">Minhas Matrículas</h2>
-        <span className="text-sm text-gray-500">
-          {filtrados.length} registro{filtrados.length !== 1 ? 's' : ''}
-        </span>
-      </div>
+      <PageHeader
+        icon="🎓"
+        title="Matrículas Comerciais"
+        subtitle={`${filtrados.length} aluno${filtrados.length !== 1 ? 's' : ''} encontrado${filtrados.length !== 1 ? 's' : ''}`}
+      />
 
       {/* Filtros */}
       <div className="flex gap-3 mb-4">
@@ -90,13 +92,13 @@ export default function MinhasMatriculas() {
 
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         {carregando ? (
-          <div className="py-16 text-center text-gray-400">Carregando...</div>
+          <SkeletonTable rows={6} cols={6} />
         ) : filtrados.length === 0 ? (
-          <div className="py-16 text-center text-gray-400">
-            {alunos.length === 0
-              ? 'Nenhuma pré-matrícula captada ainda. Converta um lead para começar.'
-              : 'Nenhum registro encontrado com esse filtro.'}
-          </div>
+          <EmptyState
+            icon="🎓"
+            title={alunos.length === 0 ? 'Nenhuma pré-matrícula captada' : 'Nenhum registro com este filtro'}
+            description={alunos.length === 0 ? 'Converta um lead para começar.' : 'Ajuste os filtros para ver resultados.'}
+          />
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase">

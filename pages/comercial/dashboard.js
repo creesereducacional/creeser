@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import ComercialLayout from '@/components/ComercialLayout';
 import DashboardCard from '@/components/recepcao/DashboardCard';
+import PageHeader from '@/components/ui/PageHeader';
+import { SkeletonCard } from '@/components/ui/LoadingSkeleton';
 
 const fmtMoeda = (v) =>
   v != null ? Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—';
@@ -30,8 +32,23 @@ export default function ComercialDashboard() {
 
   return (
     <ComercialLayout titulo="Dashboard Comercial">
+      <PageHeader
+        icon="📊"
+        title="Dashboard Comercial"
+        subtitle="Visão geral do funil e performance da equipe"
+        actions={
+          <Link href="/comercial/leads/novo">
+            <button className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-xl transition-colors">
+              + Novo Lead
+            </button>
+          </Link>
+        }
+      />
+
       {carregando && (
-        <div className="flex items-center justify-center h-48 text-gray-400">Carregando...</div>
+        <div className="space-y-6">
+          <SkeletonCard count={6} />
+        </div>
       )}
       {erro && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{erro}</div>

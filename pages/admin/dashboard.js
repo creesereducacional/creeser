@@ -2,6 +2,8 @@
 import { useRouter } from "next/router";
 import Link from "next/link";
 import DashboardLayout from "@/components/DashboardLayout";
+import PageHeader from "@/components/ui/PageHeader";
+import { SkeletonCard } from "@/components/ui/LoadingSkeleton";
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -141,11 +143,15 @@ export default function AdminDashboard() {
   return (
     <DashboardLayout>
       <div>
-        <h1 className="text-3xl font-bold mb-6 text-gray-900">Painel Administrativo</h1>
+        <PageHeader
+          icon="🏠"
+          title="Painel Administrativo"
+          subtitle={usuario?.nomecompleto ? `Bem-vindo, ${usuario.nomecompleto}` : 'Visão geral do sistema'}
+        />
         
         {carregando ? (
-          <div className="text-center py-12">
-            <div className="text-gray-500">Carregando estatísticas...</div>
+          <div className="space-y-6 mt-6">
+            <SkeletonCard count={4} cols="grid-cols-1 md:grid-cols-2 lg:grid-cols-4" />
           </div>
         ) : (
           <>

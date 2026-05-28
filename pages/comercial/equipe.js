@@ -7,20 +7,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import ComercialLayout from '@/components/ComercialLayout';
+import PageHeader from '@/components/ui/PageHeader';
+import EmptyState   from '@/components/ui/EmptyState';
+import StatusBadge from '@/components/ui/StatusBadge';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-
-function StatusBadge({ status }) {
-  const cfg = {
-    ativo:   { cls: 'bg-green-100 text-green-800', label: 'Ativo' },
-    inativo: { cls: 'bg-red-100 text-red-800',     label: 'Inativo' },
-  }[status?.toLowerCase()] || { cls: 'bg-gray-100 text-gray-600', label: status || '—' };
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${cfg.cls}`}>
-      {cfg.label}
-    </span>
-  );
-}
+// (StatusBadge agora importado do design system global)
 
 // ── Modal: Criar Operador ──────────────────────────────────────────────────
 
@@ -302,19 +294,17 @@ export default function EquipeComericalPage() {
     <ComercialLayout titulo="Equipe Comercial">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-bold text-gray-800">Equipe Comercial</h2>
-            <p className="text-sm text-gray-500 mt-0.5">Gerencie seus operadores comerciais</p>
-          </div>
-          <button onClick={() => setModalCriar(true)}
-            className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white text-sm px-4 py-2.5 rounded-lg font-semibold transition-colors">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Novo Operador
-          </button>
-        </div>
+        <PageHeader
+          icon="👥"
+          title="Equipe Comercial"
+          subtitle="Gerencie seus operadores comerciais"
+          actions={
+            <button onClick={() => setModalCriar(true)}
+              className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white text-sm px-4 py-2.5 rounded-xl font-semibold transition-colors">
+              + Novo Operador
+            </button>
+          }
+        />
 
         {/* Mensagem de feedback */}
         {msg && (
@@ -337,14 +327,12 @@ export default function EquipeComericalPage() {
           {carregando ? (
             <div className="flex items-center justify-center h-40 text-gray-400 text-sm">Carregando...</div>
           ) : operadores.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-48 text-gray-400">
-              <div className="text-4xl mb-3">👥</div>
-              <div className="text-sm font-medium">Nenhum operador cadastrado ainda</div>
-              <button onClick={() => setModalCriar(true)}
-                className="mt-3 text-teal-600 hover:text-teal-800 text-sm font-medium hover:underline">
-                Criar primeiro operador →
-              </button>
-            </div>
+            <EmptyState
+              icon="👥"
+              title="Nenhum operador cadastrado"
+              description="Crie o primeiro operador para montar sua equipe comercial."
+              action={{ label: 'Novo Operador', onClick: () => setModalCriar(true), variant: 'primary' }}
+            />
           ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {operadores.map(op => (
@@ -361,7 +349,7 @@ export default function EquipeComericalPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-bold text-gray-800 truncate text-sm">{op.nomecompleto}</p>
-                      <StatusBadge status={op.status} />
+                      <StatusBadge variant={op.status === 'ativo' ? 'success' : 'danger'} label={op.status === 'ativo' ? 'Ativo' : 'Inativo'} dot />
                     </div>
                     <p className="text-xs text-gray-500 truncate mt-0.5">{op.email || '—'}</p>
                     {op.whatsapp && <p className="text-xs text-gray-400">{op.whatsapp}</p>}

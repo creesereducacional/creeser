@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import ComercialLayout from '@/components/ComercialLayout';
 import DashboardCard from '@/components/recepcao/DashboardCard';
+import PageHeader from '@/components/ui/PageHeader';
+import EmptyState   from '@/components/ui/EmptyState';
+import { SkeletonTable } from '@/components/ui/LoadingSkeleton';
 
 const BADGES_STATUS = {
   PENDENTE_REPASSE: 'bg-yellow-100 text-yellow-700',
@@ -56,20 +59,23 @@ export default function Comissoes() {
 
   return (
     <ComercialLayout titulo="Comissões">
-      {/* Cabeçalho */}
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-gray-800">Comissões Comerciais</h2>
-        <div className="flex gap-4 text-right">
-          <div>
-            <p className="text-xs text-gray-500">Pendente repasse</p>
-            <p className="text-lg font-bold text-yellow-600">{fmtMoeda(totalPendente)}</p>
+      <PageHeader
+        icon="💰"
+        title="Comissões Comerciais"
+        subtitle="Acompanhe seus ganhos e repasses"
+        actions={
+          <div className="flex gap-4 text-right">
+            <div>
+              <p className="text-xs text-gray-500">Pendente repasse</p>
+              <p className="text-base font-bold text-yellow-600">{fmtMoeda(totalPendente)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Total repassado</p>
+              <p className="text-base font-bold text-green-600">{fmtMoeda(totalRepassado)}</p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs text-gray-500">Total repassado</p>
-            <p className="text-lg font-bold text-green-600">{fmtMoeda(totalRepassado)}</p>
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       {aviso && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-700 mb-4">
@@ -102,13 +108,13 @@ export default function Comissoes() {
       {/* Tabela */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         {carregando ? (
-          <div className="py-16 text-center text-gray-400">Carregando...</div>
+          <SkeletonTable rows={5} cols={7} />
         ) : filtradas.length === 0 ? (
-          <div className="py-16 text-center text-gray-400">
-            {comissoes.length === 0
-              ? 'Nenhuma comissão registrada. As comissões aparecem após confirmação de pagamento de matrícula.'
-              : 'Nenhuma comissão com este status.'}
-          </div>
+          <EmptyState
+            icon="💰"
+            title={comissoes.length === 0 ? 'Nenhuma comissão registrada' : 'Nenhuma comissão com este status'}
+            description={comissoes.length === 0 ? 'As comissões aparecem após confirmação de pagamento de matrícula.' : 'Mude o filtro para ver outras comissões.'}
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

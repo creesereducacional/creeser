@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import ComercialLayout from '@/components/ComercialLayout';
+import PageHeader from '@/components/ui/PageHeader';
+import EmptyState   from '@/components/ui/EmptyState';
+import { SkeletonTable } from '@/components/ui/LoadingSkeleton';
 
 const STATUS_OPCOES = ['', 'novo', 'contatado', 'interessado', 'pre_matricula', 'matriculado', 'desistente'];
 
@@ -135,14 +138,18 @@ export default function MeusLeads() {
 
   return (
     <ComercialLayout titulo="Meus Leads">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-gray-800">Meus Leads</h2>
-        <Link href="/comercial/leads/novo">
-          <button className="bg-teal-600 hover:bg-teal-700 text-white text-sm px-4 py-2 rounded-lg font-medium transition-colors">
-            + Novo Lead
-          </button>
-        </Link>
-      </div>
+      <PageHeader
+        icon="🎯"
+        title="Meus Leads"
+        subtitle={`${leadsFiltrados.length} lead${leadsFiltrados.length !== 1 ? 's' : ''} encontrado${leadsFiltrados.length !== 1 ? 's' : ''}`}
+        actions={
+          <Link href="/comercial/leads/novo">
+            <button className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-xl transition-colors">
+              + Novo Lead
+            </button>
+          </Link>
+        }
+      />
 
       {/* Filtros */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
@@ -174,13 +181,14 @@ export default function MeusLeads() {
       {/* Tabela */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         {carregando ? (
-          <div className="py-16 text-center text-gray-400">Carregando...</div>
+          <SkeletonTable rows={6} cols={5} />
         ) : leadsFiltrados.length === 0 ? (
-          <div className="py-16 text-center text-gray-400">
-            {leads.length === 0
-              ? 'Nenhum lead cadastrado ainda. Clique em "+ Novo Lead" para começar.'
-              : 'Nenhum lead encontrado com esses filtros.'}
-          </div>
+          <EmptyState
+            icon="🎯"
+            title={leads.length === 0 ? 'Nenhum lead cadastrado' : 'Nenhum resultado encontrado'}
+            description={leads.length === 0 ? 'Adicione seu primeiro lead para começar a trabalhar o funil.' : 'Ajuste os filtros para ver mais leads.'}
+            action={leads.length === 0 ? { label: '+ Novo Lead', href: '/comercial/leads/novo', variant: 'primary' } : undefined}
+          />
         ) : (
           <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[700px]">

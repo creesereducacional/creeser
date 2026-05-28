@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import AdminFinanceiroLayout from '@/components/AdminFinanceiro/Layout';
 import ModalBaixaManual from '@/components/AdminFinanceiro/ModalBaixaManual';
+import StatusBadge from '@/components/ui/StatusBadge';
+import EmptyState   from '@/components/ui/EmptyState';
+import { SkeletonTable } from '@/components/ui/LoadingSkeleton';
 
 export default function OrdensPage() {
   const [ordens, setOrdens] = useState([]);
@@ -95,31 +98,26 @@ export default function OrdensPage() {
     }
   };
 
-  const StatusBadge = ({ status }) => {
-    const cores = {
-      'ativo':      'bg-blue-100 text-blue-800',
-      'pendente':   'bg-yellow-100 text-yellow-800',
-      'pago':       'bg-green-100 text-green-800',
-      'vencido':    'bg-orange-100 text-orange-800',
-      'cancelado':  'bg-red-100 text-red-800',
-      'encerrado':  'bg-gray-100 text-gray-800'
-    };
-    const labels = {
-      'ativo': 'Ativo', 'pendente': 'Pendente', 'pago': 'Pago',
-      'vencido': 'Vencido', 'cancelado': 'Cancelado', 'encerrado': 'Encerrado'
-    };
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${cores[status] || 'bg-gray-100 text-gray-800'}`}>
-        {labels[status] || status}
-      </span>
-    );
+  // Mapeamento status → variante global do StatusBadge
+  const STATUS_VARIANTE = {
+    ativo:     { variant: 'info',    label: 'Ativo'      },
+    pendente:  { variant: 'warning', label: 'Pendente'   },
+    pago:      { variant: 'success', label: 'Pago'       },
+    vencido:   { variant: 'orange',  label: 'Vencido'    },
+    cancelado: { variant: 'danger',  label: 'Cancelado'  },
+    encerrado: { variant: 'neutral', label: 'Encerrado'  },
+  };
+
+  const BadgeOrdem = ({ status }) => {
+    const cfg = STATUS_VARIANTE[status] || { variant: 'neutral', label: status };
+    return <StatusBadge variant={cfg.variant} label={cfg.label} dot />;
   };
 
   if (loading) {
     return (
       <AdminFinanceiroLayout>
-        <div className="flex items-center justify-center h-96">
-          <p className="text-lg text-gray-600">Carregando ordens...</p>
+        <div className="space-y-6">
+          <SkeletonTable rows={6} cols={7} />
         </div>
       </AdminFinanceiroLayout>
     );
@@ -194,9 +192,12 @@ export default function OrdensPage() {
         {/* TABELA */}
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
           {ordensFiltradas.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              <p className="text-lg">Nenhuma ordem encontrada</p>
-            </div>
+            <EmptyState
+              icon="📄"
+              title="Nenhuma ordem encontrada"
+              description="Ajuste os filtros ou crie uma nova ordem de pagamento."
+              compact
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -218,7 +219,7 @@ export default function OrdensPage() {
                         {ordem.aluno_nome}
                       </td>
                       <td className="px-4 py-4 text-sm">
-                        <StatusBadge status={ordem.status_parcela || ordem.status} />
+                          <BadgeOrdem status={ordem.status_parcela || ordem.status} />
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-600">
                         {formataData(ordem.data_vencimento)}

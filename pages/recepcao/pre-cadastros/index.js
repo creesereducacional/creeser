@@ -4,6 +4,7 @@ import RecepcaoLayout from '@/components/RecepcaoLayout';
 import Link from 'next/link';
 import StatusBadge, { STATUS_CONFIG } from '@/components/recepcao/StatusBadge';
 import EmptyState from '@/components/recepcao/EmptyState';
+import PageHeader from '@/components/ui/PageHeader';
 
 const STATUS_FILTROS = [
   { key: '',                               label: 'Todos' },
@@ -65,7 +66,19 @@ export default function PreCadastrosIndex() {
   return (
     <RecepcaoLayout titulo="Pré-Cadastros">
       <div className="space-y-4">
-
+        {/* ── Header ────────────────────────────────────────────────── */}
+        <PageHeader
+          icon="📋"
+          title="Pré-Cadastros"
+          subtitle={`${filtrados.length} de ${lista.length} registro${lista.length !== 1 ? 's' : ''}`}
+          actions={
+            <Link href="/recepcao/pre-cadastros/novo">
+              <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors">
+                + Novo Pré-Cadastro
+              </button>
+            </Link>
+          }
+        />
         {/* ── Barra superior ─────────────────────────────────────── */}
         <div className="flex items-center gap-3 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
