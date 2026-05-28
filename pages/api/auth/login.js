@@ -1,5 +1,7 @@
 ﻿import { supabaseAdmin } from '../../../lib/supabase';
 import { buildAuthCookie, sanitizeUserForToken, signAuthToken } from '../../../lib/auth-server';
+import { rateLimit, getClientIp } from '../../../lib/rate-limit';
+import { writeAuditLog } from '../../../lib/audit-log';
 
 const resolveInstituicao = async (usuario, requestInstituicaoId) => {
   const userInstituicao = usuario?.instituicao_id || usuario?.instituicaoId || null;
@@ -47,6 +49,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Metodo nao permitido' });
   }
 
+  // ── Rate limit: 10 tentativas por IP a cada 15 minutos ──────────────────
+  const ip = getClientIp(req);
+  const rl = rateLimit({ key: `login:${ip}`, limit: 10, windowMs: 15 * 60 * 1000 });
+  if (!rl.allowed) {
+    return res.status(429).json({
+      error: `Muitas tentativas de login. Aguarde ${rl.retryAfter} segundo(s) e tente novamente.`,
+    });
+  }
+
   const { email, senha, instituicaoId, instituicao_id } = req.body || {};
 
   if (!email || !senha) {
@@ -67,16 +78,19 @@ export default async function handler(req, res) {
     .single();
 
   if (dbError || !usuario) {
+    writeAuditLog({ acao: 'LOGIN_FALHA', modulo: 'auth', ip, detalhes: { email: emailNormalizado, motivo: 'usuario_nao_encontrado' } });
     return res.status(401).json({ error: 'Email ou senha invalidos' });
   }
 
   // Verificar senha — campo `senha` em texto plano (sistema legado)
   if (String(usuario.senha) !== String(senha)) {
+    writeAuditLog({ usuario_id: usuario.id, usuario_email: emailNormalizado, acao: 'LOGIN_FALHA', modulo: 'auth', ip, detalhes: { motivo: 'senha_incorreta' } });
     return res.status(401).json({ error: 'Email ou senha invalidos' });
   }
 
   const statusNormalizado = String(usuario.status || 'ativo').toLowerCase();
   if (statusNormalizado === 'inativo' || statusNormalizado === 'bloqueado' || statusNormalizado === 'suspenso') {
+    writeAuditLog({ usuario_id: usuario.id, usuario_email: emailNormalizado, acao: 'LOGIN_BLOQUEADO', modulo: 'auth', ip, detalhes: { status: statusNormalizado } });
     return res.status(403).json({ error: 'Conta inativa ou bloqueada' });
   }
 
@@ -102,6 +116,17 @@ export default async function handler(req, res) {
 
   const token = signAuthToken(tokenPayload);
   res.setHeader('Set-Cookie', buildAuthCookie(token));
+
+  // Auditoria de login bem-sucedido
+  writeAuditLog({
+    usuario_id: tokenPayload.id,
+    usuario_email: tokenPayload.email,
+    perfil: tokenPayload.perfil,
+    acao: 'LOGIN',
+    modulo: 'auth',
+    ip,
+    instituicao_id: resolvedInstituicaoId,
+  });
 
   return res.status(200).json({
     message: 'Login realizado com sucesso',

@@ -6,6 +6,7 @@ import {
   applyInstituicaoFilter,
   resolveInstituicaoId,
 } from '../../../../lib/auth-server';
+import { rateLimit, getClientIp } from '../../../../lib/rate-limit';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -34,12 +35,20 @@ export default async function handler(req, res) {
 
     query = applyInstituicaoFilter(query, instituicaoId);
     const { data, error } = await query;
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      console.error('[pre-cadastros/GET]', error.message);
+      return res.status(500).json({ error: 'Erro interno ao carregar pré-cadastros' });
+    }
     return res.status(200).json(data || []);
   }
 
   // ── POST ─ criar pré-cadastro ───────────────────────────────────
-  if (req.method === 'POST') {
+  if (req.method === 'POST') {    // Rate limit: 20 pré-cadastros por IP a cada hora
+    const ip = getClientIp(req);
+    const rl = rateLimit({ key: `precadastro_criar:${ip}`, limit: 20, windowMs: 60 * 60 * 1000 });
+    if (!rl.allowed) {
+      return res.status(429).json({ error: 'Muitas tentativas. Aguarde antes de criar mais pré-cadastros.' });
+    }
     // recepcao puro não pode alterar status para ATIVO
     const isRecepcaoPuro = hasPerfil(authUser, ['recepcao']) &&
       !hasPerfil(authUser, ['grupo_admin', 'instituicao_admin', 'admin']);

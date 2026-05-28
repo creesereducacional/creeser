@@ -1,12 +1,15 @@
 ﻿import '../styles/globals.css';
 import CookieBanner from '../components/CookieBanner';
 import { SidebarProvider } from '../context/SidebarContext';
+import { ToastProvider } from '../context/ToastContext';
 
 function MyApp({ Component, pageProps }) {
   return (
     <SidebarProvider>
-      <Component {...pageProps} />
-      <CookieBanner />
+      <ToastProvider>
+        <Component {...pageProps} />
+        <CookieBanner />
+      </ToastProvider>
     </SidebarProvider>
   );
 }

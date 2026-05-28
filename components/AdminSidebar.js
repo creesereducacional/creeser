@@ -57,6 +57,8 @@ const MENU_ITEMS = [
       { id: 'calendario-aulas', href: '#', label: 'Calendário de Aulas', perfis: ['grupo_admin'] },
       { id: 'contas-bancarias', href: '#', label: 'Contas Bancárias', perfis: ['grupo_admin'] },
       { id: 'go-live-checklist', href: '/admin/go-live-checklist', label: '🚀 Go-Live Checklist', perfis: ['grupo_admin', 'instituicao_admin'] },
+      { id: 'logs-auditoria',   href: '/admin/logs',              label: '📋 Logs de Auditoria',  perfis: ['grupo_admin', 'instituicao_admin'] },
+      { id: 'backup-export',    href: '/admin/backup',            label: '💾 Backup / Exportar',   perfis: ['grupo_admin', 'instituicao_admin'] },
     ],
   },
 ];

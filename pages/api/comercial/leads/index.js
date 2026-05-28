@@ -6,6 +6,7 @@ import {
   applyInstituicaoFilter,
   resolveInstituicaoId,
 } from '../../../../lib/auth-server';
+import { rateLimit, getClientIp } from '../../../../lib/rate-limit';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -84,12 +85,20 @@ export default async function handler(req, res) {
     }
 
     const { data, error } = await query;
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      console.error('[leads/GET]', error.message);
+      return res.status(500).json({ error: 'Erro interno ao carregar leads' });
+    }
     return res.status(200).json(data);
   }
 
   // ── POST: criar lead ──────────────────────────────────────────────────────
-  if (req.method === 'POST') {
+  if (req.method === 'POST') {    // Rate limit: 30 leads por IP a cada hora
+    const ip = getClientIp(req);
+    const rl = rateLimit({ key: `lead_criar:${ip}`, limit: 30, windowMs: 60 * 60 * 1000 });
+    if (!rl.allowed) {
+      return res.status(429).json({ error: 'Muitas tentativas. Aguarde antes de criar mais leads.' });
+    }
     const { nome, telefone, whatsapp, email, curso_interesse, origem, observacoes, status } = req.body || {};
 
     if (!nome || !String(nome).trim()) {
