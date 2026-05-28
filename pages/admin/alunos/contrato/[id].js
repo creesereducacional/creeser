@@ -2,14 +2,70 @@ import { useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 
+const TIMELINE_STEPS = [
+  { key: 'gerado',      label: 'Gerado',     icon: '📝' },
+  { key: 'enviado',     label: 'Enviado',    icon: '✉️'  },
+  { key: 'visualizado', label: 'Visualizado',icon: '👁'  },
+  { key: 'assinado',    label: 'Assinado',   icon: '✅'  },
+];
+
+function Timeline({ assinaturaStatus }) {
+  const status = assinaturaStatus?.status || '';
+  const passedSteps = {
+    gerado:      true,
+    enviado:     ['pending_signature', 'signed', 'failed', 'cancelled'].includes(status),
+    visualizado: ['signed'].includes(status),
+    assinado:    status === 'signed',
+  };
+  const hasError = status === 'failed' || status === 'cancelled';
+
+  return (
+    <div className="print:hidden bg-white rounded-xl border border-gray-200 px-5 py-4 mb-4">
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Timeline do Contrato</p>
+      <div className="flex items-center gap-0">
+        {TIMELINE_STEPS.map((step, i) => {
+          const done = passedSteps[step.key];
+          const isLast = i === TIMELINE_STEPS.length - 1;
+          const isError = isLast && hasError;
+          return (
+            <div key={step.key} className="flex items-center flex-1 min-w-0">
+              <div className="flex flex-col items-center flex-shrink-0">
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm border-2 transition-all ${
+                  isError ? 'bg-red-100 border-red-400 text-red-600' :
+                  done ? 'bg-green-100 border-green-400 text-green-700' :
+                  'bg-gray-100 border-gray-300 text-gray-400'
+                }`}>
+                  {isError ? '✗' : done ? '✓' : step.icon}
+                </div>
+                <p className={`text-[10px] font-semibold mt-1 text-center leading-tight ${
+                  isError ? 'text-red-600' : done ? 'text-green-700' : 'text-gray-400'
+                }`}>{step.label}</p>
+              </div>
+              {!isLast && (
+                <div className={`h-0.5 flex-1 mx-1 mb-4 rounded-full ${done && passedSteps[TIMELINE_STEPS[i + 1].key] ? 'bg-green-400' : 'bg-gray-200'}`} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {assinaturaStatus?.errorMessage && (
+        <p className="mt-3 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          ⚡ Erro: {assinaturaStatus.errorMessage}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function ContratoAlunoImpressao() {
   const router = useRouter();
   const { id, autoprint } = router.query;
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [payload, setPayload] = useState(null);
-  const [printed, setPrinted] = useState(false);
+  const [loading, setLoading]                 = useState(true);
+  const [error, setError]                     = useState('');
+  const [payload, setPayload]                 = useState(null);
+  const [printed, setPrinted]                 = useState(false);
+  const [assinaturaStatus, setAssinaturaStatus] = useState(null);
 
   useEffect(() => {
     if (!id) return;
@@ -35,6 +91,12 @@ export default function ContratoAlunoImpressao() {
     };
 
     carregarContrato();
+
+    // Carrega status de assinatura para timeline
+    fetch(`/api/contratos/aluno/${id}/assinatura-status`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setAssinaturaStatus(d))
+      .catch(() => {});
   }, [id]);
 
   useEffect(() => {
@@ -65,19 +127,30 @@ export default function ContratoAlunoImpressao() {
             <button
               type="button"
               onClick={() => router.back()}
-              className="px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700"
+              className="px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm"
             >
-              Voltar
+              ← Voltar
             </button>
 
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="px-4 py-2 rounded-lg bg-yellow-500 hover:bg-yellow-600 text-white font-semibold"
-            >
-              Imprimir / Salvar PDF
-            </button>
+            <div className="flex gap-2">
+              <a
+                href={`/admin/alunos/${id}`}
+                className="px-4 py-2 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-medium transition-colors"
+              >
+                👤 Ver Aluno
+              </a>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold transition-colors"
+              >
+                🖨️ Imprimir / Salvar PDF
+              </button>
+            </div>
           </div>
+
+          {/* Timeline */}
+          {!loading && !error && <Timeline assinaturaStatus={assinaturaStatus} />}
 
           {loading ? (
             <div className="bg-white rounded-lg shadow p-8 text-center text-slate-600">
