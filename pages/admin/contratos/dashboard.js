@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import Link from 'next/link';
+import PageHeader   from '@/components/ui/PageHeader';
+import { DashboardCard, SectionCard, StatsGrid } from '@/components/ui';
 
 const STATUS_CONFIG = {
   NAO_GERADO:         { label: 'Não Gerado',         bg: 'bg-gray-100',   text: 'text-gray-600',   border: 'border-gray-300',   bar: 'bg-gray-400'   },
@@ -10,20 +12,6 @@ const STATUS_CONFIG = {
   RECUSADO:           { label: 'Recusado',           bg: 'bg-red-100',    text: 'text-red-700',    border: 'border-red-300',    bar: 'bg-red-500'    },
   EXPIRADO:           { label: 'Vencido',            bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300', bar: 'bg-orange-400' },
 };
-
-function KpiCard({ label, valor, sub, icon, textColor, borderColor, alerta }) {
-  return (
-    <div className={`bg-white rounded-2xl shadow-sm border-2 ${borderColor || 'border-gray-200'} p-3 sm:p-4 flex flex-col gap-1`}>
-      <div className="flex items-center justify-between mb-1">
-        <p className={`text-xs font-semibold uppercase tracking-wide ${textColor || 'text-gray-600'}`}>{label}</p>
-        <span className="text-base opacity-75">{icon}</span>
-      </div>
-      <p className={`text-xl sm:text-2xl font-bold ${textColor || 'text-gray-800'}`}>{valor ?? '—'}</p>
-      {sub && <p className="text-xs text-gray-400 leading-snug mt-0.5">{sub}</p>}
-      {alerta && <p className="mt-1.5 text-xs font-semibold text-red-600">⚠ {alerta}</p>}
-    </div>
-  );
-}
 
 function ChecklistItem({ ok, label, sublabel, criticidade }) {
   const estado = ok ? 'ok' : (criticidade === 'critico' ? 'critico' : 'warn');
@@ -125,20 +113,19 @@ export default function DashboardContratos() {
       <div className="max-w-6xl mx-auto space-y-6">
 
         {/* Cabeçalho */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-teal-600 rounded-xl flex items-center justify-center text-xl text-white flex-shrink-0">📄</div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">Dashboard de Contratos</h1>
-              <p className="text-sm text-gray-500">Painel jurídico-operacional de contratos dos alunos</p>
-            </div>
-          </div>
-          <Link href="/admin/contratos/relatorio">
-            <button className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-semibold transition-colors">
-              📋 Lista de Contratos
-            </button>
-          </Link>
-        </div>
+        <PageHeader
+          icon="📄"
+          title="Dashboard de Contratos"
+          subtitle="Painel jurídico-operacional de contratos dos alunos"
+          breadcrumbs={[{ label: 'Admin', href: '/admin/dashboard' }, { label: 'Contratos' }]}
+          actions={
+            <Link href="/admin/contratos/relatorio">
+              <button className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-semibold transition-colors">
+                📋 Lista de Contratos
+              </button>
+            </Link>
+          }
+        />
 
         {/* Alertas críticos */}
         {stats && (stats.ativosSemContrato > 0 || c.RECUSADO > 0 || c.EXPIRADO > 0) && (
@@ -182,14 +169,14 @@ export default function DashboardContratos() {
         ) : (
           <>
             {/* 6 KPI Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
-              <KpiCard label="Pendentes"        valor={pendentes}              sub="Sem contrato ou gerado"       icon="📋" textColor="text-gray-700"   borderColor="border-gray-200"   />
-              <KpiCard label="Env. Assinatura"  valor={c.ENVIADO_ASSINATURA||0} sub="Aguardando retorno"           icon="✉️" textColor="text-amber-700"  borderColor="border-amber-300"  />
-              <KpiCard label="Assinados"        valor={c.ASSINADO||0}          sub="Concluídos"                  icon="✅" textColor="text-green-700"  borderColor="border-green-300"  />
-              <KpiCard label="Recusados"        valor={c.RECUSADO||0}          sub="Signatário recusou"           icon="❌" textColor="text-red-700"    borderColor="border-red-300"    alerta={c.RECUSADO   > 0 ? 'Requer ação'     : null} />
-              <KpiCard label="Vencidos"         valor={c.EXPIRADO||0}          sub="Prazo expirado"              icon="⏰" textColor="text-orange-700" borderColor="border-orange-300" alerta={c.EXPIRADO   > 0 ? 'Requer renovação': null} />
-              <KpiCard label="Erro Assinatura"  valor={c.ERRO||0}              sub="Falha no envio digital"       icon="⚡" textColor="text-purple-700" borderColor="border-purple-200" alerta={c.ERRO       > 0 ? 'Verificar'       : null} />
-            </div>
+            <StatsGrid preset="kpi">
+              <DashboardCard label="Pendentes"        value={pendentes}              subtitle="Sem contrato ou gerado"     icon="📋" variant="neutral"                                                  />
+              <DashboardCard label="Env. Assinatura"  value={c.ENVIADO_ASSINATURA||0} subtitle="Aguardando retorno"         icon="✉️" variant="warning"                                                  />
+              <DashboardCard label="Assinados"        value={c.ASSINADO||0}          subtitle="Concluídos"                icon="✅" variant="success"                                                  />
+              <DashboardCard label="Recusados"        value={c.RECUSADO||0}          subtitle="Signatário recusou"         icon="❌" variant="danger"   alert={c.RECUSADO   > 0 ? 'Requer ação'      : null} />
+              <DashboardCard label="Vencidos"         value={c.EXPIRADO||0}          subtitle="Prazo expirado"            icon="⏰" variant="orange"   alert={c.EXPIRADO   > 0 ? 'Requer renovação' : null} />
+              <DashboardCard label="Erro Assinatura"  value={c.ERRO||0}              subtitle="Falha no envio digital"     icon="⚡" variant="purple"   alert={c.ERRO       > 0 ? 'Verificar'        : null} />
+            </StatsGrid>
 
             {/* Métricas globais */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -230,8 +217,7 @@ export default function DashboardContratos() {
             </div>
 
             {/* Gráfico de distribuição */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-5">Distribuição por Status</h2>
+            <SectionCard title="Distribuição por Status">
               <div className="space-y-3.5">
                 {Object.entries(STATUS_CONFIG).map(([key, cfg]) => {
                   const val = c[key] || 0;
@@ -257,12 +243,10 @@ export default function DashboardContratos() {
                   );
                 })}
               </div>
-            </div>
-
-            {/* Checklist Operacional */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Checklist Operacional</h2>
+            </SectionCard>
+            <SectionCard
+              title="Checklist Operacional"
+              actions={
                 <div className="flex items-center gap-3">
                   <div className="text-right">
                     <p className={`text-lg font-bold ${scoreColor}`}>{scorePct}%</p>
@@ -272,7 +256,8 @@ export default function DashboardContratos() {
                     {scorePct === 100 ? '✓' : scorePct}
                   </div>
                 </div>
-              </div>
+              }
+            >
               <div className="w-full bg-gray-100 rounded-full h-2 mb-6">
                 <div className={`h-2 rounded-full transition-all duration-700 ${scoreBar}`} style={{ width: `${scorePct}%` }} />
               </div>
@@ -286,7 +271,7 @@ export default function DashboardContratos() {
                   </div>
                 ))}
               </div>
-            </div>
+            </SectionCard>
           </>
         )}
       </div>

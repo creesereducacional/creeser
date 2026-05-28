@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import AdminFinanceiroLayout from '@/components/AdminFinanceiro/Layout';
 import DashboardCard from '@/components/recepcao/DashboardCard';
+import PageHeader from '@/components/ui/PageHeader';
 
 export default function DashboardFinanceiro() {
   const [dados, setDados] = useState({
@@ -40,16 +41,17 @@ export default function DashboardFinanceiro() {
       <div className="space-y-6">
 
         {/* ── Cabeçalho ─────────────────────────────────────────────── */}
-        <div className="flex items-end justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Dashboard Financeiro</h2>
-            <p className="text-sm text-gray-500 mt-0.5 capitalize">{hoje}</p>
-          </div>
-          <button onClick={carregarDados}
-            className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 text-gray-600 rounded-xl hover:bg-gray-50 transition">
-            🔄 Atualizar
-          </button>
-        </div>
+        <PageHeader
+          icon="💰"
+          title="Dashboard Financeiro"
+          subtitle={hoje}
+          actions={
+            <button onClick={carregarDados}
+              className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 text-gray-600 rounded-xl hover:bg-gray-50 transition">
+              🔄 Atualizar
+            </button>
+          }
+        />
 
         {/* ── Alertas de ação ─────────────────────────────────────── */}
         {!loading && dados.boletosVencidos > 0 && (

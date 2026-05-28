@@ -1,61 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-
-const TIMELINE_STEPS = [
-  { key: 'gerado',      label: 'Gerado',     icon: '📝' },
-  { key: 'enviado',     label: 'Enviado',    icon: '✉️'  },
-  { key: 'visualizado', label: 'Visualizado',icon: '👁'  },
-  { key: 'assinado',    label: 'Assinado',   icon: '✅'  },
-];
-
-function Timeline({ assinaturaStatus }) {
-  const status = assinaturaStatus?.status || '';
-  const passedSteps = {
-    gerado:      true,
-    enviado:     ['pending_signature', 'signed', 'failed', 'cancelled'].includes(status),
-    visualizado: ['signed'].includes(status),
-    assinado:    status === 'signed',
-  };
-  const hasError = status === 'failed' || status === 'cancelled';
-
-  return (
-    <div className="print:hidden bg-white rounded-xl border border-gray-200 px-5 py-4 mb-4">
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Timeline do Contrato</p>
-      <div className="flex items-center gap-0">
-        {TIMELINE_STEPS.map((step, i) => {
-          const done = passedSteps[step.key];
-          const isLast = i === TIMELINE_STEPS.length - 1;
-          const isError = isLast && hasError;
-          return (
-            <div key={step.key} className="flex items-center flex-1 min-w-0">
-              <div className="flex flex-col items-center flex-shrink-0">
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm border-2 transition-all ${
-                  isError ? 'bg-red-100 border-red-400 text-red-600' :
-                  done ? 'bg-green-100 border-green-400 text-green-700' :
-                  'bg-gray-100 border-gray-300 text-gray-400'
-                }`}>
-                  {isError ? '✗' : done ? '✓' : step.icon}
-                </div>
-                <p className={`text-[10px] font-semibold mt-1 text-center leading-tight ${
-                  isError ? 'text-red-600' : done ? 'text-green-700' : 'text-gray-400'
-                }`}>{step.label}</p>
-              </div>
-              {!isLast && (
-                <div className={`h-0.5 flex-1 mx-1 mb-4 rounded-full ${done && passedSteps[TIMELINE_STEPS[i + 1].key] ? 'bg-green-400' : 'bg-gray-200'}`} />
-              )}
-            </div>
-          );
-        })}
-      </div>
-      {assinaturaStatus?.errorMessage && (
-        <p className="mt-3 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-          ⚡ Erro: {assinaturaStatus.errorMessage}
-        </p>
-      )}
-    </div>
-  );
-}
+import Timeline from '@/components/ui/Timeline';
 
 export default function ContratoAlunoImpressao() {
   const router = useRouter();
@@ -150,7 +96,27 @@ export default function ContratoAlunoImpressao() {
           </div>
 
           {/* Timeline */}
-          {!loading && !error && <Timeline assinaturaStatus={assinaturaStatus} />}
+          {!loading && !error && (() => {
+            const s = assinaturaStatus?.status || '';
+            const hasError = s === 'failed' || s === 'cancelled';
+            const steps = [
+              { key: 'gerado',      label: 'Gerado',      icon: '📝', done: true },
+              { key: 'enviado',     label: 'Enviado',     icon: '✉️',  done: ['pending_signature','signed','failed','cancelled'].includes(s) },
+              { key: 'visualizado', label: 'Visualizado', icon: '👁',  done: ['signed'].includes(s) },
+              { key: 'assinado',    label: 'Assinado',    icon: '✅',  done: s === 'signed', error: hasError },
+            ];
+            return (
+              <div className="print:hidden bg-white rounded-xl border border-gray-200 px-5 py-4 mb-4">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Timeline do Contrato</p>
+                <Timeline steps={steps} />
+                {assinaturaStatus?.errorMessage && (
+                  <p className="mt-3 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                    ⚡ Erro: {assinaturaStatus.errorMessage}
+                  </p>
+                )}
+              </div>
+            );
+          })()}
 
           {loading ? (
             <div className="bg-white rounded-lg shadow p-8 text-center text-slate-600">

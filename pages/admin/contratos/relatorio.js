@@ -1,28 +1,28 @@
 import { useState, useEffect, useCallback } from 'react';
 import DashboardLayout from '@/components/DashboardLayout';
 import Link from 'next/link';
+import StatusBadge  from '@/components/ui/StatusBadge';
+import EmptyState   from '@/components/ui/EmptyState';
+import PageHeader   from '@/components/ui/PageHeader';
+import { SkeletonTable } from '@/components/ui/LoadingSkeleton';
 
 const STATUS_CONTRATO = ['', 'NAO_GERADO', 'GERADO', 'ENVIADO_ASSINATURA', 'ASSINADO', 'RECUSADO', 'EXPIRADO', 'CANCELADO', 'ERRO'];
 
-const STATUS_CONFIG = {
-  NAO_GERADO:         { label: 'Não Gerado',       icon: '○',  bg: 'bg-gray-100',   text: 'text-gray-600',   border: 'border-gray-300'   },
-  GERADO:             { label: 'Gerado',           icon: '📝', bg: 'bg-blue-100',   text: 'text-blue-700',   border: 'border-blue-300'   },
-  ENVIADO_ASSINATURA: { label: 'Env. Assinatura',  icon: '✉',  bg: 'bg-amber-100',  text: 'text-amber-700',  border: 'border-amber-300'  },
-  ASSINADO:           { label: 'Assinado',         icon: '✅', bg: 'bg-green-100',  text: 'text-green-700',  border: 'border-green-300'  },
-  RECUSADO:           { label: 'Recusado',         icon: '❌', bg: 'bg-red-100',    text: 'text-red-700',    border: 'border-red-300'    },
-  EXPIRADO:           { label: 'Vencido',          icon: '⏰', bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300' },
-  CANCELADO:          { label: 'Cancelado',        icon: '✗',  bg: 'bg-gray-100',   text: 'text-gray-500',   border: 'border-gray-200'   },
-  ERRO:               { label: 'Erro',             icon: '⚡', bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-300' },
+// Mapeamento status_contrato → variante do StatusBadge global
+const STATUS_TO_VARIANT = {
+  NAO_GERADO:         { variant: 'neutral', label: 'Não Gerado',      icon: '○'  },
+  GERADO:             { variant: 'info',    label: 'Gerado',          icon: '📝' },
+  ENVIADO_ASSINATURA: { variant: 'warning', label: 'Env. Assinatura', icon: '✉'   },
+  ASSINADO:           { variant: 'success', label: 'Assinado',        icon: '✓'   },
+  RECUSADO:           { variant: 'danger',  label: 'Recusado',        icon: '✗'   },
+  EXPIRADO:           { variant: 'orange',  label: 'Vencido',         icon: '⏰'   },
+  CANCELADO:          { variant: 'neutral', label: 'Cancelado',       icon: '✕'   },
+  ERRO:               { variant: 'purple',  label: 'Erro',            icon: '⚡'   },
 };
 
-function StatusBadge({ status }) {
-  const cfg = STATUS_CONFIG[status] || { label: status, icon: '?', bg: 'bg-gray-100', text: 'text-gray-500', border: 'border-gray-200' };
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
-      <span className="text-[10px]">{cfg.icon}</span>
-      {cfg.label}
-    </span>
-  );
+function ContratoBadge({ status }) {
+  const cfg = STATUS_TO_VARIANT[status] || { variant: 'neutral', label: status || '—', icon: '?' };
+  return <StatusBadge variant={cfg.variant} label={cfg.label} icon={cfg.icon} dot />;
 }
 
 function fmtDate(iso) {
@@ -81,28 +81,19 @@ export default function RelatorioContratos() {
       <div className="max-w-7xl mx-auto space-y-5">
 
         {/* Cabeçalho */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-teal-600 rounded-xl flex items-center justify-center text-xl text-white flex-shrink-0">📋</div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">Lista de Contratos</h1>
-              <p className="text-sm text-gray-500">{dadosFiltrados.length} registro(s) encontrado(s)</p>
-            </div>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            <Link href="/admin/contratos/dashboard">
-              <button className="px-4 py-2 border border-gray-300 text-gray-600 rounded-xl text-sm hover:bg-gray-50 transition-colors">
-                ← Dashboard
-              </button>
-            </Link>
-            <button onClick={buscar} className="px-4 py-2 border border-teal-300 text-teal-700 rounded-xl text-sm hover:bg-teal-50 transition-colors">
-              🔄 Atualizar
-            </button>
-            <button onClick={exportarCSV} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-semibold transition-colors">
-              ⬇️ Exportar CSV
-            </button>
-          </div>
-        </div>
+        <PageHeader
+          icon="📋"
+          title="Lista de Contratos"
+          subtitle={`${dadosFiltrados.length} registro(s) encontrado(s)`}
+          breadcrumbs={[{ label: 'Admin', href: '/admin/dashboard' }, { label: 'Contratos', href: '/admin/contratos/dashboard' }, { label: 'Lista' }]}
+          actions={[
+            <Link key="dash" href="/admin/contratos/dashboard">
+              <button className="px-4 py-2 border border-gray-300 text-gray-600 rounded-xl text-sm hover:bg-gray-50 transition-colors">← Dashboard</button>
+            </Link>,
+            <button key="refresh" onClick={buscar} className="px-4 py-2 border border-teal-300 text-teal-700 rounded-xl text-sm hover:bg-teal-50 transition-colors">🔄 Atualizar</button>,
+            <button key="csv" onClick={exportarCSV} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-semibold transition-colors">⬇️ Exportar CSV</button>,
+          ]}
+        />
 
         {/* Filtros */}
         <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
@@ -112,7 +103,7 @@ export default function RelatorioContratos() {
               className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-400">
               <option value="">— Todos —</option>
               {STATUS_CONTRATO.slice(1).map(s => (
-                <option key={s} value={s}>{STATUS_CONFIG[s]?.label || s}</option>
+                <option key={s} value={s}>{STATUS_TO_VARIANT[s]?.label || s}</option>
               ))}
             </select>
           </div>
@@ -143,15 +134,14 @@ export default function RelatorioContratos() {
         {erro && <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">{erro}</div>}
 
         {carregando ? (
-          <div className="text-center py-16 text-gray-400">
-            <div className="w-8 h-8 border-2 border-teal-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            Carregando contratos...
-          </div>
+          <SkeletonTable rows={6} cols={9} />
         ) : dadosFiltrados.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 py-16 text-center">
-            <div className="text-4xl mb-3">📄</div>
-            <p className="text-gray-500 font-medium">Nenhum registro encontrado</p>
-            <p className="text-sm text-gray-400 mt-1">Ajuste os filtros para ver contratos</p>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+            <EmptyState
+              icon="📄"
+              title="Nenhum contrato encontrado"
+              description="Ajuste os filtros para ver os contratos dos alunos."
+            />
           </div>
         ) : (
           <>
@@ -164,7 +154,7 @@ export default function RelatorioContratos() {
                       <p className="font-semibold text-gray-800 truncate">{a.nome}</p>
                       <p className="text-xs text-gray-400 font-mono mt-0.5">{a.cpf || '—'}</p>
                     </div>
-                    <StatusBadge status={a.statusContrato} />
+                    <ContratoBadge status={a.statusContrato} />
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 mb-3">
                     <div>
@@ -233,7 +223,7 @@ export default function RelatorioContratos() {
                         <td className="px-4 py-3">
                           <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{a.statusMatricula || '—'}</span>
                         </td>
-                        <td className="px-4 py-3"><StatusBadge status={a.statusContrato} /></td>
+                        <td className="px-4 py-3"><ContratoBadge status={a.statusContrato} /></td>
                         <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(a.dataEnvioContrato) || '—'}</td>
                         <td className="px-4 py-3 text-xs">
                           {fmtDate(a.dataAssinaturaContrato)
