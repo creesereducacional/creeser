@@ -27,7 +27,7 @@ export default function OrdensPage() {
         setOrdens(Array.isArray(data.ordens) ? data.ordens : []);
       }
     } catch (error) {
-      console.error('Erro ao carregar ordens:', error);
+      console.error('Erro ao carregar boletos:', error);
     } finally {
       setLoading(false);
     }
@@ -108,7 +108,7 @@ export default function OrdensPage() {
     encerrado: { variant: 'neutral', label: 'Encerrado'  },
   };
 
-  const BadgeOrdem = ({ status }) => {
+  const BadgeBoleto = ({ status }) => {
     const cfg = STATUS_VARIANTE[status] || { variant: 'neutral', label: status };
     return <StatusBadge variant={cfg.variant} label={cfg.label} dot />;
   };
@@ -129,25 +129,25 @@ export default function OrdensPage() {
         {/* HEADER */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Ordens de Pagamento</h2>
-            <p className="text-gray-600">Gestão de pagamentos simples e únicos</p>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Boletos</h2>
+            <p className="text-gray-600">Gestão de boletos simples e únicos</p>
           </div>
           <Link
             href="/admin-financeiro/alunos"
             className="px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold transition"
           >
-            ➕ Nova Ordem
+            ➕ Novo Boleto
           </Link>
         </div>
 
         {/* RESUMO */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-700 font-semibold">Total de Ordens</p>
+            <p className="text-sm text-blue-700 font-semibold">Total de Boletos</p>
             <p className="text-3xl font-bold text-blue-900 mt-1">{resumo.total}</p>
           </div>
           <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
-            <p className="text-sm text-green-700 font-semibold">Ativas</p>
+            <p className="text-sm text-green-700 font-semibold">Ativos</p>
             <p className="text-3xl font-bold text-green-900 mt-1">{resumo.ativas}</p>
           </div>
           <div className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-lg p-4">
@@ -155,7 +155,7 @@ export default function OrdensPage() {
             <p className="text-2xl font-bold text-orange-900 mt-1">{formataValor(resumo.valor_total)}</p>
           </div>
           <div className="bg-gradient-to-br from-red-50 to-pink-50 border border-red-200 rounded-lg p-4">
-            <p className="text-sm text-red-700 font-semibold">Canceladas</p>
+            <p className="text-sm text-red-700 font-semibold">Cancelados</p>
             <p className="text-3xl font-bold text-red-900 mt-1">{resumo.canceladas}</p>
           </div>
         </div>
@@ -194,8 +194,8 @@ export default function OrdensPage() {
           {ordensFiltradas.length === 0 ? (
             <EmptyState
               icon="📄"
-              title="Nenhuma ordem encontrada"
-              description="Ajuste os filtros ou crie uma nova ordem de pagamento."
+              title="Nenhum boleto encontrado"
+              description="Ajuste os filtros ou crie um novo boleto."
               compact
             />
           ) : (
@@ -219,12 +219,12 @@ export default function OrdensPage() {
                         {ordem.aluno_nome}
                       </td>
                       <td className="px-4 py-4 text-sm">
-                          <BadgeOrdem status={ordem.status_parcela || ordem.status} />
+                          <BadgeBoleto status={ordem.status_parcela || ordem.status} />
                       </td>
-                      <td className="px-4 py-4 text-sm text-gray-600">
+                      <td className="px-4 py-4 text-sm text-gray-650">
                         {formataData(ordem.data_vencimento)}
                       </td>
-                      <td className="px-4 py-4 text-sm text-gray-600">
+                      <td className="px-4 py-4 text-sm text-gray-650">
                         {formataData(ordem.created_at)}
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-900 font-semibold">
