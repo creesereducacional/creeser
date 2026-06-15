@@ -81,7 +81,6 @@ export default async function handler(req, res) {
         turmas (
           id,
           nome,
-          anoletivo,
           unidades (
             id,
             nome
@@ -115,12 +114,7 @@ export default async function handler(req, res) {
     }
 
     if (anoLetivo) {
-      const { data: turmasDoAno } = await supabase
-        .from('turmas')
-        .select('id')
-        .eq('anoletivo', String(anoLetivo));
-      const idsTurmasAno = (turmasDoAno || []).map(t => t.id);
-      alunosQuery = alunosQuery.or(`ano_letivo.eq.${anoLetivo},turmaid.in.(${idsTurmasAno.length > 0 ? idsTurmasAno.join(',') : -1})`);
+      alunosQuery = alunosQuery.eq('ano_letivo', Number(anoLetivo));
     }
 
     if (search && String(search).trim()) {
@@ -234,7 +228,7 @@ export default async function handler(req, res) {
         unidade_id: unidadeObj.id || null,
         curso: cursoObj.nome || '',
         turma: turmaObj.nome || '',
-        ano_letivo_turma: turmaObj.anoletivo || '',
+        ano_letivo_turma: a.ano_letivo || '',
         responsavel: responsavelObj,
       };
     });
