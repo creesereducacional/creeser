@@ -92,7 +92,7 @@ async function criarCarne(req, res) {
       .from('financeiro_ordens_pagamento')
       .select(`
         id, instituicao_id, tipo, descricao, status, quantidade_parcelas, efi_carnet_id,
-        aluno:alunos!inner ( id, nome, cpf, email, data_nascimento, telefone_celular )
+        aluno:alunos!inner ( id, nome, cpf, email, data_nascimento, telefone_celular, turmaid, cursoid )
       `)
       .eq('id', ordem_id);
 
@@ -135,6 +135,20 @@ async function criarCarne(req, res) {
     }
 
     const aluno = ordemSelecionada.aluno;
+
+    // Buscar curso e turma
+    const { data: turma } = aluno.turmaid
+      ? await supabase.from('turmas').select('nome').eq('id', aluno.turmaid).maybeSingle()
+      : { data: null };
+
+    const { data: curso } = aluno.cursoid
+      ? await supabase.from('cursos').select('nome').eq('id', aluno.cursoid).maybeSingle()
+      : { data: null };
+
+    const turmaNome = turma?.nome || 'Não definida';
+    const cursoNome = curso?.nome || 'Não definido';
+    const efiDescricao = `Aluno: ${aluno.nome} | Curso: ${cursoNome} | Turma: ${turmaNome}`.slice(0, 100);
+
     const cpfLimpo = (aluno.cpf || '').replace(/\D/g, '');
 
     if (!cpfLimpo || cpfLimpo.length !== 11) {
@@ -163,7 +177,7 @@ async function criarCarne(req, res) {
 
     // 3. Criar carnê na EFI
     const carnetData = await efi.createCarnet({
-      items: [{ name: ordemSelecionada.descricao, value: valorCentavos, amount: 1 }],
+      items: [{ name: efiDescricao, value: valorCentavos, amount: 1 }],
       customer,
       expire_at: primeiroVencimento,
       repeats: parcelas.length,

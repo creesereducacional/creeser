@@ -50,13 +50,12 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: 'ID da parcela não informado' });
   }
 
-  const { metodo_pagamento, valor_pago, data_pagamento, observacao } = req.body || {};
+  const { metodo_pagamento, valor_pago, data_pagamento, observacao, pagamentos } = req.body || {};
 
   // ── Validações de entrada ──────────────────────────────────────────────────
-  if (!metodo_pagamento || !METODOS_VALIDOS.includes(String(metodo_pagamento).toLowerCase())) {
-    return res.status(400).json({
-      message: `metodo_pagamento inválido. Use: ${METODOS_VALIDOS.join(', ')}`,
-    });
+  const dataPagamentoStr = parseDate(data_pagamento);
+  if (!dataPagamentoStr) {
+    return res.status(400).json({ message: 'data_pagamento obrigatória no formato YYYY-MM-DD' });
   }
 
   const valorPagoNum = parsePositiveNumber(valor_pago);
@@ -64,9 +63,30 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: 'valor_pago deve ser um número maior que zero' });
   }
 
-  const dataPagamentoStr = parseDate(data_pagamento);
-  if (!dataPagamentoStr) {
-    return res.status(400).json({ message: 'data_pagamento obrigatória no formato YYYY-MM-DD' });
+  let metodoFinal = '';
+  if (Array.isArray(pagamentos) && pagamentos.length > 0) {
+    const somaValores = pagamentos.reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
+    if (Math.abs(somaValores - valorPagoNum) > 0.01) {
+      return res.status(400).json({
+        message: `A soma dos valores dos múltiplos pagamentos (${somaValores}) deve ser igual ao valor_pago (${valorPagoNum}).`
+      });
+    }
+
+    for (const item of pagamentos) {
+      if (!item.metodo || !METODOS_VALIDOS.includes(String(item.metodo).toLowerCase())) {
+        return res.status(400).json({
+          message: `Método de pagamento inválido encontrado na lista: ${item.metodo}. Métodos permitidos: ${METODOS_VALIDOS.join(', ')}`
+        });
+      }
+    }
+    metodoFinal = 'multiplo';
+  } else {
+    if (!metodo_pagamento || !METODOS_VALIDOS.includes(String(metodo_pagamento).toLowerCase())) {
+      return res.status(400).json({
+        message: `metodo_pagamento inválido. Use: ${METODOS_VALIDOS.join(', ')}`,
+      });
+    }
+    metodoFinal = String(metodo_pagamento).toLowerCase();
   }
 
   // ── Buscar parcela ─────────────────────────────────────────────────────────
@@ -106,12 +126,12 @@ export default async function handler(req, res) {
   const usuarioId = authUser.id ? Number(authUser.id) : null;
   const agora = new Date().toISOString();
 
-  // Payload completo (requer migration 20260525_add_baixa_manual_parcelas)
   const updatePayloadFull = {
     status: 'pago',
     data_pagamento: dataPagamentoStr,
     valor_pago: valorPagoNum,
-    metodo_pagamento: String(metodo_pagamento).toLowerCase(),
+    metodo_pagamento: metodoFinal,
+    detalhes_baixa_multipla: pagamentos || null,
     baixado_por_id: usuarioId,
     baixado_em: agora,
     observacao_baixa: observacao ? String(observacao).trim().slice(0, 500) : null,
@@ -201,14 +221,33 @@ export default async function handler(req, res) {
     usuario_id: usuarioId,
     acao: 'baixa_manual',
     valor_pago: valorPagoNum,
-    metodo_pagamento: String(metodo_pagamento).toLowerCase(),
+    metodo_pagamento: metodoFinal,
     data_pagamento: dataPagamentoStr,
     observacao: observacao ? String(observacao).trim().slice(0, 500) : null,
     dados_extras: {
       ordem_pagamento_id: parcela.ordem_pagamento_id,
       efi_charge_id: parcela.efi_charge_id || null,
+      pagamentos_multiplos: pagamentos || null,
     },
   });
+
+  try {
+    await supabase.from('audit_logs').insert([{
+      usuario_id: usuarioId,
+      usuario_email: authUser.email || null,
+      perfil: authUser.perfil || authUser.tipo || null,
+      acao: 'BAIXA_MANUAL',
+      modulo: 'financeiro',
+      entidade: 'parcela',
+      id_entidade: String(id),
+      detalhes: {
+        valor_pago: valorPagoNum,
+        metodo_pagamento: metodoFinal,
+        pagamentos_multiplos: pagamentos || null,
+        observacao: observacao || null
+      }
+    }]);
+  } catch (_) {}
 
   // ── Resposta ───────────────────────────────────────────────────────────────
   const aviso = parcela.efi_charge_id

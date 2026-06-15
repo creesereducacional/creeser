@@ -30,7 +30,30 @@ export default async function handler(req, res) {
       return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
     }
 
-    // Buscar todos os alunos com dados financeiros
+    const { anoLetivo, unidadeId, cursoId, turmaId, status, search } = req.query;
+
+    // Buscar IDs de alunos por responsável financeiro se houver termo de busca
+    let responsavelAlunoIds = [];
+    if (search && String(search).trim()) {
+      const term = String(search).trim();
+      const { data: matchedResponsaveis } = await supabase
+        .from('responsaveis')
+        .select('id')
+        .or(`nome.ilike.%${term}%,cpf.eq.${term}`);
+
+      if (matchedResponsaveis && matchedResponsaveis.length > 0) {
+        const respIds = matchedResponsaveis.map(r => r.id);
+        const { data: matchedRelacoes } = await supabase
+          .from('responsavel_aluno')
+          .select('aluno_id')
+          .in('responsavel_id', respIds);
+        if (matchedRelacoes) {
+          responsavelAlunoIds = matchedRelacoes.map(r => r.aluno_id).filter(Boolean);
+        }
+      }
+    }
+
+    // Buscar alunos com dados financeiros e relações
     let alunosQuery = supabase
       .from('alunos')
       .select(
@@ -47,14 +70,91 @@ export default async function handler(req, res) {
         qtd_parcelas,
         dia_pagamento,
         telefone_celular,
-        endereco`
+        endereco,
+        ano_letivo,
+        matricula,
+        foto,
+        cursos (
+          id,
+          nome
+        ),
+        turmas (
+          id,
+          nome,
+          anoletivo,
+          unidades (
+            id,
+            nome
+          )
+        )`
       )
       .order('nome', { ascending: true });
 
     alunosQuery = applyInstituicaoFilter(alunosQuery, instituicaoId);
+
+    // Aplicar filtros dinâmicos
+    if (status && String(status).trim()) {
+      alunosQuery = alunosQuery.eq('statusmatricula', String(status).trim());
+    }
+
+    if (cursoId) {
+      alunosQuery = alunosQuery.eq('cursoid', Number(cursoId));
+    }
+
+    if (turmaId) {
+      alunosQuery = alunosQuery.eq('turmaid', Number(turmaId));
+    }
+
+    if (unidadeId) {
+      const { data: turmasDaUnidade } = await supabase
+        .from('turmas')
+        .select('id')
+        .eq('unidadeid', Number(unidadeId));
+      const idsTurmasUnidade = (turmasDaUnidade || []).map(t => t.id);
+      alunosQuery = alunosQuery.in('turmaid', idsTurmasUnidade.length > 0 ? idsTurmasUnidade : [-1]);
+    }
+
+    if (anoLetivo) {
+      const { data: turmasDoAno } = await supabase
+        .from('turmas')
+        .select('id')
+        .eq('anoletivo', String(anoLetivo));
+      const idsTurmasAno = (turmasDoAno || []).map(t => t.id);
+      alunosQuery = alunosQuery.or(`ano_letivo.eq.${anoLetivo},turmaid.in.(${idsTurmasAno.length > 0 ? idsTurmasAno.join(',') : -1})`);
+    }
+
+    if (search && String(search).trim()) {
+      const term = String(search).trim();
+      let orFilter = `nome.ilike.%${term}%,cpf.eq.${term},matricula.ilike.%${term}%`;
+      if (responsavelAlunoIds.length > 0) {
+        orFilter += `,id.in.(${responsavelAlunoIds.join(',')})`;
+      }
+      alunosQuery = alunosQuery.or(orFilter);
+    }
+
     const { data: alunos, error: alunosError } = await alunosQuery;
 
     if (alunosError) throw alunosError;
+
+    // Buscar responsáveis financeiros dos alunos retornados em lote
+    const alunoIds = (alunos || []).map(a => a.id);
+    let relacoesResponsavel = [];
+    if (alunoIds.length > 0) {
+      const { data: relResp, error: relRespError } = await supabase
+        .from('responsavel_aluno')
+        .select(`
+          aluno_id,
+          responsaveis (
+            id,
+            nome,
+            cpf
+          )
+        `)
+        .in('aluno_id', alunoIds);
+      if (!relRespError && relResp) {
+        relacoesResponsavel = relResp;
+      }
+    }
 
     // Buscar turmas
     let turmasQuery = supabase
@@ -107,12 +207,37 @@ export default async function handler(req, res) {
       }
     }
 
-    const alunosComResumo = (alunos || []).map(a => ({
-      ...a,
-      financeiro_aberto: resumoFinanceiro[a.id]?.aberto || 0,
-      financeiro_atraso: resumoFinanceiro[a.id]?.atraso || 0,
-      financeiro_pago: resumoFinanceiro[a.id]?.pago || 0,
-    }));
+    const mapResponsavel = (alunoId) => {
+      const rels = relacoesResponsavel.filter(r => r.aluno_id === alunoId);
+      if (rels.length === 0) return null;
+      const resp = rels[0].responsaveis;
+      if (!resp) return null;
+      return {
+        id: resp.id,
+        nome: resp.nome || '',
+        cpf: resp.cpf || '',
+      };
+    };
+
+    const alunosComResumo = (alunos || []).map(a => {
+      const turmaObj = a.turmas || {};
+      const cursoObj = a.cursos || {};
+      const unidadeObj = turmaObj.unidades || {};
+      const responsavelObj = mapResponsavel(a.id);
+
+      return {
+        ...a,
+        financeiro_aberto: resumoFinanceiro[a.id]?.aberto || 0,
+        financeiro_atraso: resumoFinanceiro[a.id]?.atraso || 0,
+        financeiro_pago: resumoFinanceiro[a.id]?.pago || 0,
+        unidade: unidadeObj.nome || '',
+        unidade_id: unidadeObj.id || null,
+        curso: cursoObj.nome || '',
+        turma: turmaObj.nome || '',
+        ano_letivo_turma: turmaObj.anoletivo || '',
+        responsavel: responsavelObj,
+      };
+    });
 
     return res.status(200).json({
       alunos: alunosComResumo,

@@ -938,6 +938,21 @@ function ModalContrato({ aluno, onClose }) {
 
 export default function AlunosFinanceiroPage() {
   const router = useRouter();
+
+  const handleCopyBoletoUrl = (url) => {
+    if (!url) return;
+    navigator.clipboard.writeText(url)
+      .then(() => alert('Link do boleto copiado!'))
+      .catch(() => {
+        const el = document.createElement('textarea');
+        el.value = url;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+        alert('Link do boleto copiado!');
+      });
+  };
   const [alunos, setAlunos] = useState([]);
   const [turmas, setTurmas] = useState([]);
   const [cursos, setCursos] = useState([]);
@@ -947,6 +962,11 @@ export default function AlunosFinanceiroPage() {
   const [filtroTurma, setFiltroTurma] = useState('');
   const [filtroCurso, setFiltroCurso] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('ATIVO');
+  const [filtroUnidade, setFiltroUnidade] = useState('');
+  const [filtroAnoLetivo, setFiltroAnoLetivo] = useState('');
+  const [unidades, setUnidades] = useState([]);
+  const [todasTurmas, setTodasTurmas] = useState([]);
+  const [carregouOpcoes, setCarregouOpcoes] = useState(false);
 
   const [modalFinanceiro, setModalFinanceiro] = useState(null);
   const [modalOrdem, setModalOrdem] = useState(null);
@@ -956,6 +976,9 @@ export default function AlunosFinanceiroPage() {
   const [modalHistorico, setModalHistorico] = useState(null);
   const [modalRecibo, setModalRecibo] = useState(null);
   const [modalContrato, setModalContrato] = useState(null);
+  const [modalTrancar, setModalTrancar] = useState(null);
+  const [modalLote, setModalLote] = useState(false);
+  const [modalCarteirinha, setModalCarteirinha] = useState(null);
   const [selectedFaturas, setSelectedFaturas] = useState(new Set());
   const [deletandoLote, setDeletandoLote] = useState(false);
 
@@ -1093,29 +1116,82 @@ export default function AlunosFinanceiroPage() {
     } catch (e) { console.error(e); } finally { setDeletandoLote(false); }
   };
 
-  useEffect(() => { carregarDados(); }, []);
-
   const carregarDados = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/admin-financeiro/alunos');
+      const query = new URLSearchParams();
+      if (filtroStatus) query.set('status', filtroStatus);
+      if (filtroCurso) query.set('cursoId', filtroCurso);
+      if (filtroTurma) query.set('turmaId', filtroTurma);
+      if (filtroUnidade) query.set('unidadeId', filtroUnidade);
+      if (filtroAnoLetivo) query.set('anoLetivo', filtroAnoLetivo);
+      if (filtroNome) query.set('search', filtroNome);
+
+      const res = await fetch(`/api/admin-financeiro/alunos?${query.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setAlunos(Array.isArray(data.alunos) ? data.alunos : []);
         if (data.turmas) setTurmas(data.turmas);
         if (data.cursos) setCursos(data.cursos);
       }
+
+      if (!carregouOpcoes) {
+        const [resOpcoes, resTurmas] = await Promise.all([
+          fetch('/api/turmas/opcoes'),
+          fetch('/api/turmas')
+        ]);
+        if (resOpcoes.ok) {
+          const dataOpcoes = await resOpcoes.json();
+          if (dataOpcoes.unidades) setUnidades(dataOpcoes.unidades);
+        }
+        if (resTurmas.ok) {
+          const dataTurmas = await resTurmas.json();
+          setTodasTurmas(Array.isArray(dataTurmas) ? dataTurmas : dataTurmas.turmas || []);
+        }
+        setCarregouOpcoes(true);
+      }
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
-  const alunosFiltrados = useMemo(() => {
-    let r = alunos;
-    if (filtroStatus) r = r.filter(a => a.statusmatricula === filtroStatus);
-    if (filtroNome) { const t = filtroNome.toLowerCase(); r = r.filter(a => (a.nome||'').toLowerCase().includes(t)||(a.cpf||'').includes(t)||(a.email||'').toLowerCase().includes(t)); }
-    if (filtroTurma) r = r.filter(a => a.turmaid === filtroTurma);
-    if (filtroCurso) r = r.filter(a => a.cursoid === filtroCurso);
-    return r;
-  }, [alunos, filtroNome, filtroTurma, filtroCurso, filtroStatus]);
+  // Disparar busca ao mudar os filtros
+  useEffect(() => {
+    carregarDados();
+  }, [filtroStatus, filtroCurso, filtroTurma, filtroUnidade, filtroAnoLetivo]);
+
+  // Debounce para busca por texto
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      carregarDados();
+    }, 400);
+    return () => clearTimeout(delayDebounceFn);
+  }, [filtroNome]);
+
+  const limparFiltros = () => {
+    setFiltroNome('');
+    setFiltroStatus('ATIVO');
+    setFiltroCurso('');
+    setFiltroTurma('');
+    setFiltroUnidade('');
+    setFiltroAnoLetivo('');
+  };
+
+  const turmasFiltradasOpcoes = useMemo(() => {
+    let list = todasTurmas;
+    if (filtroCurso) {
+      list = list.filter(t => String(t.cursoId) === String(filtroCurso));
+    }
+    if (filtroUnidade) {
+      list = list.filter(t => String(t.unidadeId) === String(filtroUnidade));
+    }
+    return list;
+  }, [todasTurmas, filtroCurso, filtroUnidade]);
+
+  const anosLetivosOpcoes = useMemo(() => {
+    const anos = todasTurmas.map(t => t.anoLetivo).filter(Boolean);
+    return [...new Set(anos)].sort();
+  }, [todasTurmas]);
+
+  const alunosFiltrados = alunos;
 
   const resumo = useMemo(() => ({
     totalAlunos: alunosFiltrados.length,
@@ -1159,9 +1235,18 @@ export default function AlunosFinanceiroPage() {
   return (
     <AdminFinanceiroLayout>
       <div className="space-y-6">
-        <div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Alunos</h2>
-          <p className="text-gray-600">Selecione um aluno para lançar ordens ou carnês de pagamento</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Alunos</h2>
+            <p className="text-gray-600">Selecione um aluno para lançar ordens ou carnês de pagamento</p>
+          </div>
+          <button
+            onClick={() => setModalLote(true)}
+            className="px-4 py-2.5 bg-purple-650 text-white rounded-lg hover:bg-purple-700 font-semibold transition text-sm flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+            Gerar Carnê em Lote
+          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1183,12 +1268,15 @@ export default function AlunosFinanceiroPage() {
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <input type="text" placeholder="🔍 Nome, Email ou CPF..." value={filtroNome} onChange={e => setFiltroNome(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500" />
+        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            <div className="flex flex-col col-span-1 md:col-span-2">
+              <input type="text" placeholder="🔍 Aluno, Matrícula, CPF ou Responsável..." value={filtroNome} onChange={e => setFiltroNome(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm" />
+            </div>
+            
             <select value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500">
+              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm">
               <option value="">Todos os Status</option>
               <option value="ATIVO">Ativo</option>
               <option value="PRE_CADASTRO">Pré-Cadastro</option>
@@ -1198,16 +1286,39 @@ export default function AlunosFinanceiroPage() {
               <option value="CANCELADO">Cancelado</option>
               <option value="INATIVO">Inativo</option>
             </select>
-            <select value={filtroTurma} onChange={e => setFiltroTurma(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500">
-              <option value="">Todas as Turmas</option>
-              {turmas.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+
+            <select value={filtroUnidade} onChange={e => setFiltroUnidade(e.target.value)}
+              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm">
+              <option value="">Todas as Unidades</option>
+              {unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
             </select>
+
             <select value={filtroCurso} onChange={e => setFiltroCurso(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500">
+              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm">
               <option value="">Todos os Cursos</option>
               {cursos.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
             </select>
+
+            <select value={filtroTurma} onChange={e => setFiltroTurma(e.target.value)}
+              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm">
+              <option value="">Todas as Turmas</option>
+              {turmasFiltradasOpcoes.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+            </select>
+          </div>
+          
+          <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-gray-100">
+            <div className="flex items-center gap-4">
+              <select value={filtroAnoLetivo} onChange={e => setFiltroAnoLetivo(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm">
+                <option value="">Todos os Anos Letivos</option>
+                {anosLetivosOpcoes.map(ano => <option key={ano} value={ano}>{ano}</option>)}
+              </select>
+            </div>
+            
+            <button onClick={limparFiltros}
+              className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-teal-600 border border-gray-300 rounded-lg hover:border-teal-500 transition-colors bg-white">
+              🧹 Limpar Filtros
+            </button>
           </div>
         </div>
 
@@ -1268,6 +1379,18 @@ export default function AlunosFinanceiroPage() {
                               className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition">
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                             </button>
+                            <button onClick={() => setModalCarteirinha(aluno)} title="Carteirinha"
+                              className="p-1.5 text-indigo-650 hover:bg-indigo-50 rounded-lg transition">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 012-2h2a2 2 0 012 2v1m-6 4h4" /></svg>
+                            </button>
+                            {!['CANCELADO', 'DESISTENTE', 'TRANCADO'].includes(aluno.statusmatricula) && (
+                              <button onClick={() => setModalTrancar(aluno)} title="Trancar Matrícula"
+                                className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1443,6 +1566,12 @@ export default function AlunosFinanceiroPage() {
                                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                                                                   </button>
                                                                 )}
+                                                                {parcela.boleto_url && (
+                                                                  <button title="Copiar Link do Boleto" onClick={() => handleCopyBoletoUrl(parcela.boleto_url)}
+                                                                    className="p-1.5 text-gray-650 hover:bg-gray-100 rounded transition">
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+                                                                  </button>
+                                                                )}
                                                                 {cancelavel && (
                                                                   <button onClick={() => handleCancelarParcelaAluno(carne, parcela, aluno.id)} disabled={cancelandoParcelaAluno}
                                                                     title="Cancelar parcela"
@@ -1562,6 +1691,12 @@ export default function AlunosFinanceiroPage() {
                                                     className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition">
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                                                   </button>
+                                                  {ordem.boleto_url && (
+                                                    <button title="Copiar Link do Boleto" onClick={e => { e.stopPropagation(); handleCopyBoletoUrl(ordem.boleto_url); }}
+                                                      className="p-1.5 text-gray-650 hover:bg-gray-100 rounded transition">
+                                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+                                                    </button>
+                                                  )}
                                                   <button title="Excluir Fatura" onClick={e => { e.stopPropagation(); setModalExcluir({ ordem, aluno }); }}
                                                     className="p-1.5 text-red-500 hover:bg-red-50 rounded transition">
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -1642,6 +1777,26 @@ export default function AlunosFinanceiroPage() {
       {modalContrato && (
         <ModalContrato aluno={modalContrato} onClose={() => setModalContrato(null)} />
       )}
+      {modalTrancar && (
+        <ModalTrancar
+          aluno={modalTrancar}
+          onClose={() => setModalTrancar(null)}
+          onSalvo={carregarDados}
+        />
+      )}
+      {modalLote && (
+        <ModalLote
+          turmas={todasTurmas}
+          onClose={() => setModalLote(false)}
+          onSalvo={carregarDados}
+        />
+      )}
+      {modalCarteirinha && (
+        <ModalCarteirinha
+          aluno={modalCarteirinha}
+          onClose={() => setModalCarteirinha(null)}
+        />
+      )}
       {modalConfirmarAluno && (
         <ModalConfirmar
           titulo={modalConfirmarAluno.titulo}
@@ -1680,6 +1835,573 @@ function ModalConfirmar({ titulo, mensagem, onConfirm, onClose }) {
             Confirmar
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+
+function ModalTrancar({ aluno, onClose, onSalvo }) {
+  const [observacao, setObservacao] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [erro, setErro] = useState('');
+  const [parcelasCancelaveis, setParcelasCancelaveis] = useState([]);
+  const [loadingParcelas, setLoadingParcelas] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/admin-financeiro/aluno-ordens/${aluno.id}`);
+        if (!res.ok) throw new Error('Falha ao carregar parcelas');
+        const data = await res.json();
+        if (!active) return;
+
+        const today = new Date().toISOString().split('T')[0];
+        const cancelaveis = [];
+
+        if (data.ordens) {
+          data.ordens.forEach(o => {
+            const list = o.financeiro_parcelas || [];
+            list.forEach(p => {
+              if (p.status !== 'pago' && p.status !== 'cancelado' && p.data_vencimento >= today) {
+                cancelaveis.push({
+                  id: p.id,
+                  numero_parcela: p.numero_parcela,
+                  valor: p.valor,
+                  data_vencimento: p.data_vencimento,
+                  descricao: o.descricao || 'Ordem'
+                });
+              }
+            });
+          });
+        }
+
+        if (data.carnes) {
+          data.carnes.forEach(c => {
+            const list = c.parcelas || [];
+            list.forEach(p => {
+              if (p.status !== 'pago' && p.status !== 'cancelado' && p.data_vencimento >= today) {
+                cancelaveis.push({
+                  id: p.id,
+                  numero_parcela: p.numero_parcela,
+                  valor: p.valor,
+                  data_vencimento: p.data_vencimento,
+                  descricao: c.descricao || 'Carnê'
+                });
+              }
+            });
+          });
+        }
+
+        setParcelasCancelaveis(cancelaveis);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (active) setLoadingParcelas(false);
+      }
+    };
+    load();
+    return () => { active = false; };
+  }, [aluno.id]);
+
+  const handleConfirmar = async (e) => {
+    e.preventDefault();
+    if (!observacao.trim()) {
+      setErro('Observação é obrigatória');
+      return;
+    }
+    setLoading(true);
+    setErro('');
+    try {
+      const res = await fetch(`/api/admin-financeiro/alunos/${aluno.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acao: 'trancar', observacao_trancamento: observacao }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Erro ao trancar aluno');
+      }
+      onSalvo();
+      onClose();
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const temAtraso = Number(aluno.financeiro_atraso) > 0;
+  const totalCancelado = parcelasCancelaveis.reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
+
+  const formatarValor = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const formatarData = (d) => {
+    if (!d) return '';
+    const parts = d.split('-');
+    if (parts.length !== 3) return d;
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  };
+
+  const cursoNome = aluno.cursos?.nome || aluno.curso || '-';
+  const turmaNome = aluno.turmas?.nome || aluno.turma || '-';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
+          <h3 className="text-base font-bold text-gray-800">Trancar Matrícula</h3>
+          <button onClick={onClose} disabled={loading} className="text-gray-400 hover:text-gray-650">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <form onSubmit={handleConfirmar} className="flex flex-col flex-1 overflow-hidden">
+          <div className="p-6 overflow-y-auto space-y-4 flex-1">
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-xs text-amber-800 font-semibold">Aviso Importante</p>
+              <p className="text-xs text-amber-700 mt-1">Só é permitido trancar alunos sem parcelas em atraso. As parcelas futuras e pendentes deste aluno serão canceladas.</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block">Aluno</label>
+                <p className="font-semibold text-gray-800">{aluno.nome}</p>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block">Curso / Turma</label>
+                <p className="font-semibold text-gray-800">{cursoNome} · {turmaNome}</p>
+              </div>
+            </div>
+
+            <div className="border-t pt-3">
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">
+                Resumo de Cancelamento Financeiro
+              </label>
+              {loadingParcelas ? (
+                <p className="text-xs text-gray-450 italic">Carregando parcelas futuras...</p>
+              ) : parcelasCancelaveis.length === 0 ? (
+                <p className="text-xs text-gray-500 italic">Nenhuma parcela futura a ser cancelada.</p>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-xs bg-red-50 text-red-800 p-2 rounded border border-red-100 font-medium">
+                    <span>Qtd. de parcelas: {parcelasCancelaveis.length}</span>
+                    <span>Total a cancelar: {formatarValor(totalCancelado)}</span>
+                  </div>
+                  <div className="border rounded-lg max-h-[140px] overflow-y-auto p-2 bg-gray-50 space-y-1">
+                    {parcelasCancelaveis.map((p, idx) => (
+                      <div key={p.id || idx} className="flex justify-between items-center text-[11px] p-1 border-b border-gray-150 last:border-b-0 hover:bg-white rounded">
+                        <span className="text-gray-700 font-medium truncate max-w-[200px]" title={p.descricao}>
+                          {p.descricao} (P. {p.numero_parcela})
+                        </span>
+                        <span className="text-gray-500 font-mono">Venc. {formatarData(p.data_vencimento)}</span>
+                        <span className="text-red-700 font-bold font-mono">{formatarValor(p.valor)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
+                Observação do Trancamento <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                required
+                rows={3}
+                value={observacao}
+                onChange={e => setObservacao(e.target.value)}
+                placeholder="Descreva o motivo do trancamento..."
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-amber-400 resize-none text-gray-800 bg-white"
+              />
+            </div>
+
+            {erro && <p className="text-xs text-red-650 font-semibold">{erro}</p>}
+          </div>
+
+          <div className="flex justify-end gap-3 p-4 border-t bg-gray-50 rounded-b-xl flex-shrink-0">
+            <button type="button" onClick={onClose} disabled={loading}
+              className="px-4 py-2 text-sm text-gray-650 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading || temAtraso || !observacao.trim() || loadingParcelas}
+              className="px-5 py-2 text-sm font-semibold bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition disabled:opacity-50"
+            >
+              {loading ? 'Trancando...' : 'Trancar Matrícula'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+
+function ModalCarteirinha({ aluno, onClose }) {
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const getIniciais = (nome) => {
+    if (!nome) return '';
+    return nome.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+  };
+
+  const matriculaFinal = aluno.matricula || `ALU-${aluno.id}`;
+  const cursoNome = aluno.cursos?.nome || aluno.curso || '-';
+  const turmaNome = aluno.turmas?.nome || aluno.turma || '-';
+  const unidadeNome = aluno.turmas?.unidades?.nome || '-';
+  const anoLetivoVal = aluno.ano_letivo || aluno.turmas?.anoletivo || '-';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 print:p-0 print:bg-white print:static print:inset-auto">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 print:shadow-none print:w-auto print:max-w-none print:mx-0 print:rounded-none flex flex-col no-print-container">
+        <div className="flex items-center justify-between px-6 py-4 border-b print:hidden">
+          <h3 className="text-base font-bold text-gray-800">Carteirinha de Estudante</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-650 text-xl leading-none">&times;</button>
+        </div>
+
+        <div className="p-6 flex justify-center print:p-0" id="carteirinha-impressao">
+          <div className="w-80 h-48 bg-gradient-to-br from-indigo-950 via-purple-950 to-slate-950 text-white rounded-xl p-4 flex flex-col justify-between shadow-lg relative overflow-hidden border border-white/10 print:shadow-none print:border-black print:text-black">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-xl -mr-6 -mt-6"></div>
+            <div className="absolute bottom-0 left-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl -ml-10 -mb-10"></div>
+
+            <div className="flex justify-between items-start border-b border-white/20 pb-2">
+              <div>
+                <h4 className="text-[10px] font-bold tracking-widest text-indigo-300 uppercase">CREESER EDUCACIONAL</h4>
+                <p className="text-[8px] text-gray-400">CARTEIRA DE ESTUDANTE</p>
+              </div>
+              <span className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase ${aluno.statusmatricula === 'ATIVO' ? 'bg-green-500/20 text-green-300' : 'bg-amber-500/20 text-amber-300'}`}>
+                {aluno.statusmatricula || 'ATIVO'}
+              </span>
+            </div>
+
+            <div className="flex gap-3 my-2 flex-grow items-center">
+              <div className="w-14 h-18 bg-white/10 rounded-lg border border-white/20 flex-shrink-0 overflow-hidden flex items-center justify-center relative">
+                {aluno.foto ? (
+                  <img src={aluno.foto} alt="Foto Aluno" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-lg font-bold text-indigo-300">{getIniciais(aluno.nome)}</span>
+                )}
+              </div>
+
+              <div className="space-y-0.5 overflow-hidden flex-grow min-w-0">
+                <h5 className="text-[10px] font-bold truncate" title={aluno.nome}>{aluno.nome}</h5>
+
+                <div className="grid grid-cols-2 gap-x-1 text-[7px] text-gray-300">
+                  <div className="min-w-0">
+                    <span className="text-gray-550 block">Matrícula</span>
+                    <span className="font-semibold block truncate">{matriculaFinal}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-gray-550 block">Ano Letivo</span>
+                    <span className="font-semibold block truncate">{anoLetivoVal}</span>
+                  </div>
+                </div>
+
+                <div className="text-[7px] text-gray-300 min-w-0">
+                  <span className="text-gray-550 block">Curso / Turma</span>
+                  <span className="font-semibold block truncate">{cursoNome} · {turmaNome}</span>
+                </div>
+
+                <div className="text-[7px] text-gray-300 min-w-0">
+                  <span className="text-gray-550 block">Unidade</span>
+                  <span className="font-semibold block truncate">{unidadeNome}</span>
+                </div>
+              </div>
+
+              {/* Área Reservada para QR Code */}
+              <div className="w-14 h-14 bg-white text-slate-900 rounded-lg p-1 border border-white/10 flex flex-col items-center justify-center flex-shrink-0 text-center font-mono print:border-black print:text-black">
+                {aluno.qrcode || aluno.qr_code ? (
+                  <img src={aluno.qrcode || aluno.qr_code} alt="QR Code" className="w-full h-full object-contain" />
+                ) : (
+                  <>
+                    <div className="text-[5px] font-bold text-indigo-700 print:text-black tracking-wider uppercase leading-none mb-0.5">QR CODE</div>
+                    <div className="w-7 h-7 border border-dashed border-indigo-300 print:border-black rounded flex items-center justify-center my-0.5 bg-indigo-50/50 print:bg-transparent">
+                      <svg className="w-4.5 h-4.5 text-indigo-500 print:text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M4 8h.01M4 16h.01M4 20h.01" /></svg>
+                    </div>
+                    <div className="text-[4px] text-gray-500 font-bold truncate max-w-full">ALU-{matriculaFinal}</div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-between items-end border-t border-white/20 pt-2 text-[7px] text-gray-400">
+              <span className="font-mono">ID: {aluno.id}</span>
+              <span className="font-mono font-bold text-white tracking-widest">{matriculaFinal}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-xl print:hidden">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-650 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
+            Fechar
+          </button>
+          <button onClick={handlePrint} className="px-5 py-2 text-sm font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition flex items-center gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+            Imprimir
+          </button>
+        </div>
+      </div>
+
+      <style jsx global>{`
+        @media print {
+          body * {
+            visibility: hidden !important;
+          }
+          #carteirinha-impressao, #carteirinha-impressao * {
+            visibility: visible !important;
+          }
+          #carteirinha-impressao {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+
+function ModalLote({ turmas, onClose, onSalvo }) {
+  const [turmaId, setTurmaId] = useState('');
+  const [alunos, setAlunos] = useState([]);
+  const [selectedAlunos, setSelectedAlunos] = useState(new Set());
+  const [loadingAlunos, setLoadingAlunos] = useState(false);
+
+  const [form, setForm] = useState({
+    periodo_inicio: '2026-01-05',
+    periodo_fim: '2026-06-05',
+    qtd_parcelas: 6,
+    dia_vencimento: 10
+  });
+
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
+  const [relatorio, setRelatorio] = useState(null);
+
+  useEffect(() => {
+    if (!turmaId) {
+      setAlunos([]);
+      setSelectedAlunos(new Set());
+      return;
+    }
+    setLoadingAlunos(true);
+    setErro('');
+    fetch(`/api/admin-financeiro/alunos?turmaId=${turmaId}`)
+      .then(res => res.json())
+      .then(data => {
+        const list = Array.isArray(data) ? data : data.alunos || [];
+        setAlunos(list);
+        setSelectedAlunos(new Set(list.map(a => a.id)));
+      })
+      .catch(() => setErro('Erro ao carregar alunos da turma.'))
+      .finally(() => setLoadingAlunos(false));
+  }, [turmaId]);
+
+  const handleToggleAluno = (id) => {
+    setSelectedAlunos(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleToggleTodos = () => {
+    if (selectedAlunos.size === alunos.length) {
+      setSelectedAlunos(new Set());
+    } else {
+      setSelectedAlunos(new Set(alunos.map(a => a.id)));
+    }
+  };
+
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (selectedAlunos.size === 0) {
+      setErro('Selecione pelo menos um aluno.');
+      return;
+    }
+    setSalvando(true);
+    setErro('');
+    setRelatorio(null);
+    try {
+      const res = await fetch('/api/admin-financeiro/ordens/lote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          turmaId: Number(turmaId),
+          alunoIds: Array.from(selectedAlunos),
+          ...form
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Erro ao gerar carnê em lote');
+      }
+      setRelatorio(data.relatorio);
+      onSalvo();
+    } catch (err) {
+      setErro(err.message);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <h3 className="text-lg font-bold text-purple-700">Gerar Carnê em Lote (Primeiro Semestre)</h3>
+          <button onClick={onClose} disabled={salvando} className="text-gray-400 hover:text-gray-650 text-xl leading-none">&times;</button>
+        </div>
+
+        {relatorio ? (
+          <div className="p-6 space-y-4 overflow-y-auto flex-1">
+            <h4 className="text-sm font-bold text-green-700">Geração de Carnês Finalizada!</h4>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-center">
+                <span className="text-xs font-semibold text-emerald-800 uppercase block">Gerados</span>
+                <span className="text-2xl font-bold text-emerald-900">{relatorio.gerados.length}</span>
+              </div>
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-center">
+                <span className="text-xs font-semibold text-amber-800 uppercase block">Ignorados</span>
+                <span className="text-2xl font-bold text-amber-900">{relatorio.ignorados.length}</span>
+              </div>
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-center">
+                <span className="text-xs font-semibold text-red-800 uppercase block">Erros</span>
+                <span className="text-2xl font-bold text-red-900">{relatorio.erros.length}</span>
+              </div>
+            </div>
+
+            <div className="space-y-3 max-h-[250px] overflow-y-auto border rounded-lg p-3 bg-gray-50">
+              {relatorio.gerados.length > 0 && (
+                <div>
+                  <h5 className="text-xs font-bold text-emerald-800">✅ Carnês Gerados com Sucesso:</h5>
+                  <ul className="text-xs text-gray-700 list-disc list-inside mt-1">
+                    {relatorio.gerados.map(g => <li key={g.alunoId}>{g.nome} (Total: R$ {g.valor.toFixed(2)})</li>)}
+                  </ul>
+                </div>
+              )}
+              {relatorio.ignorados.length > 0 && (
+                <div className="pt-2 border-t">
+                  <h5 className="text-xs font-bold text-amber-800">⚠️ Alunos Ignorados (Sem alteração):</h5>
+                  <ul className="text-xs text-gray-750 list-inside mt-1 space-y-0.5">
+                    {relatorio.ignorados.map(i => <li key={i.alunoId}>• <strong>{i.nome}</strong>: {i.motivo}</li>)}
+                  </ul>
+                </div>
+              )}
+              {relatorio.erros.length > 0 && (
+                <div className="pt-2 border-t">
+                  <h5 className="text-xs font-bold text-red-800">❌ Erros durante Processamento:</h5>
+                  <ul className="text-xs text-gray-750 list-inside mt-1 space-y-0.5">
+                    {relatorio.erros.map(e => <li key={e.alunoId}>• <strong>{e.nome}</strong>: {e.motivo}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-3">
+              <button onClick={onClose} className="px-5 py-2 bg-purple-650 hover:bg-purple-755 text-white rounded-lg text-sm font-semibold">
+                Fechar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="overflow-y-auto p-6 space-y-4 flex-1">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-semibold text-gray-650 uppercase tracking-wide mb-1 block">Turma *</label>
+                <select value={turmaId} onChange={e => setTurmaId(e.target.value)} required
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:border-purple-500 bg-white text-gray-800">
+                  <option value="">Selecione uma turma</option>
+                  {turmas.filter(t => (t.status_formacao || 'EM_FORMACAO') === 'EM_FORMACAO').map(t => (
+                    <option key={t.id} value={t.id}>{t.nome} (Não Iniciada)</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-650 uppercase tracking-wide mb-1 block">Dia de Vencimento *</label>
+                <input type="number" min="1" max="31" value={form.dia_vencimento} onChange={e => set('dia_vencimento', e.target.value)} required
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:border-purple-500 bg-white text-gray-800" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-gray-650 uppercase tracking-wide mb-1 block">Início Período *</label>
+                <input type="date" value={form.periodo_inicio} onChange={e => set('periodo_inicio', e.target.value)} required
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:border-purple-500 bg-white text-gray-800" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-650 uppercase tracking-wide mb-1 block">Fim Período *</label>
+                <input type="date" value={form.periodo_fim} onChange={e => set('periodo_fim', e.target.value)} required
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:border-purple-500 bg-white text-gray-800" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-650 uppercase tracking-wide mb-1 block">Qtd. Parcelas *</label>
+                <input type="number" min="1" max="12" value={form.qtd_parcelas} onChange={e => set('qtd_parcelas', e.target.value)} required
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:border-purple-500 bg-white text-gray-800" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Alunos da Turma ({selectedAlunos.size}/{alunos.length})</span>
+                {alunos.length > 0 && (
+                  <button type="button" onClick={handleToggleTodos} className="text-xs text-purple-600 hover:text-purple-700 font-bold">
+                    {selectedAlunos.size === alunos.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
+                  </button>
+                )}
+              </div>
+
+              <div className="border rounded-lg max-h-[180px] overflow-y-auto p-2 bg-gray-50 space-y-1">
+                {loadingAlunos ? (
+                  <p className="text-xs text-gray-400 italic py-2 text-center">Carregando alunos...</p>
+                ) : alunos.length === 0 ? (
+                  <p className="text-xs text-gray-400 italic py-2 text-center">Selecione uma turma para carregar os alunos.</p>
+                ) : (
+                  alunos.map(aluno => (
+                    <label key={aluno.id} className="flex items-center gap-2 p-1.5 hover:bg-white rounded cursor-pointer text-xs">
+                      <input type="checkbox" checked={selectedAlunos.has(aluno.id)} onChange={() => handleToggleAluno(aluno.id)}
+                        className="rounded border-gray-300 text-purple-650 focus:ring-purple-500" />
+                      <span className="text-gray-800 font-medium">{aluno.nome}</span>
+                      {aluno.valor_mensalidade ? (
+                        <span className="text-gray-400 ml-auto">Mensalidade: R$ {Number(aluno.valor_mensalidade).toFixed(2)}</span>
+                      ) : (
+                        <span className="text-red-500 font-semibold ml-auto">Sem mensalidade definida</span>
+                      )}
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {erro && <p className="text-xs text-red-650 font-semibold">{erro}</p>}
+
+            <div className="flex justify-end gap-3 pt-2 border-t">
+              <button type="button" onClick={onClose} disabled={salvando}
+                className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
+                Cancelar
+              </button>
+              <button type="submit" disabled={salvando || !turmaId || selectedAlunos.size === 0}
+                className="px-5 py-2 text-sm font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50">
+                {salvando ? 'Gerando Lote...' : 'Gerar Carnês'}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );

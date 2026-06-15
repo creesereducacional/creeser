@@ -17,9 +17,13 @@ export default function DashboardFinanceiro() {
     valorTotalCarnes: 0,
     totalRecebido: 0,
     taxaRecebimento: 0,
-    totalGerado: 0 
+    totalGerado: 0,
+    carnesAVencerCount: 0,
+    carnesAVencerList: [],
+    alunosEmAtrasoList: []
   });
 
+  const [modalDetalhes, setModalDetalhes] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { carregarDados(); }, []);
@@ -66,12 +70,19 @@ export default function DashboardFinanceiro() {
         )}
 
         {/* ── Cards operacionais ────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-3">
           <DashboardCard icon="✅" label="Total Recebido"    valor={fmtValor(dados.totalRecebido)}    cor="border-green-500"  bgIcon="bg-green-50"  loading={loading} />
           <DashboardCard icon="📈" label="A Receber"         valor={fmtValor(dados.totalAReceber)}    cor="border-cyan-500"   bgIcon="bg-cyan-50"   loading={loading} href="/admin-financeiro/carnes" />
           <DashboardCard icon="🚨" label="Parcelas Vencidas" valor={dados.boletosVencidos}            cor="border-red-500"    bgIcon="bg-red-50"    loading={loading} href="/admin-financeiro/carnes" />
-          <DashboardCard icon="💵" label="Valor em Atraso"   valor={fmtValor(dados.valorVencido)}     cor="border-orange-500" bgIcon="bg-orange-50" loading={loading} />
+          
+          <DashboardCard icon="💵" label="Valor em Atraso"   valor={fmtValor(dados.valorVencido)}     cor="border-orange-500" bgIcon="bg-orange-50" loading={loading} 
+            onClick={() => setModalDetalhes({ tipo: 'atraso', titulo: 'Alunos com Parcelas em Atraso', lista: dados.alunosEmAtrasoList || [] })} />
+            
           <DashboardCard icon="📋" label="Carnês Ativos"     valor={dados.totalCarnes}                cor="border-blue-500"   bgIcon="bg-blue-50"   loading={loading} href="/admin-financeiro/carnes" />
+          
+          <DashboardCard icon="⏳" label="Carnês a Vencer"    valor={dados.carnesAVencerCount}         cor="border-amber-500"  bgIcon="bg-amber-50"  loading={loading}
+            onClick={() => setModalDetalhes({ tipo: 'vencer', titulo: 'Carnês Próximos de Finalizar (1 Parcela Restante)', lista: dados.carnesAVencerList || [] })} />
+            
           <DashboardCard icon="📊" label="Taxa Recebimento"  valor={`${dados.taxaRecebimento || 0}%`} cor="border-purple-500" bgIcon="bg-purple-50" loading={loading} />
         </div>
 
@@ -114,6 +125,89 @@ export default function DashboardFinanceiro() {
             <Link href="/admin-financeiro/carnes" className="mt-3 inline-flex text-xs text-teal-600 hover:underline">Ver todos →</Link>
           </div>
         </div>
+
+        {/* ── Modal de Detalhes (Inadimplência ou Carnês a Vencer) ──── */}
+        {modalDetalhes && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+                <h3 className="text-lg font-bold text-gray-800">{modalDetalhes.titulo}</h3>
+                <button onClick={() => setModalDetalhes(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 overflow-y-auto flex-grow">
+                {modalDetalhes.lista.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">
+                    <p className="text-base">Nenhum registro encontrado.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto border border-gray-100 rounded-xl">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-gray-50 text-xs text-gray-700 uppercase border-b border-gray-100">
+                        {modalDetalhes.tipo === 'atraso' ? (
+                          <tr>
+                            <th className="px-6 py-3">Aluno</th>
+                            <th className="px-6 py-3">Matrícula</th>
+                            <th className="px-6 py-3">Curso / Turma</th>
+                            <th className="px-6 py-3 text-right">Parcelas Atrasadas</th>
+                            <th className="px-6 py-3 text-right text-red-600 font-semibold">Valor em Atraso</th>
+                          </tr>
+                        ) : (
+                          <tr>
+                            <th className="px-6 py-3">Aluno</th>
+                            <th className="px-6 py-3">Matrícula</th>
+                            <th className="px-6 py-3">Curso / Turma</th>
+                            <th className="px-6 py-3">Vencimento da Última</th>
+                            <th className="px-6 py-3 text-right text-amber-600 font-semibold">Valor Restante</th>
+                          </tr>
+                        )}
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {modalDetalhes.tipo === 'atraso' ? (
+                          modalDetalhes.lista.map(item => (
+                            <tr key={item.aluno_id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 font-medium text-gray-800">{item.nome}</td>
+                              <td className="px-6 py-4 text-gray-500">{item.matricula || '—'}</td>
+                              <td className="px-6 py-4 text-gray-500">
+                                <div className="font-medium text-gray-700">{item.curso || '—'}</div>
+                                <div className="text-xs text-gray-400">{item.turma || '—'}</div>
+                              </td>
+                              <td className="px-6 py-4 text-right font-medium text-gray-700">{item.qtd_parcelas_atrasadas}x</td>
+                              <td className="px-6 py-4 text-right font-bold text-red-600">{fmtValor(item.valor_em_atraso)}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          modalDetalhes.lista.map((item, idx) => (
+                            <tr key={idx} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 font-medium text-gray-800">{item.aluno_nome}</td>
+                              <td className="px-6 py-4 text-gray-500">{item.aluno_matricula || '—'}</td>
+                              <td className="px-6 py-4 text-gray-500">
+                                <div className="font-medium text-gray-700">{item.curso || '—'}</div>
+                                <div className="text-xs text-gray-400">{item.turma || '—'}</div>
+                              </td>
+                              <td className="px-6 py-4 text-gray-500">{item.data_vencimento ? new Date(item.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}</td>
+                              <td className="px-6 py-4 text-right font-bold text-amber-600">{fmtValor(item.valor_restante)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="flex justify-end px-6 py-4 border-t border-gray-100 flex-shrink-0 bg-gray-50 rounded-b-2xl">
+                <button onClick={() => setModalDetalhes(null)}
+                  className="px-5 py-2.5 text-sm font-semibold bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition">
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </AdminFinanceiroLayout>

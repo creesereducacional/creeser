@@ -279,6 +279,35 @@ export default async function handler(req, res) {
     const curso = await findCursoDaTurma(turma);
     const responsavel = await findResponsavelDoAluno(alunoId);
 
+    let periodoCarneStr = '';
+    try {
+      const { data: ordensCarne } = await supabase
+        .from('financeiro_ordens_pagamento')
+        .select('id')
+        .eq('aluno_id', alunoId)
+        .eq('tipo', 'carne')
+        .eq('status', 'ativo')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (ordensCarne && ordensCarne.length > 0) {
+        const carneId = ordensCarne[0].id;
+        const { data: parcelas } = await supabase
+          .from('financeiro_parcelas')
+          .select('data_vencimento')
+          .eq('ordem_pagamento_id', carneId)
+          .order('data_vencimento', { ascending: true });
+
+        if (parcelas && parcelas.length > 0) {
+          const dIni = formatDate(parcelas[0].data_vencimento);
+          const dFim = formatDate(parcelas[parcelas.length - 1].data_vencimento);
+          if (dIni && dFim) {
+            periodoCarneStr = `Período do carnê: ${dIni} a ${dFim}`;
+          }
+        }
+      }
+    } catch (_) {}
+
     const placeholders = {
       '{{ALUNO_NOME}}': asText(aluno.nome),
       '{{ALUNO_CPF}}': asText(aluno.cpf),
@@ -309,10 +338,14 @@ export default async function handler(req, res) {
       '{{INSTITUICAO_ENDERECO}}': buildAddress(instituicao),
       '{{RESPONSAVEL_NOME}}': asText(responsavel?.nome),
       '{{RESPONSAVEL_CPF}}': asText(responsavel?.cpf),
+      '{{PERIODO_CARNE}}': periodoCarneStr,
       '{{DATA_ASSINATURA}}': formatDate(new Date())
     };
 
-    const htmlContrato = replacePlaceholders(contrato.conteudo_html || '', placeholders);
+    let htmlContrato = replacePlaceholders(contrato.conteudo_html || '', placeholders);
+    if (periodoCarneStr && !contrato.conteudo_html.includes('{{PERIODO_CARNE}}')) {
+      htmlContrato += `<p style="margin-top: 20px;"><strong>${escapeHtml(periodoCarneStr)}</strong></p>`;
+    }
 
     return res.status(200).json({
       aluno: {

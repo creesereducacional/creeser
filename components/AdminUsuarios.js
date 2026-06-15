@@ -1,4 +1,19 @@
-﻿import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+
+const formatarWhatsapp = (value) => {
+  if (!value) return '';
+  const limpo = String(value).replace(/\D/g, '');
+  if (limpo.length <= 2) {
+    return limpo;
+  }
+  if (limpo.length <= 6) {
+    return `(${limpo.slice(0, 2)}) ${limpo.slice(2)}`;
+  }
+  if (limpo.length <= 10) {
+    return `(${limpo.slice(0, 2)}) ${limpo.slice(2, 6)}-${limpo.slice(6)}`;
+  }
+  return `(${limpo.slice(0, 2)}) ${limpo.slice(2, 7)}-${limpo.slice(7, 11)}`;
+};
 
 const PERFIS = [
   { value: 'grupo_admin',       label: 'Admin Geral (Grupo)' },
@@ -83,7 +98,7 @@ export default function AdminUsuarios() {
       tipo:         u.tipo || 'usuario',
       perfil:       u.perfil || 'secretaria',
       status:       u.status || 'ativo',
-      whatsapp:     u.whatsapp || '',
+      whatsapp:     formatarWhatsapp(u.whatsapp || ''),
     });
     setEditandoId(u.id);
     setErroForm('');
@@ -97,7 +112,11 @@ export default function AdminUsuarios() {
   };
 
   const handleChange = (e) => {
-    setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+    let { name, value } = e.target;
+    if (name === 'whatsapp') {
+      value = formatarWhatsapp(value);
+    }
+    setForm(f => ({ ...f, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
@@ -115,7 +134,7 @@ export default function AdminUsuarios() {
         tipo:         form.tipo,
         perfil:       form.perfil,
         status:       form.status,
-        whatsapp:     form.whatsapp || '',
+        whatsapp:     (form.whatsapp || '').replace(/\D/g, ''),
       };
       if (form.senha.trim()) payload.senha = form.senha.trim();
 

@@ -112,6 +112,80 @@ export default async function handler(req, res) {
 
     const taxaRecebimento = totalGerado > 0 ? ((totalRecebido / totalGerado) * 100).toFixed(1) : 0;
 
+    // Buscar carnês ativos para calcular carnês a vencer
+    let carnesAtivosQuery = supabase
+      .from('financeiro_ordens_pagamento')
+      .select('id, aluno_id, alunos(id, nome, matricula, cursos(nome), turmas(nome))')
+      .eq('tipo', 'carne')
+      .eq('status', 'ativo');
+
+    carnesAtivosQuery = applyInstituicaoFilter(carnesAtivosQuery, instituicaoId);
+    const { data: carnesList } = await carnesAtivosQuery;
+
+    const carneIds = (carnesList || []).map(c => c.id);
+    let parcelasCarne = [];
+    if (carneIds.length > 0) {
+      const { data: parcs } = await supabase
+        .from('financeiro_parcelas')
+        .select('id, ordem_pagamento_id, status, data_vencimento, valor')
+        .in('ordem_pagamento_id', carneIds);
+      if (parcs) parcelasCarne = parcs;
+    }
+
+    const carnesAVencerList = [];
+    for (const c of (carnesList || [])) {
+      const parcs = parcelasCarne.filter(p => p.ordem_pagamento_id === c.id);
+      const restantes = parcs.filter(p => p.status !== 'pago' && p.status !== 'cancelado');
+      if (restantes.length === 1) {
+        const unica = restantes[0];
+        carnesAVencerList.push({
+          carne_id: c.id,
+          aluno_id: c.aluno_id,
+          aluno_nome: c.alunos?.nome || 'Sem nome',
+          aluno_matricula: c.alunos?.matricula || '',
+          curso: c.alunos?.cursos?.nome || '',
+          turma: c.alunos?.turmas?.nome || '',
+          valor_restante: Number(unica.valor) || 0,
+          data_vencimento: unica.data_vencimento,
+        });
+      }
+    }
+
+    // Buscar detalhamento de alunos inadimplentes (valor em atraso)
+    let parcelasAtrasoQuery = supabase
+      .from('financeiro_parcelas')
+      .select('valor, status, data_vencimento, aluno_id, alunos(id, nome, matricula, cursos(nome), turmas(nome))');
+
+    parcelasAtrasoQuery = applyInstituicaoFilter(parcelasAtrasoQuery, instituicaoId);
+    const { data: todasParcelasAtraso } = await parcelasAtrasoQuery;
+
+    const hojeStr = new Date().toISOString().split('T')[0];
+    const parcelasAtrasadas = (todasParcelasAtraso || []).filter(p => {
+      const isVencido = p.status === 'vencido' || (p.status === 'pendente' && p.data_vencimento < hojeStr);
+      return isVencido;
+    });
+
+    const inadimplentesMap = {};
+    for (const p of parcelasAtrasadas) {
+      const aluno = p.alunos;
+      if (!aluno) continue;
+      if (!inadimplentesMap[aluno.id]) {
+        inadimplentesMap[aluno.id] = {
+          aluno_id: aluno.id,
+          nome: aluno.nome,
+          matricula: aluno.matricula || '',
+          curso: aluno.cursos?.nome || '',
+          turma: aluno.turmas?.nome || '',
+          valor_em_atraso: 0,
+          qtd_parcelas_atrasadas: 0,
+        };
+      }
+      inadimplentesMap[aluno.id].valor_em_atraso += Number(p.valor) || 0;
+      inadimplentesMap[aluno.id].qtd_parcelas_atrasadas += 1;
+    }
+
+    const inadimplentesList = Object.values(inadimplentesMap).sort((a, b) => b.valor_em_atraso - a.valor_em_atraso);
+
     // Montar resposta
     const dados = {
       // EDUCACIONAL
@@ -133,6 +207,11 @@ export default async function handler(req, res) {
       totalRecebido: totalRecebido,
       taxaRecebimento: parseFloat(taxaRecebimento),
       totalGerado: totalGerado,
+      
+      // NOVAS MÉTRICAS FASE 2A
+      carnesAVencerCount: carnesAVencerList.length,
+      carnesAVencerList: carnesAVencerList,
+      alunosEmAtrasoList: inadimplentesList,
       
       // COMPATIBILIDADE COM INTERFACE ANTERIOR
       faturasPendentes: alunosComPendencias,
