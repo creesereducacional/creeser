@@ -1242,7 +1242,7 @@ export default function AlunosFinanceiroPage() {
           </div>
           <button
             onClick={() => setModalLote(true)}
-            className="px-4 py-2.5 bg-purple-650 text-white rounded-lg hover:bg-purple-700 font-semibold transition text-sm flex items-center gap-2"
+            className="px-4 py-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 font-bold transition text-sm flex items-center gap-2 shadow-sm"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
             Gerar Carnê em Lote
@@ -2187,6 +2187,9 @@ function ModalLote({ turmas, onClose, onSalvo }) {
   const [erro, setErro] = useState('');
   const [relatorio, setRelatorio] = useState(null);
 
+  const turmasFiltradas = (turmas || []).filter(t => (t.status_formacao || 'EM_FORMACAO') === 'EM_FORMACAO');
+  const semTurmas = turmasFiltradas.length === 0;
+
   useEffect(() => {
     if (!turmaId) {
       setAlunos([]);
@@ -2227,6 +2230,7 @@ function ModalLote({ turmas, onClose, onSalvo }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (semTurmas) return;
     if (selectedAlunos.size === 0) {
       setErro('Selecione pelo menos um aluno.');
       return;
@@ -2261,7 +2265,7 @@ function ModalLote({ turmas, onClose, onSalvo }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h3 className="text-lg font-bold text-purple-700">Gerar Carnê em Lote (Primeiro Semestre)</h3>
+          <h3 className="text-lg font-bold text-teal-700">Gerar Carnê em Lote (Primeiro Semestre)</h3>
           <button onClick={onClose} disabled={salvando} className="text-gray-400 hover:text-gray-650 text-xl leading-none">&times;</button>
         </div>
 
@@ -2312,20 +2316,27 @@ function ModalLote({ turmas, onClose, onSalvo }) {
             </div>
 
             <div className="flex justify-end pt-3">
-              <button onClick={onClose} className="px-5 py-2 bg-purple-650 hover:bg-purple-755 text-white rounded-lg text-sm font-semibold">
+              <button onClick={onClose} className="px-5 py-2 bg-teal-650 hover:bg-teal-700 text-white rounded-lg text-sm font-semibold">
                 Fechar
               </button>
             </div>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="overflow-y-auto p-6 space-y-4 flex-1">
+            {semTurmas && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded-xl text-xs space-y-1">
+                <p className="font-bold">Nenhuma turma Não Iniciada disponível para geração em lote.</p>
+                <p className="text-[11px] text-red-700">A geração em lote só é permitida para turmas com status Não Iniciada.</p>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-semibold text-gray-650 uppercase tracking-wide mb-1 block">Turma *</label>
-                <select value={turmaId} onChange={e => setTurmaId(e.target.value)} required
-                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:border-purple-500 bg-white text-gray-800">
+                <select value={turmaId} onChange={e => setTurmaId(e.target.value)} required disabled={semTurmas}
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:border-teal-500 bg-white text-gray-800 disabled:opacity-55 disabled:bg-gray-100">
                   <option value="">Selecione uma turma</option>
-                  {turmas.filter(t => (t.status_formacao || 'EM_FORMACAO') === 'EM_FORMACAO').map(t => (
+                  {turmasFiltradas.map(t => (
                     <option key={t.id} value={t.id}>{t.nome} (Não Iniciada)</option>
                   ))}
                 </select>
@@ -2333,34 +2344,34 @@ function ModalLote({ turmas, onClose, onSalvo }) {
 
               <div>
                 <label className="text-xs font-semibold text-gray-650 uppercase tracking-wide mb-1 block">Dia de Vencimento *</label>
-                <input type="number" min="1" max="31" value={form.dia_vencimento} onChange={e => set('dia_vencimento', e.target.value)} required
-                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:border-purple-500 bg-white text-gray-800" />
+                <input type="number" min="1" max="31" value={form.dia_vencimento} onChange={e => set('dia_vencimento', e.target.value)} required disabled={semTurmas}
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:border-teal-500 bg-white text-gray-800 disabled:opacity-55 disabled:bg-gray-100" />
               </div>
             </div>
 
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="text-xs font-semibold text-gray-650 uppercase tracking-wide mb-1 block">Início Período *</label>
-                <input type="date" value={form.periodo_inicio} onChange={e => set('periodo_inicio', e.target.value)} required
-                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:border-purple-500 bg-white text-gray-800" />
+                <input type="date" value={form.periodo_inicio} onChange={e => set('periodo_inicio', e.target.value)} required disabled={semTurmas}
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:border-teal-500 bg-white text-gray-800 disabled:opacity-55 disabled:bg-gray-100" />
               </div>
               <div>
                 <label className="text-xs font-semibold text-gray-650 uppercase tracking-wide mb-1 block">Fim Período *</label>
-                <input type="date" value={form.periodo_fim} onChange={e => set('periodo_fim', e.target.value)} required
-                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:border-purple-500 bg-white text-gray-800" />
+                <input type="date" value={form.periodo_fim} onChange={e => set('periodo_fim', e.target.value)} required disabled={semTurmas}
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:border-teal-500 bg-white text-gray-800 disabled:opacity-55 disabled:bg-gray-100" />
               </div>
               <div>
                 <label className="text-xs font-semibold text-gray-650 uppercase tracking-wide mb-1 block">Qtd. Parcelas *</label>
-                <input type="number" min="1" max="12" value={form.qtd_parcelas} onChange={e => set('qtd_parcelas', e.target.value)} required
-                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:border-purple-500 bg-white text-gray-800" />
+                <input type="number" min="1" max="12" value={form.qtd_parcelas} onChange={e => set('qtd_parcelas', e.target.value)} required disabled={semTurmas}
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:border-teal-500 bg-white text-gray-800 disabled:opacity-55 disabled:bg-gray-100" />
               </div>
             </div>
 
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Alunos da Turma ({selectedAlunos.size}/{alunos.length})</span>
-                {alunos.length > 0 && (
-                  <button type="button" onClick={handleToggleTodos} className="text-xs text-purple-600 hover:text-purple-700 font-bold">
+                {alunos.length > 0 && !semTurmas && (
+                  <button type="button" onClick={handleToggleTodos} className="text-xs text-teal-600 hover:text-teal-700 font-bold">
                     {selectedAlunos.size === alunos.length ? 'Desmarcar Todos' : 'Selecionar Todos'}
                   </button>
                 )}
@@ -2369,16 +2380,18 @@ function ModalLote({ turmas, onClose, onSalvo }) {
               <div className="border rounded-lg max-h-[180px] overflow-y-auto p-2 bg-gray-50 space-y-1">
                 {loadingAlunos ? (
                   <p className="text-xs text-gray-400 italic py-2 text-center">Carregando alunos...</p>
+                ) : semTurmas ? (
+                  <p className="text-xs text-gray-450 italic py-2 text-center">Nenhuma turma elegível selecionada.</p>
                 ) : alunos.length === 0 ? (
-                  <p className="text-xs text-gray-400 italic py-2 text-center">Selecione uma turma para carregar os alunos.</p>
+                  <p className="text-xs text-gray-450 italic py-2 text-center">Selecione uma turma para carregar os alunos.</p>
                 ) : (
                   alunos.map(aluno => (
                     <label key={aluno.id} className="flex items-center gap-2 p-1.5 hover:bg-white rounded cursor-pointer text-xs">
-                      <input type="checkbox" checked={selectedAlunos.has(aluno.id)} onChange={() => handleToggleAluno(aluno.id)}
-                        className="rounded border-gray-300 text-purple-650 focus:ring-purple-500" />
+                      <input type="checkbox" checked={selectedAlunos.has(aluno.id)} onChange={() => handleToggleAluno(aluno.id)} disabled={semTurmas}
+                        className="rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
                       <span className="text-gray-800 font-medium">{aluno.nome}</span>
                       {aluno.valor_mensalidade ? (
-                        <span className="text-gray-400 ml-auto">Mensalidade: R$ {Number(aluno.valor_mensalidade).toFixed(2)}</span>
+                        <span className="text-gray-450 ml-auto">Mensalidade: R$ {Number(aluno.valor_mensalidade).toFixed(2)}</span>
                       ) : (
                         <span className="text-red-500 font-semibold ml-auto">Sem mensalidade definida</span>
                       )}
@@ -2392,11 +2405,11 @@ function ModalLote({ turmas, onClose, onSalvo }) {
 
             <div className="flex justify-end gap-3 pt-2 border-t">
               <button type="button" onClick={onClose} disabled={salvando}
-                className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
+                className="px-4 py-2 text-sm text-gray-650 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
                 Cancelar
               </button>
-              <button type="submit" disabled={salvando || !turmaId || selectedAlunos.size === 0}
-                className="px-5 py-2 text-sm font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50">
+              <button type="submit" disabled={salvando || !turmaId || selectedAlunos.size === 0 || semTurmas}
+                className="px-5 py-2 text-sm font-semibold bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
                 {salvando ? 'Gerando Lote...' : 'Gerar Carnês'}
               </button>
             </div>
