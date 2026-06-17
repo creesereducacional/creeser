@@ -97,7 +97,7 @@ export default async function handler(req, res) {
       }
 
       // Bloquear trancamento de alunos cancelados/desistentes
-      if (aluno.statusmatricula === 'CANCELADO' || aluno.statusmatricula === 'DESISTENTE' || aluno.statusmatricula === 'TRANCADO') {
+      if (aluno.statusmatricula === 'CANCELADO' || aluno.statusmatricula === 'DESISTENTE' || aluno.statusmatricula === 'TRANCADO' || aluno.statusmatricula === 'TRANCADO_COM_DEBITO') {
         return res.status(422).json({ message: `Não é possível trancar aluno com status ${aluno.statusmatricula}` });
       }
 
@@ -115,17 +115,14 @@ export default async function handler(req, res) {
         return res.status(500).json({ message: 'Erro ao validar parcelas do aluno: ' + parcelasError.message });
       }
 
-      if (parcelasAtrasadas && parcelasAtrasadas.length > 0) {
-        return res.status(422).json({
-          message: 'Não é permitido trancar aluno com parcelas em atraso. Regularize as pendências primeiro.'
-        });
-      }
+      const temAtraso = parcelasAtrasadas && parcelasAtrasadas.length > 0;
+      const novoStatusMatricula = temAtraso ? 'TRANCADO_COM_DEBITO' : 'TRANCADO';
 
       const agora = new Date().toISOString();
       const { data: alunoAtualizado, error: updateAlunoError } = await supabase
         .from('alunos')
         .update({
-          statusmatricula: 'TRANCADO',
+          statusmatricula: novoStatusMatricula,
           data_trancamento: agora,
           observacao_trancamento: observacao_trancamento.trim()
         })
@@ -166,7 +163,9 @@ export default async function handler(req, res) {
           dados_extras: {
             data_trancamento: agora,
             statusmatricula_anterior: aluno.statusmatricula,
-            parcelas_canceladas_ids: parcelasCanceladas ? parcelasCanceladas.map(p => p.id) : []
+            statusmatricula_novo: novoStatusMatricula,
+            parcelas_canceladas_ids: parcelasCanceladas ? parcelasCanceladas.map(p => p.id) : [],
+            parcelas_atrasadas_mantidas_count: parcelasAtrasadas ? parcelasAtrasadas.length : 0
           }
         });
       } catch (_) {}
@@ -182,7 +181,9 @@ export default async function handler(req, res) {
           id_entidade: String(aluno.id),
           detalhes: {
             observacao: observacao_trancamento.trim(),
-            parcelas_canceladas_count: parcelasCanceladas ? parcelasCanceladas.length : 0
+            status_matricula_aplicado: novoStatusMatricula,
+            parcelas_canceladas_count: parcelasCanceladas ? parcelasCanceladas.length : 0,
+            parcelas_atrasadas_mantidas_count: parcelasAtrasadas ? parcelasAtrasadas.length : 0
           }
         });
       } catch (_) {}

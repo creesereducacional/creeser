@@ -5,6 +5,7 @@ import {
   requirePerfil,
 } from '../../../../../lib/auth-server';
 import { tentarCriarComissao } from '../../../../../lib/comissoes-helper';
+import { verificarEProcessarPagamentoEntrada } from '../../../../../lib/acordos-helper';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -253,6 +254,12 @@ export default async function handler(req, res) {
   const aviso = parcela.efi_charge_id
     ? 'Esta baixa não cancela automaticamente o boleto EFI.'
     : null;
+
+  try {
+    await verificarEProcessarPagamentoEntrada(supabase, id);
+  } catch (err) {
+    console.error('[pagar API] Erro ao verificar acordo:', err);
+  }
 
   return res.status(200).json({
     message: 'Baixa manual registrada com sucesso',

@@ -224,7 +224,17 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
     vencimento_desconto: '',
     data_vencimento: vencimentoStr,
     quantidade_parcelas: 1,
+    // campos para acordo
+    valor_entrada: '',
+    data_vencimento_entrada: vencimentoStr,
+    dia_vencimento_parcelas: diaAluno,
+    quantidade_parcelas_acordo: 1,
   });
+
+  const [parcelasAberto, setParcelasAberto] = useState([]);
+  const [loadingParcelas, setLoadingParcelas] = useState(false);
+  const [selectedParcelas, setSelectedParcelas] = useState(new Set());
+
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
   const [sucesso, setSucesso] = useState('');
@@ -232,144 +242,395 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
+  // Carregar parcelas em aberto/vencidas do aluno quando a categoria for ACORDO
+  useEffect(() => {
+    if (form.categoria === 'ACORDO') {
+      setLoadingParcelas(true);
+      setErro('');
+      fetch(`/api/admin-financeiro/aluno-ordens/${aluno.id}`)
+        .then(res => res.json())
+        .then(data => {
+          // Extrair parcelas não pagas e não canceladas das ordens e dos carnês
+          const parcelasOriginais = [];
+
+          // Das ordens simples
+          (data.ordens || []).forEach(o => {
+            // Em aluno-ordens/[id].js, as ordens vêm agregadas com dados da parcela
+            // e os detalhes completos vêm no array financeiro_parcelas
+            const parcList = o.financeiro_parcelas || [];
+            parcList.forEach(p => {
+              if (p.status !== 'pago' && p.status !== 'cancelado') {
+                parcelasOriginais.push({
+                  id: p.id,
+                  descricao: o.descricao || 'Fatura',
+                  referencia: o.referencia || 'Ordem Simples',
+                  data_vencimento: p.data_vencimento,
+                  valor: Number(p.valor) || 0,
+                  numero_parcela: p.numero_parcela,
+                  cobranca: p.boleto_numero || p.efi_charge_id || o.efi_charge_id
+                });
+              }
+            });
+          });
+
+          // Dos carnês
+          (data.carnes || []).forEach(c => {
+            const parcList = c.parcelas || [];
+            parcList.forEach(p => {
+              if (p.status !== 'pago' && p.status !== 'cancelado') {
+                parcelasOriginais.push({
+                  id: p.id,
+                  descricao: c.descricao || 'Carnê',
+                  referencia: c.referencia || 'Carnê',
+                  data_vencimento: p.data_vencimento,
+                  valor: Number(p.valor) || 0,
+                  numero_parcela: p.numero_parcela,
+                  cobranca: p.boleto_numero || p.efi_charge_id
+                });
+              }
+            });
+          });
+
+          // Ordenar por data de vencimento
+          parcelasOriginais.sort((a, b) => new Date(a.data_vencimento) - new Date(b.data_vencimento));
+
+          setParcelasAberto(parcelasOriginais);
+          // Auto-selecionar todas por padrão
+          setSelectedParcelas(new Set(parcelasOriginais.map(p => p.id)));
+        })
+        .catch(err => {
+          console.error(err);
+          setErro('Erro ao carregar parcelas em aberto.');
+        })
+        .finally(() => {
+          setLoadingParcelas(false);
+        });
+    } else {
+      setParcelasAberto([]);
+      setSelectedParcelas(new Set());
+    }
+  }, [form.categoria, aluno.id]);
+
+  // Cálculos do acordo
+  const totalDebitoSelecionado = Array.from(selectedParcelas).reduce((acc, id) => {
+    const p = parcelasAberto.find(x => x.id === id);
+    return acc + (p ? p.valor : 0);
+  }, 0);
+
+  const entrada = Number(form.valor_entrada) || 0;
+  const saldo = Math.max(0, totalDebitoSelecionado - entrada);
+  const qtdParcelasAcordo = Number(form.quantidade_parcelas_acordo) || 1;
+  const valorParcelaAcordo = saldo / qtdParcelasAcordo;
+
   const valorFinal = () => {
     const v = Number(form.valor) || 0;
     if (tipoDesconto === '%') return Math.max(0, v - v * ((Number(form.percentual_desconto) || 0) / 100));
     return Math.max(0, v - (Number(form.percentual_desconto) || 0));
   };
 
+  const handleToggleParcela = (id) => {
+    setSelectedParcelas(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleToggleTodas = () => {
+    if (selectedParcelas.size === parcelasAberto.length) {
+      setSelectedParcelas(new Set());
+    } else {
+      setSelectedParcelas(new Set(parcelasAberto.map(p => p.id)));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.descricao.trim()) return setErro('Descrição é obrigatória');
-    if (!form.valor || Number(form.valor) <= 0) return setErro('Valor deve ser maior que zero');
-    setSalvando(true); setErro('');
-    try {
-      const qtd = Number(form.quantidade_parcelas) || 1;
-      const pctDesc = tipoDesconto === '%' ? (Number(form.percentual_desconto) || 0) : 0;
-      const valDesc = tipoDesconto === 'R$' ? (Number(form.percentual_desconto) || 0) : Number(form.valor) * (pctDesc / 100);
-      const res = await fetch('/api/admin-financeiro/ordens/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          aluno_id: aluno.id, tipo: 'ordem_simples',
-          descricao: form.descricao.trim(),
-          referencia: form.categoria || null,
-          valor_total: Number(form.valor),
-          percentual_desconto: pctDesc,
-          valor_desconto: valDesc,
-          quantidade_parcelas: qtd,
-          data_vencimento_primeira: form.data_vencimento,
-          criado_por: 'financeiro',
-        }),
-      });
-      const resBody = await res.json();
-      if (!res.ok) throw new Error(resBody.error || resBody.message || 'Erro ao criar ordem');
+    if (form.categoria === 'ACORDO') {
+      // Validações do Acordo
+      if (selectedParcelas.size === 0) return setErro('Selecione ao menos uma parcela original.');
+      if (entrada <= 0) return setErro('O valor de entrada deve ser maior que zero.');
+      if (entrada > totalDebitoSelecionado) return setErro('O valor de entrada não pode ser maior que o débito total.');
+      if (!form.data_vencimento_entrada) return setErro('Data de vencimento da entrada é obrigatória.');
+      if (qtdParcelasAcordo <= 0) return setErro('A quantidade de parcelas deve ser maior que zero.');
+      if (!form.dia_vencimento_parcelas || Number(form.dia_vencimento_parcelas) < 1 || Number(form.dia_vencimento_parcelas) > 31) {
+        return setErro('Dia de vencimento das parcelas deve ser entre 1 e 31.');
+      }
+      if (!form.descricao.trim()) return setErro('Observação/Descrição é obrigatória.');
 
-      const parcela_id = resBody.parcelas?.[0]?.id;
-      if (parcela_id) {
-        setSucesso('⏳ Gerando boleto no banco EFI...');
-        const efiRes = await fetch('/api/admin-financeiro/efi/cobranca', {
+      setSalvando(true); setErro('');
+      try {
+        const res = await fetch('/api/admin-financeiro/acordos/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ parcela_id, descricao: form.descricao.trim() }),
+          body: JSON.stringify({
+            aluno_id: aluno.id,
+            descricao: form.descricao.trim(),
+            parcelas_originais: Array.from(selectedParcelas),
+            valor_entrada: entrada,
+            data_vencimento_entrada: form.data_vencimento_entrada,
+            quantidade_parcelas: qtdParcelasAcordo,
+            dia_vencimento_parcelas: Number(form.dia_vencimento_parcelas),
+          }),
         });
-        if (!efiRes.ok) {
-          const efiBody = await efiRes.json();
-          setSucesso('✅ Ordem criada, mas falha no boleto EFI: ' + (efiBody.message || 'erro desconhecido'));
-          setTimeout(() => { onSalvo(); onSuccess(); onClose(); }, 2000);
-          return;
-        }
-      }
+        const resBody = await res.json();
+        if (!res.ok) throw new Error(resBody.message || 'Erro ao criar acordo');
 
-      setSucesso('✅ Ordem e boleto EFI criados com sucesso!');
-      setTimeout(() => { onSalvo(); onSuccess(); onClose(); }, 800);
-    } catch (e) { setErro(e.message); } finally { setSalvando(false); }
+        // Gerar boleto no banco EFI para a parcela de entrada
+        const entradaParcelaId = resBody.parcelas?.find(p => p.numero_parcela === 1)?.id;
+        if (entradaParcelaId) {
+          setSucesso('⏳ Gerando boleto da entrada no banco EFI...');
+          const efiRes = await fetch('/api/admin-financeiro/efi/cobranca', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ parcela_id: entradaParcelaId, descricao: `Entrada - ${form.descricao.trim()}` }),
+          });
+          if (!efiRes.ok) {
+            const efiBody = await efiRes.json();
+            setSucesso('✅ Acordo criado, mas falha no boleto da entrada: ' + (efiBody.message || 'erro desconhecido'));
+            setTimeout(() => { onSalvo(); onSuccess(); onClose(); }, 2500);
+            return;
+          }
+        }
+
+        setSucesso('✅ Acordo financeiro criado com sucesso!');
+        setTimeout(() => { onSalvo(); onSuccess(); onClose(); }, 800);
+      } catch (err) { setErro(err.message); } finally { setSalvando(false); }
+
+    } else {
+      // Comportamento original
+      if (!form.descricao.trim()) return setErro('Descrição é obrigatória');
+      if (!form.valor || Number(form.valor) <= 0) return setErro('Valor deve ser maior que zero');
+      setSalvando(true); setErro('');
+      try {
+        const qtd = Number(form.quantidade_parcelas) || 1;
+        const pctDesc = tipoDesconto === '%' ? (Number(form.percentual_desconto) || 0) : 0;
+        const valDesc = tipoDesconto === 'R$' ? (Number(form.percentual_desconto) || 0) : Number(form.valor) * (pctDesc / 100);
+        const res = await fetch('/api/admin-financeiro/ordens/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            aluno_id: aluno.id, tipo: 'ordem_simples',
+            descricao: form.descricao.trim(),
+            referencia: form.categoria || null,
+            valor_total: Number(form.valor),
+            percentual_desconto: pctDesc,
+            valor_desconto: valDesc,
+            quantidade_parcelas: qtd,
+            data_vencimento_primeira: form.data_vencimento,
+            criado_por: 'financeiro',
+          }),
+        });
+        const resBody = await res.json();
+        if (!res.ok) throw new Error(resBody.error || resBody.message || 'Erro ao criar ordem');
+
+        const parcela_id = resBody.parcelas?.[0]?.id;
+        if (parcela_id) {
+          setSucesso('⏳ Gerando boleto no banco EFI...');
+          const efiRes = await fetch('/api/admin-financeiro/efi/cobranca', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ parcela_id, descricao: form.descricao.trim() }),
+          });
+          if (!efiRes.ok) {
+            const efiBody = await efiRes.json();
+            setSucesso('✅ Ordem criada, mas falha no boleto EFI: ' + (efiBody.message || 'erro desconhecido'));
+            setTimeout(() => { onSalvo(); onSuccess(); onClose(); }, 2000);
+            return;
+          }
+        }
+
+        setSucesso('✅ Ordem e boleto EFI criados com sucesso!');
+        setTimeout(() => { onSalvo(); onSuccess(); onClose(); }, 800);
+      } catch (e) { setErro(e.message); } finally { setSalvando(false); }
+    }
   };
 
   const inputCls = 'flex-1 px-3 py-2 text-sm bg-transparent focus:outline-none text-gray-800 placeholder-gray-400';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 my-8 flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
           <div>
-            <h3 className="text-lg font-bold text-blue-700">Nova Ordem de Pagamento</h3>
+            <h3 className="text-lg font-bold text-blue-700">
+              {form.categoria === 'ACORDO' ? 'Novo Acordo Financeiro' : 'Nova Ordem de Pagamento'}
+            </h3>
             <p className="text-sm text-gray-500">{aluno.nome}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-650">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-3">
-          <p className="text-xs font-semibold text-teal-600 mb-1">Lançar faturas</p>
-
-          <div className="grid grid-cols-2 gap-3">
-            {/* Valor | Desconto */}
-            <FieldGroup label="Valor *">
-              <input type="number" step="0.01" min="0" value={form.valor}
-                onChange={e => set('valor', e.target.value)}
-                className={inputCls} placeholder="Valor da fatura" />
-            </FieldGroup>
-            <div className="flex items-stretch rounded-lg border border-teal-300 bg-teal-50 focus-within:border-teal-500">
-              <span className="px-3 py-2 text-xs font-semibold text-teal-700 bg-teal-100 border-r border-teal-300 flex items-center rounded-l-lg flex-shrink-0">Desconto</span>
-              <input type="number" step="0.01" min="0" max={tipoDesconto === '%' ? 100 : undefined} value={form.percentual_desconto}
-                onChange={e => set('percentual_desconto', e.target.value)}
-                className={inputCls} placeholder="0" />
-              <select
-                value={tipoDesconto}
-                onChange={e => { setTipoDesconto(e.target.value); set('percentual_desconto', ''); }}
-                className="px-2 py-2 text-xs font-bold text-teal-700 bg-teal-100 border-l border-teal-300 rounded-r-lg flex-shrink-0 focus:outline-none cursor-pointer">
-                <option value="%">%</option>
-                <option value="R$">R$</option>
-              </select>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
+            
+            {/* Escolha de categoria e seletor */}
+            <div className="grid grid-cols-2 gap-3">
+              <FieldGroup label="Categoria" className="col-span-2">
+                <select value={form.categoria} onChange={e => set('categoria', e.target.value)}
+                  className={inputCls + ' cursor-pointer'}>
+                  <option value="">- Escolha uma Categoria -</option>
+                  {CATEGORIAS_ORDEM.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </FieldGroup>
             </div>
 
-            {/* Vencimento | Vencimento do Desconto */}
-            <FieldGroup label="Vencimento *">
-              <input type="date" value={form.data_vencimento}
-                onChange={e => set('data_vencimento', e.target.value)}
-                className={inputCls} />
-            </FieldGroup>
-            <FieldGroup label="Vencimento do Desconto">
-              <input type="date" value={form.vencimento_desconto}
-                onChange={e => set('vencimento_desconto', e.target.value)}
-                className={inputCls} />
-            </FieldGroup>
+            {form.categoria === 'ACORDO' ? (
+              // ── ÁREA DO ACORDO FINANCEIRO ─────────────────────────────────────────────
+              <div className="space-y-4">
+                <div className="border-t pt-3">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-bold text-teal-600 uppercase tracking-wider">Selecione as Parcelas originais para o Acordo:</span>
+                    {parcelasAberto.length > 0 && (
+                      <button type="button" onClick={handleToggleTodas} className="text-xs text-teal-600 hover:text-teal-700 font-bold">
+                        {selectedParcelas.size === parcelasAberto.length ? 'Desmarcar Todas' : 'Selecionar Todas'}
+                      </button>
+                    )}
+                  </div>
 
-            {/* Categoria | Qtd. Parcelas */}
-            <FieldGroup label="Categoria">
-              <select value={form.categoria} onChange={e => set('categoria', e.target.value)}
-                className={inputCls + ' cursor-pointer'}>
-                <option value="">- Escolha uma Categoria -</option>
-                {CATEGORIAS_ORDEM.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </FieldGroup>
-            <FieldGroup label="Qtd. Parcelas">
-              <input type="number" min="1" max="60" value={form.quantidade_parcelas}
-                onChange={e => set('quantidade_parcelas', e.target.value)}
-                className={inputCls} placeholder="Quantidade de parcelas." />
-            </FieldGroup>
+                  {loadingParcelas ? (
+                    <p className="text-xs text-gray-400 italic py-2 text-center">Carregando faturas do aluno...</p>
+                  ) : parcelasAberto.length === 0 ? (
+                    <p className="text-xs text-gray-450 italic py-2 text-center">Nenhuma fatura em aberto encontrada para este aluno.</p>
+                  ) : (
+                    <div className="border rounded-lg max-h-[160px] overflow-y-auto p-2 bg-gray-50 space-y-1">
+                      {parcelasAberto.map(p => (
+                        <label key={p.id} className="flex items-center justify-between p-1.5 hover:bg-white rounded cursor-pointer text-xs select-none">
+                          <div className="flex items-center gap-2">
+                            <input type="checkbox"
+                              checked={selectedParcelas.has(p.id)}
+                              onChange={() => handleToggleParcela(p.id)}
+                              className="rounded border-gray-300 text-teal-600 cursor-pointer" />
+                            <span className="font-medium text-gray-800">{p.descricao} (Nº {p.numero_parcela})</span>
+                            <span className="text-gray-450">· Ref: {p.referencia}</span>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <span className="text-gray-500">Venc. {p.data_vencimento.split('-').reverse().join('/')}</span>
+                            <span className="font-bold text-gray-900">R$ {p.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-            {/* Descrição — linha inteira */}
-            <FieldGroup label="Descrição *" className="col-span-2">
-              <textarea rows={2} value={form.descricao}
-                onChange={e => set('descricao', e.target.value)}
-                className={inputCls + ' resize-none'} placeholder="Insira a descrição." />
-            </FieldGroup>
+                <div className="grid grid-cols-2 gap-3">
+                  <FieldGroup label="Valor de Entrada *">
+                    <input type="number" step="0.01" min="0.01" value={form.valor_entrada}
+                      onChange={e => set('valor_entrada', e.target.value)} required
+                      className={inputCls} placeholder="R$ 0,00" />
+                  </FieldGroup>
+                  <FieldGroup label="Vencimento Entrada *">
+                    <input type="date" value={form.data_vencimento_entrada}
+                      onChange={e => set('data_vencimento_entrada', e.target.value)} required
+                      className={inputCls} />
+                  </FieldGroup>
+                  <FieldGroup label="Qtd. Parcelas Saldo *">
+                    <input type="number" min="1" max="60" value={form.quantidade_parcelas_acordo}
+                      onChange={e => set('quantidade_parcelas_acordo', e.target.value)} required
+                      className={inputCls} />
+                  </FieldGroup>
+                  <FieldGroup label="Dia Venc. Parcelas *">
+                    <input type="number" min="1" max="31" value={form.dia_vencimento_parcelas}
+                      onChange={e => set('dia_vencimento_parcelas', e.target.value)} required
+                      className={inputCls} />
+                  </FieldGroup>
+                </div>
 
-            {Number(form.valor) > 0 && (
-              <div className="col-span-2 flex items-center bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-sm text-blue-800">
-                Valor final: <strong className="ml-1">R$ {valorFinal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+                {/* Resumo do Acordo */}
+                {totalDebitoSelecionado > 0 && (
+                  <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 text-sm space-y-1">
+                    <div className="flex justify-between text-gray-700">
+                      <span>Total do Débito Selecionado:</span>
+                      <span className="font-bold">R$ {totalDebitoSelecionado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-700">
+                      <span>Valor de Entrada obrigatória:</span>
+                      <span className="font-bold text-blue-700">- R$ {entrada.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-700">
+                      <span>Saldo Restante:</span>
+                      <span className="font-bold">R$ {saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="border-t border-teal-200 my-1" />
+                    <div className="flex justify-between text-teal-850 font-bold text-base">
+                      <span>{qtdParcelasAcordo}x parcelas de saldo de:</span>
+                      <span>R$ {valorParcelaAcordo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Descrição obrigatória */}
+                <FieldGroup label="Observações / Justificativa *">
+                  <textarea rows={2} value={form.descricao}
+                    onChange={e => set('descricao', e.target.value)} required
+                    className={inputCls + ' resize-none'} placeholder="Descreva os termos do acordo (obrigatório, mínimo 10 caracteres)." />
+                </FieldGroup>
+              </div>
+            ) : (
+              // ── COMPORTAMENTO ORIGINAL (OUTRAS CATEGORIAS) ──────────────────────────────
+              <div className="grid grid-cols-2 gap-3">
+                <FieldGroup label="Valor *">
+                  <input type="number" step="0.01" min="0" value={form.valor}
+                    onChange={e => set('valor', e.target.value)}
+                    className={inputCls} placeholder="Valor da fatura" />
+                </FieldGroup>
+                <div className="flex items-stretch rounded-lg border border-teal-300 bg-teal-50 focus-within:border-teal-500">
+                  <span className="px-3 py-2 text-xs font-semibold text-teal-700 bg-teal-100 border-r border-teal-300 flex items-center rounded-l-lg flex-shrink-0">Desconto</span>
+                  <input type="number" step="0.01" min="0" max={tipoDesconto === '%' ? 100 : undefined} value={form.percentual_desconto}
+                    onChange={e => set('percentual_desconto', e.target.value)}
+                    className={inputCls} placeholder="0" />
+                  <select
+                    value={tipoDesconto}
+                    onChange={e => { setTipoDesconto(e.target.value); set('percentual_desconto', ''); }}
+                    className="px-2 py-2 text-xs font-bold text-teal-700 bg-teal-100 border-l border-teal-300 rounded-r-lg flex-shrink-0 focus:outline-none cursor-pointer">
+                    <option value="%">%</option>
+                    <option value="R$">R$</option>
+                  </select>
+                </div>
+
+                <FieldGroup label="Vencimento *">
+                  <input type="date" value={form.data_vencimento}
+                    onChange={e => set('data_vencimento', e.target.value)}
+                    className={inputCls} />
+                </FieldGroup>
+                <FieldGroup label="Vencimento do Desconto">
+                  <input type="date" value={form.vencimento_desconto}
+                    onChange={e => set('vencimento_desconto', e.target.value)}
+                    className={inputCls} />
+                </FieldGroup>
+
+                <FieldGroup label="Qtd. Parcelas">
+                  <input type="number" min="1" max="60" value={form.quantidade_parcelas}
+                    onChange={e => set('quantidade_parcelas', e.target.value)}
+                    className={inputCls} placeholder="Quantidade de parcelas." />
+                </FieldGroup>
+
+                <FieldGroup label="Descrição *" className="col-span-2">
+                  <textarea rows={2} value={form.descricao}
+                    onChange={e => set('descricao', e.target.value)}
+                    className={inputCls + ' resize-none'} placeholder="Insira a descrição." />
+                </FieldGroup>
+
+                {Number(form.valor) > 0 && (
+                  <div className="col-span-2 flex items-center bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-sm text-blue-800">
+                    Valor final: <strong className="ml-1">R$ {valorFinal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+                  </div>
+                )}
               </div>
             )}
+
+            {erro && <p className="text-sm text-red-650 font-semibold">{erro}</p>}
+            {sucesso && <p className="text-sm text-green-650 font-semibold">{sucesso}</p>}
           </div>
 
-          {erro && <p className="text-sm text-red-600">{erro}</p>}
-          {sucesso && <p className="text-sm text-green-600">{sucesso}</p>}
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100">Cancelar</button>
-            <button type="submit" disabled={salvando} className="px-5 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
-              {salvando ? 'Salvando...' : 'Criar Ordem'}
+          <div className="flex justify-end gap-3 p-4 border-t bg-gray-50 rounded-b-xl flex-shrink-0">
+            <button type="button" onClick={onClose} disabled={salvando} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100">Cancelar</button>
+            <button type="submit" disabled={salvando || (form.categoria === 'ACORDO' && (selectedParcelas.size === 0 || !form.descricao || form.descricao.trim().length < 10))}
+              className="px-5 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition">
+              {salvando ? 'Processando...' : form.categoria === 'ACORDO' ? 'Confirmar Acordo' : 'Criar Ordem'}
             </button>
           </div>
         </form>
@@ -715,6 +976,39 @@ function gerarHTMLRecibo(dados) {
   const fmtData = (d) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '-';
   const numero = dados.boleto_numero || dados.ordem_id?.slice(-8).toUpperCase() || '';
 
+  const MAPA_METODOS = {
+    pix: 'PIX',
+    dinheiro: 'Dinheiro',
+    cartao: 'Cartão',
+    transferencia: 'Transferência',
+    boleto: 'Boleto'
+  };
+
+  const isMultiplo = dados.metodo_pagamento === 'multiplo' && Array.isArray(dados.detalhes_baixa_multipla) && dados.detalhes_baixa_multipla.length > 1;
+
+  let formaPagamentoHTML = '';
+  if (isMultiplo) {
+    const listItems = dados.detalhes_baixa_multipla.map(item => {
+      const label = MAPA_METODOS[String(item.metodo).toLowerCase()] || String(item.metodo).toUpperCase();
+      const valor = valorFmt(item.valor);
+      return `<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-family:monospace; font-size:12px;"><span>${label.padEnd(20, '.')}</span> <span>${valor}</span></div>`;
+    }).join('');
+
+    formaPagamentoHTML = `
+      <div style="margin-top:16px; border-top:1px dashed #ccc; padding-top:10px; max-width:280px; margin-left:auto; margin-right:auto; text-align:left;">
+        <label style="font-size:10px; font-weight:bold; text-transform:uppercase; color:#888; display:block; margin-bottom:6px;">Forma de pagamento:</label>
+        ${listItems}
+        <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:12px; margin-top:8px; border-top:1px solid #eee; padding-top:4px;">
+          <span>Total pago</span>
+          <span>${valorFmt(dados.valor)}</span>
+        </div>
+      </div>
+    `;
+  } else {
+    const labelMetodo = MAPA_METODOS[String(dados.metodo_pagamento || '').toLowerCase()] || String(dados.metodo_pagamento || 'PIX').toUpperCase();
+    formaPagamentoHTML = `<div style="margin-top:10px; font-size:12px; color:#333; text-align:center;"><strong>Forma de pagamento:</strong> ${labelMetodo}</div>`;
+  }
+
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Recibo</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
@@ -758,6 +1052,7 @@ function gerarHTMLRecibo(dados) {
 <div class="valor-box">
   <label>Valor Pago</label>
   <span>${valorFmt(dados.valor)}</span>
+  ${formaPagamentoHTML}
 </div>
 <div class="footer">
   <div class="assinatura">${dados.instituicao.nome}<br>Responsável pela Instituição</div>
@@ -825,6 +1120,47 @@ function ModalRecibo({ ordem, onClose }) {
                 <div className="text-center pt-2 border-t border-emerald-200">
                   <p className="text-xs text-gray-500 mb-1">Valor pago</p>
                   <p className="text-2xl font-bold text-emerald-700">{formataValor(dados.valor)}</p>
+                  
+                  {dados.metodo_pagamento === 'multiplo' && Array.isArray(dados.detalhes_baixa_multipla) && dados.detalhes_baixa_multipla.length > 1 ? (
+                    <div className="mt-3 border-t border-emerald-200/50 pt-2 text-left text-xs space-y-1 text-gray-700 max-w-[280px] mx-auto">
+                      <p className="font-bold text-gray-500 uppercase tracking-wide text-[9px] mb-1">Forma de pagamento:</p>
+                      {dados.detalhes_baixa_multipla.map((item, idx) => {
+                        const MAPA_METODOS = {
+                          pix: 'PIX',
+                          dinheiro: 'Dinheiro',
+                          cartao: 'Cartão',
+                          transferencia: 'Transferência',
+                          boleto: 'Boleto'
+                        };
+                        const label = MAPA_METODOS[String(item.metodo).toLowerCase()] || String(item.metodo).toUpperCase();
+                        return (
+                          <div key={idx} className="flex justify-between font-mono">
+                            <span>{label.padEnd(20, '.')}</span>
+                            <span>{formataValor(item.valor)}</span>
+                          </div>
+                        );
+                      })}
+                      <div className="flex justify-between font-bold text-gray-900 border-t border-gray-200 pt-1 mt-1">
+                        <span>Total pago</span>
+                        <span>{formataValor(dados.valor)}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-center text-xs text-gray-650">
+                      <strong>Forma de pagamento:</strong> {
+                        (() => {
+                          const MAPA_METODOS = {
+                            pix: 'PIX',
+                            dinheiro: 'Dinheiro',
+                            cartao: 'Cartão',
+                            transferencia: 'Transferência',
+                            boleto: 'Boleto'
+                          };
+                          return MAPA_METODOS[String(dados.metodo_pagamento || '').toLowerCase()] || String(dados.metodo_pagamento || 'PIX').toUpperCase();
+                        })()
+                      }
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -994,6 +1330,7 @@ export default function AlunosFinanceiroPage() {
   const [cancelandoParcelaAluno, setCancelandoParcelaAluno] = useState(false);
   const [gerandoBoletoAluno, setGerandoBoletoAluno] = useState(null);
   const [modalConfirmarAluno, setModalConfirmarAluno] = useState(null);
+  const [modalCancelarParcelaAluno, setModalCancelarParcelaAluno] = useState(null);
 
   const fetchOrdensAluno = async (alunoId, force = false) => {
     if (!force && ordensCache[alunoId]) return;
@@ -1025,46 +1362,54 @@ export default function AlunosFinanceiroPage() {
   };
 
   const handleCancelarParcelaAluno = (carne, parcela, alunoId) => {
-    setModalConfirmarAluno({
-      titulo: 'Cancelar parcela',
-      mensagem: `Confirma o cancelamento da parcela ${parcela.numero_parcela}?`,
-      onConfirm: async () => {
-        setCancelandoParcelaAluno(true);
-        try {
-          await fetch('/api/admin-financeiro/efi/carne', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ordem_id: carne.id, parcela_id: parcela.id }),
-          });
-          setCarnesCache(prev => { const n = {...prev}; delete n[alunoId]; return n; });
-          fetchOrdensAluno(alunoId, true);
-        } catch (e) { console.error(e); } finally { setCancelandoParcelaAluno(false); }
-      },
+    setModalCancelarParcelaAluno({
+      type: 'single',
+      carne,
+      parcela,
+      alunoId,
     });
   };
 
   const handleCancelarSelecionadasAluno = (carne, alunoId) => {
     const ids = [...(selectedParcelasAluno[carne.id] || [])];
     if (!ids.length) return;
-    setModalConfirmarAluno({
-      titulo: 'Cancelar parcelas',
-      mensagem: `Confirma o cancelamento de ${ids.length} parcela(s)?`,
-      onConfirm: async () => {
-        setCancelandoParcelaAluno(true);
-        try {
-          for (const parcela_id of ids) {
-            await fetch('/api/admin-financeiro/efi/carne', {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ordem_id: carne.id, parcela_id }),
-            });
-          }
-          setSelectedParcelasAluno(prev => ({ ...prev, [carne.id]: new Set() }));
-          setCarnesCache(prev => { const n = {...prev}; delete n[alunoId]; return n; });
-          fetchOrdensAluno(alunoId, true);
-        } catch (e) { console.error(e); } finally { setCancelandoParcelaAluno(false); }
-      },
+    setModalCancelarParcelaAluno({
+      type: 'multiple',
+      carne,
+      ids,
+      alunoId,
     });
+  };
+
+  const handleConfirmarCancelarParcelaAluno = async (observacao) => {
+    if (!modalCancelarParcelaAluno) return;
+    setCancelandoParcelaAluno(true);
+    const { type, carne, parcela, ids, alunoId } = modalCancelarParcelaAluno;
+    try {
+      if (type === 'single') {
+        await fetch('/api/admin-financeiro/efi/carne', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ordem_id: carne.id, parcela_id: parcela.id, observacao }),
+        });
+      } else if (type === 'multiple') {
+        for (const parcela_id of ids) {
+          await fetch('/api/admin-financeiro/efi/carne', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ordem_id: carne.id, parcela_id, observacao }),
+          });
+        }
+        setSelectedParcelasAluno(prev => ({ ...prev, [carne.id]: new Set() }));
+      }
+      setCarnesCache(prev => { const n = {...prev}; delete n[alunoId]; return n; });
+      fetchOrdensAluno(alunoId, true);
+      setModalCancelarParcelaAluno(null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCancelandoParcelaAluno(false);
+    }
   };
 
   const handleGerarBoletosAluno = async (carne, alunoId) => {
@@ -1574,8 +1919,8 @@ export default function AlunosFinanceiroPage() {
                                                                 )}
                                                                 {cancelavel && (
                                                                   <button onClick={() => handleCancelarParcelaAluno(carne, parcela, aluno.id)} disabled={cancelandoParcelaAluno}
-                                                                    title="Cancelar parcela"
-                                                                    className="p-1.5 text-red-500 hover:bg-red-50 rounded transition disabled:opacity-40">
+                                                                    title="Cancelar Parcela"
+                                                                    className="w-9 h-9 flex items-center justify-center rounded-full bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 hover:scale-105 hover:shadow-sm transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
                                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                                                                   </button>
                                                                 )}
@@ -1805,6 +2150,25 @@ export default function AlunosFinanceiroPage() {
           onClose={() => setModalConfirmarAluno(null)}
         />
       )}
+      {modalCancelarParcelaAluno && modalCancelarParcelaAluno.type === 'single' && (
+        <ModalCancelarParcela
+          carne={modalCancelarParcelaAluno.carne}
+          parcela={modalCancelarParcelaAluno.parcela}
+          onConfirm={handleConfirmarCancelarParcelaAluno}
+          onClose={() => setModalCancelarParcelaAluno(null)}
+          loading={cancelandoParcelaAluno}
+          formatData={fmtD}
+          formatValor={fmtV}
+        />
+      )}
+      {modalCancelarParcelaAluno && modalCancelarParcelaAluno.type === 'multiple' && (
+        <ModalCancelarParcelasMultiplas
+          quantidade={modalCancelarParcelaAluno.ids.length}
+          onConfirm={handleConfirmarCancelarParcelaAluno}
+          onClose={() => setModalCancelarParcelaAluno(null)}
+          loading={cancelandoParcelaAluno}
+        />
+      )}
     </AdminFinanceiroLayout>
   );
 }
@@ -1961,7 +2325,15 @@ function ModalTrancar({ aluno, onClose, onSalvo }) {
           <div className="p-6 overflow-y-auto space-y-4 flex-1">
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
               <p className="text-xs text-amber-800 font-semibold">Aviso Importante</p>
-              <p className="text-xs text-amber-700 mt-1">Só é permitido trancar alunos sem parcelas em atraso. As parcelas futuras e pendentes deste aluno serão canceladas.</p>
+              {temAtraso ? (
+                <p className="text-xs text-amber-700 mt-1">
+                  Este aluno possui débitos em aberto. A matrícula será marcada como <strong>TRANCADO COM DÉBITO</strong>. As parcelas vencidas permanecerão ativas para cobrança.
+                </p>
+              ) : (
+                <p className="text-xs text-amber-700 mt-1">
+                  As parcelas futuras e pendentes deste aluno serão canceladas.
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-sm">
@@ -2028,7 +2400,7 @@ function ModalTrancar({ aluno, onClose, onSalvo }) {
             </button>
             <button
               type="submit"
-              disabled={loading || temAtraso || !observacao.trim() || loadingParcelas}
+              disabled={loading || !observacao.trim() || loadingParcelas}
               className="px-5 py-2 text-sm font-semibold bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition disabled:opacity-50"
             >
               {loading ? 'Trancando...' : 'Trancar Matrícula'}
@@ -2415,6 +2787,136 @@ function ModalLote({ turmas, onClose, onSalvo }) {
             </div>
           </form>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ModalCancelarParcela({ carne, parcela, onConfirm, onClose, loading, formatData, formatValor }) {
+  const [observacao, setObservacao] = useState('');
+  const isValid = observacao.trim().length >= 10 && observacao.trim().length <= 500;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <h3 className="text-lg font-bold text-gray-900">Cancelar Parcela</h3>
+          <button onClick={onClose} disabled={loading} className="text-gray-400 hover:text-gray-600 disabled:opacity-50">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        
+        <div className="px-6 py-5 space-y-4 text-left">
+          <p className="text-sm text-gray-650">Tem certeza que deseja cancelar esta parcela?</p>
+          
+          <div className="bg-gray-50 border border-gray-150 rounded-lg p-3 text-sm space-y-1 text-gray-700">
+            <div><span className="font-semibold text-gray-900">Parcela:</span> #{parcela.numero_parcela}</div>
+            <div><span className="font-semibold text-gray-900">Vencimento:</span> {formatData(parcela.data_vencimento)}</div>
+            <div><span className="font-semibold text-gray-900">Valor:</span> {formatValor(parcela.valor)}</div>
+          </div>
+          
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">Observação *</label>
+            <textarea
+              value={observacao}
+              onChange={(e) => setObservacao(e.target.value)}
+              disabled={loading}
+              placeholder="Informe o motivo do cancelamento..."
+              rows={4}
+              maxLength={500}
+              className="w-full text-sm border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-100 focus:border-red-400 focus:outline-none transition disabled:bg-gray-50 text-gray-800"
+            />
+            <div className="flex justify-between text-xs text-gray-400">
+              <span>Mínimo 10 caracteres</span>
+              <span className={observacao.trim().length >= 10 ? 'text-green-600 font-semibold' : 'text-red-500'}>
+                {observacao.length} / 500
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 text-sm text-gray-650 border border-gray-300 rounded-lg hover:bg-gray-150/60 bg-white transition disabled:opacity-50"
+          >
+            Voltar
+          </button>
+          <button
+            onClick={() => onConfirm(observacao)}
+            disabled={!isValid || loading}
+            className="px-5 py-2 text-sm font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-red-350 disabled:opacity-50 disabled:cursor-not-allowed transition"
+          >
+            {loading ? '⏳ Processando...' : 'Confirmar Cancelamento'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalCancelarParcelasMultiplas({ quantidade, onConfirm, onClose, loading }) {
+  const [observacao, setObservacao] = useState('');
+  const isValid = observacao.trim().length >= 10 && observacao.trim().length <= 500;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <h3 className="text-lg font-bold text-gray-900">Cancelar Parcelas</h3>
+          <button onClick={onClose} disabled={loading} className="text-gray-400 hover:text-gray-600 disabled:opacity-50">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        
+        <div className="px-6 py-5 space-y-4 text-left">
+          <p className="text-sm text-gray-650">Tem certeza que deseja cancelar estas parcelas?</p>
+          
+          <div className="bg-gray-50 border border-gray-150 rounded-lg p-3 text-sm space-y-1 text-gray-700">
+            <div><span className="font-semibold text-gray-900">Quantidade de Parcelas:</span> {quantidade}</div>
+          </div>
+          
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">Observação *</label>
+            <textarea
+              value={observacao}
+              onChange={(e) => setObservacao(e.target.value)}
+              disabled={loading}
+              placeholder="Informe o motivo do cancelamento..."
+              rows={4}
+              maxLength={500}
+              className="w-full text-sm border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-100 focus:border-red-400 focus:outline-none transition disabled:bg-gray-50 text-gray-800"
+            />
+            <div className="flex justify-between text-xs text-gray-400">
+              <span>Mínimo 10 caracteres</span>
+              <span className={observacao.trim().length >= 10 ? 'text-green-600 font-semibold' : 'text-red-500'}>
+                {observacao.length} / 500
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 text-sm text-gray-650 border border-gray-300 rounded-lg hover:bg-gray-150/60 bg-white transition disabled:opacity-50"
+          >
+            Voltar
+          </button>
+          <button
+            onClick={() => onConfirm(observacao)}
+            disabled={!isValid || loading}
+            className="px-5 py-2 text-sm font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-red-350 disabled:opacity-50 disabled:cursor-not-allowed transition"
+          >
+            {loading ? '⏳ Processando...' : 'Confirmar Cancelamento'}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -25,6 +25,7 @@
 import { createClient } from '@supabase/supabase-js';
 import efi from '../../../../lib/efi-client';
 import { tentarCriarComissao } from '../../../../lib/comissoes-helper';
+import { verificarEProcessarPagamentoEntrada } from '../../../../lib/acordos-helper';
 
 // Desabilitar parser padrão — EFI envia multipart/form-data ou x-www-form-urlencoded
 export const config = { api: { bodyParser: false } };
@@ -150,6 +151,14 @@ async function atualizarParcelaEOrdem(parcelaId, statusLocal, statusEFI, evento,
     .from('financeiro_parcelas')
     .update({ status: statusLocal, ...extrasParcela })
     .eq('id', parcelaId);
+
+  if (statusLocal === 'pago') {
+    try {
+      await verificarEProcessarPagamentoEntrada(supabase, parcelaId);
+    } catch (err) {
+      console.error('[webhook API] Erro ao verificar acordo:', err);
+    }
+  }
 
   // Atualizar registro em financeiro_boletos
   await supabase

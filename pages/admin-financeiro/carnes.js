@@ -13,6 +13,7 @@ export default function CarnesPage() {
   const [selectedParcelas, setSelectedParcelas] = useState({});
   const [cancelandoParcela, setCancelandoParcela] = useState(false);
   const [modalConfirmar, setModalConfirmar] = useState(null); // { titulo, mensagem, onConfirm }
+  const [modalCancelarParcela, setModalCancelarParcela] = useState(null);
   const [modalRecibo, setModalRecibo] = useState(null); // ordemId
   const [modalBaixaManual, setModalBaixaManual] = useState(null); // { parcela, carne }
   const [baixandoParcela, setBaixandoParcela] = useState(false);
@@ -36,23 +37,10 @@ export default function CarnesPage() {
   const handleCancelarSelecionadas = (carne) => {
     const ids = [...(selectedParcelas[carne.id] || [])];
     if (!ids.length) return;
-    setModalConfirmar({
-      titulo: 'Cancelar parcelas',
-      mensagem: `Confirma o cancelamento de ${ids.length} parcela(s)?`,
-      onConfirm: async () => {
-        setCancelandoParcela(true);
-        try {
-          for (const parcela_id of ids) {
-            await fetch('/api/admin-financeiro/efi/carne', {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ordem_id: carne.id, parcela_id }),
-            });
-          }
-          setSelectedParcelas(prev => ({ ...prev, [carne.id]: new Set() }));
-          await carregarCarnes();
-        } finally { setCancelandoParcela(false); }
-      },
+    setModalCancelarParcela({
+      type: 'multiple',
+      carne,
+      ids,
     });
   };
 
@@ -79,21 +67,41 @@ export default function CarnesPage() {
   };
 
   const handleCancelarParcela = (carne, parcela) => {
-    setModalConfirmar({
-      titulo: 'Cancelar parcela',
-      mensagem: `Confirma o cancelamento da parcela ${parcela.numero_parcela}?`,
-      onConfirm: async () => {
-        setCancelandoParcela(true);
-        try {
+    setModalCancelarParcela({
+      type: 'single',
+      carne,
+      parcela,
+    });
+  };
+
+  const handleConfirmarCancelarParcela = async (observacao) => {
+    if (!modalCancelarParcela) return;
+    setCancelandoParcela(true);
+    const { type, carne, parcela, ids } = modalCancelarParcela;
+    try {
+      if (type === 'single') {
+        await fetch('/api/admin-financeiro/efi/carne', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ordem_id: carne.id, parcela_id: parcela.id, observacao }),
+        });
+      } else if (type === 'multiple') {
+        for (const parcela_id of ids) {
           await fetch('/api/admin-financeiro/efi/carne', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ordem_id: carne.id, parcela_id: parcela.id }),
+            body: JSON.stringify({ ordem_id: carne.id, parcela_id, observacao }),
           });
-          await carregarCarnes();
-        } finally { setCancelandoParcela(false); }
-      },
-    });
+        }
+        setSelectedParcelas(prev => ({ ...prev, [carne.id]: new Set() }));
+      }
+      await carregarCarnes();
+      setModalCancelarParcela(null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCancelandoParcela(false);
+    }
   };
 
   useEffect(() => {
@@ -472,13 +480,13 @@ export default function CarnesPage() {
                                             <>
                                               <button
                                                 onClick={() => setModalBaixaManual({ parcela, carne })}
-                                                title="Baixar manualmente"
-                                                className="p-1.5 text-green-600 hover:bg-green-50 rounded transition">
+                                                title="Registrar Baixa"
+                                                className="w-9 h-9 flex items-center justify-center rounded-full bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 hover:scale-105 hover:shadow-sm transition-all duration-200 cursor-pointer">
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                               </button>
                                               <button onClick={() => handleCancelarParcela(carne, parcela)} disabled={cancelandoParcela}
-                                                title="Cancelar parcela"
-                                                className="p-1.5 text-red-500 hover:bg-red-50 rounded transition disabled:opacity-40">
+                                                title="Cancelar Parcela"
+                                                className="w-9 h-9 flex items-center justify-center rounded-full bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 hover:scale-105 hover:shadow-sm transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                                               </button>
                                             </>
@@ -521,6 +529,25 @@ export default function CarnesPage() {
           mensagem={modalConfirmar.mensagem}
           onConfirm={async () => { setModalConfirmar(null); await modalConfirmar.onConfirm(); }}
           onClose={() => setModalConfirmar(null)}
+        />
+      )}
+      {modalCancelarParcela && modalCancelarParcela.type === 'single' && (
+        <ModalCancelarParcela
+          carne={modalCancelarParcela.carne}
+          parcela={modalCancelarParcela.parcela}
+          onConfirm={handleConfirmarCancelarParcela}
+          onClose={() => setModalCancelarParcela(null)}
+          loading={cancelandoParcela}
+          formatData={formataData}
+          formatValor={formataValor}
+        />
+      )}
+      {modalCancelarParcela && modalCancelarParcela.type === 'multiple' && (
+        <ModalCancelarParcelasMultiplas
+          quantidade={modalCancelarParcela.ids.length}
+          onConfirm={handleConfirmarCancelarParcela}
+          onClose={() => setModalCancelarParcela(null)}
+          loading={cancelandoParcela}
         />
       )}
       {modalRecibo && (
@@ -582,6 +609,39 @@ function gerarHTMLRecibo(dados) {
   const fmtData = (d) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '-';
   const numero = dados.boleto_numero || dados.ordem_id?.slice(-8).toUpperCase() || '';
 
+  const MAPA_METODOS = {
+    pix: 'PIX',
+    dinheiro: 'Dinheiro',
+    cartao: 'Cartão',
+    transferencia: 'Transferência',
+    boleto: 'Boleto'
+  };
+
+  const isMultiplo = dados.metodo_pagamento === 'multiplo' && Array.isArray(dados.detalhes_baixa_multipla) && dados.detalhes_baixa_multipla.length > 1;
+
+  let formaPagamentoHTML = '';
+  if (isMultiplo) {
+    const listItems = dados.detalhes_baixa_multipla.map(item => {
+      const label = MAPA_METODOS[String(item.metodo).toLowerCase()] || String(item.metodo).toUpperCase();
+      const valor = valorFmt(item.valor);
+      return `<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-family:monospace; font-size:12px;"><span>${label.padEnd(20, '.')}</span> <span>${valor}</span></div>`;
+    }).join('');
+
+    formaPagamentoHTML = `
+      <div style="margin-top:16px; border-top:1px dashed #ccc; padding-top:10px; max-width:280px; margin-left:auto; margin-right:auto; text-align:left;">
+        <label style="font-size:10px; font-weight:bold; text-transform:uppercase; color:#888; display:block; margin-bottom:6px;">Forma de pagamento:</label>
+        ${listItems}
+        <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:12px; margin-top:8px; border-top:1px solid #eee; padding-top:4px;">
+          <span>Total pago</span>
+          <span>${valorFmt(dados.valor)}</span>
+        </div>
+      </div>
+    `;
+  } else {
+    const labelMetodo = MAPA_METODOS[String(dados.metodo_pagamento || '').toLowerCase()] || String(dados.metodo_pagamento || 'PIX').toUpperCase();
+    formaPagamentoHTML = `<div style="margin-top:10px; font-size:12px; color:#333; text-align:center;"><strong>Forma de pagamento:</strong> ${labelMetodo}</div>`;
+  }
+
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Recibo</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
@@ -625,6 +685,7 @@ function gerarHTMLRecibo(dados) {
 <div class="valor-box">
   <label>Valor Pago</label>
   <span>${valorFmt(dados.valor)}</span>
+  ${formaPagamentoHTML}
 </div>
 <div class="footer">
   <div class="assinatura">${dados.instituicao.nome}<br>Responsável pela Instituição</div>
@@ -702,6 +763,47 @@ function ModalRecibo({ ordemId, onClose }) {
                 <div className="text-center pt-2 border-t border-emerald-200">
                   <p className="text-xs text-gray-500 mb-1">Valor pago</p>
                   <p className="text-2xl font-bold text-emerald-700">{fmtValor(dados.valor)}</p>
+                  
+                  {dados.metodo_pagamento === 'multiplo' && Array.isArray(dados.detalhes_baixa_multipla) && dados.detalhes_baixa_multipla.length > 1 ? (
+                    <div className="mt-3 border-t border-emerald-200/50 pt-2 text-left text-xs space-y-1 text-gray-700 max-w-[280px] mx-auto font-sans">
+                      <p className="font-bold text-gray-500 uppercase tracking-wide text-[9px] mb-1">Forma de pagamento:</p>
+                      {dados.detalhes_baixa_multipla.map((item, idx) => {
+                        const MAPA_METODOS = {
+                          pix: 'PIX',
+                          dinheiro: 'Dinheiro',
+                          cartao: 'Cartão',
+                          transferencia: 'Transferência',
+                          boleto: 'Boleto'
+                        };
+                        const label = MAPA_METODOS[String(item.metodo).toLowerCase()] || String(item.metodo).toUpperCase();
+                        return (
+                          <div key={idx} className="flex justify-between font-mono">
+                            <span>{label.padEnd(20, '.')}</span>
+                            <span>{fmtValor(item.valor)}</span>
+                          </div>
+                        );
+                      })}
+                      <div className="flex justify-between font-bold text-gray-900 border-t border-gray-200 pt-1 mt-1">
+                        <span>Total pago</span>
+                        <span>{fmtValor(dados.valor)}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-center text-xs text-gray-650">
+                      <strong>Forma de pagamento:</strong> {
+                        (() => {
+                          const MAPA_METODOS = {
+                            pix: 'PIX',
+                            dinheiro: 'Dinheiro',
+                            cartao: 'Cartão',
+                            transferencia: 'Transferência',
+                            boleto: 'Boleto'
+                          };
+                          return MAPA_METODOS[String(dados.metodo_pagamento || '').toLowerCase()] || String(dados.metodo_pagamento || 'PIX').toUpperCase();
+                        })()
+                      }
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -720,6 +822,136 @@ function ModalRecibo({ ordemId, onClose }) {
             </div>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ModalCancelarParcela({ carne, parcela, onConfirm, onClose, loading, formatData, formatValor }) {
+  const [observacao, setObservacao] = useState('');
+  const isValid = observacao.trim().length >= 10 && observacao.trim().length <= 500;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <h3 className="text-lg font-bold text-gray-900">Cancelar Parcela</h3>
+          <button onClick={onClose} disabled={loading} className="text-gray-400 hover:text-gray-600 disabled:opacity-50">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        
+        <div className="px-6 py-5 space-y-4 text-left">
+          <p className="text-sm text-gray-650">Tem certeza que deseja cancelar esta parcela?</p>
+          
+          <div className="bg-gray-50 border border-gray-150 rounded-lg p-3 text-sm space-y-1 text-gray-700">
+            <div><span className="font-semibold text-gray-900">Parcela:</span> #{parcela.numero_parcela}</div>
+            <div><span className="font-semibold text-gray-900">Vencimento:</span> {formatData(parcela.data_vencimento)}</div>
+            <div><span className="font-semibold text-gray-900">Valor:</span> {formatValor(parcela.valor)}</div>
+          </div>
+          
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">Observação *</label>
+            <textarea
+              value={observacao}
+              onChange={(e) => setObservacao(e.target.value)}
+              disabled={loading}
+              placeholder="Informe o motivo do cancelamento..."
+              rows={4}
+              maxLength={500}
+              className="w-full text-sm border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-100 focus:border-red-400 focus:outline-none transition disabled:bg-gray-50 text-gray-800"
+            />
+            <div className="flex justify-between text-xs text-gray-400">
+              <span>Mínimo 10 caracteres</span>
+              <span className={observacao.trim().length >= 10 ? 'text-green-600 font-semibold' : 'text-red-500'}>
+                {observacao.length} / 500
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 text-sm text-gray-650 border border-gray-300 rounded-lg hover:bg-gray-150/60 bg-white transition disabled:opacity-50"
+          >
+            Voltar
+          </button>
+          <button
+            onClick={() => onConfirm(observacao)}
+            disabled={!isValid || loading}
+            className="px-5 py-2 text-sm font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-red-350 disabled:opacity-50 disabled:cursor-not-allowed transition"
+          >
+            {loading ? '⏳ Processando...' : 'Confirmar Cancelamento'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalCancelarParcelasMultiplas({ quantidade, onConfirm, onClose, loading }) {
+  const [observacao, setObservacao] = useState('');
+  const isValid = observacao.trim().length >= 10 && observacao.trim().length <= 500;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <h3 className="text-lg font-bold text-gray-900">Cancelar Parcelas</h3>
+          <button onClick={onClose} disabled={loading} className="text-gray-400 hover:text-gray-600 disabled:opacity-50">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        
+        <div className="px-6 py-5 space-y-4 text-left">
+          <p className="text-sm text-gray-650">Tem certeza que deseja cancelar estas parcelas?</p>
+          
+          <div className="bg-gray-50 border border-gray-150 rounded-lg p-3 text-sm space-y-1 text-gray-700">
+            <div><span className="font-semibold text-gray-900">Quantidade de Parcelas:</span> {quantidade}</div>
+          </div>
+          
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold uppercase tracking-wider text-gray-500">Observação *</label>
+            <textarea
+              value={observacao}
+              onChange={(e) => setObservacao(e.target.value)}
+              disabled={loading}
+              placeholder="Informe o motivo do cancelamento..."
+              rows={4}
+              maxLength={500}
+              className="w-full text-sm border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-red-100 focus:border-red-400 focus:outline-none transition disabled:bg-gray-50 text-gray-800"
+            />
+            <div className="flex justify-between text-xs text-gray-400">
+              <span>Mínimo 10 caracteres</span>
+              <span className={observacao.trim().length >= 10 ? 'text-green-600 font-semibold' : 'text-red-500'}>
+                {observacao.length} / 500
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 text-sm text-gray-650 border border-gray-300 rounded-lg hover:bg-gray-150/60 bg-white transition disabled:opacity-50"
+          >
+            Voltar
+          </button>
+          <button
+            onClick={() => onConfirm(observacao)}
+            disabled={!isValid || loading}
+            className="px-5 py-2 text-sm font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-red-350 disabled:opacity-50 disabled:cursor-not-allowed transition"
+          >
+            {loading ? '⏳ Processando...' : 'Confirmar Cancelamento'}
+          </button>
+        </div>
       </div>
     </div>
   );

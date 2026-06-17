@@ -56,7 +56,7 @@ export default async function handler(req, res) {
 
     let ordemQuery = supabase
       .from('financeiro_ordens_pagamento')
-      .select('id, instituicao_id, descricao, referencia, valor_total, aluno_id, financeiro_parcelas(valor, data_vencimento, status, boleto_numero, updated_at)')
+      .select('id, instituicao_id, descricao, referencia, valor_total, aluno_id, financeiro_parcelas(valor, data_vencimento, status, boleto_numero, updated_at, metodo_pagamento, detalhes_baixa_multipla)')
       .eq('id', ordemId);
 
     ordemQuery = applyInstituicaoFilter(ordemQuery, instituicaoId);
@@ -86,6 +86,8 @@ export default async function handler(req, res) {
       data_vencimento: parcela.data_vencimento,
       data_pagamento: parcela.updated_at,
       boleto_numero: parcela.boleto_numero,
+      metodo_pagamento: parcela.metodo_pagamento,
+      detalhes_baixa_multipla: parcela.detalhes_baixa_multipla,
       aluno: { nome: aluno?.nome || '-', cpf: aluno?.cpf || '-' },
       turma: { nome: turma?.nome || '-' },
       curso: { nome: curso?.nome || '-' },

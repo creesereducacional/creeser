@@ -32,6 +32,7 @@ export default async function handler(req, res) {
 
   const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
   req.instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+  req.authUser = authUser;
 
   if (!isGroupAdmin && !req.instituicaoId) {
     return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
@@ -255,9 +256,13 @@ async function criarCarne(req, res) {
 // ─────────────────────────────────────────────────────────────────────────────
 async function cancelarParcela(req, res) {
   try {
-    const { ordem_id, parcela_id } = req.body;
+    const { ordem_id, parcela_id, observacao } = req.body;
     if (!ordem_id || !parcela_id) {
       return res.status(400).json({ message: 'ordem_id e parcela_id são obrigatórios.' });
+    }
+
+    if (!observacao || typeof observacao !== 'string' || observacao.trim().length < 10 || observacao.trim().length > 500) {
+      return res.status(400).json({ message: 'A justificativa é obrigatória e deve conter entre 10 e 500 caracteres.' });
     }
 
     let ordemQuery = supabase
@@ -292,8 +297,32 @@ async function cancelarParcela(req, res) {
 
     await supabase
       .from('financeiro_parcelas')
-      .update({ status: 'cancelado' })
+      .update({ status: 'cancelado', observacao_baixa: observacao.trim() })
       .eq('id', parcela_id);
+
+    // Gravar log centralizado em audit_logs
+    try {
+      const authUser = req.authUser || {};
+      const usuarioId = authUser.id ? Number(authUser.id) : null;
+      await supabase.from('audit_logs').insert([{
+        usuario_id: usuarioId,
+        usuario_email: authUser.email || null,
+        perfil: authUser.perfil || authUser.tipo || null,
+        acao: 'CANCELAR_PARCELA',
+        modulo: 'financeiro',
+        entidade: 'parcela',
+        id_entidade: String(parcela_id),
+        detalhes: {
+          numero_parcela: parcela.numero_parcela,
+          ordem_id: ordem_id,
+          motivo_cancelamento: observacao.trim(),
+          cancelado_em: new Date().toISOString()
+        },
+        instituicao_id: ordem.instituicao_id || null
+      }]);
+    } catch (logErr) {
+      console.error('[audit-log] Falha ao gravar auditoria de cancelamento:', logErr?.message || logErr);
+    }
 
     return res.status(200).json({ message: 'Parcela cancelada.' });
   } catch (err) {
