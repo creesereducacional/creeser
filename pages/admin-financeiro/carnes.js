@@ -470,7 +470,7 @@ export default function CarnesPage() {
                                       <td className="px-2 py-2 text-center">
                                         <div className="flex items-center justify-center gap-1">
                                           {parcela.status === 'pago' && (
-                                            <button onClick={() => setModalRecibo(carne.id)}
+                                            <button onClick={() => setModalRecibo({ id: carne.id, parcelaId: parcela.id })}
                                               title="Imprimir Recibo"
                                               className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition">
                                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
@@ -702,12 +702,20 @@ function ModalRecibo({ ordemId, onClose }) {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState('');
 
+  const targetOrdemId = typeof ordemId === 'object' && ordemId !== null ? ordemId.id : ordemId;
+  const targetParcelaId = typeof ordemId === 'object' && ordemId !== null ? ordemId.parcelaId : null;
+
   useEffect(() => {
-    fetch(`/api/admin-financeiro/recibo/${ordemId}`)
+    if (!targetOrdemId) return;
+    const url = targetParcelaId
+      ? `/api/admin-financeiro/recibo/${targetOrdemId}?parcelaId=${targetParcelaId}`
+      : `/api/admin-financeiro/recibo/${targetOrdemId}`;
+
+    fetch(url)
       .then(r => r.ok ? r.json() : r.json().then(b => { throw new Error(b.message); }))
       .then(d => { setDados(d); setLoading(false); })
       .catch(e => { setErro(e.message); setLoading(false); });
-  }, [ordemId]);
+  }, [targetOrdemId, targetParcelaId]);
 
   const handlePrint = () => {
     const w = window.open('', '_blank', 'width=820,height=700');
