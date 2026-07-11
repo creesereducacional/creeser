@@ -62,7 +62,8 @@ export default function AdminUsuarios() {
   const [salvando, setSalvando] = useState(false);
   const [erroForm, setErroForm] = useState('');
   const [confirmacao, setConfirmacao] = useState(null);
-  const [operadorPerfil, setOperadorPerfil] = useState('');
+  const [perfisFiltrados, setPerfisFiltrados] = useState(PERFIS);
+  const [tiposFiltrados, setTiposFiltrados] = useState(TIPOS);
 
   const buscarOperador = async () => {
     try {
@@ -76,7 +77,36 @@ export default function AdminUsuarios() {
           if (p === 'comercial_master') return 'comercial';
           return p;
         };
-        setOperadorPerfil(mapP(rawP));
+        const opPerfil = mapP(rawP);
+        
+        let pFiltrados = [];
+        if (opPerfil === 'grupo_admin') {
+          pFiltrados = PERFIS;
+        } else if (opPerfil === 'instituicao_admin') {
+          pFiltrados = PERFIS.filter(p => p.value !== 'grupo_admin' && p.value !== 'instituicao_admin');
+        } else if (opPerfil === 'coordenador') {
+          pFiltrados = PERFIS.filter(p => p.value === 'professor' || p.value === 'aluno');
+        } else if (opPerfil === 'secretaria') {
+          pFiltrados = PERFIS.filter(p => p.value === 'aluno');
+        }
+        
+        setPerfisFiltrados(pFiltrados);
+
+        const perfisPermitidosVal = pFiltrados.map(p => p.value);
+        const tFiltrados = TIPOS.filter(t => {
+          if (t.value === 'admin') {
+            return perfisPermitidosVal.includes('instituicao_admin');
+          }
+          if (t.value === 'professor') {
+            return perfisPermitidosVal.includes('professor');
+          }
+          if (t.value === 'aluno') {
+            return perfisPermitidosVal.includes('aluno');
+          }
+          return perfisPermitidosVal.some(p => p !== 'instituicao_admin' && p !== 'professor' && p !== 'aluno');
+        });
+        
+        setTiposFiltrados(tFiltrados);
       }
     } catch (e) {
       console.error(e);
@@ -87,45 +117,7 @@ export default function AdminUsuarios() {
     buscarOperador();
   }, []);
 
-  const obterPerfisPermitidos = () => {
-    if (operadorPerfil === 'grupo_admin') {
-      return PERFIS;
-    }
-    // instituicao_admin pode criar todos exceto grupo_admin e instituicao_admin
-    if (operadorPerfil === 'instituicao_admin') {
-      return PERFIS.filter(p => p.value !== 'grupo_admin' && p.value !== 'instituicao_admin');
-    }
-    // coordenador pode criar professor e aluno
-    if (operadorPerfil === 'coordenador') {
-      return PERFIS.filter(p => p.value === 'professor' || p.value === 'aluno');
-    }
-    // secretaria pode criar aluno
-    if (operadorPerfil === 'secretaria') {
-      return PERFIS.filter(p => p.value === 'aluno');
-    }
-    return [];
-  };
 
-  const obterTiposPermitidos = () => {
-    const perfisPermitidos = obterPerfisPermitidos().map(p => p.value);
-    // Tipos correspondentes
-    return TIPOS.filter(t => {
-      if (t.value === 'admin') {
-        return perfisPermitidos.includes('instituicao_admin');
-      }
-      if (t.value === 'professor') {
-        return perfisPermitidos.includes('professor');
-      }
-      if (t.value === 'aluno') {
-        return perfisPermitidos.includes('aluno');
-      }
-      // usuario corresponde aos demais perfis
-      return perfisPermitidos.some(p => p !== 'instituicao_admin' && p !== 'professor' && p !== 'aluno');
-    });
-  };
-
-  const perfisFiltrados = obterPerfisPermitidos();
-  const tiposFiltrados = obterTiposPermitidos();
 
   const buscarUsuarios = useCallback(async () => {
     try {
