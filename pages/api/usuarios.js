@@ -71,6 +71,17 @@ export default async function handler(req, res) {
     }
     const perfilResolvido = perfil || (tipo === 'admin' ? 'instituicao_admin' : tipo);
 
+    // Validação de coerência entre Tipo e Perfil
+    if (tipo === 'aluno' && perfilResolvido !== 'aluno') {
+      return res.status(400).json({ error: 'Coerência inválida: Tipo aluno exige Perfil aluno.' });
+    }
+    if (tipo === 'professor' && perfilResolvido !== 'professor') {
+      return res.status(400).json({ error: 'Coerência inválida: Tipo professor exige Perfil professor.' });
+    }
+    if (tipo === 'funcionario' && (perfilResolvido === 'aluno' || perfilResolvido === 'professor')) {
+      return res.status(400).json({ error: 'Coerência inválida: Tipo funcionário não pode receber Perfil aluno ou professor.' });
+    }
+
     // Validar se o operador logado pode atribuir o perfil de destino
     if (!validarPerfilAlvo(perfilResolvido)) {
       return res.status(403).json({ error: 'Acesso negado: Perfil de acesso não permitido para o seu cargo.' });
@@ -112,11 +123,6 @@ export default async function handler(req, res) {
       }
     }
 
-    // Se estiver atualizando o perfil, validar se o operador possui permissão
-    if (body.perfil && !validarPerfilAlvo(body.perfil)) {
-      return res.status(403).json({ error: 'Acesso negado: Perfil de acesso não permitido para o seu cargo.' });
-    }
-
     // Carregar o registro existente para validar que o operador não está alterando um usuário de perfil superior
     const { data: originalUser, error: checkError } = await supabase
       .from('usuarios')
@@ -131,6 +137,25 @@ export default async function handler(req, res) {
     const originalPerfil = originalUser.perfil || originalUser.tipo;
     if (!validarPerfilAlvo(originalPerfil)) {
       return res.status(403).json({ error: 'Acesso negado: Você não possui privilégios para alterar este usuário.' });
+    }
+
+    // Se estiver atualizando tipo e/ou perfil, validar a coerência combinatória
+    const tipoAlvo = body.tipo || originalUser.tipo;
+    const perfilAlvo = body.perfil || originalUser.perfil;
+
+    if (tipoAlvo === 'aluno' && perfilAlvo !== 'aluno') {
+      return res.status(400).json({ error: 'Coerência inválida: Tipo aluno exige Perfil aluno.' });
+    }
+    if (tipoAlvo === 'professor' && perfilAlvo !== 'professor') {
+      return res.status(400).json({ error: 'Coerência inválida: Tipo professor exige Perfil professor.' });
+    }
+    if (tipoAlvo === 'funcionario' && (perfilAlvo === 'aluno' || perfilAlvo === 'professor')) {
+      return res.status(400).json({ error: 'Coerência inválida: Tipo funcionário não pode receber Perfil aluno ou professor.' });
+    }
+
+    // Se estiver atualizando o perfil, validar se o operador possui permissão
+    if (body.perfil && !validarPerfilAlvo(body.perfil)) {
+      return res.status(403).json({ error: 'Acesso negado: Perfil de acesso não permitido para o seu cargo.' });
     }
 
     const updates = {};

@@ -27,17 +27,16 @@ const PERFIS = [
 ];
 
 const TIPOS = [
-  { value: 'admin',     label: 'Admin' },
-  { value: 'usuario',   label: 'Usuario' },
-  { value: 'professor', label: 'Professor' },
-  { value: 'aluno',     label: 'Aluno' },
+  { value: 'funcionario', label: 'Funcionário' },
+  { value: 'professor',   label: 'Professor' },
+  { value: 'aluno',       label: 'Aluno' },
 ];
 
 const FORM_INICIAL = {
   nomeCompleto: '',
   email: '',
   senha: '',
-  tipo: 'usuario',
+  tipo: 'funcionario',
   perfil: 'secretaria',
   status: 'ativo',
   whatsapp: '',
@@ -62,11 +61,13 @@ export default function AdminUsuarios() {
   const [salvando, setSalvando] = useState(false);
   const [erroForm, setErroForm] = useState('');
   const [confirmacao, setConfirmacao] = useState(null);
-  const [perfisFiltrados, setPerfisFiltrados] = useState(PERFIS);
-  const [tiposFiltrados, setTiposFiltrados] = useState(TIPOS);
+  const [carregandoOperador, setCarregandoOperador] = useState(true);
+  const [perfisFiltrados, setPerfisFiltrados] = useState([]);
+  const [tiposFiltrados, setTiposFiltrados] = useState([]);
 
   const buscarOperador = async () => {
     try {
+      setCarregandoOperador(true);
       const res = await fetch('/api/auth/me', { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
@@ -92,24 +93,28 @@ export default function AdminUsuarios() {
         
         setPerfisFiltrados(pFiltrados);
 
+        // O tipo de usuário é fixo conforme as novas regras: funcionario, professor, aluno.
+        // Mas filtramos as opções de Tipo baseados no perfil que o operador logado tem autoridade para criar:
         const perfisPermitidosVal = pFiltrados.map(p => p.value);
-        const tFiltrados = TIPOS.filter(t => {
-          if (t.value === 'admin') {
-            return perfisPermitidosVal.includes('instituicao_admin');
-          }
-          if (t.value === 'professor') {
-            return perfisPermitidosVal.includes('professor');
-          }
-          if (t.value === 'aluno') {
-            return perfisPermitidosVal.includes('aluno');
-          }
-          return perfisPermitidosVal.some(p => p !== 'instituicao_admin' && p !== 'professor' && p !== 'aluno');
-        });
+        const tFiltrados = [];
         
+        // Se puder gerenciar algum perfil administrativo (não-professor e não-aluno)
+        if (perfisPermitidosVal.some(p => p !== 'professor' && p !== 'aluno')) {
+          tFiltrados.push({ value: 'funcionario', label: 'Funcionário' });
+        }
+        if (perfisPermitidosVal.includes('professor')) {
+          tFiltrados.push({ value: 'professor', label: 'Professor' });
+        }
+        if (perfisPermitidosVal.includes('aluno')) {
+          tFiltrados.push({ value: 'aluno', label: 'Aluno' });
+        }
+
         setTiposFiltrados(tFiltrados);
       }
     } catch (e) {
       console.error(e);
+    } finally {
+      setCarregandoOperador(false);
     }
   };
 
@@ -147,11 +152,17 @@ export default function AdminUsuarios() {
   };
 
   const abrirEditar = (u) => {
+    // Normalizar tipos legados ao carregar para edição
+    let tipoResolvido = u.tipo || 'funcionario';
+    if (tipoResolvido === 'admin' || tipoResolvido === 'usuario') {
+      tipoResolvido = 'funcionario';
+    }
+
     setForm({
       nomeCompleto: u.nomecompleto || u.nomeCompleto || '',
       email:        u.email || '',
       senha:        '',
-      tipo:         u.tipo || 'usuario',
+      tipo:         tipoResolvido,
       perfil:       u.perfil || 'secretaria',
       status:       u.status || 'ativo',
       whatsapp:     formatarWhatsapp(u.whatsapp || ''),
@@ -172,7 +183,26 @@ export default function AdminUsuarios() {
     if (name === 'whatsapp') {
       value = formatarWhatsapp(value);
     }
-    setForm(f => ({ ...f, [name]: value }));
+    
+    setForm(f => {
+      const novoForm = { ...f, [name]: value };
+      
+      // Regra condicional: se alterar o Tipo, definir o perfil automaticamente
+      if (name === 'tipo') {
+        if (value === 'professor') {
+          novoForm.perfil = 'professor';
+        } else if (value === 'aluno') {
+          novoForm.perfil = 'aluno';
+        } else if (value === 'funcionario') {
+          // Se for funcionário, e o perfil anterior era professor/aluno, define um administrativo padrão permitido
+          if (f.perfil === 'professor' || f.perfil === 'aluno') {
+            const primeiroAdmin = perfisFiltrados.find(p => p.value !== 'professor' && p.value !== 'aluno');
+            novoForm.perfil = primeiroAdmin ? primeiroAdmin.value : 'secretaria';
+          }
+        }
+      }
+      return novoForm;
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -333,9 +363,14 @@ export default function AdminUsuarios() {
                 name="tipo"
                 value={form.tipo}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                disabled={carregandoOperador}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-gray-100"
               >
-                {tiposFiltrados.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                {carregandoOperador ? (
+                  <option>Carregando permissões...</option>
+                ) : (
+                  tiposFiltrados.map(t => <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
               </select>
             </div>
 
@@ -345,9 +380,20 @@ export default function AdminUsuarios() {
                 name="perfil"
                 value={form.perfil}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                disabled={carregandoOperador || form.tipo === 'professor' || form.tipo === 'aluno'}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-gray-100"
               >
-                {perfisFiltrados.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                {carregandoOperador ? (
+                  <option>Carregando permissões...</option>
+                ) : form.tipo === 'professor' ? (
+                  <option value="professor">Professor</option>
+                ) : form.tipo === 'aluno' ? (
+                  <option value="aluno">Aluno</option>
+                ) : (
+                  perfisFiltrados
+                    .filter(p => p.value !== 'professor' && p.value !== 'aluno')
+                    .map(p => <option key={p.value} value={p.value}>{p.label}</option>)
+                )}
               </select>
             </div>
 
