@@ -11,7 +11,25 @@ export const obterTipoInstituicao = (user) => {
 const permitePerfil = (item, perfil, isGroupAdmin) => {
   if (isGroupAdmin) return true;
   if (!item.perfis || item.perfis.length === 0) return true;
-  return item.perfis.map(toLower).includes(perfil);
+
+  // Normalização de aliases e equivalências
+  const mapeamentoPerfil = (p) => {
+    const raw = toLower(p);
+    if (raw === 'admin') return 'instituicao_admin';
+    if (raw === 'financeiro_admin') return 'financeiro';
+    if (raw === 'comercial_master') return 'comercial';
+    return raw;
+  };
+
+  const perfilNormalizado = mapeamentoPerfil(perfil);
+  const perfisPermitidos = item.perfis.map(mapeamentoPerfil);
+
+  // Administrador de Instituição local tem passe livre em permissões de "instituicao_admin"
+  if (perfilNormalizado === 'instituicao_admin' && perfisPermitidos.includes('instituicao_admin')) {
+    return true;
+  }
+
+  return perfisPermitidos.includes(perfilNormalizado);
 };
 
 const permiteTipoInstituicao = (item, tipoInstituicao, isGroupAdmin) => {

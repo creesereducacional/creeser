@@ -128,17 +128,62 @@ export default async function handler(req, res) {
     const { id } = req.query;
 
     if (req.method === 'GET') {
-      // Recuperar um aluno específico
-      // ⚠️ PostgreSQL converte para lowercase automaticamente
+      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+      if (!isGroupAdmin && !instituicaoId) {
+        return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
+      }
+
+      // Se for perfil professor, verificar se o aluno a ser buscado pertence a uma turma dele
+      if (hasPerfil(authUser, ['professor'])) {
+        const emailLogado = authUser.email;
+        if (!emailLogado) return res.status(403).json({ error: 'Acesso negado: E-mail não identificado.' });
+
+        // Obter o registro do professor
+        const { data: prof, error: profError } = await supabase
+          .from('professores')
+          .select('id')
+          .eq('email', emailLogado)
+          .eq('instituicao_id', instituicaoId)
+          .maybeSingle();
+
+        if (profError || !prof) return res.status(403).json({ error: 'Acesso negado: professor não cadastrado.' });
+
+        // Obter os vínculos de turmas
+        const { data: vts, error: vtsError } = await supabase
+          .from('professor_turma_disciplinas')
+          .select('turma_id')
+          .eq('professor_id', prof.id)
+          .eq('ativo', true);
+
+        if (vtsError || !vts || vts.length === 0) {
+          return res.status(403).json({ error: 'Acesso negado: professor não possui vínculos com turmas.' });
+        }
+
+        const turmaIds = vts.map(item => item.turma_id);
+
+        // Buscar dados do aluno para validar a turma dele
+        const { data: aluno, error: alunoError } = await supabase
+          .from('alunos')
+          .select('turmaId, turma_id, turmaid')
+          .eq('id', parseInt(id))
+          .maybeSingle();
+
+        if (alunoError || !aluno) {
+          return res.status(404).json({ error: 'Aluno não encontrado' });
+        }
+
+        const alunoTurmaId = aluno.turmaId || aluno.tur_id || aluno.turma_id || aluno.turmaid;
+
+        if (!alunoTurmaId || !turmaIds.includes(alunoTurmaId)) {
+          return res.status(403).json({ error: 'Acesso negado: Aluno pertence a uma turma sem vínculo com você.' });
+        }
+      }
+
       let query = supabase
         .from('alunos')
         .select('*')
         .eq('id', parseInt(id));
 
-      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
-      if (!isGroupAdmin && !instituicaoId) {
-        return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
-      }
       query = applyInstituicaoFilter(query, instituicaoId);
 
       const { data, error } = await query.single();

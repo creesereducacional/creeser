@@ -9,7 +9,12 @@ const supabase = createClient(
 export default async function handler(req, res) {
   const authUser = requireAuth(req, res);
   if (!authUser) return;
-  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria', 'admin'])) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria', 'admin', 'professor'])) return;
+
+  // Professor só tem permissão de leitura (GET)
+  if (hasPerfil(authUser, ['professor']) && req.method !== 'GET') {
+    return res.status(403).json({ error: 'Acesso negado: Professor possui acesso apenas para leitura.' });
+  }
 
   const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
   const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
@@ -19,6 +24,24 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
+    // Se for perfil professor, retornar apenas seu próprio registro (baseado no email da sessão)
+    if (hasPerfil(authUser, ['professor'])) {
+      const emailLogado = authUser.email;
+      if (!emailLogado) {
+        return res.status(200).json([]);
+      }
+      
+      const { data: prof, error } = await supabase
+        .from('professores')
+        .select('*')
+        .eq('email', emailLogado)
+        .eq('instituicao_id', instituicaoId)
+        .maybeSingle();
+
+      if (error) return res.status(500).json({ error: error.message });
+      return res.status(200).json(prof ? [prof] : []);
+    }
+
     let query = supabase.from('professores').select('*').order('nome');
     query = applyInstituicaoFilter(query, instituicaoId);
     const { data, error } = await query;

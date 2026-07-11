@@ -327,8 +327,13 @@ export default async function handler(req, res) {
   const authUser = requireAuth(req, res);
   if (!authUser) return;
 
-  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria', 'admin'])) {
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria', 'admin', 'professor'])) {
     return;
+  }
+
+  // Professor só tem permissão de leitura (GET)
+  if (hasPerfil(authUser, ['professor']) && req.method !== 'GET') {
+    return res.status(403).json({ error: 'Acesso negado: Professor possui acesso apenas para leitura.' });
   }
 
   const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);

@@ -14,23 +14,107 @@ export default function DashboardLayout({ children }) {
   useEffect(() => {
     if (window.innerWidth < 1024) setSidebarOpen(false);
   }, []);
+  const [verificando, setVerificando] = useState(true);
 
   useEffect(() => {
+    let active = true;
     setMounted(true);
     fetch('/api/auth/me', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (data?.usuario) {
-          setUser(data.usuario);
-        } else {
+        if (!active) return;
+        const usuarioLogado = data?.usuario;
+        if (!usuarioLogado) {
           router.push('/login');
+          return;
         }
+
+        const rawPerfil = String(usuarioLogado.perfil || usuarioLogado.tipo || '').toLowerCase();
+        
+        // Normalização de aliases e equivalências
+        const mapearPerfil = (p) => {
+          if (p === 'admin') return 'instituicao_admin';
+          if (p === 'financeiro_admin') return 'financeiro';
+          if (p === 'comercial_master') return 'comercial';
+          return p;
+        };
+        const perfil = mapearPerfil(rawPerfil);
+
+        // Se for grupo_admin, tem acesso total a qualquer rota
+        if (perfil === 'grupo_admin') {
+          setUser(usuarioLogado);
+          setVerificando(false);
+          return;
+        }
+
+        const path = router.pathname;
+
+        // Matriz de Acesso de Módulos (bloqueio de URLs)
+        const moduloFinanceiro = ['instituicao_admin', 'financeiro'];
+        const moduloSecretaria = ['instituicao_admin', 'secretaria', 'coordenador'];
+        const moduloComercial = ['instituicao_admin', 'comercial'];
+        const moduloAcademico = ['instituicao_admin', 'coordenador', 'secretaria', 'professor'];
+        const moduloRecepcao = ['instituicao_admin', 'recepcao'];
+
+        // 1. Validar Módulo Financeiro (/admin-financeiro e /api/admin-financeiro)
+        if (path.startsWith('/admin-financeiro') || path.startsWith('/api/admin-financeiro')) {
+          if (!moduloFinanceiro.includes(perfil)) {
+            router.replace('/admin/dashboard');
+            return;
+          }
+        }
+
+        // 2. Validar Módulo Comercial (/comercial e /api/comercial)
+        if (path.startsWith('/comercial') || path.startsWith('/api/comercial')) {
+          if (!moduloComercial.includes(perfil)) {
+            router.replace('/admin/dashboard');
+            return;
+          }
+        }
+
+        // 3. Validar Módulo Recepção (/recepcao e /api/recepcao)
+        if (path.startsWith('/recepcao') || path.startsWith('/api/recepcao')) {
+          if (!moduloRecepcao.includes(perfil)) {
+            router.replace('/admin/dashboard');
+            return;
+          }
+        }
+
+        // 4. Validar Módulo Acadêmico / Secretaria Geral (/admin/alunos, /admin/cursos, /admin/professores, etc.)
+        const rotasAcademicas = [
+          '/admin/alunos',
+          '/admin/cursos',
+          '/admin/professores',
+          '/admin/disciplinas',
+          '/admin/turmas',
+          '/admin/notas-faltas',
+          '/admin/planejamento-diario',
+          '/admin/livro-registro',
+          '/admin/atividades-complementares'
+        ];
+        if (rotasAcademicas.some(rota => path.startsWith(rota))) {
+          if (!moduloAcademico.includes(perfil)) {
+            router.replace('/admin/dashboard');
+            return;
+          }
+        }
+
+        setUser(usuarioLogado);
+        setVerificando(false);
       })
-      .catch(() => router.push('/login'));
+      .catch(() => {
+        if (active) router.push('/login');
+      });
+
+    return () => { active = false; };
   }, [router]);
 
-  if (!mounted || !user) {
-    return null;
+  if (!mounted || verificando || !user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-sm font-semibold text-gray-500 animate-pulse">Verificando permissões...</div>
+      </div>
+    );
   }
 
   const handleLogout = async () => {

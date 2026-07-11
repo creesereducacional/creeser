@@ -168,23 +168,70 @@ export default async function handler(req, res) {
   const authUser = requireAuth(req, res);
   if (!authUser) return;
 
-  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria', 'admin'])) {
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria', 'admin', 'professor'])) {
     return;
+  }
+
+  // Professor só tem permissão de leitura (GET)
+  if (hasPerfil(authUser, ['professor']) && req.method !== 'GET') {
+    return res.status(403).json({ error: 'Acesso negado: Professor possui acesso apenas para leitura.' });
   }
 
   const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
 
   try {
     if (req.method === 'GET') {
+      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+      if (!isGroupAdmin && !instituicaoId) {
+        return res.status(403).json({ error: 'Instituicao nao definida para o usuario atual' });
+      }
+
+      // Se for perfil professor, aplicar restrição por vínculos
+      if (hasPerfil(authUser, ['professor'])) {
+        const emailLogado = authUser.email;
+        if (!emailLogado) return res.status(200).json([]);
+
+        // Obter professor_id
+        const { data: prof, error: profError } = await supabase
+          .from('professores')
+          .select('id')
+          .eq('email', emailLogado)
+          .eq('instituicao_id', instituicaoId)
+          .maybeSingle();
+
+        if (profError || !prof) return res.status(200).json([]);
+
+        // Obter ids das turmas vinculadas
+        const { data: vts, error: vtsError } = await supabase
+          .from('professor_turma_disciplinas')
+          .select('turma_id')
+          .eq('professor_id', prof.id)
+          .eq('ativo', true);
+
+        if (vtsError || !vts || vts.length === 0) return res.status(200).json([]);
+
+        const turmaIds = vts.map(item => item.turma_id);
+
+        let query = supabase
+          .from('turmas')
+          .select(selectTurmas)
+          .in('id', turmaIds)
+          .order('id', { ascending: false });
+
+        query = applyInstituicaoFilter(query, instituicaoId);
+        const { data, error } = await query;
+        if (error) {
+          console.error('Supabase GET turmas error:', error);
+          return res.status(500).json({ error: 'Erro ao listar turmas', detail: error.message });
+        }
+        return res.status(200).json((data || []).map(mapRowToResponse));
+      }
+
       let query = supabase
         .from('turmas')
         .select(selectTurmas)
         .order('id', { ascending: false });
 
-      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
-      if (!isGroupAdmin && !instituicaoId) {
-        return res.status(403).json({ error: 'Instituicao nao definida para o usuario atual' });
-      }
       query = applyInstituicaoFilter(query, instituicaoId);
 
       const { data, error } = await query;

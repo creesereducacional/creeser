@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { requireAuth, requirePerfil } from '../../../lib/auth-server';
+import { requireAuth, requirePerfil, hasPerfil } from '../../../lib/auth-server';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -9,11 +9,30 @@ const supabase = createClient(
 export default async function handler(req, res) {
   const authUser = requireAuth(req, res);
   if (!authUser) return;
-  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria', 'admin'])) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria', 'admin', 'professor'])) return;
+
+  // Professor só tem permissão de leitura (GET)
+  if (hasPerfil(authUser, ['professor']) && req.method !== 'GET') {
+    return res.status(403).json({ error: 'Acesso negado: Professor possui acesso apenas para leitura.' });
+  }
 
   const { id } = req.query;
 
   if (req.method === 'GET') {
+    // Se for professor logado, certificar que ele está consultando o seu próprio registro
+    if (hasPerfil(authUser, ['professor'])) {
+      const emailLogado = authUser.email;
+      const { data: currentProf, error: checkError } = await supabase
+        .from('professores')
+        .select('id, email')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (checkError || !currentProf || currentProf.email !== emailLogado) {
+        return res.status(403).json({ error: 'Acesso negado: Professor pode consultar apenas seu próprio cadastro.' });
+      }
+    }
+
     const { data, error } = await supabase.from('professores').select('*').eq('id', id).single();
     if (error) return res.status(404).json({ error: 'Professor não encontrado' });
     return res.status(200).json(data);
