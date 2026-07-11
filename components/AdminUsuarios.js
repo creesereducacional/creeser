@@ -62,6 +62,70 @@ export default function AdminUsuarios() {
   const [salvando, setSalvando] = useState(false);
   const [erroForm, setErroForm] = useState('');
   const [confirmacao, setConfirmacao] = useState(null);
+  const [operadorPerfil, setOperadorPerfil] = useState('');
+
+  const buscarOperador = async () => {
+    try {
+      const res = await fetch('/api/auth/me', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        const rawP = String(data?.usuario?.perfil || data?.usuario?.tipo || '').toLowerCase();
+        const mapP = (p) => {
+          if (p === 'admin') return 'instituicao_admin';
+          if (p === 'financeiro_admin') return 'financeiro';
+          if (p === 'comercial_master') return 'comercial';
+          return p;
+        };
+        setOperadorPerfil(mapP(rawP));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    buscarOperador();
+  }, []);
+
+  const obterPerfisPermitidos = () => {
+    if (operadorPerfil === 'grupo_admin') {
+      return PERFIS;
+    }
+    // instituicao_admin pode criar todos exceto grupo_admin e instituicao_admin
+    if (operadorPerfil === 'instituicao_admin') {
+      return PERFIS.filter(p => p.value !== 'grupo_admin' && p.value !== 'instituicao_admin');
+    }
+    // coordenador pode criar professor e aluno
+    if (operadorPerfil === 'coordenador') {
+      return PERFIS.filter(p => p.value === 'professor' || p.value === 'aluno');
+    }
+    // secretaria pode criar aluno
+    if (operadorPerfil === 'secretaria') {
+      return PERFIS.filter(p => p.value === 'aluno');
+    }
+    return [];
+  };
+
+  const obterTiposPermitidos = () => {
+    const perfisPermitidos = obterPerfisPermitidos().map(p => p.value);
+    // Tipos correspondentes
+    return TIPOS.filter(t => {
+      if (t.value === 'admin') {
+        return perfisPermitidos.includes('instituicao_admin');
+      }
+      if (t.value === 'professor') {
+        return perfisPermitidos.includes('professor');
+      }
+      if (t.value === 'aluno') {
+        return perfisPermitidos.includes('aluno');
+      }
+      // usuario corresponde aos demais perfis
+      return perfisPermitidos.some(p => p !== 'instituicao_admin' && p !== 'professor' && p !== 'aluno');
+    });
+  };
+
+  const perfisFiltrados = obterPerfisPermitidos();
+  const tiposFiltrados = obterTiposPermitidos();
 
   const buscarUsuarios = useCallback(async () => {
     try {
@@ -271,7 +335,7 @@ export default function AdminUsuarios() {
               />
             </div>
 
-            <div>
+             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Tipo</label>
               <select
                 name="tipo"
@@ -279,7 +343,7 @@ export default function AdminUsuarios() {
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
               >
-                {TIPOS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                {tiposFiltrados.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
 
@@ -291,7 +355,7 @@ export default function AdminUsuarios() {
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
               >
-                {PERFIS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                {perfisFiltrados.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
             </div>
 

@@ -99,6 +99,15 @@ export default function DashboardLayout({ children }) {
           }
         }
 
+        // 5. Validar Módulo de Usuários (/admin/usuarios)
+        if (path.startsWith('/admin/usuarios')) {
+          const moduloUsuarios = ['instituicao_admin']; // grupo_admin é liberado na linha 44
+          if (!moduloUsuarios.includes(perfil)) {
+            router.replace('/admin/dashboard');
+            return;
+          }
+        }
+
         setUser(usuarioLogado);
         setVerificando(false);
       })
