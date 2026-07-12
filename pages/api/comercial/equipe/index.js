@@ -23,7 +23,7 @@ const supabase = createClient(
 const PERFIS_PERMITIDOS = ['grupo_admin', 'instituicao_admin', 'admin', 'comercial', 'comercial_master'];
 
 // Campos seguros para retornar de usuarios (nunca retornar senha)
-const CAMPOS_SEGUROS = 'id, nomecompleto, email, whatsapp, tipo, perfil, status, instituicao_id, comercial_master_id, criado_por_id, created_at';
+const CAMPOS_SEGUROS = 'id, nomecompleto, email, whatsapp, tipo, perfil, status, instituicao_id, comercial_master_id, criado_por_id, datacriacao';
 
 const isMaster = (user) =>
   hasPerfil(user, ['comercial_master']) &&

@@ -31,8 +31,8 @@ export default async function handler(req, res) {
 
   let query = supabase
     .from('alunos')
-    .select('id, nome, email, telefone_celular, statusmatricula, cursoid, turmaid, captado_por_id, created_at')
-    .order('created_at', { ascending: false });
+    .select('id, nome, email, telefone_celular, statusmatricula, cursoid, turmaid, captado_por_id, datacriacao')
+    .order('datacriacao', { ascending: false });
 
   if (instituicaoId) query = applyInstituicaoFilter(query, instituicaoId);
 
