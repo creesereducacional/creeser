@@ -666,6 +666,26 @@ export default function CadastroAluno() {
                 </select>
               </div>
 
+              {isEditando && (
+                <div>
+                  <label className="text-xs font-medium text-teal-600 mb-1 block">STATUS DA MATRÍCULA</label>
+                  <select
+                    name="status"
+                    value={formData.status}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                  >
+                    <option value="ATIVO">ATIVO</option>
+                    <option value="TRANCADO">TRANCADO (Suspenso)</option>
+                    <option value="CANCELADO">CANCELADO (Cancelado pós-ativo)</option>
+                    <option value="DESISTENTE">DESISTENTE (Desistência pré-ativa)</option>
+                    <option value="AGUARDANDO_FORMACAO_TURMA">AGUARDANDO FORMAÇÃO DE TURMA</option>
+                    <option value="AGUARDANDO_PAGAMENTO_MATRICULA">AGUARDANDO PAGAMENTO MATRÍCULA</option>
+                    <option value="PRE_CADASTRO">PRÉ-CADASTRO</option>
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label className="text-xs font-medium text-teal-600 mb-1 block">ANO LETIVO</label>
                 <select

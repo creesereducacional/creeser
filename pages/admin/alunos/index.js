@@ -585,6 +585,30 @@ export default function ListagemAlunos() {
                               📜
                             </button>
                           </Link>
+                          <Link href={`/admin/alunos/declaracao?id=${aluno.id}&tipo=matricula`}>
+                            <button
+                              className="p-2 text-gray-600 hover:text-gray-800 transition text-base"
+                              title="Declaração de Matrícula"
+                            >
+                              📝
+                            </button>
+                          </Link>
+                          <Link href={`/admin/alunos/declaracao?id=${aluno.id}&tipo=frequencia`}>
+                            <button
+                              className="p-2 text-gray-600 hover:text-gray-800 transition text-base"
+                              title="Declaração de Frequência"
+                            >
+                              📅
+                            </button>
+                          </Link>
+                          <Link href={`/admin/alunos/declaracao?id=${aluno.id}&tipo=conclusao`}>
+                            <button
+                              className="p-2 text-gray-600 hover:text-gray-800 transition text-base"
+                              title="Declaração de Conclusão"
+                            >
+                              🎓
+                            </button>
+                          </Link>
                           <button
                             onClick={() => iniciarAssinaturaDigital(aluno.id)}
                             className="p-2 text-gray-600 hover:text-gray-800 transition"
