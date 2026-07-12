@@ -154,6 +154,211 @@ export default function Configuracoes() {
     }
   };
 
+  const renderGeral = () => (
+    <div className="space-y-4">
+      <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Identidade Visual</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Field label="Nome da Instituição *">
+          <input value={form.nomeEmpresa || ''} onChange={set('nomeEmpresa')} className={INPUT} />
+        </Field>
+        <Field label="Razão Social">
+          <input value={form.razaoSocial || ''} onChange={set('razaoSocial')} className={INPUT} />
+        </Field>
+        <Field label="CNPJ">
+          <input value={form.cnpj || ''} onChange={set('cnpj')} placeholder="00.000.000/0001-00" className={INPUT} />
+        </Field>
+        <Field label="Website">
+          <input value={form.website || ''} onChange={set('website')} placeholder="https://..." className={INPUT} />
+        </Field>
+        <Field label="URL do Logo">
+          <input value={form.logo || ''} onChange={set('logo')} placeholder="https://... ou /logo.png" className={INPUT} />
+        </Field>
+        {form.logo && (
+          <div className="flex items-center gap-3">
+            <img src={form.logo} alt="Logo" className="h-12 object-contain border rounded-lg p-1 bg-gray-50" />
+            <p className="text-xs text-gray-400">Pré-visualização</p>
+          </div>
+        )}
+      </div>
+      <Field label="Descrição / Slogan">
+        <textarea value={form.descricao || ''} onChange={set('descricao')} rows={2} className={INPUT} />
+      </Field>
+
+      <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide pt-2">Contato</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Field label="E-mail Institucional">
+          <input type="email" value={form.email || ''} onChange={set('email')} className={INPUT} />
+        </Field>
+        <Field label="Telefone">
+          <input value={form.telefone || ''} onChange={set('telefone')} className={INPUT} />
+        </Field>
+        <Field label="WhatsApp de Contato">
+          <input value={form.contatoWhatsapp || ''} onChange={set('contatoWhatsapp')} placeholder="5511999999999" className={INPUT} />
+        </Field>
+        <Field label="DDD Padrão">
+          <input value={form.ddd || ''} onChange={set('ddd')} maxLength={2} placeholder="11" className={INPUT} />
+        </Field>
+      </div>
+      <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+        <input type="checkbox" checked={!!form.exibirWhatsappAluno} onChange={set('exibirWhatsappAluno')} className="rounded" />
+        Exibir WhatsApp de contato no portal do aluno
+      </label>
+
+      <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide pt-2">Endereço</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Field label="Endereço">
+          <input value={form.endereco || ''} onChange={set('endereco')} className={INPUT} />
+        </Field>
+        <Field label="Cidade">
+          <input value={form.cidade || ''} onChange={set('cidade')} className={INPUT} />
+        </Field>
+        <Field label="Estado (UF)">
+          <input value={form.estado || ''} onChange={set('estado')} maxLength={2} placeholder="SP" className={INPUT} />
+        </Field>
+        <Field label="CEP">
+          <input value={form.cep || ''} onChange={set('cep')} placeholder="00000-000" className={INPUT} />
+        </Field>
+      </div>
+    </div>
+  );
+
+  const renderFinanceiro = () => (
+    <div className="space-y-4">
+      <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Dados Bancários / Boleto</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Field label="Banco">
+          <input value={form.fin_banco || ''} onChange={set('fin_banco')} placeholder="Ex: Banco do Brasil" className={INPUT} />
+        </Field>
+        <Field label="Agência">
+          <input value={form.fin_agencia || ''} onChange={set('fin_agencia')} className={INPUT} />
+        </Field>
+        <Field label="Conta Corrente">
+          <input value={form.fin_conta || ''} onChange={set('fin_conta')} className={INPUT} />
+        </Field>
+        <Field label="Chave PIX">
+          <input value={form.fin_pix || ''} onChange={set('fin_pix')} className={INPUT} />
+        </Field>
+      </div>
+
+      <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide pt-2">Regras de Cobrança</h3>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Field label="Vencimento do Boleto (dia)">
+          <input type="number" min="1" max="28" value={form.fin_boleto_venc || ''} onChange={set('fin_boleto_venc')} className={INPUT} />
+        </Field>
+        <Field label="Multa por Atraso (%)">
+          <input type="number" step="0.1" min="0" max="10" value={form.fin_multa || ''} onChange={set('fin_multa')} className={INPUT} />
+        </Field>
+        <Field label="Juros ao Mês (%)">
+          <input type="number" step="0.1" min="0" max="5" value={form.fin_juros || ''} onChange={set('fin_juros')} className={INPUT} />
+        </Field>
+      </div>
+    </div>
+  );
+
+  const renderContratos = () => (
+    <div className="space-y-4">
+      <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Assinatura Institucional</h3>
+      <Field label="Assinatura / Rodapé do Contrato">
+        <textarea value={form.cont_assinatura || ''} onChange={set('cont_assinatura')} rows={3}
+          placeholder="Nome do responsável, cargo, cidade/data…" className={INPUT} />
+      </Field>
+      <Field label="Validade do Link de Assinatura (dias)">
+        <input type="number" min="1" max="365" value={form.cont_validade || '30'} onChange={set('cont_validade')} className={`${INPUT} max-w-[200px]`} />
+      </Field>
+      <Field label="Modelo padrão de contrato">
+        <select value={form.cont_modelo || ''} onChange={set('cont_modelo')} className={INPUT}>
+          <option value="">— Padrão do sistema —</option>
+          <option value="basico">Básico</option>
+          <option value="completo">Completo com cláusulas LGPD</option>
+          <option value="customizado">Customizado (ver empresa.js)</option>
+        </select>
+      </Field>
+
+      <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 text-sm text-teal-800">
+        <p className="font-semibold mb-1">📄 Gerenciamento de Contratos</p>
+        <p>Acesse o <Link href="/admin/contratos" className="underline font-semibold">módulo de Contratos</Link> para gerar, enviar e monitorar assinaturas individuais.</p>
+      </div>
+    </div>
+  );
+
+  const renderComercial = () => (
+    <div className="space-y-4">
+      <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Regras de Comissão</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Field label="Comissão Padrão">
+          <input type="number" step="0.01" min="0" value={form.com_comissao_padrao || ''} onChange={set('com_comissao_padrao')} className={INPUT} />
+        </Field>
+        <Field label="Tipo de Comissão">
+          <select value={form.com_comissao_tipo || 'percentual'} onChange={set('com_comissao_tipo')} className={INPUT}>
+            <option value="percentual">Percentual (%)</option>
+            <option value="fixo">Valor Fixo (R$)</option>
+          </select>
+        </Field>
+      </div>
+      <Field label="Etapas do Funil Comercial (uma por linha)">
+        <textarea value={form.com_funil_etapas || ''} onChange={set('com_funil_etapas')} rows={5}
+          placeholder="Novo Lead&#10;Contatado&#10;Interessado&#10;Pré-Matrícula&#10;Matriculado" className={INPUT} />
+      </Field>
+    </div>
+  );
+
+  const renderIntegracoes = () => (
+    <div className="space-y-5">
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+        ⚠️ Chaves de API e tokens sensíveis devem ser configurados via <strong>variáveis de ambiente</strong> no painel da Vercel — não aqui.
+      </div>
+
+      <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Gerencianet / EFI (Boletos)</h3>
+      <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+        <input type="checkbox" checked={!!form.int_efi_sandbox} onChange={set('int_efi_sandbox')} className="rounded" />
+        Modo Sandbox (homologação) — desmarque em produção real
+      </label>
+
+      <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide pt-2">E-mail Transacional (SMTP)</h3>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Field label="Host SMTP">
+          <input value={form.int_email_host || ''} onChange={set('int_email_host')} placeholder="smtp.gmail.com" className={INPUT} />
+        </Field>
+        <Field label="Porta">
+          <input type="number" value={form.int_email_port || '587'} onChange={set('int_email_port')} className={INPUT} />
+        </Field>
+        <Field label="Usuário">
+          <input value={form.int_email_user || ''} onChange={set('int_email_user')} className={INPUT} />
+        </Field>
+      </div>
+
+      <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide pt-2">Assinafy (Contratos Digitais)</h3>
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-600">
+        Configure <code className="text-xs bg-gray-200 px-1 rounded">ASSINAFY_API_KEY</code> e <code className="text-xs bg-gray-200 px-1 rounded">ASSINAFY_BASE_URL</code> nas variáveis de ambiente da Vercel.
+      </div>
+    </div>
+  );
+
+  const renderAvancado = () => (
+    <div className="space-y-4">
+      <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Módulos do Sistema</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {[
+          { href: '/admin/configuracoes/empresa', label: 'Config. Empresa', icon: '🏢' },
+          { href: '/admin/configuracoes/usuarios', label: 'Gerenciar Usuários', icon: '👥' },
+          { href: '/admin/configuracoes/rematricula', label: 'Rematrícula', icon: '📝' },
+          { href: '/admin/configuracoes/matriculadores', label: 'Matriculadores', icon: '👤' },
+          { href: '/admin/configuracoes/campanhas', label: 'Campanhas de Matrículas', icon: '📊' },
+          { href: '/admin/configuracoes/diploma-digital', label: 'Diploma Digital', icon: '📜' },
+          { href: '/admin/configuracoes/certificado-digital', label: 'Certificado Digital', icon: '🎖️' },
+          { href: '/admin/go-live-checklist', label: '🚀 Go-Live Checklist', icon: '✅' },
+          { href: '/admin/logs', label: 'Logs de Auditoria', icon: '📋' },
+        ].map(item => (
+          <Link key={item.href} href={item.href}
+            className="flex items-center gap-3 p-3.5 bg-gray-50 hover:bg-teal-50 border border-gray-200 hover:border-teal-200 rounded-xl transition-colors text-sm font-medium text-gray-700 hover:text-teal-700">
+            <span className="text-xl">{item.icon}</span>
+            {item.label}
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+
   if (carregando) {
     return (
       <DashboardLayout>
@@ -189,216 +394,12 @@ export default function Configuracoes() {
           </div>
 
           <div className="p-6 space-y-5">
-            {/* ── Visual ────────────────────────────────────────────────── */}
-            {aba === 'visual' && (
-              <div className="space-y-4">
-                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Identidade Visual</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Field label="Nome da Instituição *">
-                    <input value={form.nomeEmpresa || ''} onChange={set('nomeEmpresa')} className={INPUT} />
-                  </Field>
-                  <Field label="Razão Social">
-                    <input value={form.razaoSocial || ''} onChange={set('razaoSocial')} className={INPUT} />
-                  </Field>
-                  <Field label="CNPJ">
-                    <input value={form.cnpj || ''} onChange={set('cnpj')} placeholder="00.000.000/0001-00" className={INPUT} />
-                  </Field>
-                  <Field label="Website">
-                    <input value={form.website || ''} onChange={set('website')} placeholder="https://..." className={INPUT} />
-                  </Field>
-                  <Field label="URL do Logo">
-                    <input value={form.logo || ''} onChange={set('logo')} placeholder="https://... ou /logo.png" className={INPUT} />
-                  </Field>
-                  {form.logo && (
-                    <div className="flex items-center gap-3">
-                      <img src={form.logo} alt="Logo" className="h-12 object-contain border rounded-lg p-1 bg-gray-50" />
-                      <p className="text-xs text-gray-400">Pré-visualização</p>
-                    </div>
-                  )}
-                </div>
-                <Field label="Descrição / Slogan">
-                  <textarea value={form.descricao || ''} onChange={set('descricao')} rows={2} className={INPUT} />
-                </Field>
-
-                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide pt-2">Contato</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Field label="E-mail Institucional">
-                    <input type="email" value={form.email || ''} onChange={set('email')} className={INPUT} />
-                  </Field>
-                  <Field label="Telefone">
-                    <input value={form.telefone || ''} onChange={set('telefone')} className={INPUT} />
-                  </Field>
-                  <Field label="WhatsApp de Contato">
-                    <input value={form.contatoWhatsapp || ''} onChange={set('contatoWhatsapp')} placeholder="5511999999999" className={INPUT} />
-                  </Field>
-                  <Field label="DDD Padrão">
-                    <input value={form.ddd || ''} onChange={set('ddd')} maxLength={2} placeholder="11" className={INPUT} />
-                  </Field>
-                </div>
-                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                  <input type="checkbox" checked={!!form.exibirWhatsappAluno} onChange={set('exibirWhatsappAluno')} className="rounded" />
-                  Exibir WhatsApp de contato no portal do aluno
-                </label>
-
-                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide pt-2">Endereço</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Field label="Endereço">
-                    <input value={form.endereco || ''} onChange={set('endereco')} className={INPUT} />
-                  </Field>
-                  <Field label="Cidade">
-                    <input value={form.cidade || ''} onChange={set('cidade')} className={INPUT} />
-                  </Field>
-                  <Field label="Estado (UF)">
-                    <input value={form.estado || ''} onChange={set('estado')} maxLength={2} placeholder="SP" className={INPUT} />
-                  </Field>
-                  <Field label="CEP">
-                    <input value={form.cep || ''} onChange={set('cep')} placeholder="00000-000" className={INPUT} />
-                  </Field>
-                </div>
-              </div>
-            )}
-
-            {/* ── Financeiro ────────────────────────────────────────────── */}
-            {aba === 'financeiro' && (
-              <div className="space-y-4">
-                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Dados Bancários / Boleto</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Field label="Banco">
-                    <input value={form.fin_banco || ''} onChange={set('fin_banco')} placeholder="Ex: Banco do Brasil" className={INPUT} />
-                  </Field>
-                  <Field label="Agência">
-                    <input value={form.fin_agencia || ''} onChange={set('fin_agencia')} className={INPUT} />
-                  </Field>
-                  <Field label="Conta Corrente">
-                    <input value={form.fin_conta || ''} onChange={set('fin_conta')} className={INPUT} />
-                  </Field>
-                  <Field label="Chave PIX">
-                    <input value={form.fin_pix || ''} onChange={set('fin_pix')} className={INPUT} />
-                  </Field>
-                </div>
-
-                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide pt-2">Regras de Cobrança</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Field label="Vencimento do Boleto (dia)">
-                    <input type="number" min="1" max="28" value={form.fin_boleto_venc || ''} onChange={set('fin_boleto_venc')} className={INPUT} />
-                  </Field>
-                  <Field label="Multa por Atraso (%)">
-                    <input type="number" step="0.1" min="0" max="10" value={form.fin_multa || ''} onChange={set('fin_multa')} className={INPUT} />
-                  </Field>
-                  <Field label="Juros ao Mês (%)">
-                    <input type="number" step="0.1" min="0" max="5" value={form.fin_juros || ''} onChange={set('fin_juros')} className={INPUT} />
-                  </Field>
-                </div>
-              </div>
-            )}
-
-            {/* ── Contratos ─────────────────────────────────────────────── */}
-            {aba === 'contratos' && (
-              <div className="space-y-4">
-                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Assinatura Institucional</h3>
-                <Field label="Assinatura / Rodapé do Contrato">
-                  <textarea value={form.cont_assinatura || ''} onChange={set('cont_assinatura')} rows={3}
-                    placeholder="Nome do responsável, cargo, cidade/data…" className={INPUT} />
-                </Field>
-                <Field label="Validade do Link de Assinatura (dias)">
-                  <input type="number" min="1" max="365" value={form.cont_validade || '30'} onChange={set('cont_validade')} className={`${INPUT} max-w-[200px]`} />
-                </Field>
-                <Field label="Modelo padrão de contrato">
-                  <select value={form.cont_modelo || ''} onChange={set('cont_modelo')} className={INPUT}>
-                    <option value="">— Padrão do sistema —</option>
-                    <option value="basico">Básico</option>
-                    <option value="completo">Completo com cláusulas LGPD</option>
-                    <option value="customizado">Customizado (ver empresa.js)</option>
-                  </select>
-                </Field>
-
-                <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 text-sm text-teal-800">
-                  <p className="font-semibold mb-1">📄 Gerenciamento de Contratos</p>
-                  <p>Acesse o <Link href="/admin/contratos" className="underline font-semibold">módulo de Contratos</Link> para gerar, enviar e monitorar assinaturas individuais.</p>
-                </div>
-              </div>
-            )}
-
-            {/* ── Comercial ─────────────────────────────────────────────── */}
-            {aba === 'comercial' && (
-              <div className="space-y-4">
-                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Regras de Comissão</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Field label="Comissão Padrão">
-                    <input type="number" step="0.01" min="0" value={form.com_comissao_padrao || ''} onChange={set('com_comissao_padrao')} className={INPUT} />
-                  </Field>
-                  <Field label="Tipo de Comissão">
-                    <select value={form.com_comissao_tipo || 'percentual'} onChange={set('com_comissao_tipo')} className={INPUT}>
-                      <option value="percentual">Percentual (%)</option>
-                      <option value="fixo">Valor Fixo (R$)</option>
-                    </select>
-                  </Field>
-                </div>
-                <Field label="Etapas do Funil Comercial (uma por linha)">
-                  <textarea value={form.com_funil_etapas || ''} onChange={set('com_funil_etapas')} rows={5}
-                    placeholder="Novo Lead&#10;Contatado&#10;Interessado&#10;Pré-Matrícula&#10;Matriculado" className={INPUT} />
-                </Field>
-              </div>
-            )}
-
-            {/* ── Integrações ───────────────────────────────────────────── */}
-            {aba === 'integracoes' && (
-              <div className="space-y-5">
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
-                  ⚠️ Chaves de API e tokens sensíveis devem ser configurados via <strong>variáveis de ambiente</strong> no painel da Vercel — não aqui.
-                </div>
-
-                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Gerencianet / EFI (Boletos)</h3>
-                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                  <input type="checkbox" checked={!!form.int_efi_sandbox} onChange={set('int_efi_sandbox')} className="rounded" />
-                  Modo Sandbox (homologação) — desmarque em produção real
-                </label>
-
-                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide pt-2">E-mail Transacional (SMTP)</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Field label="Host SMTP">
-                    <input value={form.int_email_host || ''} onChange={set('int_email_host')} placeholder="smtp.gmail.com" className={INPUT} />
-                  </Field>
-                  <Field label="Porta">
-                    <input type="number" value={form.int_email_port || '587'} onChange={set('int_email_port')} className={INPUT} />
-                  </Field>
-                  <Field label="Usuário">
-                    <input value={form.int_email_user || ''} onChange={set('int_email_user')} className={INPUT} />
-                  </Field>
-                </div>
-
-                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide pt-2">Assinafy (Contratos Digitais)</h3>
-                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-600">
-                  Configure <code className="text-xs bg-gray-200 px-1 rounded">ASSINAFY_API_KEY</code> e <code className="text-xs bg-gray-200 px-1 rounded">ASSINAFY_BASE_URL</code> nas variáveis de ambiente da Vercel.
-                </div>
-              </div>
-            )}
-
-            {/* ── Avançado ──────────────────────────────────────────────── */}
-            {aba === 'avancado' && (
-              <div className="space-y-4">
-                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Módulos do Sistema</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {[
-                    { href: '/admin/configuracoes/empresa', label: 'Config. Empresa', icon: '🏢' },
-                    { href: '/admin/configuracoes/usuarios', label: 'Gerenciar Usuários', icon: '👥' },
-                    { href: '/admin/configuracoes/rematricula', label: 'Rematrícula', icon: '📝' },
-                    { href: '/admin/configuracoes/matriculadores', label: 'Matriculadores', icon: '👤' },
-                    { href: '/admin/configuracoes/campanhas', label: 'Campanhas de Matrículas', icon: '📊' },
-                    { href: '/admin/configuracoes/diploma-digital', label: 'Diploma Digital', icon: '📜' },
-                    { href: '/admin/configuracoes/certificado-digital', label: 'Certificado Digital', icon: '🎖️' },
-                    { href: '/admin/go-live-checklist', label: '🚀 Go-Live Checklist', icon: '✅' },
-                    { href: '/admin/logs', label: 'Logs de Auditoria', icon: '📋' },
-                  ].map(item => (
-                    <Link key={item.href} href={item.href}
-                      className="flex items-center gap-3 p-3.5 bg-gray-50 hover:bg-teal-50 border border-gray-200 hover:border-teal-200 rounded-xl transition-colors text-sm font-medium text-gray-700 hover:text-teal-700">
-                      <span className="text-xl">{item.icon}</span>
-                      {item.label}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
+            {aba === 'visual' && renderGeral()}
+            {aba === 'financeiro' && renderFinanceiro()}
+            {aba === 'contratos' && renderContratos()}
+            {aba === 'comercial' && renderComercial()}
+            {aba === 'integracoes' && renderIntegracoes()}
+            {aba === 'avancado' && renderAvancado()}
 
             {/* ── Alert + Botão Salvar ──────────────────────────────────── */}
             {aba !== 'avancado' && (
