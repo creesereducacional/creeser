@@ -1497,467 +1497,530 @@ export default function ConfiguracaoEmpresa() {
 
             {/* ABA: FINANCEIRO */}
             {activeTab === 'financeiro' && (
-              <>
-                <h3 className="text-sm font-bold text-teal-600">💰 Dados Financeiros</h3>
+              <div className="space-y-6">
                 
-                <div className="space-y-4">
+                {/* 1. Dados Bancários */}
+                <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-xs space-y-4">
+                  <h3 className="text-sm font-bold text-teal-600 flex items-center gap-2 pb-2 border-b">
+                    <span>🏦</span> 1. Dados Bancários
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">BANCO</label>
+                      <input
+                        type="text"
+                        value={formData?.financeiro?.banco || ''}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: { ...(prev.financeiro || {}), banco: e.target.value }
+                        }))}
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                        placeholder="Ex: Banco do Brasil"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">AGÊNCIA</label>
+                      <input
+                        type="text"
+                        value={formData?.financeiro?.agencia || ''}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: { ...(prev.financeiro || {}), agencia: e.target.value }
+                        }))}
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                        placeholder="Ex: 1234-5"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">CONTA CORRENTE</label>
+                      <input
+                        type="text"
+                        value={formData?.financeiro?.conta || ''}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: { ...(prev.financeiro || {}), conta: e.target.value }
+                        }))}
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                        placeholder="Ex: 54321-0"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">TIPO DE CONTA</label>
+                      <select
+                        value={formData?.financeiro?.tipoConta || ''}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: { ...(prev.financeiro || {}), tipoConta: e.target.value }
+                        }))}
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                      >
+                        <option value="">Selecione</option>
+                        <option value="corrente">Conta Corrente</option>
+                        <option value="poupanca">Conta Poupança</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">FAVORECIDO</label>
+                      <input
+                        type="text"
+                        value={formData?.financeiro?.favorecido || ''}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: { ...(prev.financeiro || {}), favorecido: e.target.value }
+                        }))}
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                        placeholder="Ex: Nome da Instituição Ltda"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">CHAVE PIX</label>
+                      <input
+                        type="text"
+                        value={formData?.financeiro?.chavePix || ''}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: { ...(prev.financeiro || {}), chavePix: e.target.value }
+                        }))}
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                        placeholder="Ex: cnpj, email, telefone"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Regras Financeiras */}
+                <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-xs space-y-4">
+                  <h3 className="text-sm font-bold text-teal-600 flex items-center gap-2 pb-2 border-b">
+                    <span>⚙️</span> 2. Regras Financeiras
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">VENCIMENTO PADRÃO</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="31"
+                        value={formData?.financeiro?.diaVencimentoPadrao || ''}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: { ...(prev.financeiro || {}), diaVencimentoPadrao: parseInt(e.target.value) || '' }
+                        }))}
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                        placeholder="Ex: 10"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">MULTA (%)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={formData?.financeiro?.multa || ''}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: { ...(prev.financeiro || {}), multa: parseFloat(e.target.value) || '' }
+                        }))}
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                        placeholder="Ex: 2.00"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">JUROS (%) ao mês</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={formData?.financeiro?.juros || ''}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: { ...(prev.financeiro || {}), juros: parseFloat(e.target.value) || '' }
+                        }))}
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                        placeholder="Ex: 1.00"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">TOLERÂNCIA (DIAS)</label>
+                      <input
+                        type="number"
+                        value={formData?.financeiro?.diasTolerancia || ''}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: { ...(prev.financeiro || {}), diasTolerancia: parseInt(e.target.value) || '' }
+                        }))}
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                        placeholder="Ex: 3"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">DESC. PONTUALIDADE (%)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={formData?.financeiro?.descontoPontualidade || ''}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: { ...(prev.financeiro || {}), descontoPontualidade: parseFloat(e.target.value) || '' }
+                        }))}
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                        placeholder="Ex: 5.00"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Configurações de Cobrança */}
+                <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-xs space-y-4">
+                  <h3 className="text-sm font-bold text-teal-600 flex items-center gap-2 pb-2 border-b">
+                    <span>📋</span> 3. Configurações de Cobrança
+                  </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <label className="flex items-center gap-3 p-3 bg-green-50 border border-green-300 rounded-lg cursor-pointer hover:bg-green-100 transition">
+                    <label className="flex items-center justify-between p-3 bg-gray-50/50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100/50 transition">
+                      <span className="text-sm font-medium text-gray-800">Gerar carnê automaticamente na conversão?</span>
+                      <input
+                        type="checkbox"
+                        checked={formData?.financeiro?.gerarCarneAutomatico || false}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: { ...(prev.financeiro || {}), gerarCarneAutomatico: e.target.checked }
+                        }))}
+                        className="w-5 h-5 rounded text-teal-600 focus:ring-teal-500"
+                      />
+                    </label>
+
+                    <label className="flex items-center justify-between p-3 bg-gray-50/50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100/50 transition">
+                      <span className="text-sm font-medium text-gray-800">Gerar taxa de matrícula automaticamente?</span>
+                      <input
+                        type="checkbox"
+                        checked={formData?.financeiro?.gerarMatriculaAutomatico || false}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: { ...(prev.financeiro || {}), gerarMatriculaAutomatico: e.target.checked }
+                        }))}
+                        className="w-5 h-5 rounded text-teal-600 focus:ring-teal-500"
+                      />
+                    </label>
+
+                    <label className="flex items-center justify-between p-3 bg-gray-50/50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100/50 transition">
+                      <span className="text-sm font-medium text-gray-800">Permitir renegociação de parcelas vencidas?</span>
+                      <input
+                        type="checkbox"
+                        checked={formData?.financeiro?.permitirRenegociacao || false}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: { ...(prev.financeiro || {}), permitirRenegociacao: e.target.checked }
+                        }))}
+                        className="w-5 h-5 rounded text-teal-600 focus:ring-teal-500"
+                      />
+                    </label>
+
+                    <label className="flex items-center justify-between p-3 bg-gray-50/50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100/50 transition">
+                      <span className="text-sm font-medium text-gray-800">Permitir pagamento parcial das mensalidades?</span>
+                      <input
+                        type="checkbox"
+                        checked={formData?.financeiro?.permitirPagamentoParcial || false}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: { ...(prev.financeiro || {}), permitirPagamentoParcial: e.target.checked }
+                        }))}
+                        className="w-5 h-5 rounded text-teal-600 focus:ring-teal-500"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* 4. Plano Financeiro Padrão */}
+                <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-xs space-y-4">
+                  <h3 className="text-sm font-bold text-teal-600 flex items-center gap-2 pb-2 border-b">
+                    <span>📅</span> 4. Plano Financeiro Padrão
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">PARCELAS PADRÃO</label>
+                      <input
+                        type="number"
+                        value={formData?.financeiro?.qtdParcelasPadrao || ''}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: { ...(prev.financeiro || {}), qtdParcelasPadrao: parseInt(e.target.value) || '' }
+                        }))}
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                        placeholder="Ex: 12"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">PRIMEIRO VENCIMENTO PADRÃO</label>
+                      <select
+                        value={formData?.financeiro?.primeiroVencimentoPadrao || ''}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: { ...(prev.financeiro || {}), primeiroVencimentoPadrao: e.target.value }
+                        }))}
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                      >
+                        <option value="">Selecione</option>
+                        <option value="mes_corrente">Mês Corrente (Mês da Matrícula)</option>
+                        <option value="proximo_mes">Próximo Mês</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">FORMA DE COBRANÇA PADRÃO</label>
+                      <select
+                        value={formData?.financeiro?.formaCobrancaPadrao || ''}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: { ...(prev.financeiro || {}), formaCobrancaPadrao: e.target.value }
+                        }))}
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                      >
+                        <option value="">Selecione</option>
+                        <option value="boleto">Boleto Bancário</option>
+                        <option value="pix">PIX</option>
+                        <option value="cartao">Cartão de Crédito</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Gateways & Integrações (Legado e Configurações de API) */}
+                <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-xs space-y-6">
+                  <h3 className="text-sm font-bold text-teal-600 flex items-center gap-2 pb-2 border-b">
+                    <span>🔐</span> Gateways & Configurações de API
+                  </h3>
+                  
+                  {/* Controles Gerais */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <label className="flex items-center justify-between p-3 bg-gray-50/50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100/50 transition">
+                      <span className="text-sm font-medium text-gray-800">Desativar Financeiro do Portal do Aluno?</span>
                       <input
                         type="checkbox"
                         checked={formData?.financeiro?.desativarFinanceiro || false}
                         onChange={(e) => setFormData(prev => ({
                           ...prev,
-                          financeiro: {
-                            ...(prev.financeiro || {}),
-                            desativarFinanceiro: e.target.checked
-                          }
+                          financeiro: { ...(prev.financeiro || {}), desativarFinanceiro: e.target.checked }
                         }))}
-                        className="w-5 h-5"
+                        className="w-5 h-5 rounded text-teal-600"
                       />
-                      <span className="text-sm font-medium text-gray-800">Desativar Financeiro do Portal do Aluno?</span>
                     </label>
 
-                    <label className="flex items-center gap-3 p-3 bg-green-50 border border-green-300 rounded-lg cursor-pointer hover:bg-green-100 transition">
+                    <label className="flex items-center justify-between p-3 bg-gray-50/50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100/50 transition">
+                      <span className="text-sm font-medium text-gray-800">Desativar Botão Juros e Multa?</span>
                       <input
                         type="checkbox"
                         checked={formData?.financeiro?.desativarJurosMulha || false}
                         onChange={(e) => setFormData(prev => ({
                           ...prev,
-                          financeiro: {
-                            ...(prev.financeiro || {}),
-                            desativarJurosMulha: e.target.checked
-                          }
+                          financeiro: { ...(prev.financeiro || {}), desativarJurosMulha: e.target.checked }
                         }))}
-                        className="w-5 h-5"
+                        className="w-5 h-5 rounded text-teal-600"
                       />
-                      <span className="text-sm font-medium text-gray-800">Desativar Botão Juros e Mulha?</span>
                     </label>
-                  </div>
 
-                  <label className="flex items-center gap-3 p-3 bg-green-50 border border-green-300 rounded-lg cursor-pointer hover:bg-green-100 transition">
-                    <input
-                      type="checkbox"
-                      checked={formData?.financeiro?.bloquearAlunoInadimplente || false}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        financeiro: {
-                          ...(prev.financeiro || {}),
-                          bloquearAlunoInadimplente: e.target.checked
-                        }
-                      }))}
-                      className="w-5 h-5"
-                    />
-                    <span className="text-sm font-medium text-gray-800">Bloquear aluno inadimplente?</span>
-                  </label>
-
-                  <label className="flex items-center gap-3 p-3 bg-green-50 border border-green-300 rounded-lg cursor-pointer hover:bg-green-100 transition">
-                    <input
-                      type="checkbox"
-                      checked={formData?.financeiro?.saldarVencimentoFinal || false}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        financeiro: {
-                          ...(prev.financeiro || {}),
-                          saldarVencimentoFinal: e.target.checked
-                        }
-                      }))}
-                      className="w-5 h-5"
-                    />
-                    <span className="text-sm font-medium text-gray-800">Saltar Vencimentos no Final de Semana?</span>
-                  </label>
-                </div>
-
-                <div className="pt-6 border-t border-gray-200">
-                  <h3 className="text-sm font-bold text-teal-600 mb-4">📋 Notas Fiscais</h3>
-                  
-                  <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-4">
-                    <h4 className="text-xs font-bold text-yellow-800 mb-2">⚠️ ATENÇÃO:</h4>
-                    <p className="text-xs text-yellow-700">
-                      Com RPS Manual ativado, informe no Cerbrum o último número consultado no portal da prefeitura.
-                    </p>
-                    <p className="text-xs text-yellow-700 mt-1">
-                      Com RPS Manual desativado, o Cerbrum usa o último número gerado no próprio sistema.
-                    </p>
-                    <p className="text-xs text-yellow-700 mt-2">
-                      <em>(Use apenas se emitir notas também em outro sistema fora do Cerbrum.)</em>
-                    </p>
-                  </div>
-
-                  <label className="flex items-center gap-3 p-3 bg-green-50 border border-green-300 rounded-lg cursor-pointer hover:bg-green-100 transition">
-                    <input
-                      type="checkbox"
-                      checked={formData?.financeiro?.ativarRPSManual || false}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        financeiro: {
-                          ...(prev.financeiro || {}),
-                          ativarRPSManual: e.target.checked
-                        }
-                      }))}
-                      className="w-5 h-5"
-                    />
-                    <span className="text-sm font-medium text-gray-800">Ativar RPS manual?</span>
-                  </label>
-                </div>
-
-                <div className="pt-6 border-t border-gray-200">
-                  <h3 className="text-sm font-bold text-teal-600 mb-4">🔐 Gerencianet</h3>
-                  
-                  <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-4">
-                    <h4 className="text-xs font-bold text-yellow-800 mb-2">💡 DICA</h4>
-                    <p className="text-xs text-yellow-700">
-                      Ativando esta função, será exibido a opção <strong>Gerencianet</strong> na criação das turmas no campo Conta de Recebimento.
-                    </p>
-                    <p className="text-xs text-yellow-700 mt-1">
-                      Certifique que o <strong>Client ID</strong> e o <strong>Client Secret</strong> estão preenchidos corretamente.
-                    </p>
-                    <p className="text-xs text-yellow-700 mt-1">
-                      O não preenchimento correto do <strong>Client ID</strong> e o <strong>Client Secret</strong> causará erros no momento de gerar as formas de pagamento.
-                    </p>
-                    <p className="text-xs text-yellow-700 mt-1">
-                      <a href="#" className="text-blue-600 hover:text-blue-800">Clique aqui</a>, e veja como encontrar o <strong>Client ID</strong> e o <strong>Client Secret</strong>. Use os dados de produção.
-                    </p>
-                    <p className="text-xs text-yellow-700 mt-1">
-                      Para habilitar os pagamentos via Cartão é necessário informar o <strong>Identificador de Conta</strong>.
-                    </p>
-                    <p className="text-xs text-yellow-700 mt-1">
-                      <a href="#" className="text-blue-600 hover:text-blue-800">Clique aqui</a>, e veja como encontrar o <strong>Identificador de Conta</strong>.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <label className="flex items-center gap-3 p-3 bg-green-50 border border-green-300 rounded-lg cursor-pointer hover:bg-green-100 transition">
+                    <label className="flex items-center justify-between p-3 bg-gray-50/50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100/50 transition">
+                      <span className="text-sm font-medium text-gray-800">Bloquear aluno inadimplente?</span>
                       <input
                         type="checkbox"
-                        checked={formData?.financeiro?.ativarGerencianet || false}
+                        checked={formData?.financeiro?.bloquearAlunoInadimplente || false}
                         onChange={(e) => setFormData(prev => ({
                           ...prev,
-                          financeiro: {
-                            ...(prev.financeiro || {}),
-                            ativarGerencianet: e.target.checked
-                          }
+                          financeiro: { ...(prev.financeiro || {}), bloquearAlunoInadimplente: e.target.checked }
                         }))}
-                        className="w-5 h-5"
+                        className="w-5 h-5 rounded text-teal-600"
                       />
-                      <span className="text-sm font-medium text-gray-800">Ativar Gerencianet</span>
                     </label>
 
-                    <div>
+                    <label className="flex items-center justify-between p-3 bg-gray-50/50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100/50 transition">
+                      <span className="text-sm font-medium text-gray-800">Saltar Vencimentos no Final de Semana?</span>
+                      <input
+                        type="checkbox"
+                        checked={formData?.financeiro?.saldarVencimentoFinal || false}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: { ...(prev.financeiro || {}), saldarVencimentoFinal: e.target.checked }
+                        }))}
+                        className="w-5 h-5 rounded text-teal-600"
+                      />
+                    </label>
+                  </div>
+
+                  {/* RPS Manual */}
+                  <div className="pt-4 border-t border-gray-100">
+                    <h4 className="text-xs font-bold text-gray-550 uppercase tracking-wider mb-2">Configurações de RPS/NF</h4>
+                    <label className="flex items-center justify-between p-3 bg-gray-50/50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100/50 transition">
+                      <span className="text-sm font-medium text-gray-800">Ativar RPS manual?</span>
+                      <input
+                        type="checkbox"
+                        checked={formData?.financeiro?.ativarRPSManual || false}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: { ...(prev.financeiro || {}), ativarRPSManual: e.target.checked }
+                        }))}
+                        className="w-5 h-5 rounded text-teal-600"
+                      />
+                    </label>
+                  </div>
+
+                  {/* Gerencianet/EFI */}
+                  <div className="pt-4 border-t border-gray-100 space-y-4">
+                    <h4 className="text-xs font-bold text-gray-550 uppercase tracking-wider">🔐 API Gerencianet / EFI</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <label className="flex items-center justify-between p-3 bg-gray-50/50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100/50 transition">
+                        <span className="text-sm font-medium text-gray-800">Ativar Gerencianet / EFI?</span>
+                        <input
+                          type="checkbox"
+                          checked={formData?.financeiro?.ativarGerencianet || false}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            financeiro: { ...(prev.financeiro || {}), ativarGerencianet: e.target.checked }
+                          }))}
+                          className="w-5 h-5 rounded text-teal-600"
+                        />
+                      </label>
+
+                      <label className="flex items-center justify-between p-3 bg-gray-50/50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100/50 transition">
+                        <span className="text-sm font-medium text-gray-800">Aceitar Pagamentos via Cartão?</span>
+                        <input
+                          type="checkbox"
+                          checked={formData?.financeiro?.aceitarCartaoGerencianet || false}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            financeiro: { ...(prev.financeiro || {}), aceitarCartaoGerencianet: e.target.checked }
+                          }))}
+                          className="w-5 h-5 rounded text-teal-600"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 mb-1 block">CLIENT ID</label>
+                        <input
+                          type="text"
+                          value={formData?.financeiro?.clientId || ''}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            financeiro: { ...(prev.financeiro || {}), clientId: e.target.value }
+                          }))}
+                          placeholder="Client_Id"
+                          className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-semibold text-gray-500 mb-1 block">CLIENT SECRET</label>
+                        <input
+                          type="text"
+                          value={formData?.financeiro?.clientSecret || ''}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            financeiro: { ...(prev.financeiro || {}), clientSecret: e.target.value }
+                          }))}
+                          placeholder="Client_Secret"
+                          className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Asaas */}
+                  <div className="pt-4 border-t border-gray-100 space-y-4">
+                    <h4 className="text-xs font-bold text-gray-550 uppercase tracking-wider">🔐 API Asaas</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <label className="flex items-center justify-between p-3 bg-gray-50/50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100/50 transition">
+                        <span className="text-sm font-medium text-gray-800">Ativar Asaas?</span>
+                        <input
+                          type="checkbox"
+                          checked={formData?.financeiro?.ativarAsaas || false}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            financeiro: { ...(prev.financeiro || {}), ativarAsaas: e.target.checked }
+                          }))}
+                          className="w-5 h-5 rounded text-teal-600"
+                        />
+                      </label>
+
+                      <label className="flex items-center justify-between p-3 bg-gray-50/50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100/50 transition">
+                        <span className="text-sm font-medium text-gray-800">Aceitar Cartão Asaas?</span>
+                        <input
+                          type="checkbox"
+                          checked={formData?.financeiro?.aceitarPagamentosCartaoAsaas || false}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            financeiro: { ...(prev.financeiro || {}), aceitarPagamentosCartaoAsaas: e.target.checked }
+                          }))}
+                          className="w-5 h-5 rounded text-teal-600"
+                        />
+                      </label>
+
+                      <label className="flex items-center justify-between p-3 bg-gray-50/50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100/50 transition">
+                        <span className="text-sm font-medium text-gray-800">Aceitar PIX Asaas?</span>
+                        <input
+                          type="checkbox"
+                          checked={formData?.financeiro?.aceitarPagamentosPixAsaas || false}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            financeiro: { ...(prev.financeiro || {}), aceitarPagamentosPixAsaas: e.target.checked }
+                          }))}
+                          className="w-5 h-5 rounded text-teal-600"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-semibold text-gray-505 mb-1 block">API KEY ASAAS</label>
+                        <input
+                          type="password"
+                          value={formData?.financeiro?.apiKeyAsaas || ''}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            financeiro: { ...(prev.financeiro || {}), apiKeyAsaas: e.target.value }
+                          }))}
+                          className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-semibold text-gray-505 mb-1 block">AMBIENTE</label>
+                        <select
+                          value={formData?.financeiro?.ambienteAsaas || 'sandbox'}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            financeiro: { ...(prev.financeiro || {}), ambienteAsaas: e.target.value }
+                          }))}
+                          className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                        >
+                          <option value="sandbox">Sandbox (Homologação)</option>
+                          <option value="producao">Produção</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
                       <button
                         type="button"
-                        className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition"
+                        onClick={handleTestarAsaas}
+                        disabled={testingAsaas}
+                        className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs rounded-xl transition"
                       >
-                        ✓ Validar suas Credenciais
+                        {testingAsaas ? 'Testando...' : '🔌 Testar Conexão Asaas'}
                       </button>
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div>
-                      <label className="text-xs font-medium text-teal-600 mb-1 block">CLIENT ID</label>
-                      <input
-                        type="text"
-                        value={formData?.financeiro?.clientId || ''}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          financeiro: {
-                            ...(prev.financeiro || {}),
-                            clientId: e.target.value
-                          }
-                        }))}
-                        placeholder="Client_Id_66a1f0187f1f3e8a53ed7c296e322043a95e762a"
-                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-medium text-teal-600 mb-1 block">CLIENT SECRET</label>
-                      <input
-                        type="text"
-                        value={formData?.financeiro?.clientSecret || ''}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          financeiro: {
-                            ...(prev.financeiro || {}),
-                            clientSecret: e.target.value
-                          }
-                        }))}
-                        placeholder="Client_Secret_817629a3f55cbe4c753bfac451232393dff22d07"
-                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <label className="flex items-center gap-3 p-3 bg-green-50 border border-green-300 rounded-lg cursor-pointer hover:bg-green-100 transition">
-                      <input
-                        type="checkbox"
-                        checked={formData?.financeiro?.aceitarCartaoGerencianet || false}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          financeiro: {
-                            ...(prev.financeiro || {}),
-                            aceitarCartaoGerencianet: e.target.checked
-                          }
-                        }))}
-                        className="w-5 h-5"
-                      />
-                      <span className="text-sm font-medium text-gray-800">Aceitar Pagamentos via Cartão?</span>
-                    </label>
-
-                    <div>
-                      <label className="text-xs font-medium text-teal-600 mb-1 block">IDENTIFICADOR DE CONTA</label>
-                      <input
-                        type="text"
-                        value={formData?.financeiro?.identificadorConta || ''}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          financeiro: {
-                            ...(prev.financeiro || {}),
-                            identificadorConta: e.target.value
-                          }
-                        }))}
-                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-medium text-teal-600 mb-1 block">% JUROS</label>
-                      <input
-                        type="number"
-                        step="0.001"
-                        value={formData?.financeiro?.jurosGerencianet || 0.033}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          financeiro: {
-                            ...(prev.financeiro || {}),
-                            jurosGerencianet: parseFloat(e.target.value)
-                          }
-                        }))}
-                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-medium text-teal-600 mb-1 block">% MULTA</label>
-                      <input
-                        type="number"
-                        step="0.001"
-                        value={formData?.financeiro?.multaGerencianet || 2.0}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          financeiro: {
-                            ...(prev.financeiro || {}),
-                            multaGerencianet: parseFloat(e.target.value)
-                          }
-                        }))}
-                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                      />
-                    </div>
-                  </div>
                 </div>
 
-                <div className="pt-6 border-t border-gray-200">
-                  <h3 className="text-sm font-bold text-teal-600 mb-4">🔐 Asaas</h3>
-                  
-                  <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-4">
-                    <h4 className="text-xs font-bold text-yellow-800 mb-2">💡 DICA</h4>
-                    <p className="text-xs text-yellow-700">
-                      Ativando esta função, será exibido a opção <strong>Asaas</strong> na criação das turmas no campo Conta de Recebimento.
-                    </p>
-                    <p className="text-xs text-yellow-700 mt-1">
-                      Certifique que a <strong>API Key Asaas</strong> está preenchida corretamente.
-                    </p>
-                    <p className="text-xs text-yellow-700 mt-1">
-                      O não preenchimento correto da <strong>API Key Asaas</strong> causará erros no momento de gerar as formas de pagamento.
-                    </p>
-                    <p className="text-xs text-yellow-700 mt-1">
-                      <a href="#" className="text-blue-600 hover:text-blue-800">Clique aqui</a>, e veja como encontrar a <strong>API key Asaas</strong>. Use os dados de produção.
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <label className="flex items-center gap-3 p-3 bg-green-50 border border-green-300 rounded-lg cursor-pointer hover:bg-green-100 transition">
-                      <input
-                        type="checkbox"
-                        checked={formData?.financeiro?.ativarAsaas || false}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          financeiro: {
-                            ...(prev.financeiro || {}),
-                            ativarAsaas: e.target.checked
-                          }
-                        }))}
-                        className="w-5 h-5"
-                      />
-                      <span className="text-sm font-medium text-gray-800">Ativar Asaas</span>
-                    </label>
-
-                    <div>
-                      <label className="text-xs font-medium text-teal-600 mb-1 block">API KEY ASAAS</label>
-                      <input
-                        type="password"
-                        value={formData?.financeiro?.apiKeyAsaas || ''}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          financeiro: {
-                            ...(prev.financeiro || {}),
-                            apiKeyAsaas: e.target.value
-                          }
-                        }))}
-                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div>
-                      <label className="text-xs font-medium text-teal-600 mb-1 block">AMBIENTE</label>
-                      <select
-                        value={formData?.financeiro?.ambienteAsaas || 'sandbox'}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          financeiro: {
-                            ...(prev.financeiro || {}),
-                            ambienteAsaas: e.target.value
-                          }
-                        }))}
-                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                      >
-                        <option value="sandbox">Sandbox (Homologação)</option>
-                        <option value="producao">Produção</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-medium text-teal-600 mb-1 block">WALLET ID (OPCIONAL)</label>
-                      <input
-                        type="text"
-                        value={formData?.financeiro?.walletIdAsaas || ''}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          financeiro: {
-                            ...(prev.financeiro || {}),
-                            walletIdAsaas: e.target.value
-                          }
-                        }))}
-                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                        placeholder="Ex: 00000000-0000-0000-0000-000000000000"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-medium text-teal-600 mb-1 block">TOKEN WEBHOOK (OPCIONAL)</label>
-                      <input
-                        type="password"
-                        value={formData?.financeiro?.webhookTokenAsaas || ''}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          financeiro: {
-                            ...(prev.financeiro || {}),
-                            webhookTokenAsaas: e.target.value
-                          }
-                        }))}
-                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mb-6">
-                    <button
-                      type="button"
-                      onClick={handleTestarAsaas}
-                      disabled={testingAsaas}
-                      className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs rounded-lg transition-colors cursor-pointer"
-                    >
-                      {testingAsaas ? 'Testando...' : '🔌 Testar Conexão Asaas'}
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-medium text-teal-600 mb-1 block">% JUROS *</label>
-                      <input
-                        type="number"
-                        step="0.001"
-                        value={formData?.financeiro?.percentualJurosAsaas || 0.033}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          financeiro: {
-                            ...(prev.financeiro || {}),
-                            percentualJurosAsaas: parseFloat(e.target.value)
-                          }
-                        }))}
-                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-medium text-teal-600 mb-1 block">% MULTA *</label>
-                      <input
-                        type="number"
-                        step="0.001"
-                        value={formData?.financeiro?.percentualMultaAsaas || 2.000}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          financeiro: {
-                            ...(prev.financeiro || {}),
-                            percentualMultaAsaas: parseFloat(e.target.value)
-                          }
-                        }))}
-                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    <label className="flex items-center gap-3 p-3 bg-green-50 border border-green-300 rounded-lg cursor-pointer hover:bg-green-100 transition">
-                      <input
-                        type="checkbox"
-                        checked={formData?.financeiro?.aceitarPagamentosCartaoAsaas || false}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          financeiro: {
-                            ...(prev.financeiro || {}),
-                            aceitarPagamentosCartaoAsaas: e.target.checked
-                          }
-                        }))}
-                        className="w-5 h-5"
-                      />
-                      <span className="text-sm font-medium text-gray-800">Aceitar Pagamentos via Cartão?</span>
-                    </label>
-
-                    <label className="flex items-center gap-3 p-3 bg-green-50 border border-green-300 rounded-lg cursor-pointer hover:bg-green-100 transition">
-                      <input
-                        type="checkbox"
-                        checked={formData?.financeiro?.aceitarPagamentosPixAsaas || false}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          financeiro: {
-                            ...(prev.financeiro || {}),
-                            aceitarPagamentosPixAsaas: e.target.checked
-                          }
-                        }))}
-                        className="w-5 h-5"
-                      />
-                      <span className="text-sm font-medium text-gray-800">Aceitar Pagamentos via PIX?</span>
-                    </label>
-                  </div>
-
-                  <div className="mt-4">
-                    <label className="text-xs font-medium text-teal-600 mb-1 block">CHAVE PIX PARA COBRANÇAS</label>
-                    <select
-                      className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                    >
-                      <option value="">SELECIONE UMA CHAVE PIX</option>
-                      <option value="pix1">Chave PIX 1</option>
-                    </select>
-                  </div>
-                </div>
-              </>
+              </div>
             )}
 
             {/* ABA: BIBLIOTECA */}
