@@ -71,6 +71,8 @@ export default function NovoLead() {
     periodo: '',
     turno: '',
     data_matricula: new Date().toISOString().slice(0, 10),
+    matriz_curricular: '',
+    unidade_id: '',
 
     // Plano Financeiro
     valor_inscricao: '',
@@ -108,6 +110,17 @@ export default function NovoLead() {
   const [loadingTurmas, setLoadingTurmas] = useState(false);
   const [equipe, setEquipe] = useState([]);
 
+  // Estados inteligentes de preenchimento automático
+  const [semParametroFinanceiro, setSemParametroFinanceiro] = useState(false);
+  const [touchedFields, setTouchedFields] = useState({
+    valor_inscricao: false,
+    valor_mensalidade: false,
+    qtd_parcelas: false,
+    dia_vencimento: false,
+    data_primeiro_vencimento: false,
+    convenio: false
+  });
+
   // 1. Carrega instituições e equipe comercial ao montar
   useEffect(() => {
     fetch('/api/comercial/instituicoes', { credentials: 'include' })
@@ -131,7 +144,17 @@ export default function NovoLead() {
     setLoadingCursos(true);
     setCursos([]);
     setTurmas([]);
-    setForm(f => ({ ...f, curso_id: '', curso_interesse: '', turma_id: '', valor_mensalidade: '', valor_inscricao: '' }));
+    setSemParametroFinanceiro(false);
+    setForm(f => ({ 
+      ...f, 
+      curso_id: '', 
+      curso_interesse: '', 
+      turma_id: '', 
+      valor_mensalidade: '', 
+      valor_inscricao: '',
+      matriz_curricular: '',
+      unidade_id: ''
+    }));
     fetch(`/api/comercial/cursos?instituicao_id=${instituicaoId}`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : [])
       .then(data => setCursos(Array.isArray(data) ? data : []))
@@ -139,10 +162,11 @@ export default function NovoLead() {
       .finally(() => setLoadingCursos(false));
   }, [instituicaoId]);
 
-  // 3. Carrega turmas e valores quando o curso muda e limpa turma_id
+  // 3. Carrega turmas quando o curso muda e limpa turma_id
   useEffect(() => {
     if (!form.curso_id) {
       setTurmas([]);
+      setSemParametroFinanceiro(false);
       return;
     }
     setLoadingTurmas(true);
@@ -150,24 +174,74 @@ export default function NovoLead() {
     fetch(`/api/comercial/turmas?cursoid=${form.curso_id}`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : [])
       .then(data => {
-        const list = Array.isArray(data) ? data : [];
-        setTurmas(list);
-        
-        // Auto-preencher valores
-        const selectedCurso = cursos.find(c => String(c.id) === form.curso_id);
-        if (selectedCurso) {
-          setForm(f => ({ 
-            ...f, 
-            valor_mensalidade: selectedCurso.valor_mensalidade || (list[0]?.mensalidade) || '',
-            valor_inscricao: list[0]?.matricula || '',
-            turno: list[0]?.turno || '',
-            periodo: list[0]?.semestre || ''
-          }));
-        }
+        setTurmas(Array.isArray(data) ? data : []);
       })
       .catch(() => {})
       .finally(() => setLoadingTurmas(false));
   }, [form.curso_id]);
+
+  // 4. Centraliza lógica de preenchimento automático baseado na Turma selecionada
+  const loadTurmaConfiguration = (tId) => {
+    if (!tId) {
+      setSemParametroFinanceiro(false);
+      return;
+    }
+    const turma = turmas.find(t => String(t.id) === String(tId));
+    if (!turma) return;
+
+    // Alerta de parâmetros financeiros vazios
+    const temFinanceiro = !!(turma.mensalidade || turma.matricula || turma.mesescontrato);
+    setSemParametroFinanceiro(!temFinanceiro);
+
+    setForm(f => {
+      const updates = {};
+
+      // DADOS ACADÊMICOS
+      if (turma.datainicio) {
+        updates.ano_letivo = new Date(turma.datainicio).getFullYear();
+        const mes = new Date(turma.datainicio).getMonth() + 1;
+        updates.periodo = `${updates.ano_letivo}/${mes <= 6 ? '1' : '2'}`;
+        
+        // Primeiro vencimento: dia_vencimento no mês seguinte à data de início da turma
+        const nextMonth = new Date(turma.datainicio);
+        nextMonth.setMonth(nextMonth.getMonth() + 1);
+        nextMonth.setDate(parseInt(f.dia_vencimento || '10'));
+        updates.data_primeiro_vencimento = nextMonth.toISOString().slice(0, 10);
+      }
+      if (turma.turno) {
+        updates.turno = turma.turno.toUpperCase();
+      }
+      if (turma.gradeid) {
+        updates.matriz_curricular = String(turma.gradeid);
+      }
+      if (turma.unidadeid) {
+        updates.unidade_id = String(turma.unidadeid);
+      }
+
+      // DADOS FINANCEIROS (Preservar se alterado manualmente)
+      if (!touchedFields.valor_inscricao) {
+        updates.valor_inscricao = turma.matricula || '';
+      }
+      if (!touchedFields.valor_mensalidade) {
+        updates.valor_mensalidade = turma.mensalidade || '';
+      }
+      if (!touchedFields.qtd_parcelas) {
+        updates.qtd_parcelas = turma.mesescontrato || '12';
+      }
+      if (!touchedFields.dia_vencimento) {
+        updates.dia_vencimento = '10';
+      }
+      if (!touchedFields.convenio && turma.tipocobranca) {
+        updates.convenio = turma.tipocobranca;
+      }
+
+      return { ...f, ...updates };
+    });
+  };
+
+  useEffect(() => {
+    loadTurmaConfiguration(form.turma_id);
+  }, [form.turma_id, turmas]);
 
   // Sync Responsável Financeiro com Aluno se checkbox marcado
   useEffect(() => {
@@ -257,6 +331,8 @@ export default function NovoLead() {
         periodo: form.periodo || null,
         turno: form.turno || null,
         data_matricula: form.data_matricula || null,
+        matriz_curricular: form.matriz_curricular || null,
+        unidade_id: form.unidade_id || null,
       },
       responsavel_financeiro: {
         nome: form.resp_nome || null,
@@ -320,6 +396,17 @@ export default function NovoLead() {
     } finally {
       setSalvando(false);
     }
+  };
+
+  const renderSugerido = (campo) => {
+    if (!touchedFields[campo] && form[campo]) {
+      return (
+        <span className="text-[10px] text-green-600 font-semibold block mt-1">
+          ✓ Valores sugeridos automaticamente
+        </span>
+      );
+    }
+    return null;
   };
 
   const emailInvalido = emailTocado && !emailValido(form.email);
@@ -718,6 +805,13 @@ export default function NovoLead() {
             <h3 className="text-base font-semibold text-gray-800 border-b pb-2 flex items-center gap-2">
               <span className="text-teal-600">📅</span> 4. Dados da Matrícula
             </h3>
+
+            {semParametroFinanceiro && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700 flex items-center gap-2">
+                <span>⚠️</span>
+                <span>Esta turma ainda não possui parâmetros financeiros configurados no módulo acadêmico.</span>
+              </div>
+            )}
             
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {/* Ano Letivo */}
@@ -729,6 +823,7 @@ export default function NovoLead() {
                   onChange={set('ano_letivo')}
                   className={inputBase}
                 />
+                {form.turma_id && renderSugerido('ano_letivo')}
               </div>
 
               {/* Período */}
@@ -741,6 +836,7 @@ export default function NovoLead() {
                   placeholder="2026/1"
                   className={inputBase}
                 />
+                {form.turma_id && renderSugerido('periodo')}
               </div>
 
               {/* Turno */}
@@ -757,6 +853,7 @@ export default function NovoLead() {
                   <option value="TARDE">Tarde</option>
                   <option value="NOITE">Noite</option>
                 </select>
+                {form.turma_id && renderSugerido('turno')}
               </div>
 
               {/* Data Matrícula */}
@@ -768,6 +865,32 @@ export default function NovoLead() {
                   onChange={set('data_matricula')}
                   className={inputBase}
                 />
+              </div>
+
+              {/* Matriz Curricular */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Matriz Curricular (ID)</label>
+                <input
+                  type="text"
+                  value={form.matriz_curricular}
+                  onChange={set('matriz_curricular')}
+                  placeholder="Matriz"
+                  className={inputBase}
+                />
+                {form.turma_id && renderSugerido('matriz_curricular')}
+              </div>
+
+              {/* Unidade */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Unidade (ID)</label>
+                <input
+                  type="text"
+                  value={form.unidade_id}
+                  onChange={set('unidade_id')}
+                  placeholder="Unidade"
+                  className={inputBase}
+                />
+                {form.turma_id && renderSugerido('unidade_id')}
               </div>
             </div>
           </div>
@@ -786,10 +909,14 @@ export default function NovoLead() {
                   type="number"
                   step="0.01"
                   value={form.valor_inscricao}
-                  onChange={set('valor_inscricao')}
+                  onChange={e => {
+                    setForm(f => ({ ...f, valor_inscricao: e.target.value }));
+                    setTouchedFields(t => ({ ...t, valor_inscricao: true }));
+                  }}
                   placeholder="R$ 150,00"
                   className={inputBase}
                 />
+                {form.turma_id && renderSugerido('valor_inscricao')}
               </div>
 
               {/* Valor Mensalidade */}
@@ -799,10 +926,14 @@ export default function NovoLead() {
                   type="number"
                   step="0.01"
                   value={form.valor_mensalidade}
-                  onChange={set('valor_mensalidade')}
+                  onChange={e => {
+                    setForm(f => ({ ...f, valor_mensalidade: e.target.value }));
+                    setTouchedFields(t => ({ ...t, valor_mensalidade: true }));
+                  }}
                   placeholder="R$ 300,00"
                   className={inputBase}
                 />
+                {form.turma_id && renderSugerido('valor_mensalidade')}
               </div>
 
               {/* Parcelas */}
@@ -811,10 +942,14 @@ export default function NovoLead() {
                 <input
                   type="number"
                   value={form.qtd_parcelas}
-                  onChange={set('qtd_parcelas')}
+                  onChange={e => {
+                    setForm(f => ({ ...f, qtd_parcelas: e.target.value }));
+                    setTouchedFields(t => ({ ...t, qtd_parcelas: true }));
+                  }}
                   placeholder="12"
                   className={inputBase}
                 />
+                {form.turma_id && renderSugerido('qtd_parcelas')}
               </div>
 
               {/* Dia Vencimento */}
@@ -823,10 +958,14 @@ export default function NovoLead() {
                 <input
                   type="number"
                   value={form.dia_vencimento}
-                  onChange={set('dia_vencimento')}
+                  onChange={e => {
+                    setForm(f => ({ ...f, dia_vencimento: e.target.value }));
+                    setTouchedFields(t => ({ ...t, dia_vencimento: true }));
+                  }}
                   placeholder="10"
                   className={inputBase}
                 />
+                {form.turma_id && renderSugerido('dia_vencimento')}
               </div>
 
               {/* Primeiro Vencimento */}
@@ -835,9 +974,13 @@ export default function NovoLead() {
                 <input
                   type="date"
                   value={form.data_primeiro_vencimento}
-                  onChange={set('data_primeiro_vencimento')}
+                  onChange={e => {
+                    setForm(f => ({ ...f, data_primeiro_vencimento: e.target.value }));
+                    setTouchedFields(t => ({ ...t, data_primeiro_vencimento: true }));
+                  }}
                   className={inputBase}
                 />
+                {form.turma_id && renderSugerido('data_primeiro_vencimento')}
               </div>
 
               {/* Bolsa % */}
@@ -884,10 +1027,14 @@ export default function NovoLead() {
                 <input
                   type="text"
                   value={form.convenio}
-                  onChange={set('convenio')}
+                  onChange={e => {
+                    setForm(f => ({ ...f, convenio: e.target.value }));
+                    setTouchedFields(t => ({ ...t, convenio: true }));
+                  }}
                   placeholder="Associação, Empresa parceira, etc."
                   className={inputBase}
                 />
+                {form.turma_id && renderSugerido('convenio')}
               </div>
 
               {/* Observações Financeiras */}

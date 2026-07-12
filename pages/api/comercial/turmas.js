@@ -27,7 +27,7 @@ export default async function handler(req, res) {
 
   let query = supabase
     .from('turmas')
-    .select('id, nome, cursoid, instituicao_id, mensalidade, matricula, mesescontrato, datainicio, datafim, situacao, turno, capacidademaxima, desconto')
+    .select('id, nome, cursoid, instituicao_id, mensalidade, matricula, mesescontrato, datainicio, datafim, situacao, turno, capacidademaxima, desconto, unidadeid, gradeid, tipocobranca')
     .eq('cursoid', cursoid)
     .order('nome');
 
