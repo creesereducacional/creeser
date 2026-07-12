@@ -4,7 +4,7 @@ import Link from 'next/link';
 import ComercialLayout from '@/components/ComercialLayout';
 import PageHeader from '@/components/ui/PageHeader';
 
-const ORIGENS = ['', 'Instagram', 'Facebook', 'WhatsApp', 'Indicação', 'Site', 'Evento', 'Outros'];
+const ORIGENS = ['', 'Site', 'Instagram', 'Facebook', 'Google', 'WhatsApp', 'Evento', 'Indicação', 'Outro'];
 
 // Máscara (99) 99999-9999
 function maskPhone(value) {
@@ -57,9 +57,43 @@ export default function NovoLead() {
     cidade: '',
     estado: '',
 
-    // Financeiro
+    // Responsável Financeiro
+    resp_nome: '',
+    resp_cpf: '',
+    resp_rg: '',
+    resp_telefone: '',
+    resp_email: '',
+    resp_parentesco: '',
+    resp_mesmo_aluno: false,
+
+    // Dados da Matrícula
+    ano_letivo: new Date().getFullYear(),
+    periodo: '',
+    turno: '',
+    data_matricula: new Date().toISOString().slice(0, 10),
+
+    // Plano Financeiro
     valor_inscricao: '',
     valor_mensalidade: '',
+    qtd_parcelas: '12',
+    dia_vencimento: '10',
+    data_primeiro_vencimento: '',
+    bolsa_percentual: '',
+    bolsa_valor: '',
+    convenio: '',
+    desconto: '',
+    observacoes_financeiras: '',
+
+    // Origem e Equipe
+    captador_id: '',
+
+    // Checklist Comercial
+    chk_documentacao: false,
+    chk_contrato_enviado: false,
+    chk_contrato_assinado: false,
+    chk_cobranca_enviada: false,
+    chk_pagamento_confirmado: false,
+    chk_matricula_efetivada: false,
   });
 
   const [salvando, setSalvando] = useState(false);
@@ -70,11 +104,11 @@ export default function NovoLead() {
   const [instituicaoId, setInstituicaoId] = useState('');
   const [cursos, setCursos] = useState([]);
   const [loadingCursos, setLoadingCursos] = useState(false);
-  
   const [turmas, setTurmas] = useState([]);
   const [loadingTurmas, setLoadingTurmas] = useState(false);
+  const [equipe, setEquipe] = useState([]);
 
-  // 1. Carrega instituições ao montar
+  // 1. Carrega instituições e equipe comercial ao montar
   useEffect(() => {
     fetch('/api/comercial/instituicoes', { credentials: 'include' })
       .then(r => r.ok ? r.json() : [])
@@ -83,6 +117,11 @@ export default function NovoLead() {
         setInstituicoes(lista);
         if (lista.length > 0) setInstituicaoId(String(lista[0].id));
       })
+      .catch(() => {});
+
+    fetch('/api/comercial/equipe', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setEquipe(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, []);
 
@@ -114,12 +153,15 @@ export default function NovoLead() {
         const list = Array.isArray(data) ? data : [];
         setTurmas(list);
         
-        // Auto-preencher valor padrão de mensalidade
+        // Auto-preencher valores
         const selectedCurso = cursos.find(c => String(c.id) === form.curso_id);
         if (selectedCurso) {
           setForm(f => ({ 
             ...f, 
-            valor_mensalidade: selectedCurso.valor_mensalidade || (list[0]?.mensalidade) || '' 
+            valor_mensalidade: selectedCurso.valor_mensalidade || (list[0]?.mensalidade) || '',
+            valor_inscricao: list[0]?.matricula || '',
+            turno: list[0]?.turno || '',
+            periodo: list[0]?.semestre || ''
           }));
         }
       })
@@ -127,14 +169,31 @@ export default function NovoLead() {
       .finally(() => setLoadingTurmas(false));
   }, [form.curso_id]);
 
+  // Sync Responsável Financeiro com Aluno se checkbox marcado
+  useEffect(() => {
+    if (form.resp_mesmo_aluno) {
+      setForm(f => ({
+        ...f,
+        resp_nome: f.nome,
+        resp_cpf: f.cpf,
+        resp_rg: f.rg,
+        resp_telefone: f.whatsapp || f.telefone,
+        resp_email: f.email,
+        resp_parentesco: 'O Próprio',
+      }));
+    }
+  }, [form.resp_mesmo_aluno, form.nome, form.cpf, form.rg, form.whatsapp, form.telefone, form.email]);
+
   const set = (campo) => (e) => setForm(f => ({ ...f, [campo]: e.target.value }));
+  
+  const setCheck = (campo) => (e) => setForm(f => ({ ...f, [campo]: e.target.checked }));
 
   const setPhone = (campo) => (e) => {
     setForm(f => ({ ...f, [campo]: maskPhone(e.target.value) }));
   };
 
-  const setCpf = (e) => {
-    setForm(f => ({ ...f, cpf: maskCpf(e.target.value) }));
+  const setCpf = (campo) => (e) => {
+    setForm(f => ({ ...f, [campo]: maskCpf(e.target.value) }));
   };
 
   const setCurso = (e) => {
@@ -174,7 +233,7 @@ export default function NovoLead() {
     setSalvando(true);
     setErro(null);
 
-    // Preparar Ficha de Matrícula Serializada
+    // Preparar Ficha de Matrícula Completa Serializada
     const fichaMatricula = {
       aluno: {
         data_nascimento: form.data_nascimento || null,
@@ -194,10 +253,43 @@ export default function NovoLead() {
         curso_id: form.curso_id,
         turma_id: form.turma_id,
         instituicao_id: instituicaoId,
+        ano_letivo: form.ano_letivo || null,
+        periodo: form.periodo || null,
+        turno: form.turno || null,
+        data_matricula: form.data_matricula || null,
+      },
+      responsavel_financeiro: {
+        nome: form.resp_nome || null,
+        cpf: form.resp_cpf || null,
+        rg: form.resp_rg || null,
+        telefone: form.resp_telefone || null,
+        email: form.resp_email || null,
+        parentesco: form.resp_parentesco || null,
+        mesmo_aluno: form.resp_mesmo_aluno,
       },
       financeiro: {
         valor_inscricao: form.valor_inscricao || null,
         valor_mensalidade: form.valor_mensalidade || null,
+        qtd_parcelas: form.qtd_parcelas || null,
+        dia_vencimento: form.dia_vencimento || null,
+        data_primeiro_vencimento: form.data_primeiro_vencimento || null,
+        bolsa_percentual: form.bolsa_percentual || null,
+        bolsa_valor: form.bolsa_valor || null,
+        convenio: form.convenio || null,
+        desconto: form.desconto || null,
+        observacoes_financeiras: form.observacoes_financeiras || null,
+      },
+      comercial: {
+        origem: form.origem || null,
+        captador_id: form.captador_id || null,
+        checklist: {
+          documentacao: form.chk_documentacao,
+          contrato_enviado: form.chk_contrato_enviado,
+          contrato_assinado: form.chk_contrato_assinado,
+          cobranca_enviada: form.chk_cobranca_enviada,
+          pagamento_confirmado: form.chk_pagamento_confirmado,
+          matricula_efetivada: form.chk_matricula_efetivada,
+        }
       }
     };
 
@@ -217,6 +309,7 @@ export default function NovoLead() {
           origem:          form.origem,
           observacoes:     observacoesFinais,
           status:          form.status,
+          captado_por_id:  form.captador_id || null
         }),
       });
       const data = await res.json();
@@ -234,14 +327,14 @@ export default function NovoLead() {
 
   return (
     <ComercialLayout titulo="Ficha de Matrícula Comercial">
-      <div className="max-w-3xl w-full mx-auto pb-12">
+      <div className="max-w-4xl w-full mx-auto pb-12">
         <PageHeader
           icon="📝"
           title="Ficha de Matrícula Comercial"
           breadcrumbs={[
             { label: 'Dashboard', href: '/comercial/dashboard' },
             { label: 'Meus Leads', href: '/comercial/leads' },
-            { label: 'Nova Ficha' }
+            { label: 'Ficha de Matrícula' }
           ]}
         />
 
@@ -345,7 +438,6 @@ export default function NovoLead() {
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Nome Completo */}
               <div className="md:col-span-2">
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Nome Completo <span className="text-red-500">*</span>
@@ -360,7 +452,6 @@ export default function NovoLead() {
                 />
               </div>
 
-              {/* Data Nascimento */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Data de Nascimento</label>
                 <input
@@ -371,7 +462,6 @@ export default function NovoLead() {
                 />
               </div>
 
-              {/* Nome da Mãe */}
               <div className="md:col-span-2">
                 <label className="block text-xs font-medium text-gray-600 mb-1">Nome da Mãe</label>
                 <input
@@ -383,7 +473,6 @@ export default function NovoLead() {
                 />
               </div>
 
-              {/* RG */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">RG</label>
                 <input
@@ -395,7 +484,6 @@ export default function NovoLead() {
                 />
               </div>
 
-              {/* Nome do Pai */}
               <div className="md:col-span-2">
                 <label className="block text-xs font-medium text-gray-600 mb-1">Nome do Pai</label>
                 <input
@@ -407,20 +495,18 @@ export default function NovoLead() {
                 />
               </div>
 
-              {/* CPF */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">CPF</label>
                 <input
                   type="text"
                   value={form.cpf}
-                  onChange={setCpf}
+                  onChange={setCpf('cpf')}
                   placeholder="000.000.000-00"
                   maxLength={14}
                   className={inputBase}
                 />
               </div>
 
-              {/* Telefone */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Telefone / WhatsApp</label>
                 <input
@@ -433,7 +519,6 @@ export default function NovoLead() {
                 />
               </div>
 
-              {/* E-mail */}
               <div className="md:col-span-2">
                 <label className="block text-xs font-medium text-gray-600 mb-1">E-mail</label>
                 <input
@@ -451,7 +536,6 @@ export default function NovoLead() {
             <div className="pt-2">
               <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">Residência / Endereço</h4>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {/* CEP */}
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">CEP</label>
                   <input
@@ -465,7 +549,6 @@ export default function NovoLead() {
                   />
                 </div>
 
-                {/* Logradouro */}
                 <div className="md:col-span-2">
                   <label className="block text-xs font-medium text-gray-600 mb-1">Rua / Logradouro</label>
                   <input
@@ -477,7 +560,6 @@ export default function NovoLead() {
                   />
                 </div>
 
-                {/* Número */}
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Número</label>
                   <input
@@ -489,7 +571,6 @@ export default function NovoLead() {
                   />
                 </div>
 
-                {/* Complemento */}
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Complemento</label>
                   <input
@@ -501,7 +582,6 @@ export default function NovoLead() {
                   />
                 </div>
 
-                {/* Bairro */}
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Bairro</label>
                   <input
@@ -513,7 +593,6 @@ export default function NovoLead() {
                   />
                 </div>
 
-                {/* Cidade */}
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Cidade</label>
                   <input
@@ -525,7 +604,6 @@ export default function NovoLead() {
                   />
                 </div>
 
-                {/* Estado */}
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Estado (UF)</label>
                   <input
@@ -541,13 +619,166 @@ export default function NovoLead() {
             </div>
           </div>
 
-          {/* SEÇÃO 3: Dados Financeiros */}
+          {/* SEÇÃO 3: Responsável Financeiro */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
-            <h3 className="text-base font-semibold text-gray-800 border-b pb-2 flex items-center gap-2">
-              <span className="text-teal-600">💵</span> 3. Dados Financeiros
-            </h3>
+            <div className="flex flex-wrap items-center justify-between border-b pb-2">
+              <h3 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+                <span className="text-teal-600">🛡️</span> 3. Responsável Financeiro
+              </h3>
+              <label className="flex items-center gap-2 text-sm font-medium text-teal-600 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={form.resp_mesmo_aluno}
+                  onChange={setCheck('resp_mesmo_aluno')}
+                  className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 h-4 w-4"
+                />
+                O aluno é o responsável financeiro
+              </label>
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Nome Completo</label>
+                <input
+                  type="text"
+                  value={form.resp_nome}
+                  onChange={set('resp_nome')}
+                  disabled={form.resp_mesmo_aluno}
+                  placeholder="Nome completo do responsável"
+                  className={`${inputBase} ${form.resp_mesmo_aluno ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Parentesco</label>
+                <input
+                  type="text"
+                  value={form.resp_parentesco}
+                  onChange={set('resp_parentesco')}
+                  disabled={form.resp_mesmo_aluno}
+                  placeholder="Pai, Mãe, Cônjuge, etc."
+                  className={`${inputBase} ${form.resp_mesmo_aluno ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">CPF</label>
+                <input
+                  type="text"
+                  value={form.resp_cpf}
+                  onChange={setCpf('resp_cpf')}
+                  disabled={form.resp_mesmo_aluno}
+                  placeholder="000.000.000-00"
+                  maxLength={14}
+                  className={`${inputBase} ${form.resp_mesmo_aluno ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">RG</label>
+                <input
+                  type="text"
+                  value={form.resp_rg}
+                  onChange={set('resp_rg')}
+                  disabled={form.resp_mesmo_aluno}
+                  placeholder="RG do responsável"
+                  className={`${inputBase} ${form.resp_mesmo_aluno ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Telefone Celular</label>
+                <input
+                  type="tel"
+                  value={form.resp_telefone}
+                  onChange={setPhone('resp_telefone')}
+                  disabled={form.resp_mesmo_aluno}
+                  placeholder="(99) 99999-9999"
+                  maxLength={15}
+                  className={`${inputBase} ${form.resp_mesmo_aluno ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
+                />
+              </div>
+
+              <div className="md:col-span-3">
+                <label className="block text-xs font-medium text-gray-600 mb-1">E-mail</label>
+                <input
+                  type="email"
+                  value={form.resp_email}
+                  onChange={set('resp_email')}
+                  disabled={form.resp_mesmo_aluno}
+                  placeholder="responsavel@exemplo.com"
+                  className={`${inputBase} ${form.resp_mesmo_aluno ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* SEÇÃO 4: Dados da Matrícula */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <h3 className="text-base font-semibold text-gray-800 border-b pb-2 flex items-center gap-2">
+              <span className="text-teal-600">📅</span> 4. Dados da Matrícula
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {/* Ano Letivo */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Ano Letivo</label>
+                <input
+                  type="number"
+                  value={form.ano_letivo}
+                  onChange={set('ano_letivo')}
+                  className={inputBase}
+                />
+              </div>
+
+              {/* Período */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Período / Semestre</label>
+                <input
+                  type="text"
+                  value={form.periodo}
+                  onChange={set('periodo')}
+                  placeholder="2026/1"
+                  className={inputBase}
+                />
+              </div>
+
+              {/* Turno */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Turno</label>
+                <select
+                  value={form.turno}
+                  onChange={set('turno')}
+                  className={inputBase}
+                >
+                  <option value="">Selecione...</option>
+                  <option value="INTEGRAL">Integral</option>
+                  <option value="MANHA">Manhã</option>
+                  <option value="TARDE">Tarde</option>
+                  <option value="NOITE">Noite</option>
+                </select>
+              </div>
+
+              {/* Data Matrícula */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Data da Matrícula</label>
+                <input
+                  type="date"
+                  value={form.data_matricula}
+                  onChange={set('data_matricula')}
+                  className={inputBase}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* SEÇÃO 5: Plano Financeiro */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <h3 className="text-base font-semibold text-gray-800 border-b pb-2 flex items-center gap-2">
+              <span className="text-teal-600">💵</span> 5. Plano Financeiro
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {/* Valor Inscrição */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Valor da Inscrição (Matrícula)</label>
@@ -574,9 +805,115 @@ export default function NovoLead() {
                 />
               </div>
 
-              {/* Origem / Indicação */}
+              {/* Parcelas */}
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Origem / Indicação</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Parcelas (Mensalidades)</label>
+                <input
+                  type="number"
+                  value={form.qtd_parcelas}
+                  onChange={set('qtd_parcelas')}
+                  placeholder="12"
+                  className={inputBase}
+                />
+              </div>
+
+              {/* Dia Vencimento */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Dia Vencimento</label>
+                <input
+                  type="number"
+                  value={form.dia_vencimento}
+                  onChange={set('dia_vencimento')}
+                  placeholder="10"
+                  className={inputBase}
+                />
+              </div>
+
+              {/* Primeiro Vencimento */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Primeiro Vencimento</label>
+                <input
+                  type="date"
+                  value={form.data_primeiro_vencimento}
+                  onChange={set('data_primeiro_vencimento')}
+                  className={inputBase}
+                />
+              </div>
+
+              {/* Bolsa % */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Bolsa (%)</label>
+                <input
+                  type="number"
+                  value={form.bolsa_percentual}
+                  onChange={set('bolsa_percentual')}
+                  placeholder="Ex: 50"
+                  className={inputBase}
+                />
+              </div>
+
+              {/* Bolsa R$ */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Bolsa Valor (R$)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={form.bolsa_valor}
+                  onChange={set('bolsa_valor')}
+                  placeholder="R$ 0,00"
+                  className={inputBase}
+                />
+              </div>
+
+              {/* Desconto */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Desconto Comercial (R$)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={form.desconto}
+                  onChange={set('desconto')}
+                  placeholder="R$ 0,00"
+                  className={inputBase}
+                />
+              </div>
+
+              {/* Convênio */}
+              <div className="md:col-span-4">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Convênio / Parceria</label>
+                <input
+                  type="text"
+                  value={form.convenio}
+                  onChange={set('convenio')}
+                  placeholder="Associação, Empresa parceira, etc."
+                  className={inputBase}
+                />
+              </div>
+
+              {/* Observações Financeiras */}
+              <div className="md:col-span-4">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Observações Financeiras</label>
+                <textarea
+                  value={form.observacoes_financeiras}
+                  onChange={set('observacoes_financeiras')}
+                  rows={2}
+                  placeholder="Regras específicas de cobrança..."
+                  className={`${inputBase} resize-none`}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* SEÇÃO 6: Origem Comercial */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <h3 className="text-base font-semibold text-gray-800 border-b pb-2 flex items-center gap-2">
+              <span className="text-teal-600">🎯</span> 6. Origem Comercial
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Origem */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Origem do Lead</label>
                 <select
                   value={form.origem}
                   onChange={set('origem')}
@@ -585,18 +922,96 @@ export default function NovoLead() {
                   {ORIGENS.map(o => <option key={o} value={o}>{o || 'Selecionar...'}</option>)}
                 </select>
               </div>
-            </div>
 
-            {/* Observações */}
-            <div className="pt-2">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Observações Internas</label>
-              <textarea
-                value={form.observacoes}
-                onChange={set('observacoes')}
-                rows={3}
-                placeholder="Anotações comerciais sobre a negociação..."
-                className={`${inputBase} resize-none`}
-              />
+              {/* Captador */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Vendedor / Captador</label>
+                <select
+                  value={form.captador_id}
+                  onChange={set('captador_id')}
+                  className={inputBase}
+                >
+                  <option value="">Selecionar vendedor...</option>
+                  {equipe.map(member => (
+                    <option key={member.id} value={member.id}>{member.nomecompleto}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* SEÇÃO 7: Checklist Comercial */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <h3 className="text-base font-semibold text-gray-800 border-b pb-2 flex items-center gap-2">
+              <span className="text-teal-600">✅</span> 7. Checklist Comercial
+            </h3>
+            
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+              {/* Doc recebido */}
+              <label className="flex flex-col items-center justify-center p-3 border rounded-xl hover:bg-gray-50 cursor-pointer select-none text-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.chk_documentacao}
+                  onChange={setCheck('chk_documentacao')}
+                  className="rounded text-teal-600 focus:ring-teal-500 h-5 w-5"
+                />
+                <span className="text-xs font-medium text-gray-700">Documentação</span>
+              </label>
+
+              {/* Contrato Enviado */}
+              <label className="flex flex-col items-center justify-center p-3 border rounded-xl hover:bg-gray-50 cursor-pointer select-none text-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.chk_contrato_enviado}
+                  onChange={setCheck('chk_contrato_enviado')}
+                  className="rounded text-teal-600 focus:ring-teal-500 h-5 w-5"
+                />
+                <span className="text-xs font-medium text-gray-700">Contrato Enviado</span>
+              </label>
+
+              {/* Contrato Assinado */}
+              <label className="flex flex-col items-center justify-center p-3 border rounded-xl hover:bg-gray-50 cursor-pointer select-none text-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.chk_contrato_assinado}
+                  onChange={setCheck('chk_contrato_assinado')}
+                  className="rounded text-teal-600 focus:ring-teal-500 h-5 w-5"
+                />
+                <span className="text-xs font-medium text-gray-700">Contrato Assinado</span>
+              </label>
+
+              {/* Cobrança Enviada */}
+              <label className="flex flex-col items-center justify-center p-3 border rounded-xl hover:bg-gray-50 cursor-pointer select-none text-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.chk_cobranca_enviada}
+                  onChange={setCheck('chk_cobranca_enviada')}
+                  className="rounded text-teal-600 focus:ring-teal-500 h-5 w-5"
+                />
+                <span className="text-xs font-medium text-gray-700">Cobrança Enviada</span>
+              </label>
+
+              {/* Pagamento Confirmado */}
+              <label className="flex flex-col items-center justify-center p-3 border rounded-xl hover:bg-gray-50 cursor-pointer select-none text-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.chk_pagamento_confirmado}
+                  onChange={setCheck('chk_pagamento_confirmado')}
+                  className="rounded text-teal-600 focus:ring-teal-500 h-5 w-5"
+                />
+                <span className="text-xs font-medium text-gray-700">Pagto Confirmado</span>
+              </label>
+
+              {/* Matrícula Efetivada */}
+              <label className="flex flex-col items-center justify-center p-3 border rounded-xl hover:bg-gray-50 cursor-pointer select-none text-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.chk_matricula_efetivada}
+                  onChange={setCheck('chk_matricula_efetivada')}
+                  className="rounded text-teal-600 focus:ring-teal-500 h-5 w-5"
+                />
+                <span className="text-xs font-medium text-gray-700">Matrícula Ok</span>
+              </label>
             </div>
           </div>
 
