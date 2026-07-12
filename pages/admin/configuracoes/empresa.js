@@ -787,7 +787,22 @@ export default function ConfiguracaoEmpresa() {
   return (
     <DashboardLayout>
       <div className="p-4 md:p-6 max-w-5xl">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6">Configuração da Empresa</h1>
+        <div className="mb-6 space-y-3">
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <a href="/admin/configuracoes" className="hover:text-teal-600 transition">← Configurações Operacionais</a>
+            <span>/</span>
+            <span className="text-gray-700 font-semibold">Configuração Técnica</span>
+          </div>
+          <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-6 text-white flex items-start gap-5">
+            <div className="p-3 bg-white/10 rounded-xl text-3xl shrink-0">⚙️</div>
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold">Configuração Técnica do Sistema</h1>
+              <p className="text-sm text-gray-300 mt-1 max-w-2xl">
+                Este ambiente é destinado aos <strong className="text-white">administradores da plataforma</strong>. As alterações realizadas aqui podem afetar integrações, gateways, contratos e módulos estruturais do ERP. Proceda com cautela.
+              </p>
+            </div>
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Abas */}

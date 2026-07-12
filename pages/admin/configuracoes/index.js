@@ -743,14 +743,18 @@ export default function Configuracoes() {
                 </label>
               </div>
             </div>
-            <div>
+            <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => alert('Conexão com EFI testada com sucesso!')}
-                className="w-full px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition"
+                className="flex-1 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition"
               >
                 Testar Conexão
               </button>
+              <Link href="/admin/configuracoes/empresa"
+                className="px-3 py-2 border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold transition whitespace-nowrap">
+                🔑 Credenciais
+              </Link>
             </div>
           </div>
 
@@ -783,14 +787,18 @@ export default function Configuracoes() {
                 </div>
               </div>
             </div>
-            <div>
+            <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => alert('Conexão com ASAAS (Comercial) testada com sucesso!')}
-                className="w-full px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition"
+                className="flex-1 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition"
               >
                 Testar Conexão
               </button>
+              <Link href="/admin/configuracoes/empresa"
+                className="px-3 py-2 border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold transition whitespace-nowrap">
+                🔑 Credenciais
+              </Link>
             </div>
           </div>
 
@@ -915,27 +923,55 @@ export default function Configuracoes() {
   };
 
   const renderAvancado = () => (
-    <div className="space-y-4">
-      <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Módulos do Sistema</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {[
-          { href: '/admin/configuracoes/empresa', label: 'Config. Empresa', icon: '🏢' },
-          { href: '/admin/configuracoes/usuarios', label: 'Gerenciar Usuários', icon: '👥' },
-          { href: '/admin/configuracoes/rematricula', label: 'Rematrícula', icon: '📝' },
-          { href: '/admin/configuracoes/matriculadores', label: 'Matriculadores', icon: '👤' },
-          { href: '/admin/configuracoes/campanhas', label: 'Campanhas de Matrículas', icon: '📊' },
-          { href: '/admin/configuracoes/diploma-digital', label: 'Diploma Digital', icon: '📜' },
-          { href: '/admin/configuracoes/certificado-digital', label: 'Certificado Digital', icon: '🎖️' },
-          { href: '/admin/go-live-checklist', label: '🚀 Go-Live Checklist', icon: '✅' },
-          { href: '/admin/logs', label: 'Logs de Auditoria', icon: '📋' },
-        ].map(item => (
-          <Link key={item.href} href={item.href}
-            className="flex items-center gap-3 p-3.5 bg-gray-50 hover:bg-teal-50 border border-gray-200 hover:border-teal-200 rounded-xl transition-colors text-sm font-medium text-gray-700 hover:text-teal-700">
-            <span className="text-xl">{item.icon}</span>
-            {item.label}
+    <div className="space-y-6">
+
+      {/* Card principal — Configuração Técnica */}
+      <div className="bg-gradient-to-br from-gray-900 to-gray-800 p-6 rounded-2xl text-white space-y-4">
+        <div className="flex items-start gap-4">
+          <div className="p-3 bg-white/10 rounded-xl text-3xl">⚙️</div>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold">Configuração Técnica do Sistema</h3>
+            <p className="text-sm text-gray-300 mt-1">
+              Gerencie credenciais, integrações, parâmetros pedagógicos, biblioteca, instituições e configurações avançadas do ERP.
+              Destinado ao administrador do sistema e equipe de implantação.
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <Link href="/admin/configuracoes/empresa"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-teal-500 hover:bg-teal-400 text-white rounded-xl text-sm font-bold transition shadow-md">
+            Abrir Configuração Técnica →
           </Link>
-        ))}
+          <Link href="/admin/configuracoes/empresa"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-semibold transition">
+            🔐 Gateways e Credenciais
+          </Link>
+        </div>
       </div>
+
+      {/* Módulos operacionais */}
+      <div>
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">📦 Módulos Operacionais</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {[
+            { href: '/admin/configuracoes/usuarios',          label: 'Gerenciar Usuários',       icon: '👥' },
+            { href: '/admin/configuracoes/rematricula',       label: 'Rematrícula',               icon: '📝' },
+            { href: '/admin/configuracoes/matriculadores',    label: 'Matriculadores',            icon: '👤' },
+            { href: '/admin/configuracoes/campanhas',         label: 'Campanhas de Matrículas',   icon: '📊' },
+            { href: '/admin/configuracoes/diploma-digital',   label: 'Diploma Digital',           icon: '📜' },
+            { href: '/admin/configuracoes/certificado-digital', label: 'Certificado Digital',     icon: '🎖️' },
+            { href: '/admin/go-live-checklist',               label: 'Go-Live Checklist',        icon: '🚀' },
+            { href: '/admin/logs',                            label: 'Logs de Auditoria',        icon: '📋' },
+          ].map(item => (
+            <Link key={item.href} href={item.href}
+              className="flex items-center gap-3 p-3.5 bg-gray-50 hover:bg-teal-50 border border-gray-200 hover:border-teal-200 rounded-xl transition-colors text-sm font-medium text-gray-700 hover:text-teal-700">
+              <span className="text-xl">{item.icon}</span>
+              {item.label}
+            </Link>
+          ))}
+        </div>
+      </div>
+
     </div>
   );
 
