@@ -89,6 +89,7 @@ export default async function handler(req, res) {
       captado_por_id:   authUser.id,
       statusmatricula,
       data_captacao:    new Date().toISOString().slice(0, 10),
+      origem_captacao:  'RECEPCAO',
       ...(cursoid             ? { cursoid: Number(cursoid) }                   : {}),
       ...(turmaid             ? { turmaid: Number(turmaid) }                   : {}),
       ...(valor_matricula     ? { valor_matricula: Number(valor_matricula) }   : {}),
