@@ -142,6 +142,21 @@ export default async function handler(req, res) {
           if (newRev && !insertErr) {
             // Calcular comissão automaticamente
             await calcularComissaoReceita(supabase, newRev.id);
+            
+            // Timeline 360
+            try {
+              const { registrarInteracao } = require('../../../lib/comercial/interacao-service');
+              await registrarInteracao(supabase, lead.id, {
+                instituicao_id: lead.instituicao_id,
+                tipo: 'pagamento_confirmado',
+                descricao: `Pagamento de matrícula confirmado pelo gateway Asaas. Valor: R$ ${rawValue.toFixed(2)}`
+              });
+              await registrarInteracao(supabase, lead.id, {
+                instituicao_id: lead.instituicao_id,
+                tipo: 'receita_criada',
+                descricao: `Lançamento de receita comercial gerado no financeiro. ID: ${newRev.id}`
+              });
+            } catch (_) {}
           }
 
           if (insertErr) {
@@ -225,7 +240,7 @@ export default async function handler(req, res) {
           })
           .eq('id', existingSale.id);
       } else {
-        const { error: insertSaleErr } = await supabase
+        const { data: newSale, error: insertSaleErr } = await supabase
           .from('vendas_comerciais')
           .insert({
             lead_id: lead.id,
@@ -237,7 +252,21 @@ export default async function handler(req, res) {
             gateway_payment_id: payment.id,
             valor: rawValue,
             status: statusVenda
-          });
+          })
+          .select()
+          .single();
+
+        if (!insertSaleErr) {
+          // Timeline 360
+          try {
+            const { registrarInteracao } = require('../../../lib/comercial/interacao-service');
+            await registrarInteracao(supabase, lead.id, {
+              instituicao_id: lead.instituicao_id,
+              tipo: 'venda_criada',
+              descricao: `Nova venda comercial registrada. Gateway: Asaas. Valor: R$ ${rawValue.toFixed(2)}. Status: ${statusVenda}`
+            });
+          } catch (_) {}
+        }
 
         if (insertSaleErr) {
           console.error('[Webhook Asaas] Erro ao inserir venda comercial (tentando fallback):', insertSaleErr);

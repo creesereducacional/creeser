@@ -104,6 +104,17 @@ export default async function handler(req, res) {
 
     await registrarAuditoria(id, authUser.id, 'edicao', lead, updates);
 
+    // Timeline 360
+    try {
+      const { registrarInteracao } = require('../../../../lib/comercial/interacao-service');
+      await registrarInteracao(supabase, id, {
+        instituicao_id: lead.instituicao_id,
+        usuario_id: authUser.id,
+        tipo: 'atualizacao',
+        descricao: `Ficha cadastral atualizada. Novo status: ${updates.status || lead.status}`
+      });
+    } catch (_) {}
+
     return res.status(200).json(data);
   }
 

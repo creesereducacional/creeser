@@ -125,6 +125,17 @@ export default async function handler(req, res) {
 
     await registrarAuditoria(data.id, authUser.id, 'criacao', null, novoLead);
 
+    // Timeline 360
+    try {
+      const { registrarInteracao } = require('../../../../lib/comercial/interacao-service');
+      await registrarInteracao(supabase, data.id, {
+        instituicao_id: instituicaoId,
+        usuario_id: authUser.id,
+        tipo: 'criacao',
+        descricao: 'Ficha de Matrícula Comercial cadastrada no sistema'
+      });
+    } catch (_) {}
+
     return res.status(201).json(data);
   }
 

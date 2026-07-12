@@ -47,6 +47,51 @@ export default function DetalharLead() {
   // Dados extras vindos do wizard após conversão
   const [dadosConvertido, setDadosConvertido] = useState(null);
 
+  // Timeline e Interações
+  const [abaAtiva, setAbaAtiva] = useState('dados'); // 'dados' ou 'timeline'
+  const [interacoes, setInteracoes] = useState([]);
+  const [carregandoInteracoes, setCarregandoInteracoes] = useState(false);
+  const [formInteracao, setFormInteracao] = useState({ tipo: 'observacao', descricao: '' });
+  const [salvandoInteracao, setSalvandoInteracao] = useState(false);
+
+  const carregarInteracoes = () => {
+    if (!id) return;
+    setCarregandoInteracoes(true);
+    fetch(`/api/comercial/leads/${id}/interacoes`, { credentials: 'include' })
+      .then(r => r.json())
+      .then(data => setInteracoes(Array.isArray(data) ? data : []))
+      .catch(() => {})
+      .finally(() => setCarregandoInteracoes(false));
+  };
+
+  useEffect(() => {
+    if (abaAtiva === 'timeline') {
+      carregarInteracoes();
+    }
+  }, [id, abaAtiva]);
+
+  const handleSalvarInteracao = async (e) => {
+    e.preventDefault();
+    if (!formInteracao.descricao.trim()) return;
+
+    setSalvandoInteracao(true);
+    try {
+      const res = await fetch(`/api/comercial/leads/${id}/interacoes`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formInteracao)
+      });
+      if (res.ok) {
+        setFormInteracao(f => ({ ...f, descricao: '' }));
+        carregarInteracoes();
+      }
+    } catch (_) {}
+    finally {
+      setSalvandoInteracao(false);
+    }
+  };
+
   // Carregar lead
   useEffect(() => {
     if (!id) return;
@@ -364,95 +409,225 @@ export default function DetalharLead() {
               />
             )}
 
-            {/* Formulário */}
-            {form && (
-              <form onSubmit={handleSalvar} className="bg-white rounded-xl shadow-sm p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
-                  <input
-                    type="text"
-                    value={form.nome || ''}
-                    onChange={set('nome')}
-                    disabled={!editando}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 disabled:bg-gray-50 disabled:text-gray-500"
-                  />
-                </div>
+            {/* Tabs */}
+            <div className="flex border-b border-gray-200 mb-5">
+              <button
+                type="button"
+                onClick={() => setAbaAtiva('dados')}
+                className={`py-2 px-4 font-semibold text-sm border-b-2 transition-all ${
+                  abaAtiva === 'dados'
+                    ? 'border-teal-600 text-teal-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Ficha do Lead
+              </button>
+              <button
+                type="button"
+                onClick={() => setAbaAtiva('timeline')}
+                className={`py-2 px-4 font-semibold text-sm border-b-2 transition-all ${
+                  abaAtiva === 'timeline'
+                    ? 'border-teal-600 text-teal-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Timeline 360º
+              </button>
+            </div>
 
-                <div className="grid grid-cols-2 gap-3">
+            {abaAtiva === 'dados' ? (
+              form && (
+                <form onSubmit={handleSalvar} className="bg-white rounded-xl shadow-sm p-6 space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
-                    <input type="tel" value={form.telefone || ''} onChange={set('telefone')} disabled={!editando}
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
+                    <input
+                      type="text"
+                      value={form.nome || ''}
+                      onChange={set('nome')}
+                      disabled={!editando}
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 disabled:bg-gray-50 disabled:text-gray-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
+                      <input type="tel" value={form.telefone || ''} onChange={set('telefone')} disabled={!editando}
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none disabled:bg-gray-50 disabled:text-gray-500" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp</label>
+                      <input type="tel" value={form.whatsapp || ''} onChange={set('whatsapp')} disabled={!editando}
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none disabled:bg-gray-50 disabled:text-gray-500" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
+                    <input type="email" value={form.email || ''} onChange={set('email')} disabled={!editando}
                       className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none disabled:bg-gray-50 disabled:text-gray-500" />
                   </div>
+
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp</label>
-                    <input type="tel" value={form.whatsapp || ''} onChange={set('whatsapp')} disabled={!editando}
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Curso de Interesse</label>
+                    <input type="text" value={form.curso_interesse || ''} onChange={set('curso_interesse')} disabled={!editando}
                       className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none disabled:bg-gray-50 disabled:text-gray-500" />
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
-                  <input type="email" value={form.email || ''} onChange={set('email')} disabled={!editando}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none disabled:bg-gray-50 disabled:text-gray-500" />
-                </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Origem</label>
+                      {editando ? (
+                        <select value={form.origem || ''} onChange={set('origem')}
+                          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300">
+                          {ORIGENS.map(o => <option key={o} value={o}>{o || 'Não informado'}</option>)}
+                        </select>
+                      ) : (
+                        <input value={form.origem || '—'} disabled
+                          className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500" />
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                      {editando ? (
+                        <select value={form.status || 'novo'} onChange={set('status')}
+                          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300">
+                          <option value="novo">Novo</option>
+                          <option value="contatado">Contatado</option>
+                          <option value="interessado">Interessado</option>
+                          <option value="perdido">Perdido</option>
+                        </select>
+                      ) : (
+                        <input value={form.status || ''} disabled
+                          className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500" />
+                      )}
+                    </div>
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Curso de Interesse</label>
-                  <input type="text" value={form.curso_interesse || ''} onChange={set('curso_interesse')} disabled={!editando}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none disabled:bg-gray-50 disabled:text-gray-500" />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Origem</label>
-                    {editando ? (
-                      <select value={form.origem || ''} onChange={set('origem')}
-                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300">
-                        {ORIGENS.map(o => <option key={o} value={o}>{o || 'Não informado'}</option>)}
-                      </select>
-                    ) : (
-                      <input value={form.origem || '—'} disabled
-                        className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500" />
-                    )}
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+                    <textarea value={form.observacoes || ''} onChange={set('observacoes')} disabled={!editando}
+                      rows={3}
+                      className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none disabled:bg-gray-50 disabled:text-gray-500 resize-none" />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                    {editando ? (
-                      <select value={form.status || 'novo'} onChange={set('status')}
-                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300">
-                        <option value="novo">Novo</option>
-                        <option value="contatado">Contatado</option>
-                        <option value="interessado">Interessado</option>
-                        <option value="perdido">Perdido</option>
-                      </select>
-                    ) : (
-                      <input value={form.status || ''} disabled
-                        className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500" />
-                    )}
-                  </div>
-                </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
-                  <textarea value={form.observacoes || ''} onChange={set('observacoes')} disabled={!editando}
-                    rows={3}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none disabled:bg-gray-50 disabled:text-gray-500 resize-none" />
-                </div>
-
-                {editando && (
-                  <div className="flex gap-3 pt-2">
-                    <button type="submit" disabled={salvando}
-                      className="bg-teal-600 hover:bg-teal-700 disabled:bg-teal-300 text-white px-5 py-2 rounded-lg text-sm font-medium">
-                      {salvando ? 'Salvando...' : 'Salvar'}
-                    </button>
-                    <button type="button" onClick={() => { setEditando(false); setForm({ ...lead }); }}
-                      className="border border-gray-300 text-gray-600 hover:bg-gray-50 px-5 py-2 rounded-lg text-sm">
-                      Cancelar
+                  {editando && (
+                    <div className="flex gap-3 pt-2">
+                      <button type="submit" disabled={salvando}
+                        className="bg-teal-600 hover:bg-teal-700 disabled:bg-teal-300 text-white px-5 py-2 rounded-lg text-sm font-medium">
+                        {salvando ? 'Salvando...' : 'Salvar'}
+                      </button>
+                      <button type="button" onClick={() => { setEditando(false); setForm({ ...lead }); }}
+                        className="border border-gray-300 text-gray-600 hover:bg-gray-50 px-5 py-2 rounded-lg text-sm">
+                        Cancelar
+                      </button>
+                    </div>
+                  )}
+                </form>
+              )
+            ) : (
+              <div className="space-y-6">
+                {/* Form Registrar Interação Manual */}
+                <form onSubmit={handleSalvarInteracao} className="bg-white rounded-xl shadow-sm p-5 border border-gray-100 space-y-4">
+                  <h4 className="font-semibold text-gray-800 text-sm flex items-center gap-2">
+                    <span>✍️</span> Registrar Interação Manual
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div className="sm:col-span-1">
+                      <label className="block text-xs text-gray-500 mb-1">Canal / Tipo</label>
+                      <select
+                        value={formInteracao.tipo}
+                        onChange={e => setFormInteracao(f => ({ ...f, tipo: e.target.value }))}
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+                      >
+                        <option value="ligacao">📞 Ligação</option>
+                        <option value="whatsapp">📱 WhatsApp</option>
+                        <option value="email">📧 E-mail</option>
+                        <option value="reuniao">🤝 Reunião</option>
+                        <option value="visita">🏢 Visita</option>
+                        <option value="observacao">📝 Observação</option>
+                      </select>
+                    </div>
+                    <div className="sm:col-span-3">
+                      <label className="block text-xs text-gray-500 mb-1">Resumo do contato</label>
+                      <input
+                        type="text"
+                        value={formInteracao.descricao}
+                        onChange={e => setFormInteracao(f => ({ ...f, descricao: e.target.value }))}
+                        placeholder="Ex: Cliente atendeu e solicitou envio do plano financeiro..."
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={salvandoInteracao || !formInteracao.descricao.trim()}
+                      className="bg-teal-600 hover:bg-teal-700 disabled:bg-teal-300 text-white px-5 py-2 rounded-lg text-xs font-semibold shadow-sm transition"
+                    >
+                      {salvandoInteracao ? 'Registrando...' : 'Adicionar na Linha do Tempo'}
                     </button>
                   </div>
-                )}
-              </form>
+                </form>
+
+                {/* Lista da Timeline */}
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                  <h4 className="font-semibold text-gray-800 text-sm mb-4">Linha do Tempo 360º</h4>
+                  {carregandoInteracoes ? (
+                    <div className="text-center py-8 text-sm text-gray-400">Carregando timeline...</div>
+                  ) : interacoes.length === 0 ? (
+                    <div className="text-center py-8 text-sm text-gray-400">Nenhum evento registrado ainda.</div>
+                  ) : (
+                    <div className="relative border-l border-gray-200 ml-4 space-y-6">
+                      {interacoes.map((item) => {
+                        const iconMap = {
+                          criacao: '🎯',
+                          atualizacao: '🔄',
+                          cobranca_asaas: '💳',
+                          link_enviado: '🔗',
+                          pagamento_confirmado: '💰',
+                          receita_criada: '📊',
+                          comissao_calculada: '💸',
+                          venda_criada: '🏷️',
+                          matricula_efetivada: '🎓',
+                          ligacao: '📞',
+                          whatsapp: '📱',
+                          email: '📧',
+                          reuniao: '🤝',
+                          visita: '🏢',
+                          observacao: '📝'
+                        };
+                        const icon = iconMap[item.tipo] || '💬';
+                        return (
+                          <div key={item.id} className="relative pl-6">
+                            {/* Círculo / Ícone */}
+                            <div className="absolute -left-3.5 top-0.5 bg-white border border-gray-200 rounded-full w-7 h-7 flex items-center justify-center text-sm shadow-sm">
+                              {icon}
+                            </div>
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between gap-4 flex-wrap">
+                                <span className="font-semibold text-gray-800 text-sm capitalize">
+                                  {item.tipo.replace('_', ' ')}
+                                </span>
+                                <span className="text-[10px] text-gray-400">
+                                  {new Date(item.data_evento).toLocaleString('pt-BR')}
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-600 leading-relaxed">{item.descricao}</p>
+                              {item.usuarios?.nomecompleto && (
+                                <div className="text-[10px] text-gray-400 flex items-center gap-1">
+                                  <span>👤</span> {item.usuarios.nomecompleto}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
 
             {/* Datas */}
