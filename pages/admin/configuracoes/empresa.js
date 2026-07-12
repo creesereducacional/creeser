@@ -121,7 +121,10 @@ export default function ConfiguracaoEmpresa() {
       percentualMultaAsaas: 2.000,
       aceitarPagamentosCartaoAsaas: false,
       aceitarPagamentosPixAsaas: false,
-      chavePix: ''
+      chavePix: '',
+      ambienteAsaas: 'sandbox',
+      walletIdAsaas: '',
+      webhookTokenAsaas: '',
     },
     biblioteca: {
       gerente: '',
@@ -136,6 +139,34 @@ export default function ConfiguracaoEmpresa() {
   });
 
   const [loading, setLoading] = useState(false);
+  const [testingAsaas, setTestingAsaas] = useState(false);
+
+  const handleTestarAsaas = async () => {
+    const key = formData?.financeiro?.apiKeyAsaas;
+    const amb = formData?.financeiro?.ambienteAsaas || 'sandbox';
+    if (!key) {
+      alert('Por favor, informe a API Key Asaas para testar.');
+      return;
+    }
+    setTestingAsaas(true);
+    try {
+      const res = await fetch('/api/configuracoes/testar-asaas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: key, ambiente: amb })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert('Conexão estabelecida com sucesso com o Asaas!');
+      } else {
+        alert(`Erro de conexão: ${data.error || 'Verifique as credenciais.'}`);
+      }
+    } catch (e) {
+      alert('Erro ao testar conexão.');
+    } finally {
+      setTestingAsaas(false);
+    }
+  };
   const [instituicoes, setInstituicoes] = useState([]);
   const [loadingInstituicoes, setLoadingInstituicoes] = useState(false);
   const [formInstituicao, setFormInstituicao] = useState({
@@ -1721,6 +1752,70 @@ export default function ConfiguracaoEmpresa() {
                         className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                       />
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div>
+                      <label className="text-xs font-medium text-teal-600 mb-1 block">AMBIENTE</label>
+                      <select
+                        value={formData?.financeiro?.ambienteAsaas || 'sandbox'}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: {
+                            ...(prev.financeiro || {}),
+                            ambienteAsaas: e.target.value
+                          }
+                        }))}
+                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                      >
+                        <option value="sandbox">Sandbox (Homologação)</option>
+                        <option value="producao">Produção</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-teal-600 mb-1 block">WALLET ID (OPCIONAL)</label>
+                      <input
+                        type="text"
+                        value={formData?.financeiro?.walletIdAsaas || ''}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: {
+                            ...(prev.financeiro || {}),
+                            walletIdAsaas: e.target.value
+                          }
+                        }))}
+                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                        placeholder="Ex: 00000000-0000-0000-0000-000000000000"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-teal-600 mb-1 block">TOKEN WEBHOOK (OPCIONAL)</label>
+                      <input
+                        type="password"
+                        value={formData?.financeiro?.webhookTokenAsaas || ''}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          financeiro: {
+                            ...(prev.financeiro || {}),
+                            webhookTokenAsaas: e.target.value
+                          }
+                        }))}
+                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mb-6">
+                    <button
+                      type="button"
+                      onClick={handleTestarAsaas}
+                      disabled={testingAsaas}
+                      className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs rounded-lg transition-colors cursor-pointer"
+                    >
+                      {testingAsaas ? 'Testando...' : '🔌 Testar Conexão Asaas'}
+                    </button>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

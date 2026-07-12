@@ -264,6 +264,25 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Instituição, unidade, curso e grade são obrigatórios' });
       }
 
+      // Validar se a grade existe, está ativa e pertence ao mesmo curso
+      const { data: gradeData, error: gradeError } = await supabase
+        .from('grades')
+        .select('curso_id, situacao')
+        .eq('id', payloadNormalizado.gradeid)
+        .single();
+      
+      if (gradeError || !gradeData) {
+        return res.status(400).json({ error: 'Matriz Curricular vinculada não existe ou é inválida.' });
+      }
+
+      if (gradeData.situacao !== 'ATIVO') {
+        return res.status(400).json({ error: 'A Matriz Curricular selecionada precisa estar ativa.' });
+      }
+
+      if (String(gradeData.curso_id) !== String(payloadNormalizado.cursoid)) {
+        return res.status(400).json({ error: 'A Matriz Curricular selecionada não pertence ao mesmo Curso da Turma.' });
+      }
+
       let data = null;
       let error = null;
 

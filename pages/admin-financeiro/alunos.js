@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import AdminFinanceiroLayout from '@/components/AdminFinanceiro/Layout';
+import BarraFiltros from '@/components/AdminFinanceiro/BarraFiltros';
 
 const PLANOS_FINANCEIROS = [
   'MENSAL', 'SEMESTRAL', 'ANUAL', 'AVULSO', 'BOLSISTA', 'CONVÊNIO'
@@ -1335,6 +1336,7 @@ export default function AlunosFinanceiroPage() {
   const [gerandoBoletoAluno, setGerandoBoletoAluno] = useState(null);
   const [modalConfirmarAluno, setModalConfirmarAluno] = useState(null);
   const [modalCancelarParcelaAluno, setModalCancelarParcelaAluno] = useState(null);
+  const [modalWhatsapp, setModalWhatsapp] = useState(null);
 
   const fetchOrdensAluno = async (alunoId, force = false) => {
     if (!force && ordensCache[alunoId]) return;
@@ -1363,6 +1365,76 @@ export default function AlunosFinanceiroPage() {
       ...prev,
       [carneId]: selecionar ? new Set(cancelaveis.map(p => p.id)) : new Set(),
     }));
+  };
+
+  const handleEnviarWhatsApp = async (parcelaId, fastSend = false) => {
+    try {
+      const res = await fetch(`/api/admin-financeiro/parcelas/${parcelaId}/whatsapp-info`);
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Erro ao buscar dados do WhatsApp');
+      }
+      const data = await res.json();
+      const { aluno_nome, responsavel_telefone, numero_parcela, valor, data_vencimento, payment_url } = data;
+
+      if (!responsavel_telefone) {
+        console.warn('WhatsApp/telefone não encontrado para o responsável ou aluno no banco de dados.');
+        alert('Responsável sem telefone cadastrado.');
+        return;
+      }
+
+      let telefoneLimpo = responsavel_telefone.replace(/\D/g, '');
+      if (telefoneLimpo.length === 10 || telefoneLimpo.length === 11) {
+        telefoneLimpo = '55' + telefoneLimpo;
+      }
+
+      if (telefoneLimpo.length < 10) {
+        console.error('Número de telefone inválido ou incompleto:', responsavel_telefone);
+        alert('Responsável sem telefone cadastrado.');
+        return;
+      }
+
+      if (!payment_url) {
+        console.warn('payment_url/boleto_url não encontrado para a parcela:', parcelaId);
+        alert('A cobrança não possui link disponível para envio.');
+        return;
+      }
+
+      const dataFormatada = data_vencimento ? new Date(data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR') : '';
+      const valorFormatado = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
+
+      const msg = `Olá, tudo bem?\n\nSegue a 2ª via da parcela *#${numero_parcela}* do aluno *${aluno_nome}*.\n\n*Vencimento:* ${dataFormatada}\n*Valor:* ${valorFormatado}\n\nVocê pode efetuar o pagamento pelo link a seguir:\n${payment_url}\n\nQualquer dúvida, estamos à disposição!`;
+
+      if (fastSend) {
+        try {
+          await fetch(`/api/admin-financeiro/parcelas/${parcelaId}/log-whatsapp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telefone: telefoneLimpo })
+          });
+        } catch (err) {
+          console.error('Falha ao registrar log de auditoria:', err);
+        }
+        const url = `https://wa.me/${telefoneLimpo}?text=${encodeURIComponent(msg)}`;
+        window.open(url, '_blank');
+      } else {
+        setModalWhatsapp({
+          id: parcelaId,
+          aluno_nome,
+          responsavel_telefone: telefoneLimpo,
+          numero_parcela,
+          valor,
+          data_vencimento,
+          payment_url,
+          valorFormatado,
+          dataFormatada,
+          mensagemPadrao: msg
+        });
+      }
+    } catch (err) {
+      console.error('Erro ao processar envio para o WhatsApp:', err);
+      alert('Erro ao processar envio: ' + err.message);
+    }
   };
 
   const handleCancelarParcelaAluno = (carne, parcela, alunoId) => {
@@ -1617,59 +1689,35 @@ export default function AlunosFinanceiroPage() {
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-            <div className="flex flex-col col-span-1 md:col-span-2">
-              <input type="text" placeholder="🔍 Aluno, Matrícula, CPF ou Responsável..." value={filtroNome} onChange={e => setFiltroNome(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm" />
-            </div>
-            
-            <select value={filtroStatus} onChange={e => setFiltroStatus(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm">
-              <option value="">Todos os Status</option>
-              <option value="ATIVO">Ativo</option>
-              <option value="PRE_CADASTRO">Pré-Cadastro</option>
-              <option value="AGUARDANDO_PAGAMENTO_MATRICULA">Ag. Pagamento Matrícula</option>
-              <option value="AGUARDANDO_FORMACAO_TURMA">Ag. Formação de Turma</option>
-              <option value="DESISTENTE">Desistente</option>
-              <option value="CANCELADO">Cancelado</option>
-              <option value="INATIVO">Inativo</option>
-            </select>
-
-            <select value={filtroUnidade} onChange={e => setFiltroUnidade(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm">
-              <option value="">Todas as Unidades</option>
-              {unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
-            </select>
-
-            <select value={filtroCurso} onChange={e => setFiltroCurso(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm">
-              <option value="">Todos os Cursos</option>
-              {cursos.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-            </select>
-
-            <select value={filtroTurma} onChange={e => setFiltroTurma(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm">
-              <option value="">Todas as Turmas</option>
-              {turmasFiltradasOpcoes.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
-            </select>
-          </div>
-          
-          <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-gray-100">
-            <div className="flex items-center gap-4">
-              <select value={filtroAnoLetivo} onChange={e => setFiltroAnoLetivo(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm">
-                <option value="">Todos os Anos Letivos</option>
-                {anosLetivosOpcoes.map(ano => <option key={ano} value={ano}>{ano}</option>)}
-              </select>
-            </div>
-            
-            <button onClick={limparFiltros}
-              className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-teal-600 border border-gray-300 rounded-lg hover:border-teal-500 transition-colors bg-white">
-              🧹 Limpar Filtros
-            </button>
-          </div>
-        </div>
+        <BarraFiltros
+          searchPlaceholder="🔍 Aluno, Matrícula, CPF ou Responsável..."
+          searchValue={filtroNome}
+          onSearchChange={setFiltroNome}
+          statusValue={filtroStatus}
+          onStatusChange={setFiltroStatus}
+          statusOptions={[
+            { value: "ATIVO", label: "Ativo" },
+            { value: "PRE_CADASTRO", label: "Pré-Cadastro" },
+            { value: "AGUARDANDO_PAGAMENTO_MATRICULA", label: "Ag. Pagamento Matrícula" },
+            { value: "AGUARDANDO_FORMACAO_TURMA", label: "Ag. Formação de Turma" },
+            { value: "DESISTENTE", label: "Desistente" },
+            { value: "CANCELADO", label: "Cancelado" },
+            { value: "INATIVO", label: "Inativo" }
+          ]}
+          unidadeValue={filtroUnidade}
+          onUnidadeChange={setFiltroUnidade}
+          unidades={unidades}
+          cursoValue={filtroCurso}
+          onCursoChange={setFiltroCurso}
+          cursos={cursos}
+          turmaValue={filtroTurma}
+          onTurmaChange={setFiltroTurma}
+          turmas={turmasFiltradasOpcoes}
+          anoLetivoValue={filtroAnoLetivo}
+          onAnoLetivoChange={setFiltroAnoLetivo}
+          anosLetivos={anosLetivosOpcoes}
+          onClear={limparFiltros}
+        />
 
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
           {alunosFiltrados.length === 0 ? (
@@ -1907,6 +1955,7 @@ export default function AlunosFinanceiroPage() {
                                                             <td className="px-2 py-2">
                                                               <span className={`px-2 py-0.5 rounded text-xs font-semibold ${CoresParcela[parcela.status] || 'bg-gray-100 text-gray-800'}`}>{parcela.status}</span>
                                                             </td>
+
                                                             <td className="px-2 py-2 text-center">
                                                               <div className="flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
                                                                 {parcela.status === 'pago' && (
@@ -1914,6 +1963,27 @@ export default function AlunosFinanceiroPage() {
                                                                     className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition">
                                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                                                                   </button>
+                                                                )}
+                                                                {(parcela.status === 'pendente' || parcela.status === 'vencido') && (
+                                                                  <div className="flex items-center rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 hover:bg-emerald-100 hover:shadow-sm transition-all duration-200 divide-x divide-emerald-250">
+                                                                    <button
+                                                                      onClick={() => handleEnviarWhatsApp(parcela.id, true)}
+                                                                      onContextMenu={(e) => { e.preventDefault(); handleEnviarWhatsApp(parcela.id, false); }}
+                                                                      title="Enviar 2ª via rápida por WhatsApp (Clique com botão direito para editar)"
+                                                                      className="w-9 h-9 flex items-center justify-center rounded-l-full hover:scale-105 transition-all duration-200 cursor-pointer">
+                                                                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                                                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.625 1.451 5.48-.002 9.932-4.453 9.935-9.934.002-2.657-1.03-5.155-2.905-7.03C16.426 1.768 13.932.735 11.28.735 5.798.735 1.346 5.188 1.343 10.669c-.001 1.554.415 3.076 1.203 4.437l-.988 3.606 3.693-.97c1.37.747 2.808 1.134 4.396 1.14l.003-.008zm10.153-6.885c-.29-.145-1.722-.85-1.99-.947-.267-.097-.463-.146-.658.145-.195.29-.757.947-.928 1.142-.17.195-.34.22-.63.075-.29-.145-1.228-.453-2.338-1.444-.864-.77-1.448-1.721-1.618-2.011-.17-.29-.018-.447.127-.592.13-.13.29-.34.436-.509.145-.17.195-.29.29-.485.097-.195.048-.364-.025-.509-.073-.145-.658-1.587-.9-2.17-.236-.569-.475-.491-.657-.5l-.558-.01c-.195 0-.51.072-.777.363-.267.29-1.02 1.02-1.02 2.485s1.07 2.871 1.218 3.064c.146.195 2.105 3.2 5.1 4.499.712.309 1.268.494 1.7.632.715.228 1.364.195 1.878.118.571-.085 1.722-.704 1.965-1.385.243-.68.243-1.261.17-1.385-.073-.122-.268-.195-.559-.34z"/>
+                                                                      </svg>
+                                                                    </button>
+                                                                    <button
+                                                                      onClick={() => handleEnviarWhatsApp(parcela.id, false)}
+                                                                      title="Personalizar mensagem antes de enviar"
+                                                                      className="w-5 h-9 flex items-center justify-center rounded-r-full hover:bg-emerald-100/50 hover:scale-105 transition-all duration-200 cursor-pointer">
+                                                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                                                                      </svg>
+                                                                    </button>
+                                                                  </div>
                                                                 )}
                                                                 {parcela.boleto_url && (
                                                                   <button title="Copiar Link do Boleto" onClick={() => handleCopyBoletoUrl(parcela.boleto_url)}
@@ -2171,6 +2241,26 @@ export default function AlunosFinanceiroPage() {
           onConfirm={handleConfirmarCancelarParcelaAluno}
           onClose={() => setModalCancelarParcelaAluno(null)}
           loading={cancelandoParcelaAluno}
+        />
+      )}
+      {modalWhatsapp && (
+        <ModalWhatsapp
+          data={modalWhatsapp}
+          onConfirm={async (editedText) => {
+            try {
+              await fetch(`/api/admin-financeiro/parcelas/${modalWhatsapp.id}/log-whatsapp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telefone: modalWhatsapp.responsavel_telefone })
+              });
+            } catch (err) {
+              console.error('Falha ao registrar log de auditoria:', err);
+            }
+            const url = `https://wa.me/${modalWhatsapp.responsavel_telefone}?text=${encodeURIComponent(editedText)}`;
+            window.open(url, '_blank');
+            setModalWhatsapp(null);
+          }}
+          onClose={() => setModalWhatsapp(null)}
         />
       )}
     </AdminFinanceiroLayout>
@@ -2919,6 +3009,62 @@ function ModalCancelarParcelasMultiplas({ quantidade, onConfirm, onClose, loadin
             className="px-5 py-2 text-sm font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-red-350 disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
             {loading ? '⏳ Processando...' : 'Confirmar Cancelamento'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Modal Whatsapp
+function ModalWhatsapp({ data, onConfirm, onClose }) {
+  const [text, setText] = useState(data.mensagemPadrao || '');
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-gray-100">
+        {/* Cabeçalho */}
+        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-6 py-4">
+          <h3 className="font-bold text-lg flex items-center gap-2">
+            💬 Enviar 2ª Via por WhatsApp
+          </h3>
+          <div className="mt-3 text-xs bg-white bg-opacity-15 p-3 rounded-lg flex flex-col gap-1 text-emerald-50">
+            <div><span className="font-semibold">Aluno:</span> {data.aluno_nome}</div>
+            <div className="flex justify-between">
+              <div><span className="font-semibold">Parcela:</span> #{data.numero_parcela}</div>
+              <div><span className="font-semibold">Valor:</span> {data.valorFormatado}</div>
+              <div><span className="font-semibold">Vencimento:</span> {data.dataFormatada}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Corpo / Edição */}
+        <div className="p-6">
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+            Mensagem a ser enviada:
+          </label>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={8}
+            className="w-full p-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 resize-none font-sans"
+            placeholder="Digite a mensagem..."
+          />
+        </div>
+
+        {/* Rodapé / Ações */}
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-100 transition text-sm font-semibold"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => onConfirm(text)}
+            className="px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition text-sm font-semibold shadow-sm hover:shadow flex items-center gap-1.5"
+          >
+            Abrir WhatsApp
           </button>
         </div>
       </div>

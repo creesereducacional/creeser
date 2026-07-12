@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 
+import Link from "next/link";
+
 export default function AlunoDashboard() {
   const router = useRouter();
   const [usuario, setUsuario] = useState(null);
@@ -128,11 +130,12 @@ export default function AlunoDashboard() {
             <span>Atividades</span>
             <span className="text-xs ml-auto">Em breve</span>
           </div>
-          <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-300 opacity-50 cursor-not-allowed text-sm">
-            <span className="text-lg flex-shrink-0">📊</span>
-            <span>Desempenho</span>
-            <span className="text-xs ml-auto">Em breve</span>
-          </div>
+          <Link href="/aluno/boletim">
+            <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-300 hover:bg-teal-600 transition text-sm cursor-pointer font-semibold">
+              <span className="text-lg flex-shrink-0">📊</span>
+              <span>Boletim Escolar</span>
+            </div>
+          </Link>
           <a href="/aluno/forum" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-300 hover:bg-teal-600 transition text-sm cursor-pointer font-semibold">
             <span className="text-lg flex-shrink-0">💬</span>
             <span>Fórum</span>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import AdminFinanceiroLayout from '@/components/AdminFinanceiro/Layout';
 import ModalBaixaManual from '@/components/AdminFinanceiro/ModalBaixaManual';
+import BarraFiltros from '@/components/AdminFinanceiro/BarraFiltros';
 import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState   from '@/components/ui/EmptyState';
 import { SkeletonTable } from '@/components/ui/LoadingSkeleton';
@@ -11,12 +12,41 @@ export default function OrdensPage() {
   const [loading, setLoading] = useState(true);
   const [filtroStatus, setFiltroStatus] = useState('');
   const [filtroAluno, setFiltroAluno] = useState('');
+  const [filtroUnidade, setFiltroUnidade] = useState('');
+  const [filtroCurso, setFiltroCurso] = useState('');
+  const [filtroTurma, setFiltroTurma] = useState('');
+  const [filtroAnoLetivo, setFiltroAnoLetivo] = useState('');
+  const [unidades, setUnidades] = useState([]);
+  const [cursos, setCursos] = useState([]);
+  const [todasTurmas, setTodasTurmas] = useState([]);
   const [modalBaixaManual, setModalBaixaManual] = useState(null); // { parcela_id, valor, efi_charge_id, label }
   const [baixandoParcela, setBaixandoParcela] = useState(false);
 
   useEffect(() => {
     carregarOrdens();
+    // Carregar opções de filtros
+    Promise.all([
+      fetch('/api/turmas/opcoes'),
+      fetch('/api/turmas')
+    ]).then(async ([resOpcoes, resTurmas]) => {
+      if (resOpcoes.ok) {
+        const dataOpcoes = await resOpcoes.json();
+        if (dataOpcoes.unidades) setUnidades(dataOpcoes.unidades);
+        if (dataOpcoes.cursos) setCursos(dataOpcoes.cursos);
+      }
+      if (resTurmas.ok) {
+        const dataTurmas = await resTurmas.json();
+        setTodasTurmas(Array.isArray(dataTurmas) ? dataTurmas : dataTurmas.turmas || []);
+      }
+    }).catch(console.error);
   }, []);
+
+  const turmasFiltradasOpcoes = useMemo(() => {
+    let list = todasTurmas;
+    if (filtroCurso) list = list.filter(t => t.curso_id === Number(filtroCurso));
+    if (filtroUnidade) list = list.filter(t => t.unidade_id === filtroUnidade);
+    return list;
+  }, [todasTurmas, filtroCurso, filtroUnidade]);
 
   const carregarOrdens = async () => {
     try {
@@ -70,8 +100,27 @@ export default function OrdensPage() {
       );
     }
 
+    if (filtroUnidade) {
+      resultado = resultado.filter(o => {
+        const turma = todasTurmas.find(t => t.id === o.aluno_turma_id);
+        return turma && String(turma.unidade_id) === String(filtroUnidade);
+      });
+    }
+
+    if (filtroCurso) {
+      resultado = resultado.filter(o => o.aluno_curso_id === Number(filtroCurso));
+    }
+
+    if (filtroTurma) {
+      resultado = resultado.filter(o => o.aluno_turma_id === Number(filtroTurma));
+    }
+
+    if (filtroAnoLetivo) {
+      resultado = resultado.filter(o => o.aluno_ano_letivo === filtroAnoLetivo);
+    }
+
     return resultado;
-  }, [ordens, filtroStatus, filtroAluno]);
+  }, [ordens, filtroStatus, filtroAluno, filtroUnidade, filtroCurso, filtroTurma, filtroAnoLetivo, todasTurmas]);
 
   const resumo = useMemo(() => {
     return {
@@ -160,34 +209,38 @@ export default function OrdensPage() {
           </div>
         </div>
 
-        {/* FILTROS */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <input
-              type="text"
-              placeholder="🔍 Nome ou CPF do aluno..."
-              value={filtroAluno}
-              onChange={(e) => setFiltroAluno(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500"
-            />
-            <select
-              value={filtroStatus}
-              onChange={(e) => setFiltroStatus(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500"
-            >
-              <option value="">Todos os Status</option>
-              <option value="ativo">Ativo</option>
-              <option value="cancelado">Cancelado</option>
-              <option value="encerrado">Encerrado</option>
-            </select>
-            <button
-              onClick={carregarOrdens}
-              className="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold transition"
-            >
-              🔄 Atualizar
-            </button>
-          </div>
-        </div>
+        <BarraFiltros
+          searchPlaceholder="🔍 Nome ou CPF do aluno..."
+          searchValue={filtroAluno}
+          onSearchChange={setFiltroAluno}
+          statusValue={filtroStatus}
+          onStatusChange={setFiltroStatus}
+          statusOptions={[
+            { value: "ativo", label: "Ativo" },
+            { value: "cancelado", label: "Cancelado" },
+            { value: "encerrado", label: "Encerrado" }
+          ]}
+          unidadeValue={filtroUnidade}
+          onUnidadeChange={setFiltroUnidade}
+          unidades={unidades}
+          cursoValue={filtroCurso}
+          onCursoChange={setFiltroCurso}
+          cursos={cursos}
+          turmaValue={filtroTurma}
+          onTurmaChange={setFiltroTurma}
+          turmas={turmasFiltradasOpcoes}
+          anoLetivoValue={filtroAnoLetivo}
+          onAnoLetivoChange={setFiltroAnoLetivo}
+          anosLetivos={['2024', '2025', '2026', '2027']}
+          onClear={() => {
+            setFiltroAluno('');
+            setFiltroStatus('');
+            setFiltroUnidade('');
+            setFiltroCurso('');
+            setFiltroTurma('');
+            setFiltroAnoLetivo('');
+          }}
+        />
 
         {/* TABELA */}
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">

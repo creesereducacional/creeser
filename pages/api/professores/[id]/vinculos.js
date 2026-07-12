@@ -83,6 +83,35 @@ export default async function handler(req, res) {
         }
       }
 
+      // Validar se a disciplina pertence à Matriz Curricular (gradeid) da Turma
+      const { data: turmaData, error: turmaError } = await supabase
+        .from('turmas')
+        .select('gradeid')
+        .eq('id', turma_id)
+        .single();
+      
+      if (turmaError || !turmaData) {
+        return res.status(400).json({ error: 'Turma não encontrada ou inválida.' });
+      }
+
+      if (!turmaData.gradeid) {
+        return res.status(400).json({ error: 'A Turma selecionada não possui uma Matriz Curricular vinculada.' });
+      }
+
+      const { data: disciplinaData, error: discError } = await supabase
+        .from('disciplinas')
+        .select('grade')
+        .eq('numero_id', disciplina_id)
+        .single();
+      
+      if (discError || !disciplinaData) {
+        return res.status(400).json({ error: 'Disciplina não encontrada ou inválida.' });
+      }
+
+      if (String(disciplinaData.grade) !== String(turmaData.gradeid)) {
+        return res.status(400).json({ error: 'A Disciplina selecionada não pertence à Matriz Curricular desta Turma.' });
+      }
+
       // Evitar duplicidade de vínculo
       const { data: existing, error: existError } = await supabase
         .from('professor_turma_disciplinas')

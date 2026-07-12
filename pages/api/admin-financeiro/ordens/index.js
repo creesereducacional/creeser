@@ -48,7 +48,7 @@ export default async function handler(req, res) {
         criado_por,
         created_at,
         updated_at,
-        alunos(nome, cpf, email),
+        alunos(nome, cpf, email, turmaid, cursoid, ano_letivo),
         financeiro_parcelas(id, numero_parcela, valor, data_vencimento, status, boleto_numero, efi_charge_id)
       `)
       .eq('tipo', 'ordem_simples')
@@ -68,6 +68,9 @@ export default async function handler(req, res) {
         aluno_nome: o.alunos?.nome || 'N/A',
         aluno_cpf: o.alunos?.cpf || 'N/A',
         aluno_email: o.alunos?.email || 'N/A',
+        aluno_turma_id: o.alunos?.turmaid || null,
+        aluno_curso_id: o.alunos?.cursoid || null,
+        aluno_ano_letivo: o.alunos?.ano_letivo || null,
         data_vencimento: parcela.data_vencimento || null,
         status_parcela: parcela.status || o.status,
         cobranca: parcela.boleto_numero || parcela.efi_charge_id || o.efi_charge_id || '-',

@@ -11,6 +11,78 @@ export default function PlanejamentoDiario() {
     disciplina: ''
   });
   const [loading, setLoading] = useState(true);
+  const [modalFrequencia, setModalFrequencia] = useState(null); // { aulaId, alunos: [] }
+  const [freqLoading, setFreqLoading] = useState(false);
+  const [salvandoFreq, setSalvandoFreq] = useState(false);
+
+  const abrirFrequencia = async (aulaId) => {
+    try {
+      setFreqLoading(true);
+      setModalFrequencia({ aulaId, alunos: [] });
+      const res = await fetch(`/api/planejamento-diario/${aulaId}/frequencia`);
+      if (res.ok) {
+        const data = await res.json();
+        setModalFrequencia({ aulaId, alunos: data });
+      } else {
+        alert('Erro ao carregar a chamada.');
+        setModalFrequencia(null);
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao carregar frequências');
+      setModalFrequencia(null);
+    } finally {
+      setFreqLoading(false);
+    }
+  };
+
+  const alternarPresenca = (alunoId) => {
+    setModalFrequencia(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        alunos: prev.alunos.map(a => a.id === alunoId ? { ...a, presenca: !a.presenca } : a)
+      };
+    });
+  };
+
+  const alterarJustificativa = (alunoId, justificativa) => {
+    setModalFrequencia(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        alunos: prev.alunos.map(a => a.id === alunoId ? { ...a, justificativa } : a)
+      };
+    });
+  };
+
+  const salvarFrequencia = async () => {
+    if (!modalFrequencia) return;
+    try {
+      setSalvandoFreq(true);
+      const payload = modalFrequencia.alunos.map(a => ({
+        aluno_id: a.id,
+        presenca: a.presenca,
+        justificativa: a.justificativa
+      }));
+      const res = await fetch(`/api/planejamento-diario/${modalFrequencia.aulaId}/frequencia`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ presencas: payload })
+      });
+      if (res.ok) {
+        alert('Chamada salva com sucesso!');
+        setModalFrequencia(null);
+      } else {
+        alert('Erro ao salvar chamada.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Erro de conexão ao salvar chamada.');
+    } finally {
+      setSalvandoFreq(false);
+    }
+  };
 
   useEffect(() => {
     carregarRegistros();
@@ -254,6 +326,12 @@ export default function PlanejamentoDiario() {
 
                   {/* Ações */}
                   <div className="flex gap-2 pt-4">
+                    <button
+                      onClick={() => abrirFrequencia(reg.id)}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold transition text-sm flex items-center gap-1.5"
+                    >
+                      📋 Chamada
+                    </button>
                     <Link href={`/admin/planejamento-diario/${reg.id}`}>
                       <button className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold transition text-sm">
                         ✏️ Editar
@@ -274,6 +352,78 @@ export default function PlanejamentoDiario() {
           )}
         </div>
       </div>
+      {modalFrequencia && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-4">
+              <h3 className="text-lg font-bold text-teal-800 flex items-center gap-2">
+                📋 Chamada / Controle de Frequência
+              </h3>
+              <button 
+                onClick={() => setModalFrequencia(null)}
+                className="text-gray-400 hover:text-gray-600 text-2xl font-semibold cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+
+            {freqLoading ? (
+              <p className="text-center py-8 text-gray-500">Carregando alunos e chamadas...</p>
+            ) : modalFrequencia.alunos.length === 0 ? (
+              <p className="text-center py-8 text-gray-500">Nenhum aluno ativo encontrado nesta turma.</p>
+            ) : (
+              <div className="overflow-y-auto flex-1 space-y-3 pr-2">
+                {modalFrequencia.alunos.map(aluno => (
+                  <div key={aluno.id} className="flex items-center justify-between p-3 border border-gray-100 rounded-xl hover:bg-gray-50 transition gap-4">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-800 truncate">{aluno.nome}</p>
+                      <p className="text-xs text-gray-500">Matrícula: {aluno.matricula || 'N/A'}</p>
+                    </div>
+
+                    <div className="flex items-center gap-3 flex-shrink-0 bg-white">
+                      {!aluno.presenca && (
+                        <input
+                          type="text"
+                          placeholder="Justificativa da falta..."
+                          value={aluno.justificativa}
+                          onChange={(e) => alterarJustificativa(aluno.id, e.target.value)}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-teal-500 bg-white"
+                        />
+                      )}
+                      <button
+                        onClick={() => alternarPresenca(aluno.id)}
+                        className={`px-4 py-1.5 rounded-full text-xs font-bold transition cursor-pointer ${
+                          aluno.presenca 
+                            ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                            : 'bg-red-100 text-red-700 hover:bg-red-200'
+                        }`}
+                      >
+                        {aluno.presenca ? '🟢 PRESENTE' : '🔴 AUSENTE'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 border-t border-gray-100 pt-4 mt-4">
+              <button
+                onClick={() => setModalFrequencia(null)}
+                className="px-4 py-2 border border-gray-300 text-gray-600 hover:bg-gray-50 font-semibold rounded-lg text-sm transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={salvarFrequencia}
+                disabled={salvandoFreq || freqLoading}
+                className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-lg text-sm transition disabled:opacity-50 cursor-pointer"
+              >
+                {salvandoFreq ? 'Salvando...' : 'Salvar Frequência'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

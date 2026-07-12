@@ -577,6 +577,14 @@ export default function ListagemAlunos() {
                           >
                             📄
                           </button>
+                          <Link href={`/admin/alunos/historico?id=${aluno.id}`}>
+                            <button
+                              className="p-2 text-gray-600 hover:text-gray-800 transition text-base"
+                              title="Histórico Escolar"
+                            >
+                              📜
+                            </button>
+                          </Link>
                           <button
                             onClick={() => iniciarAssinaturaDigital(aluno.id)}
                             className="p-2 text-gray-600 hover:text-gray-800 transition"

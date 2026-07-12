@@ -49,7 +49,7 @@ export default async function handler(req, res) {
         criado_por,
         created_at,
         updated_at,
-        alunos(nome, cpf, email)
+        alunos(nome, cpf, email, turmaid, cursoid, ano_letivo)
       `)
       .eq('tipo', 'carne')
       .order('created_at', { ascending: false });
@@ -75,6 +75,9 @@ export default async function handler(req, res) {
           aluno_nome: carne.alunos?.nome || 'N/A',
           aluno_cpf: carne.alunos?.cpf || 'N/A',
           aluno_email: carne.alunos?.email || 'N/A',
+          aluno_turma_id: carne.alunos?.turmaid || null,
+          aluno_curso_id: carne.alunos?.cursoid || null,
+          aluno_ano_letivo: carne.alunos?.ano_letivo || null,
           parcelas: parcelas || []
         });
       }

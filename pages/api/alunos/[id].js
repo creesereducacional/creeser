@@ -181,7 +181,7 @@ export default async function handler(req, res) {
 
       let query = supabase
         .from('alunos')
-        .select('*')
+        .select('*, turmas(gradeid)')
         .eq('id', parseInt(id));
 
       query = applyInstituicaoFilter(query, instituicaoId);
@@ -192,7 +192,13 @@ export default async function handler(req, res) {
         return res.status(404).json({ message: 'Aluno não encontrado' });
       }
 
-      res.status(200).json(data);
+      const responseData = {
+        ...data,
+        gradeid: data.turmas?.gradeid || null
+      };
+      delete responseData.turmas;
+
+      res.status(200).json(responseData);
     } 
     else if (req.method === 'PUT') {
       // ========================================

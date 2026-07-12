@@ -24,6 +24,27 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     const body = req.body || {};
     const instId = resolveInstituicaoId(req, authUser);
+
+    if (!body.grade) {
+      return res.status(400).json({ error: 'Matriz Curricular (grade) é obrigatória' });
+    }
+
+    if (body.grade) {
+      const { data: gradeData, error: gradeError } = await supabase
+        .from('grades')
+        .select('curso_nome')
+        .eq('id', body.grade)
+        .single();
+      
+      if (gradeError || !gradeData) {
+        return res.status(400).json({ error: 'Matriz Curricular selecionada não é válida' });
+      }
+
+      if (body.curso && gradeData.curso_nome !== body.curso) {
+        return res.status(400).json({ error: 'A Matriz Curricular não pertence ao Curso selecionado' });
+      }
+    }
+
     const { data, error } = await supabase.from('disciplinas').insert({
       codigo:        body.codigo        || null,
       nome:          body.nome,

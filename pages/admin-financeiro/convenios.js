@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import AdminFinanceiroLayout from '@/components/AdminFinanceiro/Layout';
+import BarraFiltros from '@/components/AdminFinanceiro/BarraFiltros';
 
 const initialForm = {
   nome: '',
@@ -233,15 +234,16 @@ export default function ConveniosFinanceiroPage() {
           </button>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-          <input
-            type="text"
-            value={filtro}
-            onChange={(event) => setFiltro(event.target.value)}
-            placeholder="🔎 Buscar por nome, instituicao ou CNPJ..."
-            className="w-full px-4 py-3 bg-white border border-teal-300 text-gray-800 rounded-lg placeholder-gray-400 focus:outline-none focus:border-teal-500"
-          />
-        </div>
+        {/*
+          Nota: Filtros acadêmicos (Status, Unidade, Curso, Turma, Ano Letivo)
+          não são aplicáveis aos Convênios por se tratar de cadastros globais e institucionais.
+        */}
+        <BarraFiltros
+          searchPlaceholder="🔍 Buscar por nome, instituicao ou CNPJ..."
+          searchValue={filtro}
+          onSearchChange={setFiltro}
+          onClear={() => setFiltro('')}
+        />
 
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
           <table className="w-full">

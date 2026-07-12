@@ -232,6 +232,41 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Instituição, unidade, curso e grade são obrigatórios' });
       }
 
+      // Recuperar a turma atual antes de atualizar
+      const { data: existingTurma, error: findError } = await supabase
+        .from('turmas')
+        .select('gradeid, cursoid')
+        .eq('id', turmaId)
+        .single();
+      
+      if (findError || !existingTurma) {
+        return res.status(404).json({ error: 'Turma não encontrada' });
+      }
+
+      // Se a turma já possui um gradeid cadastrado, não permitir que ele seja alterado
+      if (existingTurma.gradeid && String(existingTurma.gradeid) !== String(payloadNormalizado.gradeid)) {
+        return res.status(400).json({ error: 'Após criada, a Turma deve permanecer vinculada à mesma Matriz Curricular (gradeid) para não corromper históricos.' });
+      }
+
+      // Validar se a nova grade existe, está ativa e pertence ao mesmo curso
+      const { data: gradeData, error: gradeError } = await supabase
+        .from('grades')
+        .select('curso_id, situacao')
+        .eq('id', payloadNormalizado.gradeid)
+        .single();
+      
+      if (gradeError || !gradeData) {
+        return res.status(400).json({ error: 'Matriz Curricular vinculada não existe ou é inválida.' });
+      }
+
+      if (gradeData.situacao !== 'ATIVO') {
+        return res.status(400).json({ error: 'A Matriz Curricular selecionada precisa estar ativa.' });
+      }
+
+      if (String(gradeData.curso_id) !== String(payloadNormalizado.cursoid)) {
+        return res.status(400).json({ error: 'A Matriz Curricular selecionada não pertence ao mesmo Curso da Turma.' });
+      }
+
       let data = null;
       let error = null;
 

@@ -24,6 +24,18 @@ export default function NovaDisciplina() {
   });
 
   const [loading, setLoading] = useState(false);
+  const [cursos, setCursos] = useState([]);
+  const [grades, setGrades] = useState([]);
+
+  useState(() => {
+    Promise.all([
+      fetch('/api/cursos'),
+      fetch('/api/grades')
+    ]).then(async ([resCursos, resGrades]) => {
+      if (resCursos.ok) setCursos(await resCursos.json());
+      if (resGrades.ok) setGrades(await resGrades.json());
+    }).catch(console.error);
+  }, []);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -100,7 +112,9 @@ export default function NovaDisciplina() {
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 >
                   <option value="">- ESCOLHA UM CURSO -</option>
-                  <option value="ADMINISTRAÇÃO EAD">ADMINISTRAÇÃO EAD</option>
+                  {cursos.map(c => (
+                    <option key={c.id} value={c.nome}>{c.nome}</option>
+                  ))}
                 </select>
               </div>
 
@@ -192,10 +206,15 @@ export default function NovaDisciplina() {
                   name="grade"
                   value={formData.grade}
                   onChange={handleChange}
+                  required
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 >
-                  <option value="">Escolha uma Grade</option>
-                  <option value="ADM EAD">ADM EAD</option>
+                  <option value="">Escolha uma Grade *</option>
+                  {grades
+                    .filter(g => !formData.curso || g.curso_nome === formData.curso)
+                    .map(g => (
+                      <option key={g.id} value={g.id}>{g.nome} ({g.ano})</option>
+                    ))}
                 </select>
                 <Link href="/admin/disciplinas/grades">
                   <button

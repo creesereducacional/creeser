@@ -29,6 +29,7 @@ export default function EditarTurma() {
     iesRegistradoraDiploma: '',
     situacao: 'ATIVO',
   });
+  const [originalGradeId, setOriginalGradeId] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -104,6 +105,9 @@ export default function EditarTurma() {
           cursoId: data.cursoId ? String(data.cursoId) : '',
           gradeId: data.gradeId ? String(data.gradeId) : '',
         }));
+        if (data.gradeId) {
+          setOriginalGradeId(String(data.gradeId));
+        }
       } else {
         alert('Turma não encontrada');
         router.push('/admin/turmas');
@@ -333,8 +337,8 @@ export default function EditarTurma() {
                   value={formData.gradeId}
                   onChange={handleChange}
                   required
-                  disabled={!formData.cursoId || loadingOpcoes}
-                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                  disabled={Boolean(originalGradeId) || !formData.cursoId || loadingOpcoes}
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50 disabled:opacity-75 disabled:cursor-not-allowed"
                 >
                   <option value="">{formData.cursoId ? 'Selecione a Grade' : 'Selecione o curso primeiro'}</option>
                   {loadingOpcoes ? (

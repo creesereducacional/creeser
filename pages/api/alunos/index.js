@@ -184,7 +184,7 @@ export default async function handler(req, res) {
 
       let query = supabase
         .from('alunos')
-        .select('*')
+        .select('*, turmas(gradeid)')
         .order('id', { ascending: false });
 
       query = applyInstituicaoFilter(query, instituicaoId);
@@ -196,7 +196,16 @@ export default async function handler(req, res) {
         return res.status(500).json({ message: 'Erro ao recuperar alunos', error: error.message });
       }
       
-      res.status(200).json(data || []);
+      const dataWithGrade = (data || []).map(d => {
+        const student = {
+          ...d,
+          gradeid: d.turmas?.gradeid || null
+        };
+        delete student.turmas;
+        return student;
+      });
+
+      res.status(200).json(dataWithGrade);
     } 
     else if (req.method === 'POST') {
       // ========================================

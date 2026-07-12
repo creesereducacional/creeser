@@ -449,11 +449,17 @@ export default function ListagemProfessores() {
                       className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
                     >
                       <option value="">- Selecione uma Disciplina -</option>
-                      {disciplinas.map(d => (
-                        <option key={d.id} value={d.id}>{d.nome}</option>
-                      ))}
+                      {disciplinas
+                        .filter(d => {
+                          const tObj = turmas.find(t => String(t.id) === String(selectedTurma));
+                          return !tObj || !tObj.gradeId || String(d.grade) === String(tObj.gradeId);
+                        })
+                        .map(d => (
+                          <option key={d.id} value={d.numero_id || d.id}>{d.nome}</option>
+                        ))}
                     </select>
                   </div>
+
                 </div>
 
                 <div className="flex justify-end pt-2">

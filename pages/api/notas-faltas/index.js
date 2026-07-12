@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { requireAuth, requirePerfil, resolveInstituicaoId, applyInstituicaoFilter, hasPerfil } from '../../../lib/auth-server';
 
+import { calcularNotasAluno } from '../../../lib/notas-calculo';
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -94,19 +96,47 @@ export default async function handler(req, res) {
       }
     }
 
+    // Obter o curso da turma
+    let cursoId = null;
+    if (body.turma) {
+      const { data: tm } = await supabase
+        .from('turmas')
+        .select('cursoid')
+        .eq('id', parseInt(body.turma, 10))
+        .maybeSingle();
+      if (tm) {
+        cursoId = tm.cursoid;
+      }
+    }
+
+    const calcResult = await calcularNotasAluno(
+      supabase,
+      instId,
+      cursoId,
+      body.detalhes_notas || body.detalhesNotas || {
+        AP1: body.ap1,
+        AP2: body.ap2,
+        AP3: body.ap3,
+        Rec: body.rec,
+        EF: body.exameFinal || body.exame_final
+      },
+      body.frequencia
+    );
+
     const { data, error } = await supabase.from('notas_faltas').insert({
       nome_aluno:  body.nomeAluno  || body.nome_aluno  || null,
       matricula:   body.matricula  || null,
       turma:       body.turma      || null,
       disciplina:  body.disciplina || null,
-      ap1:         body.ap1        ?? null,
-      ap2:         body.ap2        ?? null,
-      ap3:         body.ap3        ?? null,
-      media_prova: body.mediaProva || body.media_prova || null,
+      ap1:         calcResult.ap1,
+      ap2:         calcResult.ap2,
+      ap3:         calcResult.ap3,
+      media_prova: calcResult.mediaProva,
       exame_final: body.exameFinal || body.exame_final || null,
       frequencia:  body.frequencia || null,
-      media_final: body.mediaFinal || body.media_final || null,
-      situacao:    body.situacao   || 'CURSANDO',
+      media_final: calcResult.mediaFinal,
+      situacao:    calcResult.situacao,
+      detalhes_notas: calcResult.detalhes,
       instituicao_id: instId       || null,
     }).select().single();
     if (error) return res.status(500).json({ error: error.message });
