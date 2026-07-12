@@ -15,8 +15,8 @@ export default async function handler(req, res) {
   if (!requirePerfil(authUser, res, PERFIS_PERMITIDOS)) return;
 
   const { id } = req.query;
-  const leadId = parseInt(id);
-  if (isNaN(leadId)) {
+  const leadId = id;
+  if (!leadId) {
     return res.status(400).json({ error: 'ID do lead inválido.' });
   }
 

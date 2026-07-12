@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS public.leads_followups (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  lead_id       INTEGER REFERENCES public.leads(id) ON DELETE CASCADE,
+  lead_id       UUID REFERENCES public.leads(id) ON DELETE CASCADE,
   instituicao_id INTEGER REFERENCES public.instituicoes(id) ON DELETE SET NULL,
   usuario_id    INTEGER REFERENCES public.usuarios(id) ON DELETE SET NULL,
   tipo          VARCHAR(50) NOT NULL, -- 'ligacao', 'whatsapp', 'email', 'reuniao', 'visita'
