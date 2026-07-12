@@ -4,7 +4,7 @@ import DashboardLayout from '../../../components/DashboardLayout';
 import PageHeader from '@/components/ui/PageHeader';
 
 const ABAS = [
-  { id: 'visual',       icon: '🎨', label: 'Visual' },
+  { id: 'visual',       icon: '🏢', label: 'Geral' },
   { id: 'financeiro',   icon: '💰', label: 'Financeiro' },
   { id: 'contratos',    icon: '📄', label: 'Contratos' },
   { id: 'comercial',    icon: '🎯', label: 'Comercial' },
@@ -97,6 +97,24 @@ export default function Configuracoes() {
 
   const set = (key) => (e) => setForm(f => ({ ...f, [key]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
 
+  const buscarCep = async (cep) => {
+    const raw = cep.replace(/\D/g, '');
+    if (raw.length !== 8) return;
+    try {
+      const r = await fetch(`https://viacep.com.br/ws/${raw}/json/`);
+      const d = await r.json();
+      if (!d.erro) {
+        setForm(f => ({
+          ...f,
+          endereco: d.logradouro || f.endereco,
+          bairro:   d.bairro    || f.bairro,
+          cidade:   d.localidade || f.cidade,
+          estado:   d.uf        || f.estado,
+        }));
+      }
+    } catch {}
+  };
+
   const salvar = async () => {
     setSalvando(true);
     setAlert(null);
@@ -155,103 +173,201 @@ export default function Configuracoes() {
   };
 
   const renderGeral = () => (
-    <div className="space-y-4">
-      <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Identidade Visual</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Field label="Nome da Instituição *">
-          <input value={form.nomeEmpresa || ''} onChange={set('nomeEmpresa')} className={INPUT} />
-        </Field>
-        <Field label="Razão Social">
-          <input value={form.razaoSocial || ''} onChange={set('razaoSocial')} className={INPUT} />
-        </Field>
-        <Field label="CNPJ">
-          <input value={form.cnpj || ''} onChange={set('cnpj')} placeholder="00.000.000/0001-00" className={INPUT} />
-        </Field>
-        <Field label="Website">
-          <input value={form.website || ''} onChange={set('website')} placeholder="https://..." className={INPUT} />
-        </Field>
-        <Field label="URL do Logo">
-          <input value={form.logo || ''} onChange={set('logo')} placeholder="https://... ou /logo.png" className={INPUT} />
-        </Field>
-        {form.logo && (
-          <div className="flex items-center gap-3">
-            <img src={form.logo} alt="Logo" className="h-12 object-contain border rounded-lg p-1 bg-gray-50" />
-            <p className="text-xs text-gray-400">Pré-visualização</p>
+    <div className="space-y-6">
+
+      {/* ── Identificação ──────────────────────────────────── */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest border-b pb-2">🏢 Identificação</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="Nome Fantasia *">
+            <input value={form.nomeEmpresa || ''} onChange={set('nomeEmpresa')} className={INPUT} />
+          </Field>
+          <Field label="Razão Social">
+            <input value={form.razaoSocial || ''} onChange={set('razaoSocial')} className={INPUT} />
+          </Field>
+          <Field label="CNPJ">
+            <input value={form.cnpj || ''} onChange={set('cnpj')} placeholder="00.000.000/0001-00" className={INPUT} />
+          </Field>
+          <Field label="Inscrição Estadual">
+            <input value={form.inscricaoEstadual || ''} onChange={set('inscricaoEstadual')} placeholder="Isento ou número" className={INPUT} />
+          </Field>
+          <Field label="Website">
+            <input value={form.website || ''} onChange={set('website')} placeholder="https://..." className={INPUT} />
+          </Field>
+          <Field label="Slogan">
+            <input value={form.descricao || ''} onChange={set('descricao')} placeholder="Ex: Transformando vidas pela educação" className={INPUT} />
+          </Field>
+        </div>
+        <div className="pt-1">
+          <Field label="Logo (URL)">
+            <input value={form.logo || ''} onChange={set('logo')} placeholder="https://... ou /logo.png" className={INPUT} />
+          </Field>
+          {form.logo && (
+            <div className="flex items-center gap-3 mt-2">
+              <img src={form.logo} alt="Logo" className="h-12 object-contain border rounded-lg p-1 bg-gray-50" />
+              <p className="text-xs text-gray-400">Pré-visualização do logo</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Contato ──────────────────────────────────────────── */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest border-b pb-2">📞 Contato</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="E-mail Institucional">
+            <input type="email" value={form.email || ''} onChange={set('email')} className={INPUT} />
+          </Field>
+          <Field label="Telefone">
+            <input value={form.telefone || ''} onChange={set('telefone')} className={INPUT} />
+          </Field>
+          <Field label="WhatsApp">
+            <input value={form.contatoWhatsapp || ''} onChange={set('contatoWhatsapp')} placeholder="5511999999999" className={INPUT} />
+          </Field>
+          <Field label="DDD Padrão">
+            <input value={form.ddd || ''} onChange={set('ddd')} maxLength={2} placeholder="11" className={INPUT} />
+          </Field>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer pt-1">
+          <input type="checkbox" checked={!!form.exibirWhatsappAluno} onChange={set('exibirWhatsappAluno')} className="rounded text-teal-600" />
+          Exibir WhatsApp de contato no portal do aluno
+        </label>
+      </div>
+
+      {/* ── Endereço ─────────────────────────────────────────── */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <div className="flex items-center justify-between border-b pb-2">
+          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">📍 Endereço</h3>
+          <span className="text-[10px] text-teal-600 font-semibold bg-teal-50 px-2 py-0.5 rounded">ViaCEP automático</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Field label="CEP">
+            <input
+              value={form.cep || ''}
+              onChange={e => { set('cep')(e); buscarCep(e.target.value); }}
+              placeholder="00000-000"
+              className={INPUT}
+            />
+          </Field>
+          <div className="md:col-span-2">
+            <Field label="Logradouro">
+              <input value={form.endereco || ''} onChange={set('endereco')} placeholder="Preenchido automaticamente" className={INPUT} />
+            </Field>
           </div>
-        )}
+          <Field label="Bairro">
+            <input value={form.bairro || ''} onChange={set('bairro')} placeholder="Preenchido automaticamente" className={INPUT} />
+          </Field>
+          <Field label="Cidade">
+            <input value={form.cidade || ''} onChange={set('cidade')} className={INPUT} />
+          </Field>
+          <Field label="Estado (UF)">
+            <input value={form.estado || ''} onChange={set('estado')} maxLength={2} placeholder="SP" className={INPUT} />
+          </Field>
+        </div>
       </div>
-      <Field label="Descrição / Slogan">
-        <textarea value={form.descricao || ''} onChange={set('descricao')} rows={2} className={INPUT} />
-      </Field>
 
-      <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide pt-2">Contato</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Field label="E-mail Institucional">
-          <input type="email" value={form.email || ''} onChange={set('email')} className={INPUT} />
-        </Field>
-        <Field label="Telefone">
-          <input value={form.telefone || ''} onChange={set('telefone')} className={INPUT} />
-        </Field>
-        <Field label="WhatsApp de Contato">
-          <input value={form.contatoWhatsapp || ''} onChange={set('contatoWhatsapp')} placeholder="5511999999999" className={INPUT} />
-        </Field>
-        <Field label="DDD Padrão">
-          <input value={form.ddd || ''} onChange={set('ddd')} maxLength={2} placeholder="11" className={INPUT} />
-        </Field>
-      </div>
-      <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-        <input type="checkbox" checked={!!form.exibirWhatsappAluno} onChange={set('exibirWhatsappAluno')} className="rounded" />
-        Exibir WhatsApp de contato no portal do aluno
-      </label>
-
-      <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide pt-2">Endereço</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Field label="Endereço">
-          <input value={form.endereco || ''} onChange={set('endereco')} className={INPUT} />
-        </Field>
-        <Field label="Cidade">
-          <input value={form.cidade || ''} onChange={set('cidade')} className={INPUT} />
-        </Field>
-        <Field label="Estado (UF)">
-          <input value={form.estado || ''} onChange={set('estado')} maxLength={2} placeholder="SP" className={INPUT} />
-        </Field>
-        <Field label="CEP">
-          <input value={form.cep || ''} onChange={set('cep')} placeholder="00000-000" className={INPUT} />
-        </Field>
-      </div>
     </div>
   );
 
   const renderFinanceiro = () => (
-    <div className="space-y-4">
-      <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Dados Bancários / Boleto</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Field label="Banco">
-          <input value={form.fin_banco || ''} onChange={set('fin_banco')} placeholder="Ex: Banco do Brasil" className={INPUT} />
-        </Field>
-        <Field label="Agência">
-          <input value={form.fin_agencia || ''} onChange={set('fin_agencia')} className={INPUT} />
-        </Field>
-        <Field label="Conta Corrente">
-          <input value={form.fin_conta || ''} onChange={set('fin_conta')} className={INPUT} />
-        </Field>
-        <Field label="Chave PIX">
-          <input value={form.fin_pix || ''} onChange={set('fin_pix')} className={INPUT} />
-        </Field>
+    <div className="space-y-6">
+
+      {/* ── 1. Dados Bancários ───────────────────────────────── */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest border-b pb-2">🏦 Dados Bancários</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="Banco">
+            <input value={form.fin_banco || ''} onChange={set('fin_banco')} placeholder="Ex: Banco do Brasil" className={INPUT} />
+          </Field>
+          <Field label="Agência">
+            <input value={form.fin_agencia || ''} onChange={set('fin_agencia')} className={INPUT} />
+          </Field>
+          <Field label="Conta">
+            <input value={form.fin_conta || ''} onChange={set('fin_conta')} className={INPUT} />
+          </Field>
+          <Field label="Tipo de Conta">
+            <select value={form.fin_tipo_conta || 'corrente'} onChange={set('fin_tipo_conta')} className={INPUT}>
+              <option value="corrente">Conta Corrente</option>
+              <option value="poupanca">Conta Poupança</option>
+              <option value="pagamento">Conta de Pagamento</option>
+            </select>
+          </Field>
+          <Field label="Favorecido">
+            <input value={form.fin_favorecido || ''} onChange={set('fin_favorecido')} placeholder="Nome completo ou Razão Social" className={INPUT} />
+          </Field>
+          <Field label="Chave PIX">
+            <input value={form.fin_pix || ''} onChange={set('fin_pix')} placeholder="CPF, CNPJ, e-mail ou chave aleatória" className={INPUT} />
+          </Field>
+        </div>
       </div>
 
-      <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide pt-2">Regras de Cobrança</h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Field label="Vencimento do Boleto (dia)">
-          <input type="number" min="1" max="28" value={form.fin_boleto_venc || ''} onChange={set('fin_boleto_venc')} className={INPUT} />
-        </Field>
-        <Field label="Multa por Atraso (%)">
-          <input type="number" step="0.1" min="0" max="10" value={form.fin_multa || ''} onChange={set('fin_multa')} className={INPUT} />
-        </Field>
-        <Field label="Juros ao Mês (%)">
-          <input type="number" step="0.1" min="0" max="5" value={form.fin_juros || ''} onChange={set('fin_juros')} className={INPUT} />
-        </Field>
+      {/* ── 2. Regras Financeiras ────────────────────────────── */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest border-b pb-2">📏 Regras Financeiras</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Field label="Dia padrão de vencimento">
+            <input type="number" min="1" max="28" value={form.fin_boleto_venc || ''} onChange={set('fin_boleto_venc')} className={INPUT} />
+          </Field>
+          <Field label="Multa por atraso (%)">
+            <input type="number" step="0.1" min="0" max="10" value={form.fin_multa || ''} onChange={set('fin_multa')} className={INPUT} />
+          </Field>
+          <Field label="Juros ao mês (%)">
+            <input type="number" step="0.1" min="0" max="5" value={form.fin_juros || ''} onChange={set('fin_juros')} className={INPUT} />
+          </Field>
+          <Field label="Dias de tolerância">
+            <input type="number" min="0" max="30" value={form.fin_tolerancia || '0'} onChange={set('fin_tolerancia')} placeholder="0" className={INPUT} />
+          </Field>
+          <Field label="Desconto por pontualidade (%)">
+            <input type="number" step="0.1" min="0" max="100" value={form.fin_desconto_pontualidade || ''} onChange={set('fin_desconto_pontualidade')} placeholder="0" className={INPUT} />
+          </Field>
+        </div>
       </div>
+
+      {/* ── 3. Configurações de Cobrança ─────────────────────── */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest border-b pb-2">⚙️ Configurações de Cobrança</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {[
+            { key: 'fin_gerar_carne_auto',       label: 'Gerar carnê automaticamente na matrícula' },
+            { key: 'fin_gerar_taxa_matricula',    label: 'Gerar taxa de matrícula automaticamente' },
+            { key: 'fin_permitir_renegociacao',   label: 'Permitir renegociação de débitos' },
+            { key: 'fin_permitir_pagto_parcial',  label: 'Permitir pagamento parcial de parcelas' },
+          ].map(({ key, label }) => (
+            <label key={key} className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50/50 cursor-pointer hover:bg-teal-50/50 hover:border-teal-200 transition">
+              <input
+                type="checkbox"
+                checked={!!form[key]}
+                onChange={set(key)}
+                className="rounded text-teal-600 focus:ring-teal-500 w-4 h-4"
+              />
+              <span className="text-sm text-gray-700">{label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* ── 4. Plano Financeiro Padrão ───────────────────────── */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest border-b pb-2">📅 Plano Financeiro Padrão</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Field label="Quantidade padrão de parcelas">
+            <input type="number" min="1" max="60" value={form.fin_parcelas_padrao || '12'} onChange={set('fin_parcelas_padrao')} className={INPUT} />
+          </Field>
+          <Field label="Primeiro vencimento padrão (dia)">
+            <input type="number" min="1" max="28" value={form.fin_primeiro_venc || '5'} onChange={set('fin_primeiro_venc')} className={INPUT} />
+          </Field>
+          <Field label="Forma de cobrança padrão">
+            <select value={form.fin_forma_cobranca || 'boleto'} onChange={set('fin_forma_cobranca')} className={INPUT}>
+              <option value="boleto">Boleto Bancário</option>
+              <option value="pix">PIX</option>
+              <option value="cartao">Cartão de Crédito</option>
+              <option value="dinheiro">Dinheiro</option>
+              <option value="transferencia">Transferência Bancária</option>
+            </select>
+          </Field>
+        </div>
+      </div>
+
     </div>
   );
 
