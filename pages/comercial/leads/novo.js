@@ -125,13 +125,13 @@ export default function NovoLead() {
       .catch(() => {});
   }, []);
 
-  // 2. Carrega cursos quando a instituição muda
+  // 2. Carrega cursos quando a instituição muda e limpa curso_id/turma_id
   useEffect(() => {
     if (!instituicaoId) return;
     setLoadingCursos(true);
     setCursos([]);
     setTurmas([]);
-    setForm(f => ({ ...f, curso_id: '', curso_interesse: '', turma_id: '', valor_mensalidade: '' }));
+    setForm(f => ({ ...f, curso_id: '', curso_interesse: '', turma_id: '', valor_mensalidade: '', valor_inscricao: '' }));
     fetch(`/api/comercial/cursos?instituicao_id=${instituicaoId}`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : [])
       .then(data => setCursos(Array.isArray(data) ? data : []))
@@ -139,7 +139,7 @@ export default function NovoLead() {
       .finally(() => setLoadingCursos(false));
   }, [instituicaoId]);
 
-  // 3. Carrega turmas e valores quando o curso muda
+  // 3. Carrega turmas e valores quando o curso muda e limpa turma_id
   useEffect(() => {
     if (!form.curso_id) {
       setTurmas([]);
@@ -359,8 +359,8 @@ export default function NovoLead() {
                 <select
                   value={instituicaoId}
                   onChange={e => setInstituicaoId(e.target.value)}
-                  disabled={instituicoes.length <= 1}
-                  className={`${inputBase} ${instituicoes.length <= 1 ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
+                  className={inputBase}
+                  required
                 >
                   {instituicoes.length === 0 && (
                     <option value="">Carregando...</option>
