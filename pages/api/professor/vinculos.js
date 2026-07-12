@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { requireAuth, resolveInstituicaoId } from '../../lib/auth-server';
+import { requireAuth, resolveInstituicaoId } from '../../../lib/auth-server';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
