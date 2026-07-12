@@ -4,6 +4,12 @@ import DashboardLayout from '../../../components/DashboardLayout';
 import RichTextEditor from '../../../components/RichTextEditor';
 import ConfirmModal from '../../../components/ConfirmModal';
 
+const UF_OPTIONS = [
+  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
+  'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
+  'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
+];
+
 const CONTRATO_PLACEHOLDERS = [
   '{{ALUNO_NOME}}',
   '{{ALUNO_CPF}}',
@@ -82,6 +88,12 @@ export default function ConfiguracaoEmpresa() {
     biografia: '',
     ddd: '',
     exibirWhatsappAluno: false,
+    inscricaoEstadual: '',
+    slogan: '',
+    whatsapp: '',
+    numero: '',
+    complemento: '',
+    bairro: '',
     contatoWhatsapp: '',
     pedagogico: {
       coordenador: '',
@@ -693,6 +705,28 @@ export default function ConfiguracaoEmpresa() {
     }, 0);
   };
 
+  const handleCepChange = async (e) => {
+    const val = e.target.value.replace(/\D/g, '').slice(0, 8);
+    setFormData(prev => ({ ...prev, cep: val }));
+    if (val.length === 8) {
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${val}/json/`);
+        const d = await res.json();
+        if (!d.erro) {
+          setFormData(prev => ({
+            ...prev,
+            endereco: d.logradouro || '',
+            bairro: d.bairro || '',
+            cidade: d.localidade || '',
+            estado: d.uf || ''
+          }));
+        }
+      } catch (err) {
+        console.error('Erro ao buscar CEP:', err);
+      }
+    }
+  };
+
   const handleChange = (e, section = null) => {
     const { name, value } = e.target;
     if (section) {
@@ -740,7 +774,7 @@ export default function ConfiguracaoEmpresa() {
   };
 
   const abas = [
-    { id: 'informacoes', nome: 'Informações', icon: '📋' },
+    { id: 'informacoes', nome: 'Geral', icon: '📋' },
     { id: 'pedagogico', nome: 'Pedagógico', icon: '📚' },
     { id: 'financeiro', nome: 'Financeiro', icon: '💰' },
     { id: 'biblioteca', nome: 'Biblioteca', icon: '📖' },
@@ -774,73 +808,92 @@ export default function ConfiguracaoEmpresa() {
             </div>
           </div>
 
-          {/* Conteúdo das Abas */}
           <div className="bg-white rounded-b-lg shadow-md p-4 md:p-6 space-y-6">
-            {/* ABA: INFORMAÇÕES */}
             {activeTab === 'informacoes' && (
-              <>
-                <h3 className="text-sm font-bold text-teal-600">📋 Informações Básicas</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-medium text-teal-600 mb-1 block">NOME DA EMPRESA *</label>
-                    <input
-                      type="text"
-                      name="nomeEmpresa"
-                      value={formData.nomeEmpresa}
-                      onChange={handleChange}
-                      required
-                      className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-teal-600 mb-1 block">RAZÃO SOCIAL *</label>
-                    <input
-                      type="text"
-                      name="razaoSocial"
-                      value={formData.razaoSocial}
-                      onChange={handleChange}
-                      required
-                      className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-teal-600 mb-1 block">CNPJ *</label>
-                    <input
-                      type="text"
-                      name="cnpj"
-                      value={formData.cnpj}
-                      onChange={handleChange}
-                      placeholder="00.000.000/0000-00"
-                      required
-                      className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-teal-600 mb-1 block">WEBSITE</label>
-                    <input
-                      type="url"
-                      name="website"
-                      value={formData.website}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-gray-200">
-                  <h3 className="text-sm font-bold text-teal-600 mb-4">🏷️ Logo</h3>
-
+              <div className="space-y-6">
+                {/* 1. Identificação */}
+                <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-xs space-y-4">
+                  <h3 className="text-sm font-bold text-teal-600 flex items-center gap-2 pb-2 border-b">
+                    <span>🆔</span> 1. Identificação
+                  </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="text-xs font-medium text-teal-600 mb-1 block">LOGO</label>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">NOME FANTASIA *</label>
+                      <input
+                        type="text"
+                        name="nomeEmpresa"
+                        value={formData.nomeEmpresa || ''}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">RAZÃO SOCIAL *</label>
+                      <input
+                        type="text"
+                        name="razaoSocial"
+                        value={formData.razaoSocial || ''}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">CNPJ *</label>
+                      <input
+                        type="text"
+                        name="cnpj"
+                        value={formData.cnpj || ''}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">INSCRIÇÃO ESTADUAL</label>
+                      <input
+                        type="text"
+                        name="inscricaoEstadual"
+                        value={formData.inscricaoEstadual || ''}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">WEBSITE</label>
+                      <input
+                        type="url"
+                        name="website"
+                        value={formData.website || ''}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">SLOGAN</label>
+                      <input
+                        type="text"
+                        name="slogan"
+                        value={formData.slogan || ''}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-105">
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">LOGO INSTITUCIONAL</label>
                       <input
                         type="file"
                         accept="image/*"
-                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none bg-teal-50/20"
                         onChange={e => {
                           const file = e.target.files?.[0];
                           if (!file) return;
@@ -852,8 +905,8 @@ export default function ConfiguracaoEmpresa() {
                     </div>
 
                     <div>
-                      <label className="text-xs font-medium text-teal-600 mb-1 block">PRÉ-VISUALIZAÇÃO</label>
-                      <div className="w-full h-20 border border-teal-300 rounded-lg bg-teal-50 flex items-center justify-center overflow-hidden">
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">PRÉ-VISUALIZAÇÃO DA LOGO</label>
+                      <div className="w-full h-20 border border-teal-200 rounded-lg bg-teal-50/10 flex items-center justify-center overflow-hidden">
                         {formData.logo ? (
                           <img src={formData.logo} alt="Logo" className="max-h-full max-w-full object-contain" />
                         ) : (
@@ -864,136 +917,164 @@ export default function ConfiguracaoEmpresa() {
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-gray-200">
-                  <h3 className="text-sm font-bold text-teal-600 mb-4">📞 Contato</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 2. Contato */}
+                <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-xs space-y-4">
+                  <h3 className="text-sm font-bold text-teal-600 flex items-center gap-2 pb-2 border-b">
+                    <span>📞</span> 2. Contato
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="text-xs font-medium text-teal-600 mb-1 block">EMAIL *</label>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">EMAIL INSTITUCIONAL *</label>
                       <input
                         type="email"
                         name="email"
-                        value={formData.email}
+                        value={formData.email || ''}
                         onChange={handleChange}
                         required
-                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
                       />
                     </div>
 
                     <div>
-                      <label className="text-xs font-medium text-teal-600 mb-1 block">TELEFONE *</label>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">TELEFONE *</label>
                       <input
                         type="tel"
                         name="telefone"
-                        value={formData.telefone}
+                        value={formData.telefone || ''}
                         onChange={handleChange}
-                        placeholder="(00) 00000-0000"
                         required
-                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">WHATSAPP</label>
+                      <input
+                        type="tel"
+                        name="whatsapp"
+                        value={formData.whatsapp || ''}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
                       />
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-gray-200">
-                  <h3 className="text-sm font-bold text-teal-600 mb-4">📍 Endereço</h3>
-                  
-                  <div>
-                    <label className="text-xs font-medium text-teal-600 mb-1 block">ENDEREÇO COMPLETO *</label>
-                    <input
-                      type="text"
-                      name="endereco"
-                      value={formData.endereco}
-                      onChange={handleChange}
-                      required
-                      className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50 mb-4"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* 3. Endereço */}
+                <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-xs space-y-4">
+                  <h3 className="text-sm font-bold text-teal-600 flex items-center gap-2 pb-2 border-b">
+                    <span>📍</span> 3. Endereço
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
-                      <label className="text-xs font-medium text-teal-600 mb-1 block">CIDADE *</label>
-                      <input
-                        type="text"
-                        name="cidade"
-                        value={formData.cidade}
-                        onChange={handleChange}
-                        required
-                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-medium text-teal-600 mb-1 block">ESTADO *</label>
-                      <select
-                        name="estado"
-                        value={formData.estado}
-                        onChange={handleChange}
-                        required
-                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                      >
-                        <option value="">- ESCOLHA -</option>
-                        <option value="AC">AC</option>
-                        <option value="AL">AL</option>
-                        <option value="AP">AP</option>
-                        <option value="AM">AM</option>
-                        <option value="BA">BA</option>
-                        <option value="CE">CE</option>
-                        <option value="DF">DF</option>
-                        <option value="ES">ES</option>
-                        <option value="GO">GO</option>
-                        <option value="MA">MA</option>
-                        <option value="MT">MT</option>
-                        <option value="MS">MS</option>
-                        <option value="MG">MG</option>
-                        <option value="PA">PA</option>
-                        <option value="PB">PB</option>
-                        <option value="PR">PR</option>
-                        <option value="PE">PE</option>
-                        <option value="PI">PI</option>
-                        <option value="RJ">RJ</option>
-                        <option value="RN">RN</option>
-                        <option value="RS">RS</option>
-                        <option value="RO">RO</option>
-                        <option value="RR">RR</option>
-                        <option value="SC">SC</option>
-                        <option value="SP">SP</option>
-                        <option value="SE">SE</option>
-                        <option value="TO">TO</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-medium text-teal-600 mb-1 block">CEP *</label>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">CEP *</label>
                       <input
                         type="text"
                         name="cep"
-                        value={formData.cep}
-                        onChange={handleChange}
+                        value={formData.cep || ''}
+                        onChange={handleCepChange}
                         placeholder="00000-000"
                         required
-                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
                       />
+                    </div>
+
+                    <div className="md:col-span-3">
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">LOGRADOURO *</label>
+                      <input
+                        type="text"
+                        name="endereco"
+                        value={formData.endereco || ''}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">NÚMERO *</label>
+                      <input
+                        type="text"
+                        name="numero"
+                        value={formData.numero || ''}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">COMPLEMENTO</label>
+                      <input
+                        type="text"
+                        name="complemento"
+                        value={formData.complemento || ''}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">BAIRRO *</label>
+                      <input
+                        type="text"
+                        name="bairro"
+                        value={formData.bairro || ''}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">CIDADE *</label>
+                      <input
+                        type="text"
+                        name="cidade"
+                        value={formData.cidade || ''}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-gray-500 mb-1 block">ESTADO *</label>
+                      <select
+                        name="estado"
+                        value={formData.estado || ''}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                      >
+                        <option value="">- ESCOLHA -</option>
+                        {UF_OPTIONS.map(uf => (
+                          <option key={uf} value={uf}>{uf}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-gray-200">
-                  <h3 className="text-sm font-bold text-teal-600 mb-4">📱 Página Inicial do Portal do Aluno</h3>
+                {/* Outras Configurações Originais */}
+                <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-xs space-y-4">
+                  <h3 className="text-sm font-bold text-teal-600 flex items-center gap-2 pb-2 border-b">
+                    <span>📱</span> Página Inicial do Portal do Aluno
+                  </h3>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="text-xs font-medium text-teal-600 mb-1 block">NOME DA EMPRESA</label>
+                      <label className="text-xs font-medium text-teal-650 mb-1 block">NOME DA EMPRESA</label>
                       <input
                         type="text"
-                        value={formData.nomeEmpresa}
+                        value={formData.nomeEmpresa || ''}
                         disabled
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-100 text-gray-500"
                       />
                     </div>
 
                     <div>
-                      <label className="text-xs font-medium text-teal-600 mb-1 block">FACULDADE</label>
+                      <label className="text-xs font-medium text-teal-650 mb-1 block">FACULDADE</label>
                       <input
                         type="text"
                         name="faculdade"
@@ -1005,11 +1086,12 @@ export default function ConfiguracaoEmpresa() {
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-gray-200">
-                  <h3 className="text-sm font-bold text-teal-600 mb-4">✍️ Biografia</h3>
+                <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-xs space-y-4">
+                  <h3 className="text-sm font-bold text-teal-600 flex items-center gap-2 pb-2 border-b">
+                    <span>✍️</span> Biografia
+                  </h3>
                   
                   <div className="border border-teal-300 rounded-lg overflow-hidden">
-                    {/* Barra de Formatação */}
                     <div className="bg-blue-50 border-b border-teal-300 p-2 flex flex-wrap gap-1">
                       <button
                         type="button"
@@ -1019,7 +1101,6 @@ export default function ConfiguracaoEmpresa() {
                       >
                         B
                       </button>
-                      
                       <button
                         type="button"
                         onClick={() => aplicarFormatacao('italico')}
@@ -1028,7 +1109,6 @@ export default function ConfiguracaoEmpresa() {
                       >
                         I
                       </button>
-                      
                       <button
                         type="button"
                         onClick={() => aplicarFormatacao('sublinhado')}
@@ -1037,9 +1117,7 @@ export default function ConfiguracaoEmpresa() {
                       >
                         U
                       </button>
-
                       <div className="border-l border-gray-300 mx-1"></div>
-
                       <button
                         type="button"
                         onClick={() => aplicarFormatacao('listaOrderada')}
@@ -1048,7 +1126,6 @@ export default function ConfiguracaoEmpresa() {
                       >
                         1️⃣
                       </button>
-
                       <button
                         type="button"
                         onClick={() => aplicarFormatacao('listaNaoOrdenada')}
@@ -1057,9 +1134,7 @@ export default function ConfiguracaoEmpresa() {
                       >
                         • 
                       </button>
-
                       <div className="border-l border-gray-300 mx-1"></div>
-
                       <button
                         type="button"
                         onClick={() => aplicarFormatacao('h1')}
@@ -1068,7 +1143,6 @@ export default function ConfiguracaoEmpresa() {
                       >
                         H1
                       </button>
-
                       <button
                         type="button"
                         onClick={() => aplicarFormatacao('h2')}
@@ -1077,7 +1151,6 @@ export default function ConfiguracaoEmpresa() {
                       >
                         H2
                       </button>
-
                       <button
                         type="button"
                         onClick={() => aplicarFormatacao('h3')}
@@ -1086,9 +1159,7 @@ export default function ConfiguracaoEmpresa() {
                       >
                         H3
                       </button>
-
                       <div className="border-l border-gray-300 mx-1"></div>
-
                       <button
                         type="button"
                         onClick={() => aplicarFormatacao('alinhadorAesquerda')}
@@ -1097,7 +1168,6 @@ export default function ConfiguracaoEmpresa() {
                       >
                         ⬅️
                       </button>
-
                       <button
                         type="button"
                         onClick={() => aplicarFormatacao('alinhadoCentro')}
@@ -1106,7 +1176,6 @@ export default function ConfiguracaoEmpresa() {
                       >
                         ⬍
                       </button>
-
                       <button
                         type="button"
                         onClick={() => aplicarFormatacao('alinhadorAdireita')}
@@ -1115,20 +1184,16 @@ export default function ConfiguracaoEmpresa() {
                       >
                         ➡️
                       </button>
-
                       <div className="border-l border-gray-300 mx-1"></div>
-
                       <button
                         type="button"
                         onClick={() => aplicarFormatacao('limpar')}
-                        className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-red-100 text-sm text-red-600"
+                        className="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-red-100 text-sm text-red-650"
                         title="Limpar Formatação"
                       >
                         ✖️
                       </button>
                     </div>
-
-                    {/* Textarea */}
                     <textarea
                       id="biografia-editor"
                       name="biografia"
@@ -1139,19 +1204,16 @@ export default function ConfiguracaoEmpresa() {
                       className="w-full px-3 py-2 text-sm border-0 focus:outline-none bg-teal-50 resize-none font-family-mono"
                     />
                   </div>
-
-                  <div className="text-xs text-gray-500 mt-2 flex gap-2">
-                    <span>ℹ️</span>
-                    <span>Use a barra de formatação acima para estilizar o texto. A formatação será exibida corretamente no portal do aluno.</span>
-                  </div>
                 </div>
 
-                <div className="pt-4 border-t border-gray-200">
-                  <h3 className="text-sm font-bold text-teal-600 mb-4">📞 WhatsApp</h3>
+                <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-xs space-y-4">
+                  <h3 className="text-sm font-bold text-teal-600 flex items-center gap-2 pb-2 border-b">
+                    <span>💬</span> WhatsApp Integrado
+                  </h3>
                   
                   <div className="space-y-3">
                     <div>
-                      <label className="text-xs font-medium text-teal-600 mb-1 block">DDD</label>
+                      <label className="text-xs font-medium text-teal-650 mb-1 block">DDD</label>
                       <input
                         type="text"
                         name="ddd"
@@ -1161,9 +1223,6 @@ export default function ConfiguracaoEmpresa() {
                         maxLength="2"
                         className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                       />
-                      <div className="text-xs text-gray-500 mt-1">
-                        ℹ️ Informe o número com o DDD. Ex: (83) 99688-2222 ou 83996882222
-                      </div>
                     </div>
 
                     <div className="flex items-center gap-4 pt-2">
@@ -1183,7 +1242,7 @@ export default function ConfiguracaoEmpresa() {
 
                     {formData.exibirWhatsappAluno && (
                       <div>
-                        <label className="text-xs font-medium text-teal-600 mb-1 block">CONTATO WHATSAPP PARA ALUNO</label>
+                        <label className="text-xs font-medium text-teal-650 mb-1 block">CONTATO WHATSAPP PARA ALUNO</label>
                         <input
                           type="tel"
                           name="contatoWhatsapp"
@@ -1196,7 +1255,7 @@ export default function ConfiguracaoEmpresa() {
                     )}
                   </div>
                 </div>
-              </>
+              </div>
             )}
 
             {/* ABA: PEDAGÓGICO */}
