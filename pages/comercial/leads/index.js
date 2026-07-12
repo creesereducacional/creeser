@@ -1,452 +1,411 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import ComercialLayout from '@/components/ComercialLayout';
-import PageHeader from '@/components/ui/PageHeader';
-import EmptyState   from '@/components/ui/EmptyState';
-import { SkeletonTable } from '@/components/ui/LoadingSkeleton';
+import { PageHeader, SkeletonCard } from '@/components/ui';
 
-const STATUS_OPCOES = ['', 'novo', 'contatado', 'interessado', 'pre_matricula', 'matriculado', 'desistente'];
+const KANBAN_COLUMNS = [
+  { status: 'novo',                 label: 'Novo Lead',            color: 'border-blue-400 bg-blue-50/20' },
+  { status: 'contatado',            label: 'Primeiro Contato',     color: 'border-yellow-400 bg-yellow-50/20' },
+  { status: 'interessado',          label: 'Em Negociação',        color: 'border-orange-400 bg-orange-50/20' },
+  { status: 'proposta_enviada',     label: 'Proposta Enviada',     color: 'border-indigo-400 bg-indigo-50/20' },
+  { status: 'aguardando_pagamento', label: 'Aguardando Pagamento', color: 'border-purple-400 bg-purple-50/20' },
+  { status: 'pago',                 label: 'Pago',                 color: 'border-emerald-400 bg-emerald-50/20' },
+  { status: 'matriculado',          label: 'Matriculado',          color: 'border-teal-500 bg-teal-50/20' },
+  { status: 'perdido',              label: 'Perdido',              color: 'border-red-400 bg-red-50/20' }
+];
 
-const BADGES = {
-  novo:          'bg-blue-100 text-blue-700',
-  contatado:     'bg-yellow-100 text-yellow-700',
-  interessado:   'bg-orange-100 text-orange-700',
-  pre_matricula: 'bg-purple-100 text-purple-700',
-  matriculado:   'bg-green-100 text-green-700',
-  desistente:    'bg-red-100 text-red-700',
-  perdido:       'bg-red-100 text-red-700',
-};
+const fmtMoeda = (v) =>
+  v != null ? Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—';
 
-const LABELS_STATUS = {
-  novo:          'Novo',
-  contatado:     'Contatado',
-  interessado:   'Interessado',
-  pre_matricula: 'Pré-Matrícula',
-  matriculado:   'Matriculado',
-  desistente:    'Desistente',
-  perdido:       'Perdido',
-};
-
-// Statuses que o operador/master pode definir manualmente
-const STATUS_MANUAIS = ['novo', 'contatado', 'interessado', 'pre_matricula', 'desistente'];
-
-function limparNumero(n) {
-  return (n || '').replace(/\D/g, '');
-}
-
-function gerarLinkWhatsApp(lead) {
-  let numero = limparNumero(lead.whatsapp) || limparNumero(lead.telefone);
-  if (!numero) return null;
-  // Adiciona código do país se necessário (<=11 dígitos = sem DDI)
-  if (numero.length <= 11) numero = '55' + numero;
-  const curso = lead.curso_interesse
-    ? `no curso ${lead.curso_interesse}`
-    : 'em nossos cursos';
-  const msg = encodeURIComponent(
-    `Olá, ${lead.nome}! Tudo bem? Aqui é da equipe comercial do Grupo Creeser Educacional. Vi seu interesse ${curso}. Posso te passar mais informações e ajudar com sua pré-matrícula?`
-  );
-  return `https://wa.me/${numero}?text=${msg}`;
-}
-
-export default function MeusLeads() {
+export default function LeadsKanban() {
   const [leads, setLeads] = useState([]);
   const [carregando, setCarregando] = useState(true);
-  const [filtroStatus, setFiltroStatus] = useState('');
+  const [draggedLead, setDraggedLead] = useState(null);
+
+  // Filtros
   const [busca, setBusca] = useState('');
+  const [filtroInst, setFiltroInst] = useState('');
+  const [filtroCaptador, setFiltroCaptador] = useState('');
+  const [filtroCurso, setFiltroCurso] = useState('');
+  const [filtroOrigem, setFiltroOrigem] = useState('');
+  const [filtroPrioridade, setFiltroPrioridade] = useState('');
 
-  // Modal: Alterar Status
-  const [modalStatus, setModalStatus] = useState(null);
-  const [novoStatus, setNovoStatus] = useState('');
-  const [salvandoStatus, setSalvandoStatus] = useState(false);
-  const [erroStatus, setErroStatus] = useState('');
+  // Listas de apoio
+  const [instituicoes, setInstituicoes] = useState([]);
+  const [captadores, setCaptadores] = useState([]);
+  const [cursos, setCursos] = useState([]);
 
-  // Modal: Desativar
-  const [modalDesativar, setModalDesativar] = useState(null);
-  const [desativando, setDesativando] = useState(false);
+  // Carregar dados iniciais e opções de filtros
+  useEffect(() => {
+    fetch('/api/comercial/instituicoes', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setInstituicoes(d))
+      .catch(() => {});
 
-  const carregar = useCallback(() => {
+    fetch('/api/comercial/equipe', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setCaptadores(d))
+      .catch(() => {});
+
+    fetch('/api/comercial/cursos', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setCursos(d))
+      .catch(() => {});
+  }, []);
+
+  const carregarLeads = useCallback(() => {
     setCarregando(true);
-    const qs = filtroStatus ? `?status=${filtroStatus}` : '';
-    fetch(`/api/comercial/leads${qs}`, { credentials: 'include' })
-      .then(r => r.json())
-      .then(data => setLeads(Array.isArray(data) ? data : []))
+    fetch('/api/comercial/leads', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setLeads(Array.isArray(d) ? d : []))
       .finally(() => setCarregando(false));
-  }, [filtroStatus]);
+  }, []);
 
-  useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => {
+    carregarLeads();
+  }, [carregarLeads]);
 
-  const leadsFiltrados = leads.filter(l =>
-    !busca || l.nome.toLowerCase().includes(busca.toLowerCase()) ||
-    (l.telefone || '').includes(busca) || (l.whatsapp || '').includes(busca)
-  );
+  // Lógica de drag & drop nativo HTML5
+  const handleDragStart = (e, lead) => {
+    setDraggedLead(lead);
+    e.dataTransfer.effectAllowed = 'move';
+  };
 
-  function abrirModalStatus(lead) {
-    setNovoStatus(STATUS_MANUAIS.includes(lead.status) ? lead.status : 'novo');
-    setErroStatus('');
-    setModalStatus(lead);
-  }
+  const handleDrop = async (e, targetStatus) => {
+    e.preventDefault();
+    if (!draggedLead || draggedLead.status === targetStatus) return;
 
-  async function salvarStatus() {
-    if (!modalStatus || novoStatus === 'matriculado') return;
-    setSalvandoStatus(true);
-    setErroStatus('');
-    try {
-      const res = await fetch(`/api/comercial/leads/${modalStatus.id}`, {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: novoStatus }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setErroStatus(data.error || 'Erro ao alterar status.'); return; }
-      setLeads(prev => prev.map(l => l.id === modalStatus.id ? { ...l, status: novoStatus } : l));
-      setModalStatus(null);
-    } catch {
-      setErroStatus('Erro de conexão.');
-    } finally {
-      setSalvandoStatus(false);
-    }
-  }
-
-  async function confirmarDesativar() {
-    if (!modalDesativar) return;
-    setDesativando(true);
-    try {
-      const res = await fetch(`/api/comercial/leads/${modalDesativar.id}`, {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'desistente' }),
-      });
-      if (res.ok) {
-        setLeads(prev => prev.map(l => l.id === modalDesativar.id ? { ...l, status: 'desistente' } : l));
-      }
-      setModalDesativar(null);
-    } catch { /* ignore */ } finally {
-      setDesativando(false);
-    }
-  }
-
-  function abrirWhatsApp(lead) {
-    const link = gerarLinkWhatsApp(lead);
-    if (!link) {
-      alert('Este lead não possui número de telefone ou WhatsApp cadastrado.');
+    if (targetStatus === 'matriculado') {
+      alert('O status "Matriculado" é definido automaticamente através do fluxo financeiro/acadêmico de conversão.');
+      setDraggedLead(null);
       return;
     }
-    window.open(link, '_blank', 'noopener,noreferrer');
-  }
+
+    const originalStatus = draggedLead.status;
+    // Otimista
+    setLeads(prev => prev.map(l => l.id === draggedLead.id ? { ...l, status: targetStatus } : l));
+
+    try {
+      const res = await fetch(`/api/comercial/leads/${draggedLead.id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: targetStatus })
+      });
+
+      if (!res.ok) {
+        throw new Error('Falha ao atualizar status do lead.');
+      }
+
+      // Adicionar log automático na timeline
+      await fetch(`/api/comercial/leads/${draggedLead.id}/interacoes`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipo: 'atualizacao',
+          titulo: 'Status Alterado',
+          descricao: `Etapa comercial alterada via painel Kanban de "${originalStatus.replace('_', ' ')}" para "${targetStatus.replace('_', ' ')}"`
+        })
+      });
+
+    } catch (err) {
+      alert(err.message);
+      // Reverter
+      setLeads(prev => prev.map(l => l.id === draggedLead.id ? { ...l, status: originalStatus } : l));
+    } finally {
+      setDraggedLead(null);
+    }
+  };
+
+  // Filtragem dos Leads
+  const leadsFiltrados = leads.filter(l => {
+    // Busca por Nome, Email, Telefone, WhatsApp ou CPF (extraído de observações caso presente)
+    const matchBusca = !busca || 
+      l.nome?.toLowerCase().includes(busca.toLowerCase()) ||
+      (l.telefone || '').includes(busca) || 
+      (l.whatsapp || '').includes(busca) ||
+      (l.email || '').toLowerCase().includes(busca.toLowerCase()) ||
+      (l.observacoes || '').includes(busca);
+
+    const matchInst = !filtroInst || String(l.instituicao_id) === String(filtroInst);
+    const matchCaptador = !filtroCaptador || String(l.captado_por_id) === String(filtroCaptador);
+    const matchCurso = !filtroCurso || String(l.cursoid) === String(filtroCurso) || l.curso_interesse === filtroCurso;
+    const matchOrigem = !filtroOrigem || l.origem === filtroOrigem;
+    const matchPrioridade = !filtroPrioridade || l.prioridade_followup === filtroPrioridade;
+
+    return matchBusca && matchInst && matchCaptador && matchCurso && matchOrigem && matchPrioridade;
+  });
+
+  const getCardPrioridadeClass = (p) => {
+    switch (p) {
+      case 'alta': return 'border-l-4 border-orange-500';
+      case 'urgente': return 'border-l-4 border-red-500 shadow-red-50/50 shadow-sm animate-pulse';
+      case 'baixa': return 'border-l-4 border-green-500';
+      default: return 'border-l-4 border-yellow-500'; // Média/Padrão
+    }
+  };
+
+  const getPrioridadeEmoji = (p) => {
+    switch (p) {
+      case 'alta': return '🟠';
+      case 'urgente': return '🔴';
+      case 'baixa': return '🟢';
+      default: return '🟡';
+    }
+  };
 
   return (
-    <ComercialLayout titulo="Meus Leads">
-      <PageHeader
-        icon="🎯"
-        title="Meus Leads"
-        subtitle={`${leadsFiltrados.length} lead${leadsFiltrados.length !== 1 ? 's' : ''} encontrado${leadsFiltrados.length !== 1 ? 's' : ''}`}
-        actions={
-          <Link href="/comercial/leads/novo">
-            <button className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-xl transition-colors">
-              + Novo Lead
-            </button>
-          </Link>
-        }
-      />
+    <ComercialLayout titulo="Painel Kanban Comercial">
+      <div className="space-y-6 max-w-full">
 
-      {/* Filtros */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <div className="relative flex-1">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
-          <input
-            type="text"
-            placeholder="Buscar por nome ou telefone..."
-            value={busca}
-            onChange={e => setBusca(e.target.value)}
-            className="w-full pl-9 pr-4 border border-gray-300 rounded-xl py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
-          />
-        </div>
-        <select
-          value={filtroStatus}
-          onChange={e => setFiltroStatus(e.target.value)}
-          className="border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
-        >
-          <option value="">Todos os status</option>
-          <option value="novo">Novo</option>
-          <option value="contatado">Contatado</option>
-          <option value="interessado">Interessado</option>
-          <option value="pre_matricula">Pré-Matrícula</option>
-          <option value="matriculado">Matriculado</option>
-          <option value="desistente">Desistente</option>
-        </select>
-      </div>
-
-      {/* Lista de leads */}
-      {carregando ? (
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <SkeletonTable rows={6} cols={5} />
-        </div>
-      ) : leadsFiltrados.length === 0 ? (
-        <EmptyState
+        {/* Cabeçalho */}
+        <PageHeader
           icon="🎯"
-          title={leads.length === 0 ? 'Nenhum lead cadastrado' : 'Nenhum resultado encontrado'}
-          description={leads.length === 0 ? 'Adicione seu primeiro lead para começar a trabalhar o funil.' : 'Ajuste os filtros para ver mais leads.'}
-          action={leads.length === 0 ? { label: '+ Novo Lead', href: '/comercial/leads/novo', variant: 'primary' } : undefined}
+          title="Funil de Vendas (Kanban)"
+          subtitle="Visualize e organize a jornada comercial dos leads com fluxo drag & drop"
+          actions={
+            <div className="flex gap-2">
+              <button
+                onClick={carregarLeads}
+                className="px-4 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-xl transition"
+              >
+                🔄 Atualizar
+              </button>
+              <Link href="/comercial/leads/novo">
+                <button className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-xl transition shadow-sm">
+                  + Novo Lead
+                </button>
+              </Link>
+            </div>
+          }
         />
-      ) : (
-        <>
-          {/* Cards — mobile/tablet (<lg) */}
-          <div className="lg:hidden space-y-3">
-            {leadsFiltrados.map(lead => (
-              <div key={lead.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-9 h-9 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold text-sm flex-shrink-0">
-                      {(lead.nome || '?')[0].toUpperCase()}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-gray-800 truncate" title={lead.nome}>{lead.nome}</p>
-                      <p className="text-xs text-gray-400 truncate">{lead.whatsapp || lead.telefone || lead.email || '—'}</p>
-                    </div>
-                  </div>
-                  <span className={`flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${
-                    {
-                      novo:          'bg-blue-50 text-blue-700 border-blue-200',
-                      contatado:     'bg-yellow-50 text-yellow-700 border-yellow-200',
-                      interessado:   'bg-orange-50 text-orange-700 border-orange-200',
-                      pre_matricula: 'bg-purple-50 text-purple-700 border-purple-200',
-                      matriculado:   'bg-green-50 text-green-700 border-green-200',
-                      desistente:    'bg-red-50 text-red-600 border-red-200',
-                    }[lead.status] || 'bg-gray-50 text-gray-600 border-gray-200'
-                  }`}>
-                    <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
-                    {LABELS_STATUS[lead.status] || lead.status}
-                  </span>
-                </div>
-                {lead.curso_interesse && (
-                  <p className="text-xs text-gray-500 mb-1">📚 {lead.curso_interesse}</p>
-                )}
-                {lead.proximo_contato && (
-                  <div className="mt-1 mb-2 bg-gray-50 border rounded-lg p-2 flex items-center justify-between text-xs">
-                    <span className={lead.dias_em_atraso > 0 ? 'text-red-650 font-bold' : 'text-gray-600'}>
-                      📅 Seg: {new Date(lead.proximo_contato).toLocaleDateString('pt-BR')}
-                    </span>
-                    <span className="text-[10px] font-bold uppercase">{lead.prioridade_followup}</span>
-                  </div>
-                )}
-                <div className="flex items-center gap-2 border-t border-gray-100 pt-3">
-                  <Link href={`/comercial/leads/${lead.id}`}
-                    className="flex-1 text-center px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-lg text-xs font-semibold transition-colors">
-                    👁 Detalhes
-                  </Link>
-                  <button onClick={() => abrirModalStatus(lead)}
-                    className="flex-1 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold transition-colors">
-                    ✏️ Status
-                  </button>
-                  <button onClick={() => abrirWhatsApp(lead)}
-                    className="flex-1 px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg text-xs font-semibold transition-colors">
-                    💬 WhatsApp
-                  </button>
-                  {lead.status !== 'desistente' && (
-                    <button onClick={() => setModalDesativar(lead)}
-                      className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg text-xs font-semibold transition-colors">
-                      ✕
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
 
-          {/* Tabela — desktop (>=lg) */}
-          <div className="hidden lg:block bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[700px]">
-                <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-                  <tr>
-                    <th className="px-4 py-3 text-left">Lead</th>
-                    <th className="px-4 py-3 text-left">Contato</th>
-                    <th className="px-4 py-3 text-left">Curso</th>
-                    <th className="px-4 py-3 text-left">Status</th>
-                    <th className="px-4 py-3 text-left">Follow-up</th>
-                    <th className="px-4 py-3 text-left">Data</th>
-                    {leadsFiltrados.some(l => l.captado_por) && <th className="px-4 py-3 text-left">Operador</th>}
-                    <th className="px-4 py-3 text-left">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {leadsFiltrados.map(lead => (
-                    <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold text-xs flex-shrink-0">
-                            {(lead.nome || '?')[0].toUpperCase()}
-                          </div>
-                          <span className="font-medium text-gray-800" title={lead.nome}>{lead.nome}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-gray-500">
-                        {lead.whatsapp || lead.telefone || lead.email || '—'}
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 max-w-[140px] truncate" title={lead.curso_interesse}>{lead.curso_interesse || '—'}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${
-                          {
-                            novo:          'bg-blue-50 text-blue-700 border-blue-200',
-                            contatado:     'bg-yellow-50 text-yellow-700 border-yellow-200',
-                            interessado:   'bg-orange-50 text-orange-700 border-orange-200',
-                            pre_matricula: 'bg-purple-50 text-purple-700 border-purple-200',
-                            matriculado:   'bg-green-50 text-green-700 border-green-200',
-                            desistente:    'bg-red-50 text-red-600 border-red-200',
-                            perdido:       'bg-red-50 text-red-600 border-red-200',
-                          }[lead.status] || 'bg-gray-50 text-gray-600 border-gray-200'
-                        }`}>
-                          <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
-                          {LABELS_STATUS[lead.status] || lead.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {lead.proximo_contato ? (
-                          <div className="space-y-0.5">
-                            <span className={`text-xs font-bold block ${lead.dias_em_atraso > 0 ? 'text-red-650' : 'text-gray-700'}`}>
-                              📅 {new Date(lead.proximo_contato).toLocaleDateString('pt-BR')} {new Date(lead.proximo_contato).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                            <div className="flex items-center gap-1.5">
-                              {lead.dias_em_atraso > 0 && (
-                                <span className="bg-red-100 text-red-800 text-[9px] font-extrabold px-1 rounded animate-pulse">
-                                  {lead.dias_em_atraso}d atraso
+        {/* Barra de Filtros Rápidos */}
+        <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-xs grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Pesquisa Instantânea</label>
+            <input
+              type="text"
+              placeholder="Buscar por nome, telefone, email..."
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Instituição</label>
+            <select
+              value={filtroInst}
+              onChange={e => setFiltroInst(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
+            >
+              <option value="">Todas</option>
+              {instituicoes.map(i => (
+                <option key={i.id} value={i.id}>{i.nome}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Captador</label>
+            <select
+              value={filtroCaptador}
+              onChange={e => setFiltroCaptador(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
+            >
+              <option value="">Todos</option>
+              {captadores.map(c => (
+                <option key={c.id} value={c.id}>{c.nomecompleto}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Curso</label>
+            <select
+              value={filtroCurso}
+              onChange={e => setFiltroCurso(e.target.value)}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
+            >
+              <option value="">Todos</option>
+              {cursos.map(c => (
+                <option key={c.id} value={c.id}>{c.nome}</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Origem</label>
+              <select
+                value={filtroOrigem}
+                onChange={e => setFiltroOrigem(e.target.value)}
+                className="w-full border rounded-lg px-2 py-2 text-xs focus:outline-none"
+              >
+                <option value="">Todas</option>
+                {['Site', 'Instagram', 'Facebook', 'Google', 'WhatsApp', 'Evento', 'Indicação', 'Outro'].map(o => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Prioridade</label>
+              <select
+                value={filtroPrioridade}
+                onChange={e => setFiltroPrioridade(e.target.value)}
+                className="w-full border rounded-lg px-2 py-2 text-xs focus:outline-none"
+              >
+                <option value="">Todas</option>
+                <option value="baixa">🟢 Baixa</option>
+                <option value="media">🟡 Média</option>
+                <option value="alta">🟠 Alta</option>
+                <option value="urgente">🔴 Urgente</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Kanban Board Container */}
+        {carregando ? (
+          <SkeletonCard count={3} cols="grid-cols-1 md:grid-cols-3" />
+        ) : (
+          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin select-none" style={{ height: 'calc(100vh - 280px)', minHeight: '500px' }}>
+            {KANBAN_COLUMNS.map(col => {
+              const colLeads = leadsFiltrados.filter(l => l.status === col.status);
+              
+              return (
+                <div
+                  key={col.status}
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={e => handleDrop(e, col.status)}
+                  className={`flex flex-col w-72 min-w-[288px] rounded-2xl border p-4 transition ${col.color}`}
+                >
+                  {/* Header da Coluna */}
+                  <div className="flex items-center justify-between mb-4 border-b pb-2">
+                    <span className="font-bold text-sm text-gray-800 tracking-wide uppercase truncate">{col.label}</span>
+                    <span className="bg-white border text-gray-500 font-extrabold text-xs px-2.5 py-0.5 rounded-full shadow-xs">
+                      {colLeads.length}
+                    </span>
+                  </div>
+
+                  {/* Lista de Cards */}
+                  <div className="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-thin">
+                    {colLeads.length === 0 ? (
+                      <div className="border-2 border-dashed border-gray-200 rounded-xl py-8 text-center text-xs text-gray-400">
+                        Solte cards aqui
+                      </div>
+                    ) : (
+                      colLeads.map(lead => {
+                        // Calcular dias sem contato
+                        const dataRef = lead.updated_at || lead.created_at;
+                        const diasSemContato = Math.floor((new Date() - new Date(dataRef)) / (1000 * 60 * 60 * 24));
+                        const semContatoCritico = diasSemContato > 7;
+
+                        // Parsear valor previsto
+                        let valorMensalidade = 0;
+                        let bolsaDesconto = '';
+                        let convenioDesc = '';
+                        try {
+                          const marker = '[FICHA_MATRICULA_COMERCIAL]';
+                          const idx = lead.observacoes?.indexOf(marker);
+                          if (idx !== -1 && idx !== undefined) {
+                            const parsed = JSON.parse(lead.observacoes.substring(idx + marker.length));
+                            if (parsed && parsed.financeiro) {
+                              valorMensalidade = parseFloat(parsed.financeiro.valor_mensalidade || 0);
+                              bolsaDesconto = parsed.financeiro.bolsa;
+                              convenioDesc = parsed.financeiro.convenio;
+                            }
+                          }
+                        } catch (_) {}
+
+                        return (
+                          <div
+                            key={lead.id}
+                            draggable
+                            onDragStart={e => handleDragStart(e, lead)}
+                            className={`bg-white rounded-xl border p-3.5 shadow-xs hover:shadow-md cursor-grab active:cursor-grabbing transition-all space-y-3 relative overflow-hidden ${getCardPrioridadeClass(lead.prioridade_followup)} ${
+                              semContatoCritico ? 'border-red-400 bg-red-50/10' : 'border-gray-150 bg-white'
+                            }`}
+                          >
+                            {/* Nome e Indicador Atraso */}
+                            <div>
+                              <div className="flex justify-between items-start gap-2">
+                                <span className="font-bold text-gray-800 text-xs block truncate max-w-[80%]" title={lead.nome}>
+                                  {lead.nome}
                                 </span>
-                              )}
-                              {lead.prioridade_followup && (
-                                <span className={`text-[9px] font-extrabold px-1 rounded uppercase ${
-                                  lead.prioridade_followup === 'alta' ? 'bg-red-50 text-red-700' :
-                                  lead.prioridade_followup === 'media' ? 'bg-yellow-50 text-yellow-700' : 'bg-gray-100 text-gray-600'
-                                }`}>
-                                  {lead.prioridade_followup}
+                                <span className="text-[10px]" title={`Prioridade: ${lead.prioridade_followup || 'média'}`}>
+                                  {getPrioridadeEmoji(lead.prioridade_followup)}
+                                </span>
+                              </div>
+                              {lead.curso_interesse && (
+                                <span className="text-[10px] font-medium text-gray-500 block truncate" title={lead.curso_interesse}>
+                                  📚 {lead.curso_interesse}
                                 </span>
                               )}
                             </div>
+
+                            {/* Detalhes Ficha */}
+                            <div className="text-[10px] text-gray-400 space-y-0.5 pt-1 border-t border-gray-100">
+                              {lead.origem && (
+                                <div><strong className="text-gray-500">Origem:</strong> {lead.origem}</div>
+                              )}
+                              {valorMensalidade > 0 && (
+                                <div>
+                                  <strong className="text-gray-500">Mensalidade Prevista:</strong>{' '}
+                                  <span className="font-bold text-gray-800">{fmtMoeda(valorMensalidade)}</span>
+                                </div>
+                              )}
+                              {lead.proximo_contato && (
+                                <div className={lead.dias_em_atraso > 0 ? 'text-red-650 font-bold' : ''}>
+                                  <strong className="text-gray-500">Follow-up:</strong> {new Date(lead.proximo_contato).toLocaleDateString('pt-BR')}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Tags */}
+                            <div className="flex flex-wrap gap-1">
+                              {lead.origem && (
+                                <span className="px-1.5 py-0.5 bg-gray-50 text-gray-500 text-[8px] font-bold uppercase rounded border">
+                                  {lead.origem}
+                                </span>
+                              )}
+                              {bolsaDesconto && (
+                                <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[8px] font-bold uppercase rounded border border-blue-200">
+                                  Bolsa: {bolsaDesconto}
+                                </span>
+                              )}
+                              {convenioDesc && (
+                                <span className="px-1.5 py-0.5 bg-purple-50 text-purple-700 text-[8px] font-bold uppercase rounded border border-purple-200">
+                                  Convênio: {convenioDesc}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Sem Contato Atraso */}
+                            {semContatoCritico && (
+                              <div className="flex items-center gap-1 bg-red-100/50 text-red-800 text-[8px] font-extrabold px-2 py-0.5 rounded-md animate-pulse">
+                                <span>⚠️</span> Sem contato há {diasSemContato} dias
+                              </div>
+                            )}
+
+                            {/* Rodapé Ações */}
+                            <div className="flex items-center justify-between pt-2 border-t border-gray-100 text-[9px]">
+                              <span className="text-gray-400 truncate max-w-[65%]">👤 {lead.usuarios?.nomecompleto || 'Sistema'}</span>
+                              <Link href={`/comercial/leads/${lead.id}`} className="text-teal-600 font-bold hover:underline">
+                                Ver Lead →
+                              </Link>
+                            </div>
                           </div>
-                        ) : (
-                          <span className="text-gray-400 text-xs">— Sem agendamento</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-gray-400 text-xs">
-                        {lead.created_at ? new Date(lead.created_at).toLocaleDateString('pt-BR') : '—'}
-                      </td>
-                      {leadsFiltrados.some(l => l.captado_por) && (
-                        <td className="px-4 py-3 text-xs text-gray-500">
-                          {lead.captado_por?.nomecompleto || '—'}
-                        </td>
-                      )}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          <Link href={`/comercial/leads/${lead.id}`}
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200 transition" title="Detalhes">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                          </Link>
-                          <button onClick={() => abrirModalStatus(lead)}
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition" title="Alterar Status">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                          </button>
-                          <button onClick={() => abrirWhatsApp(lead)}
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 transition" title="Enviar WhatsApp">
-                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                          </button>
-                          {lead.status !== 'desistente' && (
-                            <button onClick={() => setModalDesativar(lead)}
-                              className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 border border-red-200 transition" title="Desativar">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
-      )}
+                        );
+                      })
+                    )}
+                  </div>
 
-      <div className="mt-3 text-xs text-gray-400 text-right">
-        {leadsFiltrados.length} lead{leadsFiltrados.length !== 1 ? 's' : ''} exibido{leadsFiltrados.length !== 1 ? 's' : ''}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
       </div>
-
-      {/* Modal: Alterar Status */}
-      {modalStatus && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
-            <h3 className="font-bold text-gray-800 mb-1">Alterar Status</h3>
-            <p className="text-sm text-gray-500 mb-4">{modalStatus.nome}</p>
-
-            <label className="block text-xs font-medium text-gray-600 mb-1">Novo status</label>
-            <select
-              value={novoStatus}
-              onChange={e => setNovoStatus(e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 mb-2"
-            >
-              {STATUS_MANUAIS.map(s => (
-                <option key={s} value={s}>{LABELS_STATUS[s]}</option>
-              ))}
-              <option value="matriculado" disabled>Matriculado (automático)</option>
-            </select>
-
-            <p className="text-xs text-amber-600 bg-amber-50 rounded p-2 mb-3">
-              O status &quot;Matriculado&quot; é definido automaticamente após confirmação do fluxo financeiro/acadêmico.
-            </p>
-
-            {erroStatus && (
-              <p className="text-xs text-red-600 bg-red-50 rounded p-2 mb-3">{erroStatus}</p>
-            )}
-
-            <div className="flex gap-2 mt-4">
-              <button
-                onClick={() => setModalStatus(null)}
-                disabled={salvandoStatus}
-                className="flex-1 border border-gray-300 text-gray-600 rounded-lg py-2 text-sm hover:bg-gray-50 transition-colors disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={salvarStatus}
-                disabled={salvandoStatus}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg py-2 text-sm font-medium transition-colors"
-              >
-                {salvandoStatus ? 'Salvando...' : 'Salvar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Desativar */}
-      {modalDesativar && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
-            <h3 className="font-bold text-gray-800 mb-2">Desativar lead?</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              O lead <strong>{modalDesativar.nome}</strong> será marcado como <em>Desistente</em>. Esta ação pode ser revertida alterando o status.
-            </p>
-            {desativando ? (
-              <div className="text-center text-gray-400 text-sm py-2">Aguarde...</div>
-            ) : (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setModalDesativar(null)}
-                  className="flex-1 border border-gray-300 text-gray-600 rounded-lg py-2 text-sm hover:bg-gray-50 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={confirmarDesativar}
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white rounded-lg py-2 text-sm font-medium transition-colors"
-                >
-                  Desativar
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </ComercialLayout>
   );
 }

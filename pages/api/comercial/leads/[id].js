@@ -13,7 +13,7 @@ const supabase = createClient(
 );
 
 const PERFIS_PERMITIDOS = ['grupo_admin', 'instituicao_admin', 'admin', 'financeiro', 'comercial', 'comercial_master', 'comercial_operador'];
-const STATUS_VALIDOS = ['novo', 'contatado', 'interessado', 'pre_matricula', 'matriculado', 'perdido', 'desistente'];
+const STATUS_VALIDOS = ['novo', 'contatado', 'interessado', 'proposta_enviada', 'aguardando_pagamento', 'pago', 'matriculado', 'perdido', 'pre_matricula', 'desistente'];
 
 async function registrarAuditoria(leadId, usuarioId, acao, dadosAnteriores, dadosNovos) {
   try {
