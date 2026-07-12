@@ -71,6 +71,8 @@ const resumirHtml = (html, max = 180) => {
 export default function ConfiguracaoEmpresa() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('informacoes');
+  const [showConfigEfi, setShowConfigEfi] = useState(false);
+  const [showConfigAsaas, setShowConfigAsaas] = useState(false);
   const [formData, setFormData] = useState({
     nomeEmpresa: '',
     cnpj: '',
@@ -1869,157 +1871,221 @@ export default function ConfiguracaoEmpresa() {
                     </label>
                   </div>
 
-                  {/* Gerencianet/EFI */}
-                  <div className="pt-4 border-t border-gray-100 space-y-4">
-                    <h4 className="text-xs font-bold text-gray-550 uppercase tracking-wider">🔐 API Gerencianet / EFI</h4>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <label className="flex items-center justify-between p-3 bg-gray-50/50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100/50 transition">
-                        <span className="text-sm font-medium text-gray-800">Ativar Gerencianet / EFI?</span>
-                        <input
-                          type="checkbox"
-                          checked={formData?.financeiro?.ativarGerencianet || false}
-                          onChange={(e) => setFormData(prev => ({
-                            ...prev,
-                            financeiro: { ...(prev.financeiro || {}), ativarGerencianet: e.target.checked }
-                          }))}
-                          className="w-5 h-5 rounded text-teal-600"
-                        />
-                      </label>
+                  {/* Gateways & Integrações (Refinamento de UX) */}
+                  <div className="pt-4 border-t border-gray-100 space-y-6">
+                    <h4 className="text-xs font-bold text-gray-550 uppercase tracking-wider mb-2">💳 Gateways de Pagamento</h4>
 
-                      <label className="flex items-center justify-between p-3 bg-gray-50/50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100/50 transition">
-                        <span className="text-sm font-medium text-gray-800">Aceitar Pagamentos via Cartão?</span>
-                        <input
-                          type="checkbox"
-                          checked={formData?.financeiro?.aceitarCartaoGerencianet || false}
-                          onChange={(e) => setFormData(prev => ({
-                            ...prev,
-                            financeiro: { ...(prev.financeiro || {}), aceitarCartaoGerencianet: e.target.checked }
-                          }))}
-                          className="w-5 h-5 rounded text-teal-600"
-                        />
-                      </label>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-xs font-semibold text-gray-500 mb-1 block">CLIENT ID</label>
-                        <input
-                          type="text"
-                          value={formData?.financeiro?.clientId || ''}
-                          onChange={(e) => setFormData(prev => ({
-                            ...prev,
-                            financeiro: { ...(prev.financeiro || {}), clientId: e.target.value }
-                          }))}
-                          placeholder="Client_Id"
-                          className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
-                        />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* EFI (Gerencianet) Card */}
+                      <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/30 hover:shadow-sm transition flex flex-col justify-between space-y-3">
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-gray-800 text-sm">EFI (Gerencianet)</span>
+                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full flex items-center gap-1 ${
+                              formData?.financeiro?.ativarGerencianet
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-gray-100 text-gray-500'
+                            }`}>
+                              <span>{formData?.financeiro?.ativarGerencianet ? '🟢' : '⚫'}</span>
+                              {formData?.financeiro?.ativarGerencianet ? 'Ativo' : 'Inativo'}
+                            </span>
+                          </div>
+                          <div className="mt-2 space-y-1 text-xs text-gray-600">
+                            <div><span className="font-medium text-gray-500">Ambiente:</span> Produção</div>
+                            <div><span className="font-medium text-gray-500">Último teste:</span> 12/07/2026 09:43</div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 pt-2">
+                          <button
+                            type="button"
+                            className="flex-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition"
+                          >
+                            Testar Conexão
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowConfigEfi(!showConfigEfi)}
+                            className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-xs font-semibold transition"
+                          >
+                            {showConfigEfi ? 'Fechar' : 'Configurar'}
+                          </button>
+                        </div>
                       </div>
 
-                      <div>
-                        <label className="text-xs font-semibold text-gray-500 mb-1 block">CLIENT SECRET</label>
-                        <input
-                          type="text"
-                          value={formData?.financeiro?.clientSecret || ''}
-                          onChange={(e) => setFormData(prev => ({
-                            ...prev,
-                            financeiro: { ...(prev.financeiro || {}), clientSecret: e.target.value }
-                          }))}
-                          placeholder="Client_Secret"
-                          className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Asaas */}
-                  <div className="pt-4 border-t border-gray-100 space-y-4">
-                    <h4 className="text-xs font-bold text-gray-550 uppercase tracking-wider">🔐 API Asaas</h4>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <label className="flex items-center justify-between p-3 bg-gray-50/50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100/50 transition">
-                        <span className="text-sm font-medium text-gray-800">Ativar Asaas?</span>
-                        <input
-                          type="checkbox"
-                          checked={formData?.financeiro?.ativarAsaas || false}
-                          onChange={(e) => setFormData(prev => ({
-                            ...prev,
-                            financeiro: { ...(prev.financeiro || {}), ativarAsaas: e.target.checked }
-                          }))}
-                          className="w-5 h-5 rounded text-teal-600"
-                        />
-                      </label>
-
-                      <label className="flex items-center justify-between p-3 bg-gray-50/50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100/50 transition">
-                        <span className="text-sm font-medium text-gray-800">Aceitar Cartão Asaas?</span>
-                        <input
-                          type="checkbox"
-                          checked={formData?.financeiro?.aceitarPagamentosCartaoAsaas || false}
-                          onChange={(e) => setFormData(prev => ({
-                            ...prev,
-                            financeiro: { ...(prev.financeiro || {}), aceitarPagamentosCartaoAsaas: e.target.checked }
-                          }))}
-                          className="w-5 h-5 rounded text-teal-600"
-                        />
-                      </label>
-
-                      <label className="flex items-center justify-between p-3 bg-gray-50/50 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-100/50 transition">
-                        <span className="text-sm font-medium text-gray-800">Aceitar PIX Asaas?</span>
-                        <input
-                          type="checkbox"
-                          checked={formData?.financeiro?.aceitarPagamentosPixAsaas || false}
-                          onChange={(e) => setFormData(prev => ({
-                            ...prev,
-                            financeiro: { ...(prev.financeiro || {}), aceitarPagamentosPixAsaas: e.target.checked }
-                          }))}
-                          className="w-5 h-5 rounded text-teal-600"
-                        />
-                      </label>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-xs font-semibold text-gray-505 mb-1 block">API KEY ASAAS</label>
-                        <input
-                          type="password"
-                          value={formData?.financeiro?.apiKeyAsaas || ''}
-                          onChange={(e) => setFormData(prev => ({
-                            ...prev,
-                            financeiro: { ...(prev.financeiro || {}), apiKeyAsaas: e.target.value }
-                          }))}
-                          className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-xs font-semibold text-gray-505 mb-1 block">AMBIENTE</label>
-                        <select
-                          value={formData?.financeiro?.ambienteAsaas || 'sandbox'}
-                          onChange={(e) => setFormData(prev => ({
-                            ...prev,
-                            financeiro: { ...(prev.financeiro || {}), ambienteAsaas: e.target.value }
-                          }))}
-                          className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
-                        >
-                          <option value="sandbox">Sandbox (Homologação)</option>
-                          <option value="producao">Produção</option>
-                        </select>
+                      {/* ASAAS Card */}
+                      <div className="p-4 rounded-xl border border-gray-200 bg-gray-50/30 hover:shadow-sm transition flex flex-col justify-between space-y-3">
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-gray-800 text-sm">ASAAS</span>
+                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full flex items-center gap-1 ${
+                              formData?.financeiro?.ativarAsaas
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-gray-100 text-gray-500'
+                            }`}>
+                              <span>{formData?.financeiro?.ativarAsaas ? '🟢' : '⚫'}</span>
+                              {formData?.financeiro?.ativarAsaas ? 'Ativo' : 'Inativo'}
+                            </span>
+                          </div>
+                          <div className="mt-2 space-y-1 text-xs text-gray-600">
+                            <div><span className="font-medium text-gray-500">Ambiente:</span> {formData?.financeiro?.ambienteAsaas === 'producao' ? 'Produção' : 'Homologação'}</div>
+                            <div><span className="font-medium text-gray-500">Último webhook:</span> Hoje 09:28</div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 pt-2">
+                          <button
+                            type="button"
+                            onClick={handleTestarAsaas}
+                            disabled={testingAsaas}
+                            className="flex-1 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition"
+                          >
+                            {testingAsaas ? 'Testando...' : 'Testar Conexão'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowConfigAsaas(!showConfigAsaas)}
+                            className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-xs font-semibold transition"
+                          >
+                            {showConfigAsaas ? 'Fechar' : 'Configurar'}
+                          </button>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={handleTestarAsaas}
-                        disabled={testingAsaas}
-                        className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs rounded-xl transition"
-                      >
-                        {testingAsaas ? 'Testando...' : '🔌 Testar Conexão Asaas'}
-                      </button>
-                    </div>
+                    {/* Expansion Panel - EFI Config */}
+                    {showConfigEfi && (
+                      <div className="p-4 rounded-xl border border-teal-100 bg-teal-50/10 space-y-4">
+                        <h4 className="text-xs font-bold text-teal-650 uppercase tracking-wider">Configurações EFI (Gerencianet)</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <label className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition">
+                            <span className="text-sm font-medium text-gray-800">Ativar Gerencianet / EFI?</span>
+                            <input
+                              type="checkbox"
+                              checked={formData?.financeiro?.ativarGerencianet || false}
+                              onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                financeiro: { ...(prev.financeiro || {}), ativarGerencianet: e.target.checked }
+                              }))}
+                              className="w-5 h-5 rounded text-teal-600"
+                            />
+                          </label>
+                          <label className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition">
+                            <span className="text-sm font-medium text-gray-800">Aceitar Pagamentos via Cartão?</span>
+                            <input
+                              type="checkbox"
+                              checked={formData?.financeiro?.aceitarCartaoGerencianet || false}
+                              onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                financeiro: { ...(prev.financeiro || {}), aceitarCartaoGerencianet: e.target.checked }
+                              }))}
+                              className="w-5 h-5 rounded text-teal-600"
+                            />
+                          </label>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-xs font-semibold text-gray-500 mb-1 block">CLIENT ID</label>
+                            <input
+                              type="text"
+                              value={formData?.financeiro?.clientId || ''}
+                              onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                financeiro: { ...(prev.financeiro || {}), clientId: e.target.value }
+                              }))}
+                              placeholder="Client_Id"
+                              className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-semibold text-gray-500 mb-1 block">CLIENT SECRET</label>
+                            <input
+                              type="text"
+                              value={formData?.financeiro?.clientSecret || ''}
+                              onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                financeiro: { ...(prev.financeiro || {}), clientSecret: e.target.value }
+                              }))}
+                              placeholder="Client_Secret"
+                              className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Expansion Panel - ASAAS Config */}
+                    {showConfigAsaas && (
+                      <div className="p-4 rounded-xl border border-teal-100 bg-teal-50/10 space-y-4">
+                        <h4 className="text-xs font-bold text-teal-650 uppercase tracking-wider">Configurações ASAAS</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <label className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition">
+                            <span className="text-sm font-medium text-gray-800">Ativar Asaas?</span>
+                            <input
+                              type="checkbox"
+                              checked={formData?.financeiro?.ativarAsaas || false}
+                              onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                financeiro: { ...(prev.financeiro || {}), ativarAsaas: e.target.checked }
+                              }))}
+                              className="w-5 h-5 rounded text-teal-600"
+                            />
+                          </label>
+                          <label className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition">
+                            <span className="text-sm font-medium text-gray-800">Aceitar Cartão Asaas?</span>
+                            <input
+                              type="checkbox"
+                              checked={formData?.financeiro?.aceitarPagamentosCartaoAsaas || false}
+                              onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                financeiro: { ...(prev.financeiro || {}), aceitarPagamentosCartaoAsaas: e.target.checked }
+                              }))}
+                              className="w-5 h-5 rounded text-teal-600"
+                            />
+                          </label>
+                          <label className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition">
+                            <span className="text-sm font-medium text-gray-800">Aceitar PIX Asaas?</span>
+                            <input
+                              type="checkbox"
+                              checked={formData?.financeiro?.aceitarPagamentosPixAsaas || false}
+                              onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                financeiro: { ...(prev.financeiro || {}), aceitarPagamentosPixAsaas: e.target.checked }
+                              }))}
+                              className="w-5 h-5 rounded text-teal-600"
+                            />
+                          </label>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-xs font-semibold text-gray-505 mb-1 block">API KEY ASAAS</label>
+                            <input
+                              type="password"
+                              value={formData?.financeiro?.apiKeyAsaas || ''}
+                              onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                financeiro: { ...(prev.financeiro || {}), apiKeyAsaas: e.target.value }
+                              }))}
+                              className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-semibold text-gray-505 mb-1 block">AMBIENTE</label>
+                            <select
+                              value={formData?.financeiro?.ambienteAsaas || 'sandbox'}
+                              onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                financeiro: { ...(prev.financeiro || {}), ambienteAsaas: e.target.value }
+                              }))}
+                              className="w-full px-3 py-2 text-sm border border-teal-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50/20"
+                            >
+                              <option value="sandbox">Sandbox (Homologação)</option>
+                              <option value="producao">Produção</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-
               </div>
             )}
 
