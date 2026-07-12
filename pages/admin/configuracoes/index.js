@@ -500,25 +500,156 @@ export default function Configuracoes() {
 
 
   const renderComercial = () => (
-    <div className="space-y-4">
-      <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Regras de Comissão</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Field label="Comissão Padrão">
-          <input type="number" step="0.01" min="0" value={form.com_comissao_padrao || ''} onChange={set('com_comissao_padrao')} className={INPUT} />
-        </Field>
-        <Field label="Tipo de Comissão">
-          <select value={form.com_comissao_tipo || 'percentual'} onChange={set('com_comissao_tipo')} className={INPUT}>
-            <option value="percentual">Percentual (%)</option>
-            <option value="fixo">Valor Fixo (R$)</option>
-          </select>
-        </Field>
+    <div className="space-y-6">
+
+      {/* ── 1. Política de Comissão ───────────────────────────── */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest border-b pb-2">💵 Política de Comissão</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="Tipo de Comissão">
+            <select value={form.com_comissao_tipo || 'percentual'} onChange={set('com_comissao_tipo')} className={INPUT}>
+              <option value="percentual">Percentual (%)</option>
+              <option value="fixo">Valor Fixo (R$)</option>
+            </select>
+          </Field>
+          <Field label={`Comissão Padrão (${form.com_comissao_tipo === 'fixo' ? 'R$' : '%'})`}>
+            <input type="number" step="0.01" min="0" value={form.com_comissao_padrao || ''} onChange={set('com_comissao_padrao')} className={INPUT} />
+          </Field>
+          <Field label={`Comissão por Matrícula (${form.com_comissao_tipo === 'fixo' ? 'R$' : '%'})`}>
+            <input type="number" step="0.01" min="0" value={form.com_comissao_matricula || ''} onChange={set('com_comissao_matricula')} placeholder="0" className={INPUT} />
+          </Field>
+          <Field label={`Comissão por Renovação (${form.com_comissao_tipo === 'fixo' ? 'R$' : '%'})`}>
+            <input type="number" step="0.01" min="0" value={form.com_comissao_renovacao || ''} onChange={set('com_comissao_renovacao')} placeholder="0" className={INPUT} />
+          </Field>
+          <Field label={`Comissão por Indicação (${form.com_comissao_tipo === 'fixo' ? 'R$' : '%'})`}>
+            <input type="number" step="0.01" min="0" value={form.com_comissao_indicacao || ''} onChange={set('com_comissao_indicacao')} placeholder="0" className={INPUT} />
+          </Field>
+        </div>
       </div>
-      <Field label="Etapas do Funil Comercial (uma por linha)">
-        <textarea value={form.com_funil_etapas || ''} onChange={set('com_funil_etapas')} rows={5}
-          placeholder="Novo Lead&#10;Contatado&#10;Interessado&#10;Pré-Matrícula&#10;Matriculado" className={INPUT} />
-      </Field>
+
+      {/* ── 2. Regras de Conversão ───────────────────────────── */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest border-b pb-2">🔀 Regras de Conversão de Lead</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {[
+            { key: 'com_exigir_pagamento',         label: 'Exigir pagamento da taxa de matrícula' },
+            { key: 'com_exigir_contrato',           label: 'Exigir contrato assinado' },
+            { key: 'com_permitir_conv_manual',      label: 'Permitir conversão manual pelo operador' },
+            { key: 'com_auto_conv_asaas',           label: 'Converter automaticamente após confirmação ASAAS' },
+            { key: 'com_auto_conv_efi',             label: 'Converter automaticamente após confirmação EFI' },
+          ].map(({ key, label }) => (
+            <label key={key} className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50/50 cursor-pointer hover:bg-teal-50/50 hover:border-teal-200 transition">
+              <input type="checkbox" checked={!!form[key]} onChange={set(key)} className="rounded text-teal-600 focus:ring-teal-500 w-4 h-4" />
+              <span className="text-sm text-gray-700">{label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* ── 3. Regras da Matrícula ───────────────────────────── */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest border-b pb-2">🎓 Regras da Matrícula Gerada</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {[
+            { key: 'com_gerar_aluno_auto',          label: 'Gerar aluno automaticamente' },
+            { key: 'com_gerar_matricula_auto',       label: 'Gerar matrícula automaticamente' },
+            { key: 'com_gerar_plano_auto',           label: 'Gerar plano financeiro automaticamente' },
+            { key: 'com_gerar_carne_auto',           label: 'Gerar carnê automaticamente' },
+            { key: 'com_criar_credenciais_portal',   label: 'Criar credenciais do Portal do Aluno' },
+          ].map(({ key, label }) => (
+            <label key={key} className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50/50 cursor-pointer hover:bg-teal-50/50 hover:border-teal-200 transition">
+              <input type="checkbox" checked={!!form[key]} onChange={set(key)} className="rounded text-teal-600 focus:ring-teal-500 w-4 h-4" />
+              <span className="text-sm text-gray-700">{label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* ── 4. Recepção ─────────────────────────────────────── */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest border-b pb-2">🏠 Recepção</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+          <div className="space-y-3">
+            <label className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50/50 cursor-pointer hover:bg-teal-50/50 hover:border-teal-200 transition">
+              <input type="checkbox" checked={!!form.com_recepcao_ativa} onChange={set('com_recepcao_ativa')} className="rounded text-teal-600 focus:ring-teal-500 w-4 h-4" />
+              <span className="text-sm text-gray-700">Permitir pré-cadastro pela recepção</span>
+            </label>
+          </div>
+          <Field label="Fluxo padrão de origem">
+            <select value={form.com_fluxo_padrao || 'ambos'} onChange={set('com_fluxo_padrao')} className={INPUT}>
+              <option value="comercial">Comercial (via Lead + Venda)</option>
+              <option value="recepcao">Recepção (cadastro direto)</option>
+              <option value="ambos">Ambos habilitados</option>
+            </select>
+          </Field>
+        </div>
+      </div>
+
+      {/* ── 5. Funil Comercial ───────────────────────────────── */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest border-b pb-2">🎯 Funil Comercial</h3>
+        <Field label="Etapas do Funil (uma por linha)">
+          <textarea
+            value={form.com_funil_etapas || ''}
+            onChange={set('com_funil_etapas')}
+            rows={6}
+            placeholder={"Novo Lead\nContatado\nInteressado\nPré-Matrícula\nMatriculado"}
+            className={INPUT}
+          />
+        </Field>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="Tempo máximo por etapa — SLA (dias)">
+            <input type="number" min="0" value={form.com_funil_sla_dias || ''} onChange={set('com_funil_sla_dias')} placeholder="Ex: 3" className={INPUT} />
+          </Field>
+          <div className="flex items-end">
+            <label className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50/50 cursor-pointer hover:bg-teal-50/50 hover:border-teal-200 transition w-full">
+              <input type="checkbox" checked={!!form.com_followup_obrigatorio} onChange={set('com_followup_obrigatorio')} className="rounded text-teal-600 focus:ring-teal-500 w-4 h-4" />
+              <span className="text-sm text-gray-700">Follow-up obrigatório entre etapas</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 6. Resumo Executivo ──────────────────────────────── */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest border-b pb-2">📊 Resumo Executivo</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="p-4 rounded-xl border bg-teal-50 border-teal-200 space-y-1">
+            <div className="text-xl">💵</div>
+            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Comissão Padrão</div>
+            <div className="text-sm font-semibold text-teal-700">
+              {form.com_comissao_padrao
+                ? `${form.com_comissao_padrao}${form.com_comissao_tipo === 'fixo' ? ' R$' : '%'}`
+                : 'Não definida'}
+            </div>
+          </div>
+          <div className="p-4 rounded-xl border bg-blue-50 border-blue-200 space-y-1">
+            <div className="text-xl">🔀</div>
+            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Fluxo Ativo</div>
+            <div className="text-sm font-semibold text-blue-700">
+              {form.com_fluxo_padrao === 'comercial' ? 'Comercial' : form.com_fluxo_padrao === 'recepcao' ? 'Recepção' : 'Ambos'}
+            </div>
+          </div>
+          <div className="p-4 rounded-xl border bg-amber-50 border-amber-200 space-y-1">
+            <div className="text-xl">💳</div>
+            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Cobrança</div>
+            <div className="text-sm font-semibold text-amber-700">
+              {[form.com_auto_conv_asaas && 'ASAAS', form.com_auto_conv_efi && 'EFI'].filter(Boolean).join(' + ') || 'Manual'}
+            </div>
+          </div>
+          <div className="p-4 rounded-xl border bg-green-50 border-green-200 space-y-1">
+            <div className="text-xl">🤖</div>
+            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Automação</div>
+            <div className="text-sm font-semibold text-green-700">
+              {(form.com_auto_conv_asaas || form.com_auto_conv_efi) ? 'Ativa' : 'Manual'}
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   );
+
 
   const renderIntegracoes = () => {
     const efiStatus = 'operacional';
