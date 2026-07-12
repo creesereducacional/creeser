@@ -89,7 +89,78 @@ export default async function handler(req, res) {
       console.error('[leads/GET]', error.message);
       return res.status(500).json({ error: 'Erro interno ao carregar leads' });
     }
-    return res.status(200).json(data);
+
+    // Buscar followups pendentes dos leads da lista
+    const leadIds = (data || []).map(l => l.id);
+    let followupsMap = {};
+    if (leadIds.length > 0) {
+      try {
+        const { data: followupsList } = await supabase
+          .from('leads_followups')
+          .select('lead_id, data_agendada, prioridade')
+          .in('lead_id', leadIds)
+          .eq('status', 'PENDENTE')
+          .order('data_agendada', { ascending: true });
+
+        if (followupsList) {
+          followupsList.forEach(f => {
+            if (!followupsMap[f.lead_id]) {
+              followupsMap[f.lead_id] = f; // Mais próximo
+            }
+          });
+        }
+      } catch (_) {}
+    }
+
+    // Enriquecer dados dos leads
+    const enrichedData = (data || []).map(l => {
+      let nextF = followupsMap[l.id];
+      if (!nextF) {
+        // Tentar parsear das observações (fallback)
+        const obs = l.observacoes || '';
+        const marker = '[FOLLOWUP_AGENDADO]';
+        const parts = obs.split(marker);
+        let firstPending = null;
+        parts.slice(1).forEach(part => {
+          try {
+            const lines = part.trim().split('\n\n')[0];
+            const idxFim = lines.lastIndexOf('}');
+            if (idxFim !== -1) {
+              const cleanJson = lines.substring(0, idxFim + 1).trim();
+              const parsed = JSON.parse(cleanJson);
+              if (parsed && parsed.status === 'PENDENTE') {
+                if (!firstPending || new Date(parsed.data_agendada) < new Date(firstPending.data_agendada)) {
+                  firstPending = parsed;
+                }
+              }
+            }
+          } catch (_) {}
+        });
+        if (firstPending) {
+          nextF = {
+            data_agendada: firstPending.data_agendada,
+            prioridade: firstPending.prioridade
+          };
+        }
+      }
+
+      let diasAtraso = 0;
+      if (nextF) {
+        const diffTime = new Date() - new Date(nextF.data_agendada);
+        if (diffTime > 0) {
+          diasAtraso = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        }
+      }
+
+      return {
+        ...l,
+        proximo_contato: nextF ? nextF.data_agendada : null,
+        dias_em_atraso: diasAtraso,
+        prioridade_followup: nextF ? nextF.prioridade : null
+      };
+    });
+
+    return res.status(200).json(enrichedData);
   }
 
   // ── POST: criar lead ──────────────────────────────────────────────────────

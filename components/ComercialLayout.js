@@ -6,6 +6,7 @@ import { useRouter } from 'next/router';
 const MENU_BASE = [
   { href: '/comercial/dashboard',  icon: '📊', label: 'Dashboard' },
   { href: '/comercial/leads',      icon: '🎯', label: 'Meus Leads' },
+  { href: '/comercial/agenda',     icon: '📅', label: 'Minha Agenda' },
   { href: '/comercial/leads/novo', icon: '➕', label: 'Novo Lead' },
   { href: '/comercial/matriculas', icon: '🎓', label: 'Pré-Matrículas' },
   { href: '/comercial/comissoes',  icon: '💰', label: 'Comissões' },

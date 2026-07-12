@@ -48,11 +48,21 @@ export default function DetalharLead() {
   const [dadosConvertido, setDadosConvertido] = useState(null);
 
   // Timeline e Interações
-  const [abaAtiva, setAbaAtiva] = useState('dados'); // 'dados' ou 'timeline'
+  // Timeline e Interações
+  const [abaAtiva, setAbaAtiva] = useState('dados'); // 'dados', 'timeline', 'followups'
   const [interacoes, setInteracoes] = useState([]);
   const [carregandoInteracoes, setCarregandoInteracoes] = useState(false);
   const [formInteracao, setFormInteracao] = useState({ tipo: 'observacao', titulo: '', descricao: '' });
   const [salvandoInteracao, setSalvandoInteracao] = useState(false);
+
+  // Follow-ups
+  const [followups, setFollowups] = useState([]);
+  const [carregandoFollowups, setCarregandoFollowups] = useState(false);
+  const [formFollowup, setFormFollowup] = useState({ tipo: 'ligacao', assunto: '', observacao: '', data_agendada: '', prioridade: 'media' });
+  const [salvandoFollowup, setSalvandoFollowup] = useState(false);
+  const [followupConcluindo, setFollowupConcluindo] = useState(null);
+  const [obsConclusao, setObsConclusao] = useState('');
+  const [salvandoConclusao, setSalvandoConclusao] = useState(false);
 
   const carregarInteracoes = () => {
     if (!id) return;
@@ -64,10 +74,19 @@ export default function DetalharLead() {
       .finally(() => setCarregandoInteracoes(false));
   };
 
+  const carregarFollowups = () => {
+    if (!id) return;
+    setCarregandoFollowups(true);
+    fetch(`/api/comercial/leads/${id}/followups`, { credentials: 'include' })
+      .then(r => r.json())
+      .then(data => setFollowups(Array.isArray(data) ? data : []))
+      .catch(() => {})
+      .finally(() => setCarregandoFollowups(false));
+  };
+
   useEffect(() => {
-    if (abaAtiva === 'timeline') {
-      carregarInteracoes();
-    }
+    if (abaAtiva === 'timeline') carregarInteracoes();
+    if (abaAtiva === 'followups') carregarFollowups();
   }, [id, abaAtiva]);
 
   const handleSalvarInteracao = async (e) => {
@@ -89,6 +108,54 @@ export default function DetalharLead() {
     } catch (_) {}
     finally {
       setSalvandoInteracao(false);
+    }
+  };
+
+  const handleSalvarFollowup = async (e) => {
+    e.preventDefault();
+    if (!formFollowup.assunto.trim() || !formFollowup.data_agendada) return;
+
+    setSalvandoFollowup(true);
+    try {
+      const res = await fetch(`/api/comercial/leads/${id}/followups`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formFollowup)
+      });
+      if (res.ok) {
+        setFormFollowup({ tipo: 'ligacao', assunto: '', observacao: '', data_agendada: '', prioridade: 'media' });
+        carregarFollowups();
+      }
+    } catch (_) {}
+    finally {
+      setSalvandoFollowup(false);
+    }
+  };
+
+  const handleConcluirFollowup = async (e) => {
+    e.preventDefault();
+    if (!followupConcluindo) return;
+
+    setSalvandoConclusao(true);
+    try {
+      const res = await fetch(`/api/comercial/leads/${id}/followups`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          followupId: followupConcluindo.id,
+          observacao_conclusao: obsConclusao
+        })
+      });
+      if (res.ok) {
+        setFollowupConcluindo(null);
+        setObsConclusao('');
+        carregarFollowups();
+      }
+    } catch (_) {}
+    finally {
+      setSalvandoConclusao(false);
     }
   };
 
@@ -433,6 +500,17 @@ export default function DetalharLead() {
               >
                 Timeline 360º
               </button>
+              <button
+                type="button"
+                onClick={() => setAbaAtiva('followups')}
+                className={`py-2 px-4 font-semibold text-sm border-b-2 transition-all ${
+                  abaAtiva === 'followups'
+                    ? 'border-teal-600 text-teal-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Agenda / Follow-ups
+              </button>
             </div>
 
             {abaAtiva === 'dados' ? (
@@ -641,6 +719,185 @@ export default function DetalharLead() {
                       })}
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {abaAtiva === 'followups' && (
+              <div className="space-y-6">
+                {/* Form Agendar Followup */}
+                <form onSubmit={handleSalvarFollowup} className="bg-white rounded-xl shadow-sm p-5 border border-gray-100 space-y-4">
+                  <h4 className="font-semibold text-gray-800 text-sm flex items-center gap-2">
+                    <span>📅</span> Agendar Novo Contato (Follow-up)
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Tipo de Contato</label>
+                      <select
+                        value={formFollowup.tipo}
+                        onChange={e => setFormFollowup(f => ({ ...f, tipo: e.target.value }))}
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+                      >
+                        <option value="ligacao">📞 Ligação</option>
+                        <option value="whatsapp">📱 WhatsApp</option>
+                        <option value="email">📧 E-mail</option>
+                        <option value="reuniao">🤝 Reunião</option>
+                        <option value="visita">🏢 Visita</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Prioridade</label>
+                      <select
+                        value={formFollowup.prioridade}
+                        onChange={e => setFormFollowup(f => ({ ...f, prioridade: e.target.value }))}
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+                      >
+                        <option value="baixa">Baixa</option>
+                        <option value="media">Média</option>
+                        <option value="alta">Alta</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Data e Hora Planejada</label>
+                      <input
+                        type="datetime-local"
+                        value={formFollowup.data_agendada}
+                        onChange={e => setFormFollowup(f => ({ ...f, data_agendada: e.target.value }))}
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+                        required
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs text-gray-500 mb-1">Assunto / Motivo</label>
+                      <input
+                        type="text"
+                        value={formFollowup.assunto}
+                        onChange={e => setFormFollowup(f => ({ ...f, assunto: e.target.value }))}
+                        placeholder="Ex: Ligar para confirmar interesse / Enviar proposta comercial..."
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+                        required
+                      />
+                    </div>
+                    <div className="md:col-span-5">
+                      <label className="block text-xs text-gray-500 mb-1">Instruções de apoio / Detalhes (Opcional)</label>
+                      <textarea
+                        rows={2}
+                        value={formFollowup.observacao}
+                        onChange={e => setFormFollowup(f => ({ ...f, observacao: e.target.value }))}
+                        placeholder="Informações extras para apoiar no contato..."
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 resize-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={salvandoFollowup || !formFollowup.assunto.trim() || !formFollowup.data_agendada}
+                      className="bg-teal-600 hover:bg-teal-700 disabled:bg-teal-300 text-white px-5 py-2 rounded-lg text-xs font-semibold shadow-sm transition"
+                    >
+                      {salvandoFollowup ? 'Agendando...' : 'Agendar Contato'}
+                    </button>
+                  </div>
+                </form>
+
+                {/* Lista de Follow-ups do Lead */}
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                  <h4 className="font-semibold text-gray-800 text-sm mb-4">Agenda do Lead</h4>
+                  {carregandoFollowups ? (
+                    <div className="text-center py-8 text-sm text-gray-400">Carregando agendamentos...</div>
+                  ) : followups.length === 0 ? (
+                    <div className="text-center py-8 text-sm text-gray-400">Nenhum follow-up planejado ou agendado.</div>
+                  ) : (
+                    <div className="space-y-4">
+                      {followups.map((item) => {
+                        const dataAg = new Date(item.data_agendada);
+                        const isAtrasado = item.status === 'PENDENTE' && dataAg < new Date();
+                        
+                        return (
+                          <div
+                            key={item.id}
+                            className={`border rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 transition ${
+                              isAtrasado ? 'border-red-200 bg-red-50/20' : 'border-gray-150 bg-white'
+                            }`}
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded ${
+                                  item.status === 'CONCLUÍDO' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                  {item.status}
+                                </span>
+                                <span className="font-bold text-gray-800 text-sm">{item.assunto}</span>
+                                <span className="text-[10px] text-gray-400">({item.tipo})</span>
+                              </div>
+                              <p className="text-xs text-gray-600">{item.observacao || 'Sem observações adicionais.'}</p>
+                              <div className="text-[10px] text-gray-400 flex items-center gap-2">
+                                <span>📅 Agendado: {dataAg.toLocaleString('pt-BR')}</span>
+                                {item.concluido_em && (
+                                  <span className="text-green-600 font-medium">✔️ Concluído em: {new Date(item.concluido_em).toLocaleString('pt-BR')}</span>
+                                )}
+                                {isAtrasado && (
+                                  <span className="text-red-600 font-bold">⚠️ ATRASADO</span>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {item.status === 'PENDENTE' && (
+                              <button
+                                type="button"
+                                onClick={() => setFollowupConcluindo(item)}
+                                className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg text-xs font-semibold shadow-sm transition self-end md:self-auto"
+                              >
+                                Concluir
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Modal Conclusão Followup na Ficha */}
+            {followupConcluindo && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fade-in">
+                <div className="bg-white rounded-2xl max-w-md w-full shadow-xl overflow-hidden">
+                  <div className="bg-teal-600 text-white p-5">
+                    <h3 className="font-bold text-base flex items-center gap-2">
+                      <span>✅</span> Concluir Follow-up
+                    </h3>
+                  </div>
+                  <form onSubmit={handleConcluirFollowup} className="p-6 space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">O que foi conversado?</label>
+                      <textarea
+                        rows={3}
+                        value={obsConclusao}
+                        onChange={e => setObsConclusao(e.target.value)}
+                        placeholder="Digite o resumo do contato..."
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 resize-none"
+                        required
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2 border-t">
+                      <button
+                        type="button"
+                        onClick={() => setFollowupConcluindo(null)}
+                        className="border hover:bg-gray-50 px-4 py-2 rounded-lg text-sm text-gray-600"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={salvandoConclusao}
+                        className="bg-teal-600 hover:bg-teal-700 disabled:bg-teal-300 text-white px-5 py-2 rounded-lg text-sm font-semibold"
+                      >
+                        {salvandoConclusao ? 'Salvando...' : 'Gravar Conclusão'}
+                      </button>
+                    </div>
+                  </form>
                 </div>
               </div>
             )}

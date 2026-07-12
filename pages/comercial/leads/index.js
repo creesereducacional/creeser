@@ -221,7 +221,15 @@ export default function MeusLeads() {
                   </span>
                 </div>
                 {lead.curso_interesse && (
-                  <p className="text-xs text-gray-500 mb-3">📚 {lead.curso_interesse}</p>
+                  <p className="text-xs text-gray-500 mb-1">📚 {lead.curso_interesse}</p>
+                )}
+                {lead.proximo_contato && (
+                  <div className="mt-1 mb-2 bg-gray-50 border rounded-lg p-2 flex items-center justify-between text-xs">
+                    <span className={lead.dias_em_atraso > 0 ? 'text-red-650 font-bold' : 'text-gray-600'}>
+                      📅 Seg: {new Date(lead.proximo_contato).toLocaleDateString('pt-BR')}
+                    </span>
+                    <span className="text-[10px] font-bold uppercase">{lead.prioridade_followup}</span>
+                  </div>
                 )}
                 <div className="flex items-center gap-2 border-t border-gray-100 pt-3">
                   <Link href={`/comercial/leads/${lead.id}`}
@@ -257,6 +265,7 @@ export default function MeusLeads() {
                     <th className="px-4 py-3 text-left">Contato</th>
                     <th className="px-4 py-3 text-left">Curso</th>
                     <th className="px-4 py-3 text-left">Status</th>
+                    <th className="px-4 py-3 text-left">Follow-up</th>
                     <th className="px-4 py-3 text-left">Data</th>
                     {leadsFiltrados.some(l => l.captado_por) && <th className="px-4 py-3 text-left">Operador</th>}
                     <th className="px-4 py-3 text-left">Ações</th>
@@ -292,6 +301,32 @@ export default function MeusLeads() {
                           <span className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
                           {LABELS_STATUS[lead.status] || lead.status}
                         </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {lead.proximo_contato ? (
+                          <div className="space-y-0.5">
+                            <span className={`text-xs font-bold block ${lead.dias_em_atraso > 0 ? 'text-red-650' : 'text-gray-700'}`}>
+                              📅 {new Date(lead.proximo_contato).toLocaleDateString('pt-BR')} {new Date(lead.proximo_contato).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              {lead.dias_em_atraso > 0 && (
+                                <span className="bg-red-100 text-red-800 text-[9px] font-extrabold px-1 rounded animate-pulse">
+                                  {lead.dias_em_atraso}d atraso
+                                </span>
+                              )}
+                              {lead.prioridade_followup && (
+                                <span className={`text-[9px] font-extrabold px-1 rounded uppercase ${
+                                  lead.prioridade_followup === 'alta' ? 'bg-red-50 text-red-700' :
+                                  lead.prioridade_followup === 'media' ? 'bg-yellow-50 text-yellow-700' : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {lead.prioridade_followup}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-xs">— Sem agendamento</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-gray-400 text-xs">
                         {lead.created_at ? new Date(lead.created_at).toLocaleDateString('pt-BR') : '—'}
