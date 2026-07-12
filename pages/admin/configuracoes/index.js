@@ -372,30 +372,132 @@ export default function Configuracoes() {
   );
 
   const renderContratos = () => (
-    <div className="space-y-4">
-      <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Assinatura Institucional</h3>
-      <Field label="Assinatura / Rodapé do Contrato">
-        <textarea value={form.cont_assinatura || ''} onChange={set('cont_assinatura')} rows={3}
-          placeholder="Nome do responsável, cargo, cidade/data…" className={INPUT} />
-      </Field>
-      <Field label="Validade do Link de Assinatura (dias)">
-        <input type="number" min="1" max="365" value={form.cont_validade || '30'} onChange={set('cont_validade')} className={`${INPUT} max-w-[200px]`} />
-      </Field>
-      <Field label="Modelo padrão de contrato">
-        <select value={form.cont_modelo || ''} onChange={set('cont_modelo')} className={INPUT}>
-          <option value="">— Padrão do sistema —</option>
-          <option value="basico">Básico</option>
-          <option value="completo">Completo com cláusulas LGPD</option>
-          <option value="customizado">Customizado (ver empresa.js)</option>
-        </select>
-      </Field>
+    <div className="space-y-6">
 
-      <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 text-sm text-teal-800">
-        <p className="font-semibold mb-1">📄 Gerenciamento de Contratos</p>
-        <p>Acesse o <Link href="/admin/contratos" className="underline font-semibold">módulo de Contratos</Link> para gerar, enviar e monitorar assinaturas individuais.</p>
+      {/* ── 1. Assinatura Institucional ───────────────────────── */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest border-b pb-2">✍️ Assinatura Institucional</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="Nome do Responsável">
+            <input value={form.cont_resp_nome || ''} onChange={set('cont_resp_nome')} placeholder="Ex: João da Silva" className={INPUT} />
+          </Field>
+          <Field label="Cargo">
+            <input value={form.cont_resp_cargo || ''} onChange={set('cont_resp_cargo')} placeholder="Ex: Diretor Acadêmico" className={INPUT} />
+          </Field>
+          <Field label="Cidade">
+            <input value={form.cont_resp_cidade || ''} onChange={set('cont_resp_cidade')} placeholder="Ex: São Paulo – SP" className={INPUT} />
+          </Field>
+          <Field label="Validade do Link de Assinatura (dias)">
+            <input type="number" min="1" max="365" value={form.cont_validade || '30'} onChange={set('cont_validade')} className={INPUT} />
+          </Field>
+        </div>
+        <Field label="Texto de Rodapé do Contrato">
+          <textarea value={form.cont_assinatura || ''} onChange={set('cont_assinatura')} rows={3}
+            placeholder="Ex: Assinado em ___/___/______, pelo representante legal da instituição…" className={INPUT} />
+        </Field>
       </div>
+
+      {/* ── 2. Modelo de Contrato ─────────────────────────────── */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest border-b pb-2">📄 Modelo de Contrato</h3>
+        <Field label="Modelo padrão de contrato">
+          <select value={form.cont_modelo || ''} onChange={set('cont_modelo')} className={INPUT}>
+            <option value="">— Padrão do sistema —</option>
+            <option value="basico">Básico</option>
+            <option value="completo">Completo com cláusulas LGPD</option>
+            <option value="customizado">Customizado</option>
+          </select>
+        </Field>
+        <div className="flex flex-wrap gap-3 pt-1">
+          <Link href="/admin/contratos/dashboard"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-semibold transition">
+            📂 Gerenciar Modelos
+          </Link>
+          <Link href="/admin/contratos/relatorio"
+            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg text-sm font-semibold transition">
+            👁️ Visualizar Relatório
+          </Link>
+        </div>
+      </div>
+
+      {/* ── 3. Regras de Contratação ─────────────────────────── */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest border-b pb-2">⚙️ Regras de Contratação</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {[
+            { key: 'cont_exigir_assinatura',      label: 'Exigir assinatura para concluir matrícula' },
+            { key: 'cont_permitir_presencial',     label: 'Permitir assinatura presencial' },
+            { key: 'cont_permitir_digital',        label: 'Permitir assinatura digital (Assinafy)' },
+            { key: 'cont_gerar_apos_conversao',    label: 'Gerar contrato automaticamente após conversão de lead' },
+          ].map(({ key, label }) => (
+            <label key={key} className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50/50 cursor-pointer hover:bg-teal-50/50 hover:border-teal-200 transition">
+              <input
+                type="checkbox"
+                checked={!!form[key]}
+                onChange={set(key)}
+                className="rounded text-teal-600 focus:ring-teal-500 w-4 h-4"
+              />
+              <span className="text-sm text-gray-700">{label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* ── 4. Documentos Obrigatórios ────────────────────────── */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest border-b pb-2">📎 Documentos Obrigatórios</h3>
+        <p className="text-xs text-gray-500">Selecione quais documentos são obrigatórios para finalizar a matrícula.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          {[
+            { key: 'doc_rg',            label: 'RG (Identidade)' },
+            { key: 'doc_cpf',           label: 'CPF' },
+            { key: 'doc_compresidencia', label: 'Comprovante de Residência' },
+            { key: 'doc_historico',     label: 'Histórico Escolar' },
+            { key: 'doc_certificado',   label: 'Certificado de Conclusão' },
+            { key: 'doc_foto3x4',       label: 'Foto 3×4' },
+            { key: 'doc_outros',        label: 'Outros (definir caso a caso)' },
+          ].map(({ key, label }) => (
+            <label key={key} className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50/50 cursor-pointer hover:bg-teal-50/50 hover:border-teal-200 transition">
+              <input
+                type="checkbox"
+                checked={!!form[key]}
+                onChange={set(key)}
+                className="rounded text-teal-600 focus:ring-teal-500 w-4 h-4"
+              />
+              <span className="text-sm text-gray-700">{label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* ── 5. Situação ──────────────────────────────────────── */}
+      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest border-b pb-2">📊 Situação Contratual</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: 'Modelo Ativo',          value: form.cont_modelo ? (form.cont_modelo === 'basico' ? 'Básico' : form.cont_modelo === 'completo' ? 'Completo LGPD' : 'Customizado') : 'Padrão', icon: '📄', color: 'teal' },
+            { label: 'Assinaturas Pendentes', value: 'Em preparação', icon: '⏳', color: 'amber' },
+            { label: 'Contratos Emitidos',    value: 'Em preparação', icon: '✅', color: 'green' },
+            { label: 'Última Emissão',        value: 'Em preparação', icon: '🕒', color: 'gray' },
+          ].map(({ label, value, icon, color }) => (
+            <div key={label} className={`p-4 rounded-xl border bg-${color}-50 border-${color}-200 space-y-1`}>
+              <div className="text-xl">{icon}</div>
+              <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{label}</div>
+              <div className={`text-sm font-semibold text-${color}-700`}>{value}</div>
+            </div>
+          ))}
+        </div>
+        <div className="pt-1">
+          <Link href="/admin/contratos/dashboard"
+            className="inline-flex items-center gap-2 text-sm text-teal-700 font-semibold hover:underline">
+            Ver painel completo de contratos →
+          </Link>
+        </div>
+      </div>
+
     </div>
   );
+
 
   const renderComercial = () => (
     <div className="space-y-4">
