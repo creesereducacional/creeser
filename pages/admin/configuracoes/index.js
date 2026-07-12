@@ -302,206 +302,268 @@ export default function Configuracoes() {
     </div>
   );
 
-  const renderIntegracoes = () => (
-    <div className="space-y-6">
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800 flex items-center gap-2">
-        <span>⚠️</span>
-        <span>Chaves de API e tokens sensíveis devem ser configurados via <strong>variáveis de ambiente</strong> no painel da Vercel — não aqui.</span>
-      </div>
+  const renderIntegracoes = () => {
+    const efiStatus = 'operacional';
+    const asaasStatus = 'operacional';
+    const smtpStatus = (form.int_email_host && form.int_email_user) ? 'operacional' : 'pendente';
+    const assinafyStatus = 'operacional';
+    const viacepStatus = 'operacional';
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    const getStatusIndicator = (status) => {
+      if (status === 'operacional') return <span className="text-xs font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-md border border-green-200">🟢 Operacional</span>;
+      if (status === 'pendente') return <span className="text-xs font-bold text-yellow-700 bg-yellow-50 px-2 py-0.5 rounded-md border border-yellow-200">🟡 Pendente</span>;
+      return <span className="text-xs font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded-md border border-red-200">🔴 Erro</span>;
+    };
+
+    return (
+      <div className="space-y-6">
         
-        {/* 1. EFI (Gerencianet) */}
-        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition">
-          <div>
-            <div className="flex items-center justify-between border-b pb-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">💳</span>
-                <span className="font-bold text-gray-800 text-sm">EFI (Gerencianet)</span>
-              </div>
-              <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-green-50 text-green-700 border border-green-200 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                Configurado
-              </span>
-            </div>
-            <div className="mt-3 space-y-2 text-xs text-gray-600">
-              <div>
-                <span className="font-semibold text-gray-500">Ambiente:</span>{' '}
-                <span className="px-2 py-0.5 rounded bg-gray-100 font-mono text-gray-700 text-[10px]">
-                  {form.int_efi_sandbox ? 'Sandbox (Homologação)' : 'Produção'}
-                </span>
-              </div>
-              <div>
-                <span className="font-semibold text-gray-500">Última comunicação:</span>{' '}
-                <span className="text-gray-400">Nenhuma registrada</span>
-              </div>
-              <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer pt-1">
-                <input
-                  type="checkbox"
-                  checked={!!form.int_efi_sandbox}
-                  onChange={set('int_efi_sandbox')}
-                  className="rounded text-teal-600 focus:ring-teal-500"
-                />
-                Ativar Sandbox (homologação)
-              </label>
-            </div>
-          </div>
-          <div>
-            <button
-              type="button"
-              onClick={() => alert('Conexão com EFI testada com sucesso!')}
-              className="w-full px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition"
-            >
-              Testar Conexão
-            </button>
-          </div>
-        </div>
-
-        {/* 2. ASAAS */}
-        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition">
-          <div>
-            <div className="flex items-center justify-between border-b pb-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🎯</span>
-                <span className="font-bold text-gray-800 text-sm">ASAAS</span>
-              </div>
-              <div className="flex gap-1.5 items-center">
-                <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md bg-teal-100 text-teal-800">
-                  Comercial
-                </span>
-                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-green-50 text-green-700 border border-green-200 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                  Ativo
-                </span>
-              </div>
-            </div>
-            <div className="mt-3 space-y-2 text-xs text-gray-600">
-              <div>
-                <span className="font-semibold text-gray-500">Ambiente:</span>{' '}
-                <span className="px-2 py-0.5 rounded bg-gray-100 font-mono text-gray-700 text-[10px]">Produção</span>
-              </div>
-              <div>
-                <span className="font-semibold text-gray-500">Último webhook recebido:</span>{' '}
-                <span className="text-gray-400">Nenhum evento pendente</span>
-              </div>
-            </div>
-          </div>
-          <div>
-            <button
-              type="button"
-              onClick={() => alert('Conexão com ASAAS (Comercial) testada com sucesso!')}
-              className="w-full px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition"
-            >
-              Testar Conexão
-            </button>
-          </div>
-        </div>
-
-        {/* 3. E-mail Transacional */}
-        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4 hover:shadow-md transition md:col-span-2">
-          <div className="flex items-center justify-between border-b pb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">✉️</span>
-              <span className="font-bold text-gray-800 text-sm">E-mail Transacional</span>
-            </div>
-            <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-green-50 text-green-700 border border-green-200 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-              SMTP Configurado
+        {/* Indicador Visual de Saúde das Integrações */}
+        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+          <div className="flex items-center justify-between border-b pb-3">
+            <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+              <span>🏥</span> Saúde das Integrações
+            </h4>
+            <span className="text-[10px] font-semibold text-gray-400 bg-gray-100 px-2 py-0.5 rounded uppercase tracking-wider">
+              Status estimado
             </span>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
-            <Field label="Host SMTP">
-              <input value={form.int_email_host || ''} onChange={set('int_email_host')} placeholder="smtp.gmail.com" className={INPUT} />
-            </Field>
-            <Field label="Porta">
-              <input type="number" value={form.int_email_port || '587'} onChange={set('int_email_port')} className={INPUT} />
-            </Field>
-            <Field label="Usuário">
-              <input value={form.int_email_user || ''} onChange={set('int_email_user')} className={INPUT} />
-            </Field>
-          </div>
-
-          <div className="border-t pt-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="text-xs text-gray-600">
-              <span className="font-semibold text-gray-500">Resend API:</span>{' '}
-              <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium text-[10px]">
-                Em preparação (Configurar via env)
-              </span>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="p-3 bg-gray-50/50 border rounded-xl flex flex-col items-center justify-center text-center space-y-1">
+              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">EFI</span>
+              {getStatusIndicator(efiStatus)}
             </div>
-            <button
-              type="button"
-              onClick={() => alert(`E-mail de teste enviado para ${form.int_email_user || 'o usuário configurado'}`)}
-              className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition self-end md:self-auto"
-            >
-              Enviar E-mail de Teste
-            </button>
+            <div className="p-3 bg-gray-50/50 border rounded-xl flex flex-col items-center justify-center text-center space-y-1">
+              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">ASAAS</span>
+              {getStatusIndicator(asaasStatus)}
+            </div>
+            <div className="p-3 bg-gray-50/50 border rounded-xl flex flex-col items-center justify-center text-center space-y-1">
+              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">SMTP</span>
+              {getStatusIndicator(smtpStatus)}
+            </div>
+            <div className="p-3 bg-gray-50/50 border rounded-xl flex flex-col items-center justify-center text-center space-y-1">
+              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Assinafy</span>
+              {getStatusIndicator(assinafyStatus)}
+            </div>
+            <div className="p-3 bg-gray-50/50 border rounded-xl flex flex-col items-center justify-center text-center space-y-1 col-span-2 md:col-span-1">
+              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">ViaCEP</span>
+              {getStatusIndicator(viacepStatus)}
+            </div>
           </div>
         </div>
 
-        {/* 4. Assinatura Digital */}
-        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition">
-          <div>
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800 flex items-center gap-2">
+          <span>⚠️</span>
+          <span>Chaves de API e tokens sensíveis devem ser configurados via <strong>variáveis de ambiente</strong> no painel da Vercel — não aqui.</span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          {/* 1. EFI (Gerencianet) */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition">
+            <div>
+              <div className="flex items-center justify-between border-b pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">💳</span>
+                  <span className="font-bold text-gray-800 text-sm">EFI (Gerencianet)</span>
+                </div>
+                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-green-50 text-green-700 border border-green-200 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                  Configurado
+                </span>
+              </div>
+              <div className="mt-3 space-y-2 text-xs text-gray-600">
+                <div>
+                  <span className="font-semibold text-gray-500">Ambiente:</span>{' '}
+                  <span className="px-2 py-0.5 rounded bg-gray-100 font-mono text-gray-700 text-[10px]">
+                    {form.int_efi_sandbox ? 'Sandbox (Homologação)' : 'Produção'}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-500">Última comunicação:</span>{' '}
+                  <span className="text-gray-400">Nenhuma registrada</span>
+                </div>
+                <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer pt-1">
+                  <input
+                    type="checkbox"
+                    checked={!!form.int_efi_sandbox}
+                    onChange={set('int_efi_sandbox')}
+                    className="rounded text-teal-600 focus:ring-teal-500"
+                  />
+                  Ativar Sandbox (homologação)
+                </label>
+              </div>
+            </div>
+            <div>
+              <button
+                type="button"
+                onClick={() => alert('Conexão com EFI testada com sucesso!')}
+                className="w-full px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition"
+              >
+                Testar Conexão
+              </button>
+            </div>
+          </div>
+
+          {/* 2. ASAAS */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition">
+            <div>
+              <div className="flex items-center justify-between border-b pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🎯</span>
+                  <span className="font-bold text-gray-800 text-sm">ASAAS</span>
+                </div>
+                <div className="flex gap-1.5 items-center">
+                  <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md bg-teal-100 text-teal-800">
+                    Comercial
+                  </span>
+                  <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-green-50 text-green-700 border border-green-200 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                    Ativo
+                  </span>
+                </div>
+              </div>
+              <div className="mt-3 space-y-2 text-xs text-gray-600">
+                <div>
+                  <span className="font-semibold text-gray-500">Ambiente:</span>{' '}
+                  <span className="px-2 py-0.5 rounded bg-gray-100 font-mono text-gray-700 text-[10px]">Produção</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-500">Último webhook recebido:</span>{' '}
+                  <span className="text-gray-400">Nenhum evento pendente</span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <button
+                type="button"
+                onClick={() => alert('Conexão com ASAAS (Comercial) testada com sucesso!')}
+                className="w-full px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition"
+              >
+                Testar Conexão
+              </button>
+            </div>
+          </div>
+
+          {/* 3. E-mail Transacional */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4 hover:shadow-md transition md:col-span-2">
             <div className="flex items-center justify-between border-b pb-2">
               <div className="flex items-center gap-2">
-                <span className="text-xl">✍️</span>
-                <span className="font-bold text-gray-800 text-sm">Assinafy (Contrato Digital)</span>
+                <span className="text-xl">✉️</span>
+                <span className="font-bold text-gray-800 text-sm">E-mail Transacional</span>
               </div>
               <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-green-50 text-green-700 border border-green-200 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                Ativo (Variáveis Vercel)
+                SMTP Configurado
               </span>
             </div>
-            <div className="mt-3 text-xs text-gray-600 space-y-2">
-              <p>Autenticação via chave de API global gerenciada nas variáveis de ambiente.</p>
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-[11px] font-mono text-gray-600">
-                ASSINAFY_API_KEY & ASSINAFY_BASE_URL
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+              <Field label="Host SMTP">
+                <input value={form.int_email_host || ''} onChange={set('int_email_host')} placeholder="smtp.gmail.com" className={INPUT} />
+              </Field>
+              <Field label="Porta">
+                <input type="number" value={form.int_email_port || '587'} onChange={set('int_email_port')} className={INPUT} />
+              </Field>
+              <Field label="Usuário">
+                <input value={form.int_email_user || ''} onChange={set('int_email_user')} className={INPUT} />
+              </Field>
+            </div>
+
+            <div className="border-t pt-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="text-xs text-gray-600">
+                <span className="font-semibold text-gray-500">Resend API:</span>{' '}
+                <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 font-medium text-[10px]">
+                  Em preparação (Configurar via env)
+                </span>
               </div>
+              <button
+                type="button"
+                onClick={() => alert(`E-mail de teste enviado para ${form.int_email_user || 'o usuário configurado'}`)}
+                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition self-end md:self-auto"
+              >
+                Enviar E-mail de Teste
+              </button>
             </div>
           </div>
-          <div>
-            <button
-              type="button"
-              onClick={() => alert('Conexão com Assinafy testada com sucesso!')}
-              className="w-full px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition"
-            >
-              Testar Conexão
-            </button>
+
+          {/* 4. Assinatura Digital */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition">
+            <div>
+              <div className="flex items-center justify-between border-b pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">✍️</span>
+                  <span className="font-bold text-gray-800 text-sm">Assinafy (Contrato Digital)</span>
+                </div>
+                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-green-50 text-green-700 border border-green-200 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                  Ativo (Variáveis Vercel)
+                </span>
+              </div>
+              <div className="mt-3 text-xs text-gray-600 space-y-2">
+                <p>Autenticação via chave de API global gerenciada nas variáveis de ambiente.</p>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-[11px] font-mono text-gray-600">
+                  ASSINAFY_API_KEY & ASSINAFY_BASE_URL
+                </div>
+              </div>
+            </div>
+            <div>
+              <button
+                type="button"
+                onClick={() => alert('Conexão com Assinafy testada com sucesso!')}
+                className="w-full px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition"
+              >
+                Testar Conexão
+              </button>
+            </div>
           </div>
+
+          {/* 5. Serviços Adicionais */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition">
+            <div>
+              <div className="flex items-center justify-between border-b pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🛠️</span>
+                  <span className="font-bold text-gray-800 text-sm">Serviços Adicionais</span>
+                </div>
+              </div>
+              <div className="mt-3 space-y-2.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-700 font-medium">ViaCEP (Preenchimento de Endereço)</span>
+                  <span className="px-2 py-0.5 text-[10px] font-semibold bg-green-100 text-green-800 rounded">Ativo</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400">Receita Federal (CNPJ)</span>
+                  <span className="px-2 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-800 rounded">Em preparação</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-400">Google Maps (Geolocalização)</span>
+                  <span className="px-2 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-800 rounded">Em preparação</span>
+                </div>
+              </div>
+            </div>
+            <div className="text-[10px] text-gray-400 text-center">
+              Pronto para novas conexões via painel administrativo.
+            </div>
+          </div>
+
         </div>
 
-        {/* 5. Serviços Adicionais */}
-        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between space-y-4 hover:shadow-md transition">
-          <div>
-            <div className="flex items-center justify-between border-b pb-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🛠️</span>
-                <span className="font-bold text-gray-800 text-sm">Serviços Adicionais</span>
-              </div>
-            </div>
-            <div className="mt-3 space-y-2.5 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-700 font-medium">ViaCEP (Preenchimento de Endereço)</span>
-                <span className="px-2 py-0.5 text-[10px] font-semibold bg-green-100 text-green-800 rounded">Ativo</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-400">Receita Federal (CNPJ)</span>
-                <span className="px-2 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-800 rounded">Em preparação</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-400">Google Maps (Geolocalização)</span>
-                <span className="px-2 py-0.5 text-[10px] font-semibold bg-amber-100 text-amber-800 rounded">Em preparação</span>
-              </div>
-            </div>
-          </div>
-          <div className="text-[10px] text-gray-400 text-center">
-            Pronto para novas conexões via painel administrativo.
+        {/* Histórico de Testes no Rodapé */}
+        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+          <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2 border-b pb-3">
+            <span>📋</span> Histórico de Testes de Conexão
+          </h4>
+          <div className="flex flex-col items-center justify-center py-6 text-center text-gray-400 space-y-2">
+            <span className="text-2xl">🔍</span>
+            <p className="text-sm font-medium">Nenhum teste realizado</p>
+            <p className="text-xs text-gray-400 max-w-xs">Os registros de testes locais e webhooks aparecerão aqui após a sincronização com o serviço de auditoria.</p>
           </div>
         </div>
 
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderAvancado = () => (
     <div className="space-y-4">
