@@ -51,7 +51,7 @@ export default function DetalharLead() {
   const [abaAtiva, setAbaAtiva] = useState('dados'); // 'dados' ou 'timeline'
   const [interacoes, setInteracoes] = useState([]);
   const [carregandoInteracoes, setCarregandoInteracoes] = useState(false);
-  const [formInteracao, setFormInteracao] = useState({ tipo: 'observacao', descricao: '' });
+  const [formInteracao, setFormInteracao] = useState({ tipo: 'observacao', titulo: '', descricao: '' });
   const [salvandoInteracao, setSalvandoInteracao] = useState(false);
 
   const carregarInteracoes = () => {
@@ -83,7 +83,7 @@ export default function DetalharLead() {
         body: JSON.stringify(formInteracao)
       });
       if (res.ok) {
-        setFormInteracao(f => ({ ...f, descricao: '' }));
+        setFormInteracao(f => ({ ...f, titulo: '', descricao: '' }));
         carregarInteracoes();
       }
     } catch (_) {}
@@ -532,8 +532,8 @@ export default function DetalharLead() {
                   <h4 className="font-semibold text-gray-800 text-sm flex items-center gap-2">
                     <span>✍️</span> Registrar Interação Manual
                   </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                    <div className="sm:col-span-1">
+                  <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+                    <div className="md:col-span-2">
                       <label className="block text-xs text-gray-500 mb-1">Canal / Tipo</label>
                       <select
                         value={formInteracao.tipo}
@@ -548,7 +548,17 @@ export default function DetalharLead() {
                         <option value="observacao">📝 Observação</option>
                       </select>
                     </div>
-                    <div className="sm:col-span-3">
+                    <div className="md:col-span-4">
+                      <label className="block text-xs text-gray-500 mb-1">Título personalizado (Opcional)</label>
+                      <input
+                        type="text"
+                        value={formInteracao.titulo}
+                        onChange={e => setFormInteracao(f => ({ ...f, titulo: e.target.value }))}
+                        placeholder="Ex: Envio de proposta comercial / Primeira tentativa..."
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+                      />
+                    </div>
+                    <div className="md:col-span-6">
                       <label className="block text-xs text-gray-500 mb-1">Resumo do contato</label>
                       <input
                         type="text"
@@ -573,7 +583,7 @@ export default function DetalharLead() {
 
                 {/* Lista da Timeline */}
                 <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                  <h4 className="font-semibold text-gray-800 text-sm mb-4">Linha do Tempo 360º</h4>
+                  <h4 className="font-semibold text-gray-800 text-sm mb-6">Linha do Tempo 360º</h4>
                   {carregandoInteracoes ? (
                     <div className="text-center py-8 text-sm text-gray-400">Carregando timeline...</div>
                   ) : interacoes.length === 0 ? (
@@ -591,6 +601,7 @@ export default function DetalharLead() {
                           comissao_calculada: '💸',
                           venda_criada: '🏷️',
                           matricula_efetivada: '🎓',
+                          contrato_emitido: '📄',
                           ligacao: '📞',
                           whatsapp: '📱',
                           email: '📧',
@@ -600,26 +611,30 @@ export default function DetalharLead() {
                         };
                         const icon = iconMap[item.tipo] || '💬';
                         return (
-                          <div key={item.id} className="relative pl-6">
+                          <div key={item.id} className="relative pl-8 pb-6 border-l border-gray-100 last:border-0 last:pb-0">
                             {/* Círculo / Ícone */}
-                            <div className="absolute -left-3.5 top-0.5 bg-white border border-gray-200 rounded-full w-7 h-7 flex items-center justify-center text-sm shadow-sm">
+                            <div className="absolute -left-4 top-0 bg-teal-50 border-2 border-teal-500 rounded-full w-8 h-8 flex items-center justify-center text-sm shadow-sm z-10">
                               {icon}
                             </div>
-                            <div className="space-y-1">
+                            
+                            {/* Card do Evento */}
+                            <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm hover:shadow transition-shadow space-y-2">
                               <div className="flex items-center justify-between gap-4 flex-wrap">
-                                <span className="font-semibold text-gray-800 text-sm capitalize">
-                                  {item.tipo.replace('_', ' ')}
+                                <span className="font-bold text-gray-800 text-sm">
+                                  {item.titulo || item.tipo.charAt(0).toUpperCase() + item.tipo.slice(1).replace('_', ' ')}
                                 </span>
-                                <span className="text-[10px] text-gray-400">
-                                  {new Date(item.data_evento).toLocaleString('pt-BR')}
+                                <span className="text-[10px] bg-gray-50 text-gray-500 px-2 py-0.5 rounded-full font-medium">
+                                  📅 {new Date(item.data_evento).toLocaleString('pt-BR')}
                                 </span>
                               </div>
                               <p className="text-sm text-gray-600 leading-relaxed">{item.descricao}</p>
-                              {item.usuarios?.nomecompleto && (
-                                <div className="text-[10px] text-gray-400 flex items-center gap-1">
-                                  <span>👤</span> {item.usuarios.nomecompleto}
-                                </div>
-                              )}
+                              
+                              <div className="flex items-center justify-between pt-2 border-t border-gray-50 text-[10px] text-gray-400">
+                                <span>👤 {item.usuarios?.nomecompleto || 'Sistema'}</span>
+                                <span className="uppercase text-[9px] font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded">
+                                  {item.tipo.replace('_', ' ')}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         );

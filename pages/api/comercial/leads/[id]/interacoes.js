@@ -47,6 +47,7 @@ export default async function handler(req, res) {
         id: 'initial',
         lead_id: leadId,
         tipo: 'criacao',
+        titulo: 'Ficha Cadastrada',
         descricao: 'Ficha de Matrícula Comercial cadastrada no sistema',
         data_evento: lead.created_at || new Date().toISOString(),
         usuarios: { nomecompleto: 'Sistema (Conversão)' }
@@ -54,11 +55,11 @@ export default async function handler(req, res) {
 
       // Parsear as observações em busca de logs
       const obs = lead.observacoes || '';
-      const regex = /\[TIMELINE_([^\]]+)\]\s*\[([^\]]+)\]\s*(.*)/g;
+      const regex = /\[TIMELINE_([^\]]+)\]\s*\[([^\]]+)\]\s*(?:\[([^\]]+)\]\s*)?(.*)/g;
       let match;
       let count = 0;
       while ((match = regex.exec(obs)) !== null) {
-        const [, tipoLog, dataStr, desc] = match;
+        const [, tipoLog, dataStr, tituloLog, desc] = match;
         
         // Tentar parsear a data
         let dEvt = new Date().toISOString();
@@ -68,10 +69,12 @@ export default async function handler(req, res) {
           dEvt = new Date(`${year}-${month}-${day}T${t}`).toISOString();
         } catch (_) {}
 
+        const finalTipo = tipoLog.toLowerCase();
         fakeInteracoes.push({
           id: `fake_${count++}`,
           lead_id: leadId,
-          tipo: tipoLog.toLowerCase(),
+          tipo: finalTipo,
+          titulo: tituloLog || (finalTipo.charAt(0).toUpperCase() + finalTipo.slice(1).replace('_', ' ')),
           descricao: desc.trim(),
           data_evento: dEvt,
           usuarios: { nomecompleto: 'Sistema' }
@@ -88,23 +91,25 @@ export default async function handler(req, res) {
 
   // ── POST: criar interação manual ──────────────────────────────────────────
   if (req.method === 'POST') {
-    const { tipo, descricao } = req.body || {};
+    const { tipo, titulo, descricao } = req.body || {};
 
     if (!tipo || !descricao?.trim()) {
       return res.status(400).json({ error: 'Tipo e descrição são obrigatórios.' });
     }
 
-    const resultado = await registrarInteracao(supabase, leadId, {
+    const { registrarInteracaoLead } = require('../../../../../lib/comercial/interacao-service');
+    const resultado = await registrarInteracaoLead(supabase, leadId, {
       instituicao_id: instituicaoId,
       usuario_id: authUser.id,
       tipo,
+      titulo: titulo || null,
       descricao: String(descricao).trim(),
       metadata: { cadastrado_por: authUser.nome || authUser.email }
     });
 
     return res.status(201).json({
       mensagem: 'Interação registrada com sucesso.',
-      interacao: resultado.data || { tipo, descricao, data_evento: new Date().toISOString() }
+      interacao: resultado.data || { tipo, titulo, descricao, data_evento: new Date().toISOString() }
     });
   }
 
