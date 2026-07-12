@@ -20,3 +20,6 @@ export { default as PageHeader }                           from './PageHeader';
 export { default as StatsGrid }                            from './StatsGrid';
 export { default as Timeline }                             from './Timeline';
 export { default as ConfirmDialog }                        from './ConfirmDialog';
+export { default as ExecutiveMetricCard }                  from './ExecutiveMetricCard';
+export { default as DashboardContainer }                   from './DashboardContainer';
+export { default as DashboardHeader }                      from './DashboardHeader';
