@@ -968,6 +968,166 @@ export default function ConfiguracaoEmpresa() {
                   </div>
                 </div>
 
+                {/* Índice de Saúde Geral */}
+                {(() => {
+                  const checks = [
+                    { name: 'Empresa: Nome', valid: !!formData.nomeEmpresa, critical: true },
+                    { name: 'Empresa: CNPJ', valid: !!formData.cnpj, critical: true },
+                    { name: 'Empresa: Logo', valid: !!formData.logo, critical: false },
+                    { name: 'Empresa: E-mail', valid: !!formData.email, critical: true },
+                    { name: 'Empresa: Endereço', valid: !!formData.endereco && !!formData.cidade && !!formData.estado, critical: true },
+                    { name: 'Instituições cadastradas', valid: (instituicoes?.length || 0) > 0, critical: true },
+                    { name: 'Contrato padrão definido', valid: contratos.some(c => c.padrao), critical: true },
+                    { name: 'Contrato: Existe modelo ativo', valid: contratos.some(c => c.ativo), critical: true },
+                    { name: 'Asaas configurado', valid: !formData?.financeiro?.ativarAsaas || (!!formData?.financeiro?.apiKeyAsaas), critical: true },
+                    { name: 'EFI configurado', valid: !formData?.financeiro?.ativarGerencianet || (!!formData?.financeiro?.clientId && !!formData?.financeiro?.clientSecret), critical: true },
+                    { name: 'SMTP: Host e Porta', valid: true, critical: false } // SMTP mock
+                  ];
+                  
+                  const totalChecks = checks.length;
+                  const passedChecks = checks.filter(c => c.valid).length;
+                  const score = Math.round((passedChecks / totalChecks) * 100);
+                  
+                  let colorClass = 'text-green-600 bg-green-50 border-green-200';
+                  let label = '🟢 Excelente';
+                  if (score < 50) {
+                    colorClass = 'text-red-600 bg-red-50 border-red-200';
+                    label = '🔴 Crítico';
+                  } else if (score < 85) {
+                    colorClass = 'text-yellow-600 bg-yellow-50 border-yellow-200';
+                    label = '🟡 Atenção';
+                  }
+
+                  const pendenciasProducao = [];
+                  if (!formData.nomeEmpresa) pendenciasProducao.push('Configurar Nome Fantasia da Empresa');
+                  if (!formData.cnpj) pendenciasProducao.push('Configurar CNPJ da Empresa');
+                  if ((instituicoes?.length || 0) === 0) pendenciasProducao.push('Cadastrar pelo menos uma Instituição');
+                  if (!contratos.some(c => c.padrao)) pendenciasProducao.push('Definir um Contrato Padrão nas configurações de contratos');
+                  if (formData?.financeiro?.ativarAsaas && !formData?.financeiro?.apiKeyAsaas) pendenciasProducao.push('Configurar API Key do ASAAS');
+                  if (formData?.financeiro?.ativarGerencianet && (!formData?.financeiro?.clientId || !formData?.financeiro?.clientSecret)) pendenciasProducao.push('Configurar credenciais EFI');
+
+                  return (
+                    <div className="space-y-6">
+                      
+                      {/* Bloco Superior: Score & Pendências */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        
+                        {/* Score Geral */}
+                        <div className={`p-6 rounded-2xl border flex flex-col justify-between items-center text-center ${colorClass}`}>
+                          <div>
+                            <span className="text-xs font-bold uppercase tracking-wider block text-gray-500 mb-1">Índice Geral de Saúde</span>
+                            <span className="text-4xl font-extrabold">{score}%</span>
+                          </div>
+                          <span className="mt-3 px-3 py-1 bg-white/80 rounded-full text-xs font-bold border border-current">{label}</span>
+                        </div>
+
+                        {/* Pendências de Produção */}
+                        <div className="p-5 rounded-2xl border border-gray-200 bg-white md:col-span-2 space-y-3">
+                          <h4 className="text-xs font-bold text-gray-700 uppercase tracking-widest border-b pb-2">🎯 Pendências para Produção</h4>
+                          {pendenciasProducao.length > 0 ? (
+                            <ul className="space-y-2">
+                              {pendenciasProducao.map((p, i) => (
+                                <li key={i} className="flex items-center gap-2 text-xs text-red-600 font-medium">
+                                  <span>🔴</span> {p}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <div className="flex items-center gap-2 p-3 bg-green-50 text-green-700 border border-green-200 rounded-xl text-xs font-bold">
+                              <span>🟢</span> Ambiente pronto para produção.
+                            </div>
+                          )}
+                        </div>
+
+                      </div>
+
+                      {/* Seção de Diagnóstico Detalhado */}
+                      <div className="bg-white p-6 rounded-2xl border border-gray-200 space-y-4">
+                        <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2 border-b pb-3">🩺 Diagnóstico do Ambiente</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          
+                          {/* Coluna 1: Geral & Instituicoes & Contratos */}
+                          <div className="space-y-4">
+                            
+                            {/* Card Empresa */}
+                            <div className="space-y-2">
+                              <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">🏢 Empresa</h4>
+                              <div className="space-y-1 text-xs">
+                                <div className="flex justify-between"><span>Nome configurado:</span> <span>{formData.nomeEmpresa ? '🟢 Configurado' : '🔴 Pendente'}</span></div>
+                                <div className="flex justify-between"><span>CNPJ informado:</span> <span>{formData.cnpj ? '🟢 Informado' : '🔴 Pendente'}</span></div>
+                                <div className="flex justify-between"><span>Logo cadastrada:</span> <span>{formData.logo ? '🟢 Cadastrada' : '🟡 Não informada'}</span></div>
+                                <div className="flex justify-between"><span>E-mail configurado:</span> <span>{formData.email ? '🟢 Configurado' : '🔴 Pendente'}</span></div>
+                                <div className="flex justify-between"><span>Endereço completo:</span> <span>{formData.endereco && formData.cidade && formData.estado ? '🟢 Completo' : '🔴 Incompleto'}</span></div>
+                              </div>
+                            </div>
+
+                            {/* Card Instituições */}
+                            <div className="space-y-2 pt-2 border-t border-gray-100">
+                              <h4 className="text-xs font-bold text-gray-550 uppercase tracking-wider">🏛️ Instituições</h4>
+                              <div className="space-y-1 text-xs">
+                                <div className="flex justify-between"><span>Cadastradas:</span> <span className="font-semibold">{instituicoes?.length || 0}</span></div>
+                                {(instituicoes?.length || 0) === 0 && <div className="text-red-600 font-semibold mt-1">⚠️ Nenhuma instituição cadastrada.</div>}
+                              </div>
+                            </div>
+
+                            {/* Card Contratos */}
+                            <div className="space-y-2 pt-2 border-t border-gray-100">
+                              <h4 className="text-xs font-bold text-gray-550 uppercase tracking-wider">📄 Contratos</h4>
+                              <div className="space-y-1 text-xs">
+                                <div className="flex justify-between"><span>Contrato padrão definido:</span> <span>{contratos.some(c => c.padrao) ? '🟢 Definido' : '🔴 Não definido'}</span></div>
+                                <div className="flex justify-between"><span>Existe modelo ativo:</span> <span>{contratos.some(c => c.ativo) ? '🟢 Sim' : '🔴 Não'}</span></div>
+                                {!contratos.some(c => c.padrao) && <div className="text-amber-600 font-semibold mt-1">⚠️ Contrato padrão não definido.</div>}
+                              </div>
+                            </div>
+
+                          </div>
+
+                          {/* Coluna 2: Gateways & SMTP & Pedagógico & Biblioteca */}
+                          <div className="space-y-4">
+                            
+                            {/* Card Gateways */}
+                            <div className="space-y-2">
+                              <h4 className="text-xs font-bold text-gray-550 uppercase tracking-wider">💳 Gateways</h4>
+                              <div className="space-y-1 text-xs">
+                                <div className="font-semibold text-[10px] text-gray-400 mt-1 uppercase">ASAAS</div>
+                                <div className="flex justify-between"><span>API configurada:</span> <span>{formData?.financeiro?.apiKeyAsaas ? '🟢 Configurada' : '🟡 Não definida'}</span></div>
+                                <div className="flex justify-between"><span>Ambiente:</span> <span className="font-mono">{formData?.financeiro?.ambienteAsaas || 'sandbox'}</span></div>
+                                
+                                <div className="font-semibold text-[10px] text-gray-400 mt-2 uppercase">EFI</div>
+                                <div className="flex justify-between"><span>Client ID & Secret:</span> <span>{formData?.financeiro?.clientId && formData?.financeiro?.clientSecret ? '🟢 Configurado' : '🟡 Não configurado'}</span></div>
+                                
+                                {formData?.financeiro?.ativarAsaas && !formData?.financeiro?.apiKeyAsaas && <div className="text-red-600 font-semibold mt-1">⚠️ Configuração incompleta (ASAAS).</div>}
+                                {formData?.financeiro?.ativarGerencianet && (!formData?.financeiro?.clientId || !formData?.financeiro?.clientSecret) && <div className="text-red-600 font-semibold mt-1">⚠️ Configuração incompleta (EFI).</div>}
+                              </div>
+                            </div>
+
+                            {/* Card SMTP */}
+                            <div className="space-y-2 pt-2 border-t border-gray-100">
+                              <h4 className="text-xs font-bold text-gray-550 uppercase tracking-wider">✉️ SMTP</h4>
+                              <div className="space-y-1 text-xs">
+                                <div className="flex justify-between"><span>Host configurado:</span> <span>🟢 Configurado (Mock)</span></div>
+                                <div className="flex justify-between"><span>Porta / Usuário:</span> <span>🟢 Configurado (Mock)</span></div>
+                              </div>
+                            </div>
+
+                            {/* Card Pedagógico */}
+                            <div className="space-y-2 pt-2 border-t border-gray-100">
+                              <h4 className="text-xs font-bold text-gray-550 uppercase tracking-wider">📚 Módulos Acadêmicos</h4>
+                              <div className="space-y-1 text-xs">
+                                <div><span className="font-semibold text-gray-500">Pedagógico:</span> Validação será habilitada futuramente.</div>
+                                <div><span className="font-semibold text-gray-500">Biblioteca:</span> Validação será habilitada futuramente.</div>
+                              </div>
+                            </div>
+
+                          </div>
+
+                        </div>
+                      </div>
+
+                    </div>
+                  );
+                })()}
+
                 {/* Seção 3: Resumo do Ambiente & Checklist & Alertas */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   
