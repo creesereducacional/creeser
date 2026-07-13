@@ -751,9 +751,9 @@ export default function Configuracoes() {
               >
                 Testar Conexão
               </button>
-              <Link href="/admin/configuracoes/empresa"
+              <Link href="/admin/configuracoes/empresa?tab=gateways"
                 className="px-3 py-2 border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold transition whitespace-nowrap">
-                🔑 Credenciais
+                ⚙️ Configurar
               </Link>
             </div>
           </div>
@@ -795,9 +795,9 @@ export default function Configuracoes() {
               >
                 Testar Conexão
               </button>
-              <Link href="/admin/configuracoes/empresa"
+              <Link href="/admin/configuracoes/empresa?tab=gateways"
                 className="px-3 py-2 border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold transition whitespace-nowrap">
-                🔑 Credenciais
+                ⚙️ Configurar
               </Link>
             </div>
           </div>
@@ -834,13 +834,19 @@ export default function Configuracoes() {
                   Em preparação (Configurar via env)
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => alert(`E-mail de teste enviado para ${form.int_email_user || 'o usuário configurado'}`)}
-                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition self-end md:self-auto"
-              >
-                Enviar E-mail de Teste
-              </button>
+              <div className="flex gap-2 self-end md:self-auto">
+                <button
+                  type="button"
+                  onClick={() => alert(`E-mail de teste enviado para ${form.int_email_user || 'o usuário configurado'}`)}
+                  className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition"
+                >
+                  Enviar E-mail de Teste
+                </button>
+                <Link href="/admin/configuracoes/empresa?tab=gateways"
+                  className="px-4 py-2 border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold transition whitespace-nowrap">
+                  ⚙️ Configurar
+                </Link>
+              </div>
             </div>
           </div>
 
@@ -864,14 +870,18 @@ export default function Configuracoes() {
                 </div>
               </div>
             </div>
-            <div>
+            <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => alert('Conexão com Assinafy testada com sucesso!')}
-                className="w-full px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition"
+                className="flex-1 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition"
               >
                 Testar Conexão
               </button>
+              <Link href="/admin/configuracoes/empresa?tab=gateways"
+                className="px-3 py-2 border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold transition whitespace-nowrap">
+                ⚙️ Configurar
+              </Link>
             </div>
           </div>
 
