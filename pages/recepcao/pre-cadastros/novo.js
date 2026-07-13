@@ -102,11 +102,13 @@ export default function NovoPrecadastro() {
     setEtapa(s => Math.min(s + 1, 3));
   }
 
+  const [duplicateId, setDuplicateId] = useState(null);
+
   // Submit (lógica original inalterada)
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.nome?.trim()) { setErro('Nome é obrigatório.'); return; }
-    setSalvando(true); setErro(null);
+    setSalvando(true); setErro(null); setDuplicateId(null);
     try {
       const res = await fetch('/api/recepcao/pre-cadastros', {
         method: 'POST', credentials: 'include',
@@ -114,7 +116,13 @@ export default function NovoPrecadastro() {
         body: JSON.stringify({ ...form, instituicao_id: instSel || undefined }),
       });
       const data = await res.json();
-      if (!res.ok) { setErro(data.error || 'Erro ao salvar.'); return; }
+      if (!res.ok) {
+        setErro(data.error || 'Erro ao salvar.');
+        if (res.status === 409 && data.aluno_id) {
+          setDuplicateId(data.aluno_id);
+        }
+        return;
+      }
       router.push('/recepcao/pre-cadastros');
     } catch { setErro('Erro de conexão.'); }
     finally { setSalvando(false); }
@@ -165,7 +173,21 @@ export default function NovoPrecadastro() {
 
         {/* ── Alerta de erro geral ──────────────────────────────── */}
         {erro && (
-          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">{erro}</div>
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 space-y-3">
+            <p className="font-semibold">⚠️ {erro}</p>
+            {duplicateId && (
+              <div className="flex gap-2 pt-1">
+                <Link href={`/recepcao/pre-cadastros/${duplicateId}`}
+                  className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition shadow-sm">
+                  Abrir cadastro existente
+                </Link>
+                <button type="button" onClick={() => { setErro(null); setDuplicateId(null); }}
+                  className="px-3.5 py-1.5 border border-red-200 hover:bg-red-100/50 text-red-700 rounded-lg text-xs font-medium transition">
+                  Cancelar
+                </button>
+              </div>
+            )}
+          </div>
         )}
 
         <form onSubmit={handleSubmit}>

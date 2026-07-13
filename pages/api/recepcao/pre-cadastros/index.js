@@ -98,6 +98,33 @@ export default async function handler(req, res) {
       ...(observacoes_adicionais ? { observacoes_adicionais }                  : {}),
     };
 
+    if (cpf?.trim()) {
+      const cleanCpf = cpf.trim();
+      const { data: existente } = await supabase
+        .from('alunos')
+        .select('id, nome')
+        .eq('cpf', cleanCpf)
+        .maybeSingle();
+
+      if (existente) {
+        // Registrar tentativa na auditoria
+        try {
+          await supabase.from('recepcao_auditoria').insert({
+            usuario_id: authUser.id,
+            acao:       'TENTATIVA_CPF_DUPLICADO',
+            dados:      JSON.stringify({ cpf: cleanCpf, nome_tentativa: nome.trim(), aluno_existente_id: existente.id }),
+            data_hora:  new Date().toISOString(),
+          });
+        } catch (_) {}
+
+        return res.status(409).json({
+          error: 'Este CPF já possui um cadastro no sistema.',
+          aluno_id: existente.id,
+          nome: existente.nome
+        });
+      }
+    }
+
     const { data: aluno, error: alunoError } = await supabase
       .from('alunos')
       .insert(novoAluno)
