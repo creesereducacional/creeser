@@ -587,9 +587,16 @@ export default function NovoPrecadastro() {
               <button
                 type="submit"
                 disabled={salvando}
-                className="px-6 py-2.5 bg-green-600 text-white text-sm font-bold rounded-xl hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
+                className="px-6 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white text-sm font-bold rounded-xl transition-colors shadow-sm flex items-center gap-2"
               >
-                {salvando ? 'Cadastrando…' : '✅ Confirmar Pré-Cadastro'}
+                {salvando ? (
+                  <>
+                    <span className="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                    <span>Salvando...</span>
+                  </>
+                ) : (
+                  <span>✅ Confirmar Pré-Cadastro</span>
+                )}
               </button>
             )}
           </div>
