@@ -134,24 +134,6 @@ export default function DashboardLayout({ children }) {
   const menuItems = [
     // Menu Principal
     { id: 'dashboard', nome: 'Início', icon: '🏠', url: '/admin/dashboard', em_breve: false, secao: 'Menu Principal' },
-    
-    // Coordenação (com submenu)
-    {
-      id: 'coordenacao',
-      nome: 'Coordenação',
-      icon: '👔',
-      em_breve: false,
-      secao: 'Estrutura Geral',
-      perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
-      submenu: [
-        { id: 'configuracoes', nome: 'Configurações', icon: '▪', url: '/admin/configuracoes', em_breve: false, completed: true },
-        { id: 'solicitacoes', nome: 'Solicitações', icon: '▪', url: '/admin/configuracoes/solicitacoes', em_breve: false, completed: true },
-        { id: 'unidades', nome: 'Unidades', icon: '▪', url: '/admin/unidades', em_breve: false, completed: true },
-        { id: 'anos-letivos', nome: 'Anos Letivos', icon: '▪', url: '/admin/anos-letivos', em_breve: false, completed: true },
-        { id: 'calendario-aulas', nome: 'Calendário de Aulas', icon: '▪', url: '#', em_breve: true },
-        { id: 'contas-bancarias', nome: 'Contas Bancárias', icon: '▪', url: '#', em_breve: true },
-      ]
-    },
 
     { id: 'comunicados', nome: 'Comunicados', icon: '✉️', url: '#', em_breve: true, secao: 'Administrativo' },
     
@@ -258,7 +240,6 @@ export default function DashboardLayout({ children }) {
       tiposInstituicao: ['faculdade'],
       nome: 'Estágio', 
       icon: '📊', 
-      em_breve: true, 
       secao: 'Administração',
       submenu: [
         { id: 'gerenciar-empresas', nome: 'Gerenciar empresas', icon: '▪', url: '#', em_breve: true },
@@ -273,7 +254,6 @@ export default function DashboardLayout({ children }) {
       tiposInstituicao: ['faculdade'],
       nome: 'Contábil', 
       icon: '📈', 
-      em_breve: true, 
       secao: 'Administração',
       submenu: [
         { id: 'fornecedores', nome: 'Fornecedores', icon: '▪', url: '#', em_breve: true },
@@ -293,7 +273,6 @@ export default function DashboardLayout({ children }) {
       perfis: ['grupo_admin', 'instituicao_admin', 'financeiro'],
       nome: 'Documentos', 
       icon: '📁', 
-      em_breve: true, 
       secao: 'Relatórios',
       submenu: [
         { id: 'atas', nome: 'Atas', icon: '▪', url: '#', em_breve: true },
@@ -309,7 +288,6 @@ export default function DashboardLayout({ children }) {
       perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
       nome: 'Relatórios', 
       icon: '📄', 
-      em_breve: true, 
       secao: 'Relatórios',
       submenu: [
         { id: 'rel-pedagogicos', nome: 'Pedagógicos', icon: '▪', url: '#', em_breve: true },
@@ -325,7 +303,6 @@ export default function DashboardLayout({ children }) {
       perfis: ['grupo_admin', 'instituicao_admin', 'financeiro', 'coordenador'],
       nome: 'Gráficos', 
       icon: '📊', 
-      em_breve: true, 
       secao: 'Relatórios',
       submenu: [
         { id: 'graf-pedagogicos', nome: 'Pedagógicos', icon: '▪', url: '#', em_breve: true },
@@ -338,7 +315,6 @@ export default function DashboardLayout({ children }) {
       perfis: ['grupo_admin', 'instituicao_admin', 'financeiro', 'coordenador'],
       nome: 'Eventos', 
       icon: '💎', 
-      em_breve: true, 
       secao: 'Outras Funcionalidades',
       submenu: [
         { id: 'gerenciar-eventos', nome: 'Gerenciar', icon: '▪', url: '#', em_breve: true },
@@ -364,8 +340,7 @@ export default function DashboardLayout({ children }) {
     },
 
     // Solicitações
-    // Solicitações
-    { id: 'solicitacoes', nome: 'Solicitações', icon: '✋', url: '#', em_breve: true, secao: 'Outras Funcionalidades' },
+    { id: 'solicitacoes-geral', nome: 'Solicitações', icon: '✋', url: '#', em_breve: true, secao: 'Outras Funcionalidades' },
 
     // Ocorrências
     { id: 'ocorrencias', nome: 'Ocorrências', icon: '⚠️', url: '#', em_breve: true, secao: 'Outras Funcionalidades' },
@@ -385,11 +360,29 @@ export default function DashboardLayout({ children }) {
     // Integrações
     { id: 'integracao', nome: 'Integrações', icon: '🔗', url: '#', em_breve: true, secao: 'Outras Funcionalidades' },
 
-    // Funcionários
-    { id: 'funcionarios', nome: 'Funcionários', icon: '👤', url: '/admin/funcionarios', em_breve: false, secao: 'Outras Funcionalidades', completed: true, perfis: ['grupo_admin', 'instituicao_admin'] },
-
     // Usuários
     { id: 'usuarios', nome: 'Usuários', icon: '👥', url: '/admin/usuarios', em_breve: false, secao: 'Outras Funcionalidades', completed: true, perfis: ['grupo_admin', 'instituicao_admin'] },
+
+    // Configurações
+    {
+      id: 'coordenacao',
+      nome: 'Configurações',
+      icon: '⚙️',
+      em_breve: false,
+      secao: 'Outras Funcionalidades',
+      perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
+      submenu: [
+        { id: 'configuracoes', nome: 'Configurações', icon: '▪', url: '/admin/configuracoes', em_breve: false, completed: true },
+        { id: 'solicitacoes', nome: 'Solicitações', icon: '▪', url: '/admin/configuracoes/solicitacoes', em_breve: false, completed: true },
+        { id: 'unidades', nome: 'Unidades', icon: '▪', url: '/admin/unidades', em_breve: false, completed: true },
+        { id: 'anos-letivos', nome: 'Anos Letivos', icon: '▪', url: '/admin/anos-letivos', em_breve: false, completed: true },
+        { id: 'calendario-aulas', nome: 'Calendário de Aulas', icon: '▪', url: '#', em_breve: true },
+        { id: 'contas-bancarias', nome: 'Contas Bancárias', icon: '▪', url: '#', em_breve: true },
+      ]
+    },
+
+    // Funcionários
+    { id: 'funcionarios', nome: 'Funcionários', icon: '👤', url: '/admin/funcionarios', em_breve: false, secao: 'Outras Funcionalidades', completed: true, perfis: ['grupo_admin', 'instituicao_admin'] },
   ];
 
   const menuFiltrado = filtrarMenuPorContexto(menuItems, user);
