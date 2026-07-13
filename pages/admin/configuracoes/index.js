@@ -701,9 +701,17 @@ export default function Configuracoes() {
           </div>
         </div>
 
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800 flex items-center gap-2">
-          <span>⚠️</span>
-          <span>Chaves de API e tokens sensíveis devem ser configurados via <strong>variáveis de ambiente</strong> no painel da Vercel — não aqui.</span>
+        <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 text-sm text-teal-800 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span>🔐</span>
+            <span>Precisa configurar ou atualizar as chaves de API, credenciais bancárias e servidores de integração?</span>
+          </div>
+          <Link 
+            href="/admin/configuracoes/empresa?tab=gateways"
+            className="px-4 py-1.5 bg-teal-650 hover:bg-teal-700 text-white rounded-lg text-xs font-bold transition shrink-0"
+          >
+            Configurar Gateways →
+          </Link>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
