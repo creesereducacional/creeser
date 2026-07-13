@@ -38,6 +38,8 @@ export default function NovoPrecadastro() {
     nome: '', cpf: '', email: '', telefone_celular: '',
     data_nascimento: '',
     responsavel_nome: '', responsavel_cpf: '', responsavel_rg: '', responsavel_telefone: '', responsavel_parentesco: '',
+    responsavel_financeiro_mesmo: true,
+    financeiro_nome: '', financeiro_cpf: '', financeiro_rg: '', financeiro_telefone: '', financeiro_parentesco: '',
     cursoid: '', turmaid: '', observacoes_adicionais: '',
   });
   const [erros, setErros] = useState({});
@@ -111,16 +113,24 @@ export default function NovoPrecadastro() {
 
   function validarEtapa1() {
     const e = {};
-    if (!form.nome.trim()) e.nome = 'Nome é obrigatório.';
+    if (!form.nome?.trim()) e.nome = 'Nome é obrigatório.';
     if (form.cpf && form.cpf.replace(/\D/g,'').length !== 11) e.cpf = 'CPF inválido (11 dígitos).';
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'E-mail inválido.';
-    
+
     if (idade !== null && idade < 18) {
       if (!form.responsavel_nome.trim()) e.responsavel_nome = 'Nome do responsável é obrigatório para menor de idade.';
       if (!form.responsavel_cpf.trim() || form.responsavel_cpf.replace(/\D/g,'').length !== 11) e.responsavel_cpf = 'CPF do responsável é obrigatório e deve ter 11 dígitos.';
       if (!form.responsavel_rg.trim()) e.responsavel_rg = 'RG do responsável é obrigatório.';
       if (!form.responsavel_telefone.trim()) e.responsavel_telefone = 'Telefone do responsável é obrigatório.';
       if (!form.responsavel_parentesco.trim()) e.responsavel_parentesco = 'Parentesco é obrigatório.';
+
+      if (!form.responsavel_financeiro_mesmo) {
+        if (!form.financeiro_nome.trim()) e.financeiro_nome = 'Nome do responsável financeiro é obrigatório.';
+        if (!form.financeiro_cpf.trim() || form.financeiro_cpf.replace(/\D/g,'').length !== 11) e.financeiro_cpf = 'CPF do responsável financeiro é obrigatório e deve ter 11 dígitos.';
+        if (!form.financeiro_rg.trim()) e.financeiro_rg = 'RG do responsável financeiro é obrigatório.';
+        if (!form.financeiro_telefone.trim()) e.financeiro_telefone = 'Telefone do responsável financeiro é obrigatório.';
+        if (!form.financeiro_parentesco.trim()) e.financeiro_parentesco = 'Parentesco do responsável financeiro é obrigatório.';
+      }
     }
 
     setErros(e);
@@ -355,6 +365,94 @@ export default function NovoPrecadastro() {
                       {erros.responsavel_parentesco && <p className="text-xs text-red-650 mt-1">{erros.responsavel_parentesco}</p>}
                     </div>
                   </div>
+
+                  {/* Checkbox responsável financeiro */}
+                  <div className="pt-2 border-t border-amber-200">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-amber-900">
+                      <input
+                        type="checkbox"
+                        checked={form.responsavel_financeiro_mesmo}
+                        onChange={e => set('responsavel_financeiro_mesmo', e.target.checked)}
+                        className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
+                      />
+                      O Responsável Legal também é o Responsável Financeiro
+                    </label>
+                  </div>
+
+                  {/* Seção adicional do Responsável Financeiro se desmarcado */}
+                  {!form.responsavel_financeiro_mesmo && (
+                    <div className="mt-4 pt-4 border-t border-amber-200 space-y-4">
+                      <h4 className="text-xs font-bold text-amber-800 uppercase tracking-wider">
+                        💰 Responsável Financeiro
+                      </h4>
+
+                      <div>
+                        <label className={labelCls}>Nome Completo do Financeiro *</label>
+                        <input
+                          className={`${inputCls} ${erros.financeiro_nome ? inputErr : inputOk}`}
+                          value={form.financeiro_nome}
+                          onChange={e => set('financeiro_nome', e.target.value)}
+                          placeholder="Nome do pagador das mensalidades"
+                        />
+                        {erros.financeiro_nome && <p className="text-xs text-red-650 mt-1">{erros.financeiro_nome}</p>}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className={labelCls}>CPF do Financeiro *</label>
+                          <input
+                            className={`${inputCls} ${erros.financeiro_cpf ? inputErr : inputOk}`}
+                            value={form.financeiro_cpf}
+                            onChange={e => set('financeiro_cpf', maskCPF(e.target.value))}
+                            placeholder="000.000.000-00"
+                            maxLength={14}
+                          />
+                          {erros.financeiro_cpf && <p className="text-xs text-red-650 mt-1">{erros.financeiro_cpf}</p>}
+                        </div>
+
+                        <div>
+                          <label className={labelCls}>RG do Financeiro *</label>
+                          <input
+                            className={`${inputCls} ${erros.financeiro_rg ? inputErr : inputOk}`}
+                            value={form.financeiro_rg}
+                            onChange={e => set('financeiro_rg', e.target.value)}
+                            placeholder="RG do financeiro"
+                          />
+                          {erros.financeiro_rg && <p className="text-xs text-red-650 mt-1">{erros.financeiro_rg}</p>}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className={labelCls}>Telefone do Financeiro *</label>
+                          <input
+                            className={`${inputCls} ${erros.financeiro_telefone ? inputErr : inputOk}`}
+                            value={form.financeiro_telefone}
+                            onChange={e => set('financeiro_telefone', maskPhone(e.target.value))}
+                            placeholder="(00) 00000-0000"
+                            maxLength={15}
+                          />
+                          {erros.financeiro_telefone && <p className="text-xs text-red-650 mt-1">{erros.financeiro_telefone}</p>}
+                        </div>
+
+                        <div>
+                          <label className={labelCls}>Grau de Parentesco do Financeiro *</label>
+                          <select
+                            className={`${inputCls} ${erros.financeiro_parentesco ? inputErr : inputOk}`}
+                            value={form.financeiro_parentesco}
+                            onChange={e => set('financeiro_parentesco', e.target.value)}
+                          >
+                            <option value="">— Selecione —</option>
+                            <option value="pai">Pai</option>
+                            <option value="mae">Mãe</option>
+                            <option value="tutor">Tutor / Outro</option>
+                          </select>
+                          {erros.financeiro_parentesco && <p className="text-xs text-red-650 mt-1">{erros.financeiro_parentesco}</p>}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                 </div>
               )}
             </div>

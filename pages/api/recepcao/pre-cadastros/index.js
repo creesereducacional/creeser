@@ -64,6 +64,12 @@ export default async function handler(req, res) {
       responsavel_rg,
       responsavel_telefone,
       responsavel_parentesco,
+      responsavel_financeiro_mesmo,
+      financeiro_nome,
+      financeiro_cpf,
+      financeiro_rg,
+      financeiro_telefone,
+      financeiro_parentesco,
       cursoid,
       turmaid,
       valor_matricula,
@@ -86,6 +92,13 @@ export default async function handler(req, res) {
     // O financeiro gerará a cobrança e avançará o status manualmente
     const statusmatricula = 'PRE_CADASTRO';
 
+    // Determinar dados financeiros (se mesmo que o legal ou específico)
+    const finNome = responsavel_financeiro_mesmo ? responsavel_nome : financeiro_nome;
+    const finCpf  = responsavel_financeiro_mesmo ? responsavel_cpf : financeiro_cpf;
+    const finRg   = responsavel_financeiro_mesmo ? responsavel_rg : financeiro_rg;
+    const finTel  = responsavel_financeiro_mesmo ? responsavel_telefone : financeiro_telefone;
+    const finPar  = responsavel_financeiro_mesmo ? responsavel_parentesco : financeiro_parentesco;
+
     const novoAluno = {
       nome: nome.trim(),
       cpf:              cpf?.trim()             || null,
@@ -97,6 +110,13 @@ export default async function handler(req, res) {
       responsavel_rg:         responsavel_rg?.trim()         || null,
       responsavel_telefone:   responsavel_telefone?.trim()   || null,
       responsavel_parentesco: responsavel_parentesco?.trim() || null,
+      // Financeiro
+      responsavel_financeiro_mesmo: !!responsavel_financeiro_mesmo,
+      financeiro_nome:       finNome?.trim() || null,
+      financeiro_cpf:        finCpf?.trim()  || null,
+      financeiro_rg:         finRg?.trim()   || null,
+      financeiro_telefone:   finTel?.trim()  || null,
+      financeiro_parentesco: finPar?.trim()  || null,
       instituicao_id:   efetivInstituicaoId,
       captado_por_id:   authUser.id,
       statusmatricula,
