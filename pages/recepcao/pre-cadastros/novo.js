@@ -36,9 +36,12 @@ export default function NovoPrecadastro() {
 
   const [form, setForm] = useState({
     nome: '', cpf: '', email: '', telefone_celular: '',
+    data_nascimento: '',
+    responsavel_nome: '', responsavel_cpf: '', responsavel_rg: '', responsavel_telefone: '', responsavel_parentesco: '',
     cursoid: '', turmaid: '', observacoes_adicionais: '',
   });
   const [erros, setErros] = useState({});
+  const [idade, setIdade] = useState(null);
 
   const [instituicoes, setInstituicoes]           = useState([]);
   const [instSel, setInstSel]                     = useState('');
@@ -88,11 +91,38 @@ export default function NovoPrecadastro() {
     if (erros[campo]) setErros(e => ({ ...e, [campo]: null }));
   };
 
+  function calcularIdade(dataNasc) {
+    if (!dataNasc) return null;
+    const hoje = new Date();
+    const nasc = new Date(dataNasc);
+    let id = hoje.getFullYear() - nasc.getFullYear();
+    const m = hoje.getMonth() - nasc.getMonth();
+    if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) {
+      id--;
+    }
+    return id;
+  }
+
+  function handleDataNascimento(val) {
+    set('data_nascimento', val);
+    const id = calcularIdade(val);
+    setIdade(id);
+  }
+
   function validarEtapa1() {
     const e = {};
     if (!form.nome.trim()) e.nome = 'Nome é obrigatório.';
     if (form.cpf && form.cpf.replace(/\D/g,'').length !== 11) e.cpf = 'CPF inválido (11 dígitos).';
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'E-mail inválido.';
+    
+    if (idade !== null && idade < 18) {
+      if (!form.responsavel_nome.trim()) e.responsavel_nome = 'Nome do responsável é obrigatório para menor de idade.';
+      if (!form.responsavel_cpf.trim() || form.responsavel_cpf.replace(/\D/g,'').length !== 11) e.responsavel_cpf = 'CPF do responsável é obrigatório e deve ter 11 dígitos.';
+      if (!form.responsavel_rg.trim()) e.responsavel_rg = 'RG do responsável é obrigatório.';
+      if (!form.responsavel_telefone.trim()) e.responsavel_telefone = 'Telefone do responsável é obrigatório.';
+      if (!form.responsavel_parentesco.trim()) e.responsavel_parentesco = 'Parentesco é obrigatório.';
+    }
+
     setErros(e);
     return Object.keys(e).length === 0;
   }
@@ -242,8 +272,91 @@ export default function NovoPrecadastro() {
                   onChange={e => set('email', e.target.value)}
                   placeholder="email@exemplo.com"
                 />
-                {erros.email && <p className="text-xs text-red-600 mt-1">{erros.email}</p>}
+                {erros.email && <p className="text-xs text-red-650 mt-1">{erros.email}</p>}
               </div>
+
+              <div>
+                <label className={labelCls}>Data de Nascimento *</label>
+                <input
+                  type="date"
+                  className={`${inputCls} ${erros.data_nascimento ? inputErr : inputOk}`}
+                  value={form.data_nascimento}
+                  onChange={e => handleDataNascimento(e.target.value)}
+                />
+              </div>
+
+              {idade !== null && idade < 18 && (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-4">
+                  <h3 className="text-xs font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>👤</span> Responsável Legal (Aluno Menor de Idade)
+                  </h3>
+                  
+                  <div>
+                    <label className={labelCls}>Nome Completo do Responsável *</label>
+                    <input
+                      className={`${inputCls} ${erros.responsavel_nome ? inputErr : inputOk}`}
+                      value={form.responsavel_nome}
+                      onChange={e => set('responsavel_nome', e.target.value)}
+                      placeholder="Nome do pai, mãe ou tutor legal"
+                    />
+                    {erros.responsavel_nome && <p className="text-xs text-red-650 mt-1">{erros.responsavel_nome}</p>}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>CPF do Responsável *</label>
+                      <input
+                        className={`${inputCls} ${erros.responsavel_cpf ? inputErr : inputOk}`}
+                        value={form.responsavel_cpf}
+                        onChange={e => set('responsavel_cpf', maskCPF(e.target.value))}
+                        placeholder="000.000.000-00"
+                        maxLength={14}
+                      />
+                      {erros.responsavel_cpf && <p className="text-xs text-red-650 mt-1">{erros.responsavel_cpf}</p>}
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>RG do Responsável *</label>
+                      <input
+                        className={`${inputCls} ${erros.responsavel_rg ? inputErr : inputOk}`}
+                        value={form.responsavel_rg}
+                        onChange={e => set('responsavel_rg', e.target.value)}
+                        placeholder="RG do responsável"
+                      />
+                      {erros.responsavel_rg && <p className="text-xs text-red-650 mt-1">{erros.responsavel_rg}</p>}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>Telefone do Responsável *</label>
+                      <input
+                        className={`${inputCls} ${erros.responsavel_telefone ? inputErr : inputOk}`}
+                        value={form.responsavel_telefone}
+                        onChange={e => set('responsavel_telefone', maskPhone(e.target.value))}
+                        placeholder="(00) 00000-0000"
+                        maxLength={15}
+                      />
+                      {erros.responsavel_telefone && <p className="text-xs text-red-650 mt-1">{erros.responsavel_telefone}</p>}
+                    </div>
+
+                    <div>
+                      <label className={labelCls}>Grau de Parentesco *</label>
+                      <select
+                        className={`${inputCls} ${erros.responsavel_parentesco ? inputErr : inputOk}`}
+                        value={form.responsavel_parentesco}
+                        onChange={e => set('responsavel_parentesco', e.target.value)}
+                      >
+                        <option value="">— Selecione —</option>
+                        <option value="pai">Pai</option>
+                        <option value="mae">Mãe</option>
+                        <option value="tutor">Tutor / Outro</option>
+                      </select>
+                      {erros.responsavel_parentesco && <p className="text-xs text-red-650 mt-1">{erros.responsavel_parentesco}</p>}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
