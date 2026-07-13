@@ -708,7 +708,8 @@ export default function Configuracoes() {
           </div>
           <Link 
             href="/admin/configuracoes/empresa?tab=gateways"
-            className="px-4 py-1.5 bg-teal-650 hover:bg-teal-700 text-white rounded-lg text-xs font-bold transition shrink-0"
+            className="px-4 py-1.5 rounded-lg text-xs font-bold transition shrink-0 bg-teal-600 hover:bg-teal-700 text-white"
+            style={{ color: '#ffffff', backgroundColor: '#0d9488' }}
           >
             Configurar Gateways →
           </Link>
