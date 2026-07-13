@@ -7,6 +7,25 @@ import { filtrarMenuPorContexto } from "../utils/menu-permissoes";
 const MENU_ITEMS = [
   { id: 'dashboard', href: '/admin/dashboard', icon: '📊', label: 'Dashboard', secao: 'Menu Principal' },
 
+  // Coordenação (restaurado)
+  {
+    id: 'coordenacao',
+    icon: '👔',
+    label: 'Coordenação',
+    secao: 'Menu Principal',
+    perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
+    submenu: [
+      { id: 'solicitacoes', href: '/admin/solicitacoes', label: 'Solicitações' },
+      { id: 'unidades', href: '/admin/unidades', label: 'Unidades' },
+      { id: 'anos-letivos', href: '/admin/anos-letivos', label: 'Anos Letivos' },
+      { id: 'calendario-aulas', href: '#', label: 'Calendário de Aulas', perfis: ['grupo_admin'] },
+      { id: 'contas-bancarias', href: '#', label: 'Contas Bancárias', perfis: ['grupo_admin'] },
+      { id: 'go-live-checklist', href: '/admin/go-live-checklist', label: '🚀 Go-Live Checklist', perfis: ['grupo_admin', 'instituicao_admin'] },
+      { id: 'logs-auditoria',   href: '/admin/logs',              label: '📋 Logs de Auditoria',  perfis: ['grupo_admin', 'instituicao_admin'] },
+      { id: 'backup-export',    href: '/admin/backup',            label: '💾 Backup / Exportar',   perfis: ['grupo_admin', 'instituicao_admin'] },
+    ],
+  },
+
   // Gestão de Usuários
   { id: 'usuarios', href: '/admin/usuarios', icon: '👤', label: 'Usuários', secao: 'Gestão de Usuários', perfis: ['grupo_admin', 'instituicao_admin'] },
   {
@@ -52,25 +71,6 @@ const MENU_ITEMS = [
   { id: 'emails', href: '/admin/emails', icon: '✉️', label: 'E-mails', secao: 'Comunicação', perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'] },
   { id: 'avaliacoes', href: '/admin/avaliacoes', icon: '⭐', label: 'Avaliações', secao: 'Comunicação', perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'] },
   { id: 'documentos', href: '/admin/documentos', icon: '📤', label: 'Documentos', secao: 'Comunicação', perfis: ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria'] },
-
-  // Coordenação (restaurado)
-  {
-    id: 'coordenacao',
-    icon: '👔',
-    label: 'Coordenação',
-    secao: 'Configurações',
-    perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
-    submenu: [
-      { id: 'solicitacoes', href: '/admin/solicitacoes', label: 'Solicitações' },
-      { id: 'unidades', href: '/admin/unidades', label: 'Unidades' },
-      { id: 'anos-letivos', href: '/admin/anos-letivos', label: 'Anos Letivos' },
-      { id: 'calendario-aulas', href: '#', label: 'Calendário de Aulas', perfis: ['grupo_admin'] },
-      { id: 'contas-bancarias', href: '#', label: 'Contas Bancárias', perfis: ['grupo_admin'] },
-      { id: 'go-live-checklist', href: '/admin/go-live-checklist', label: '🚀 Go-Live Checklist', perfis: ['grupo_admin', 'instituicao_admin'] },
-      { id: 'logs-auditoria',   href: '/admin/logs',              label: '📋 Logs de Auditoria',  perfis: ['grupo_admin', 'instituicao_admin'] },
-      { id: 'backup-export',    href: '/admin/backup',            label: '💾 Backup / Exportar',   perfis: ['grupo_admin', 'instituicao_admin'] },
-    ],
-  },
 ];
 
 const SECOES_ORDER = ['Menu Principal', 'Gestão de Usuários', 'Pedagógico', 'Financeiro', 'Comercial', 'Conteúdo', 'Comunicação', 'Configurações'];

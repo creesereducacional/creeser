@@ -135,6 +135,23 @@ export default function DashboardLayout({ children }) {
     // Menu Principal
     { id: 'dashboard', nome: 'Início', icon: '🏠', url: '/admin/dashboard', em_breve: false, secao: 'Menu Principal' },
 
+    // Coordenação (restaurado)
+    {
+      id: 'coordenacao',
+      nome: 'Coordenação',
+      icon: '👔',
+      em_breve: false,
+      secao: 'Menu Principal',
+      perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
+      submenu: [
+        { id: 'solicitacoes', nome: 'Solicitações', icon: '▪', url: '/admin/configuracoes/solicitacoes', em_breve: false, completed: true },
+        { id: 'unidades', nome: 'Unidades', icon: '▪', url: '/admin/unidades', em_breve: false, completed: true },
+        { id: 'anos-letivos', nome: 'Anos Letivos', icon: '▪', url: '/admin/anos-letivos', em_breve: false, completed: true },
+        { id: 'calendario-aulas', nome: 'Calendário de Aulas', icon: '▪', url: '#', em_breve: true },
+        { id: 'contas-bancarias', nome: 'Contas Bancárias', icon: '▪', url: '#', em_breve: true },
+      ]
+    },
+
     { id: 'comunicados', nome: 'Comunicados', icon: '✉️', url: '#', em_breve: true, secao: 'Administrativo' },
     
     // NPJ (com submenu)
@@ -380,22 +397,6 @@ export default function DashboardLayout({ children }) {
     // Funcionários
     { id: 'funcionarios', nome: 'Funcionários', icon: '👤', url: '/admin/funcionarios', em_breve: false, secao: 'Outras Funcionalidades', completed: true, perfis: ['grupo_admin', 'instituicao_admin'] },
 
-    // Coordenação (restaurado)
-    {
-      id: 'coordenacao',
-      nome: 'Coordenação',
-      icon: '👔',
-      em_breve: false,
-      secao: 'Administração',
-      perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
-      submenu: [
-        { id: 'solicitacoes', nome: 'Solicitações', icon: '▪', url: '/admin/configuracoes/solicitacoes', em_breve: false, completed: true },
-        { id: 'unidades', nome: 'Unidades', icon: '▪', url: '/admin/unidades', em_breve: false, completed: true },
-        { id: 'anos-letivos', nome: 'Anos Letivos', icon: '▪', url: '/admin/anos-letivos', em_breve: false, completed: true },
-        { id: 'calendario-aulas', nome: 'Calendário de Aulas', icon: '▪', url: '#', em_breve: true },
-        { id: 'contas-bancarias', nome: 'Contas Bancárias', icon: '▪', url: '#', em_breve: true },
-      ]
-    },
   ];
 
   const menuFiltrado = filtrarMenuPorContexto(menuItems, user);
