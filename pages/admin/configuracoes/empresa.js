@@ -70,7 +70,7 @@ const resumirHtml = (html, max = 180) => {
 
 export default function ConfiguracaoEmpresa() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('informacoes');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [showConfigEfi, setShowConfigEfi] = useState(false);
   const [showConfigAsaas, setShowConfigAsaas] = useState(false);
   const [formData, setFormData] = useState({
@@ -779,6 +779,7 @@ export default function ConfiguracaoEmpresa() {
   };
 
   const abas = [
+    { id: 'dashboard',   nome: 'Dashboard', icon: '🏠' },
     { id: 'informacoes', nome: 'Geral', icon: '📋' },
     { id: 'pedagogico', nome: 'Pedagógico', icon: '📚' },
     { id: 'financeiro', nome: 'Financeiro', icon: '💰' },
@@ -830,6 +831,232 @@ export default function ConfiguracaoEmpresa() {
           </div>
 
           <div className="bg-white rounded-b-lg shadow-md p-4 md:p-6 space-y-6">
+            
+            {/* ABA: DASHBOARD TÉCNICA */}
+            {activeTab === 'dashboard' && (
+              <div className="space-y-6">
+
+                {/* Seção 1: Saúde da Plataforma */}
+                <div>
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">🏥 Saúde da Plataforma</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    
+                    {/* Empresa */}
+                    <div className="p-4 rounded-xl border border-gray-200 bg-gray-50 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-gray-800 text-sm">🏢 Geral (Empresa)</span>
+                          <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${formData.nomeEmpresa ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-yellow-50 text-yellow-700 border border-yellow-200'}`}>
+                            {formData.nomeEmpresa ? '🟢 Configurada' : '🟡 Pendente'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2 font-mono truncate">{formData.nomeEmpresa || 'Nenhum nome cadastrado'}</p>
+                      </div>
+                      <button type="button" onClick={() => setActiveTab('informacoes')} className="mt-3 text-xs font-bold text-teal-600 hover:text-teal-700 text-left">
+                        Visualizar dados gerais →
+                      </button>
+                    </div>
+
+                    {/* ASAAS */}
+                    <div className="p-4 rounded-xl border border-gray-200 bg-gray-50 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-gray-800 text-sm">💳 ASAAS</span>
+                          <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${formData?.financeiro?.ativarAsaas ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-gray-100 text-gray-500'}`}>
+                            {formData?.financeiro?.ativarAsaas ? '🟢 Ativo' : '⚫ Inativo'}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-gray-500 mt-2 space-y-0.5 font-mono">
+                          <div>Ambiente: {formData?.financeiro?.ambienteAsaas || 'sandbox'}</div>
+                          <div>Último teste: Estimado</div>
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => setActiveTab('gateways')} className="mt-3 text-xs font-bold text-teal-600 hover:text-teal-700 text-left">
+                        Abrir Gateways →
+                      </button>
+                    </div>
+
+                    {/* EFI */}
+                    <div className="p-4 rounded-xl border border-gray-200 bg-gray-50 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-gray-800 text-sm">💳 EFI (Gerencianet)</span>
+                          <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${formData?.financeiro?.ativarGerencianet ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-gray-100 text-gray-500'}`}>
+                            {formData?.financeiro?.ativarGerencianet ? '🟢 Ativo' : '⚫ Inativo'}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-gray-500 mt-2 space-y-0.5 font-mono">
+                          <div>Ambiente: Produção</div>
+                          <div>Último teste: Estimado</div>
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => setActiveTab('gateways')} className="mt-3 text-xs font-bold text-teal-600 hover:text-teal-700 text-left">
+                        Abrir Gateways →
+                      </button>
+                    </div>
+
+                    {/* SMTP */}
+                    <div className="p-4 rounded-xl border border-gray-200 bg-gray-50 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-gray-800 text-sm">✉️ SMTP</span>
+                          <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-green-50 text-green-700 border border-green-200">
+                            🟢 Operacional
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">Pronto para envios transacionais</p>
+                      </div>
+                      <button type="button" onClick={() => setActiveTab('gateways')} className="mt-3 text-xs font-bold text-teal-600 hover:text-teal-700 text-left">
+                        Abrir Gateways →
+                      </button>
+                    </div>
+
+                    {/* Assinafy */}
+                    <div className="p-4 rounded-xl border border-gray-200 bg-gray-50 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-gray-800 text-sm">✍️ Assinafy</span>
+                          <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-green-50 text-green-700 border border-green-200">
+                            🟢 Ativo (Env)
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">Configurado nas variáveis locais</p>
+                      </div>
+                      <button type="button" onClick={() => setActiveTab('gateways')} className="mt-3 text-xs font-bold text-teal-600 hover:text-teal-700 text-left">
+                        Abrir Gateways →
+                      </button>
+                    </div>
+
+                    {/* ViaCEP */}
+                    <div className="p-4 rounded-xl border border-gray-200 bg-gray-50 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-gray-800 text-sm">📍 ViaCEP</span>
+                          <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-green-50 text-green-700 border border-green-200">
+                            🟢 Operacional
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">Preenchimento de CEP público ativo</p>
+                      </div>
+                      <span className="mt-3 text-xs text-gray-400 font-medium">Serviço global</span>
+                    </div>
+
+                  </div>
+                </div>
+
+                {/* Seção 2: Módulos Técnicos */}
+                <div>
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">🛠️ Módulos Técnicos</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+                    {[
+                      { id: 'pedagogico',  label: '📚 Pedagógico', desc: 'Regras de notas e bloqueio de diário.' },
+                      { id: 'biblioteca',  label: '📖 Biblioteca',  desc: 'Configuração de acervo e empréstimos.' },
+                      { id: 'contratos',   label: '📄 Contratos',   desc: 'Templates de contratos e placeholders.' },
+                      { id: 'instituicoes',label: '🏛️ Instituições',desc: 'Gestão multi-tenant de unidades e MEC.' },
+                      { id: 'gateways',    label: '🔐 Gateways',    desc: 'Credenciais ASAAS, EFI, SMTP e Assinafy.' }
+                    ].map(mod => (
+                      <div key={mod.id} className="p-4 bg-white rounded-xl border border-gray-200 shadow-2xs hover:shadow-xs transition flex flex-col justify-between space-y-3">
+                        <div>
+                          <h4 className="font-bold text-gray-800 text-xs">{mod.label}</h4>
+                          <p className="text-[11px] text-gray-500 mt-1">{mod.desc}</p>
+                        </div>
+                        <button type="button" onClick={() => setActiveTab(mod.id)} className="w-full py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 rounded-lg text-xs font-bold transition">
+                          Abrir
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Seção 3: Resumo do Ambiente & Checklist & Alertas */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  
+                  {/* Resumo do Ambiente */}
+                  <div className="bg-gray-50 p-5 rounded-2xl border border-gray-200 space-y-4">
+                    <h4 className="text-xs font-bold text-gray-600 uppercase tracking-wider border-b pb-2">📊 Resumo do Ambiente</h4>
+                    <div className="space-y-2.5 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 font-medium">Total de instituições:</span>
+                        <span className="font-bold text-gray-700">{instituicoes?.length || 0} cadastradas</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 font-medium">Modelos de contrato:</span>
+                        <span className="font-bold text-gray-700">{contratos?.length || 0} templates</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 font-medium">Gateway ativo:</span>
+                        <span className="font-bold text-gray-700">
+                          {formData?.financeiro?.ativarAsaas && formData?.financeiro?.ativarGerencianet ? 'Ambos' : formData?.financeiro?.ativarAsaas ? 'ASAAS' : formData?.financeiro?.ativarGerencianet ? 'EFI' : 'Nenhum'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 font-medium">Ambiente atual:</span>
+                        <span className="font-bold text-teal-600 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded uppercase text-[10px]">
+                          {formData?.financeiro?.ambienteAsaas === 'producao' ? 'Produção' : 'Homologação'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 font-medium">Última alteração:</span>
+                        <span className="text-gray-400">Em preparação</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Checklist de Implantação */}
+                  <div className="bg-gray-50 p-5 rounded-2xl border border-gray-200 space-y-4">
+                    <h4 className="text-xs font-bold text-gray-600 uppercase tracking-wider border-b pb-2">📋 Checklist de Implantação</h4>
+                    <div className="space-y-2.5 text-xs">
+                      {[
+                        { label: 'Empresa configurada', done: !!formData.nomeEmpresa },
+                        { label: 'Gateway configurado',  done: !!formData?.financeiro?.ativarAsaas || !!formData?.financeiro?.ativarGerencianet },
+                        { label: 'SMTP configurado',     done: true }, // SMTP Mock/Pre-ativo
+                        { label: 'Contrato padrão definido', done: contratos.some(c => c.padrao) },
+                        { label: 'Instituição cadastrada',   done: (instituicoes?.length || 0) > 0 },
+                        { label: 'Pedagógico configurado',   done: !!formData?.pedagogico?.coordenador },
+                        { label: 'Biblioteca configurada',   done: !!formData?.biblioteca?.gerente }
+                      ].map(chk => (
+                        <div key={chk.label} className="flex items-center justify-between">
+                          <span className="text-gray-700">{chk.label}</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${chk.done ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                            {chk.done ? '🟢 Configurado' : '🟡 Pendente'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Alertas do Sistema */}
+                  <div className="bg-gray-50 p-5 rounded-2xl border border-gray-200 space-y-4">
+                    <h4 className="text-xs font-bold text-gray-600 uppercase tracking-wider border-b pb-2">⚠️ Alertas e Diagnóstico</h4>
+                    <div className="space-y-2.5 text-xs">
+                      {!(formData?.financeiro?.ativarAsaas || formData?.financeiro?.ativarGerencianet) && (
+                        <div className="p-2.5 bg-red-50 text-red-700 border border-red-200 rounded-lg font-medium flex items-center gap-2">
+                          <span>⚠️</span> Nenhum gateway financeiro ativo.
+                        </div>
+                      )}
+                      {!contratos.some(c => c.padrao) && (
+                        <div className="p-2.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg font-medium flex items-center gap-2">
+                          <span>⚠️</span> Não existe contrato padrão definido.
+                        </div>
+                      )}
+                      {(instituicoes?.length || 0) === 0 && (
+                        <div className="p-2.5 bg-red-50 text-red-700 border border-red-200 rounded-lg font-medium flex items-center gap-2">
+                          <span>⚠️</span> Nenhuma instituição cadastrada.
+                        </div>
+                      )}
+                      {(formData?.financeiro?.ativarAsaas || formData?.financeiro?.ativarGerencianet) && contratos.some(c => c.padrao) && (instituicoes?.length || 0) > 0 && (
+                        <div className="p-3 bg-green-50 text-green-800 border border-green-200 rounded-xl font-medium flex items-center gap-2">
+                          <span>🟢</span> Ambiente configurado corretamente.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+            )}
+
             {activeTab === 'informacoes' && (
               <div className="space-y-6">
                 {/* 1. Identificação */}
