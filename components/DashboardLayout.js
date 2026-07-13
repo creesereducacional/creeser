@@ -365,14 +365,30 @@ export default function DashboardLayout({ children }) {
 
     // Configurações
     {
-      id: 'coordenacao',
+      id: 'configuracoes-gerais',
       nome: 'Configurações',
       icon: '⚙️',
       em_breve: false,
       secao: 'Outras Funcionalidades',
       perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
       submenu: [
-        { id: 'configuracoes', nome: 'Configurações', icon: '▪', url: '/admin/configuracoes', em_breve: false, completed: true },
+        { id: 'config-operacionais', nome: 'Configurações Operacionais', icon: '▪', url: '/admin/configuracoes', em_breve: false, completed: true },
+        { id: 'config-tecnica', nome: 'Configuração Técnica', icon: '▪', url: '/admin/configuracoes/empresa', em_breve: false, completed: true }
+      ]
+    },
+
+    // Funcionários
+    { id: 'funcionarios', nome: 'Funcionários', icon: '👤', url: '/admin/funcionarios', em_breve: false, secao: 'Outras Funcionalidades', completed: true, perfis: ['grupo_admin', 'instituicao_admin'] },
+
+    // Coordenação (restaurado)
+    {
+      id: 'coordenacao',
+      nome: 'Coordenação',
+      icon: '👔',
+      em_breve: false,
+      secao: 'Administração',
+      perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
+      submenu: [
         { id: 'solicitacoes', nome: 'Solicitações', icon: '▪', url: '/admin/configuracoes/solicitacoes', em_breve: false, completed: true },
         { id: 'unidades', nome: 'Unidades', icon: '▪', url: '/admin/unidades', em_breve: false, completed: true },
         { id: 'anos-letivos', nome: 'Anos Letivos', icon: '▪', url: '/admin/anos-letivos', em_breve: false, completed: true },
@@ -380,9 +396,6 @@ export default function DashboardLayout({ children }) {
         { id: 'contas-bancarias', nome: 'Contas Bancárias', icon: '▪', url: '#', em_breve: true },
       ]
     },
-
-    // Funcionários
-    { id: 'funcionarios', nome: 'Funcionários', icon: '👤', url: '/admin/funcionarios', em_breve: false, secao: 'Outras Funcionalidades', completed: true, perfis: ['grupo_admin', 'instituicao_admin'] },
   ];
 
   const menuFiltrado = filtrarMenuPorContexto(menuItems, user);

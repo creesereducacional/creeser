@@ -10,22 +10,15 @@ const MENU_ITEMS = [
   // Gestão de Usuários
   { id: 'usuarios', href: '/admin/usuarios', icon: '👤', label: 'Usuários', secao: 'Gestão de Usuários', perfis: ['grupo_admin', 'instituicao_admin'] },
   {
-    id: 'coordenacao',
+    id: 'configuracoes-gerais',
     icon: '⚙️',
     label: 'Configurações',
     secao: 'Gestão de Usuários',
     perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
     submenu: [
-      { id: 'configuracoes', href: '/admin/configuracoes', label: 'Geral' },
-      { id: 'solicitacoes', href: '/admin/solicitacoes', label: 'Solicitações' },
-      { id: 'unidades', href: '/admin/unidades', label: 'Unidades' },
-      { id: 'anos-letivos', href: '/admin/anos-letivos', label: 'Anos Letivos' },
-      { id: 'calendario-aulas', href: '#', label: 'Calendário de Aulas', perfis: ['grupo_admin'] },
-      { id: 'contas-bancarias', href: '#', label: 'Contas Bancárias', perfis: ['grupo_admin'] },
-      { id: 'go-live-checklist', href: '/admin/go-live-checklist', label: '🚀 Go-Live Checklist', perfis: ['grupo_admin', 'instituicao_admin'] },
-      { id: 'logs-auditoria',   href: '/admin/logs',              label: '📋 Logs de Auditoria',  perfis: ['grupo_admin', 'instituicao_admin'] },
-      { id: 'backup-export',    href: '/admin/backup',            label: '💾 Backup / Exportar',   perfis: ['grupo_admin', 'instituicao_admin'] },
-    ],
+      { id: 'config-operacionais', href: '/admin/configuracoes', label: 'Configurações Operacionais' },
+      { id: 'config-tecnica', href: '/admin/configuracoes/empresa', label: 'Configuração Técnica' }
+    ]
   },
   { id: 'funcionarios', href: '/admin/funcionarios', icon: '🧑‍💼', label: 'Funcionários', secao: 'Gestão de Usuários', perfis: ['grupo_admin', 'instituicao_admin'] },
 
@@ -59,9 +52,28 @@ const MENU_ITEMS = [
   { id: 'emails', href: '/admin/emails', icon: '✉️', label: 'E-mails', secao: 'Comunicação', perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'] },
   { id: 'avaliacoes', href: '/admin/avaliacoes', icon: '⭐', label: 'Avaliações', secao: 'Comunicação', perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'] },
   { id: 'documentos', href: '/admin/documentos', icon: '📤', label: 'Documentos', secao: 'Comunicação', perfis: ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria'] },
+
+  // Coordenação (restaurado)
+  {
+    id: 'coordenacao',
+    icon: '👔',
+    label: 'Coordenação',
+    secao: 'Configurações',
+    perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
+    submenu: [
+      { id: 'solicitacoes', href: '/admin/solicitacoes', label: 'Solicitações' },
+      { id: 'unidades', href: '/admin/unidades', label: 'Unidades' },
+      { id: 'anos-letivos', href: '/admin/anos-letivos', label: 'Anos Letivos' },
+      { id: 'calendario-aulas', href: '#', label: 'Calendário de Aulas', perfis: ['grupo_admin'] },
+      { id: 'contas-bancarias', href: '#', label: 'Contas Bancárias', perfis: ['grupo_admin'] },
+      { id: 'go-live-checklist', href: '/admin/go-live-checklist', label: '🚀 Go-Live Checklist', perfis: ['grupo_admin', 'instituicao_admin'] },
+      { id: 'logs-auditoria',   href: '/admin/logs',              label: '📋 Logs de Auditoria',  perfis: ['grupo_admin', 'instituicao_admin'] },
+      { id: 'backup-export',    href: '/admin/backup',            label: '💾 Backup / Exportar',   perfis: ['grupo_admin', 'instituicao_admin'] },
+    ],
+  },
 ];
 
-const SECOES_ORDER = ['Menu Principal', 'Gestão de Usuários', 'Pedagógico', 'Financeiro', 'Comercial', 'Conteúdo', 'Comunicação'];
+const SECOES_ORDER = ['Menu Principal', 'Gestão de Usuários', 'Pedagógico', 'Financeiro', 'Comercial', 'Conteúdo', 'Comunicação', 'Configurações'];
 
 export default function AdminSidebar() {
   const router = useRouter();
