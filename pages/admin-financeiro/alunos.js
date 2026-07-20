@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import AdminFinanceiroLayout from '@/components/AdminFinanceiro/Layout';
 import BarraFiltros from '@/components/AdminFinanceiro/BarraFiltros';
+import { FinanceEngine } from '../../lib/financeiro/FinanceEngine';
 
 const PLANOS_FINANCEIROS = [
   'MENSAL', 'SEMESTRAL', 'ANUAL', 'AVULSO', 'BOLSISTA', 'CONVÊNIO'
@@ -312,7 +313,6 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
     }
   }, [form.categoria, aluno.id]);
 
-  // Cálculos do acordo
   const totalDebitoSelecionado = Array.from(selectedParcelas).reduce((acc, id) => {
     const p = parcelasAberto.find(x => x.id === id);
     return acc + (p ? p.valor : 0);
@@ -324,9 +324,7 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
   const valorParcelaAcordo = saldo / qtdParcelasAcordo;
 
   const valorFinal = () => {
-    const v = Number(form.valor) || 0;
-    if (tipoDesconto === '%') return Math.max(0, v - v * ((Number(form.percentual_desconto) || 0) / 100));
-    return Math.max(0, v - (Number(form.percentual_desconto) || 0));
+    return FinanceEngine.calcularParcelaFinal(form.valor, form.percentual_desconto, tipoDesconto);
   };
 
   const handleToggleParcela = (id) => {
@@ -696,12 +694,14 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
 
   // form.valor = valor Nominal da PARCELA
   const calcParcelaFinal = () => {
-    const v = Number(form.valor) || 0;
-    if (tipoDesconto === '%') return Math.max(0, v - v * ((Number(form.percentual_desconto) || 0) / 100));
-    return Math.max(0, v - (Number(form.percentual_desconto) || 0));
+    return FinanceEngine.calcularParcelaFinal(form.valor, form.percentual_desconto, tipoDesconto);
   };
-  const calcDescontoParcela = () => (Number(form.valor) || 0) - calcParcelaFinal();
-  const calcValorTotal = () => (Number(form.valor) || 0) * (Number(form.quantidade_parcelas) || 1);
+  const calcDescontoParcela = () => {
+    return FinanceEngine.calcularDescontoParcela(form.valor, form.percentual_desconto, tipoDesconto);
+  };
+  const calcValorTotal = () => {
+    return FinanceEngine.calcularTotalNominalCarne(form.valor, form.quantidade_parcelas);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();

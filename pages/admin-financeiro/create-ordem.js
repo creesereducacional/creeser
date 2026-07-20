@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import AdminFinanceiroLayout from '@/components/AdminFinanceiro/Layout';
+import { FinanceEngine } from '../../lib/financeiro/FinanceEngine';
 
 export default function CreateOrdenPage() {
   const router = useRouter();
@@ -58,10 +59,7 @@ export default function CreateOrdenPage() {
   };
 
   const calcularValorFinal = () => {
-    const valor = Number(form.valor) || 0;
-    const desconto = Number(form.percentual_desconto) || 0;
-    const valorDesconto = valor * (desconto / 100);
-    return valor - valorDesconto;
+    return FinanceEngine.calcularParcelaFinal(form.valor, form.percentual_desconto, '%');
   };
 
   const handleSubmit = async (e) => {
@@ -79,6 +77,8 @@ export default function CreateOrdenPage() {
         throw new Error('Valor deve ser maior que zero');
       }
 
+      const valorDesconto = FinanceEngine.calcularDescontoParcela(form.valor, form.percentual_desconto, '%');
+
       const payload = {
         aluno_id: Number(aluno_id),
         tipo: 'ordem_simples',
@@ -86,7 +86,7 @@ export default function CreateOrdenPage() {
         referencia: form.referencia.trim() || null,
         valor_total: Number(form.valor),
         percentual_desconto: Number(form.percentual_desconto) || 0,
-        valor_desconto: Number(form.valor) * ((Number(form.percentual_desconto) || 0) / 100),
+        valor_desconto: valorDesconto,
         quantidade_parcelas: 1,
         observacoes: form.observacoes.trim() || null,
         criado_por: 'financeiro'
@@ -116,6 +116,8 @@ export default function CreateOrdenPage() {
       setSalvando(false);
     }
   };
+
+
 
   if (loading) {
     return (

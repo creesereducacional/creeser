@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import AdminFinanceiroLayout from '@/components/AdminFinanceiro/Layout';
+import { FinanceEngine } from '../../lib/financeiro/FinanceEngine';
 
 export default function CreateCarnePage() {
   const router = useRouter();
@@ -63,10 +64,7 @@ export default function CreateCarnePage() {
   };
 
   const calcularValorFinal = () => {
-    const valor = Number(form.valor) || 0;
-    const desconto = Number(form.percentual_desconto) || 0;
-    const valorDesconto = valor * (desconto / 100);
-    return valor - valorDesconto;
+    return FinanceEngine.calcularParcelaFinal(form.valor, form.percentual_desconto, '%');
   };
 
   const calcularParcela = () => {
@@ -98,14 +96,17 @@ export default function CreateCarnePage() {
         throw new Error('Data de vencimento da primeira parcela é obrigatória');
       }
 
+      const valorDesconto = FinanceEngine.calcularDescontoParcela(form.valor, form.percentual_desconto, '%');
+      const valorTotalComDesconto = FinanceEngine.calcularTotalLiquidoCarne(form.valor, form.percentual_desconto, '%', form.quantidade_parcelas);
+
       const payload = {
         aluno_id: Number(aluno_id),
         tipo: 'carne',
         descricao: form.descricao.trim(),
         referencia: form.referencia.trim() || null,
-        valor_total: Number(form.valor),
+        valor_total: valorTotalComDesconto,
         percentual_desconto: Number(form.percentual_desconto) || 0,
-        valor_desconto: Number(form.valor) * ((Number(form.percentual_desconto) || 0) / 100),
+        valor_desconto: valorDesconto,
         quantidade_parcelas: Number(form.quantidade_parcelas),
         intervalo_dias: Number(form.intervalo_dias) || 30,
         data_vencimento_primeira: form.data_vencimento,
