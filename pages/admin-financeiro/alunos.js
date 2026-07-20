@@ -663,25 +663,27 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
   const [tipoDesconto, setTipoDesconto] = useState('%');
 
-  // form.valor = valor da PARCELA (não o total)
+  // form.valor = valor Nominal da PARCELA
   const calcParcelaFinal = () => {
     const v = Number(form.valor) || 0;
     if (tipoDesconto === '%') return Math.max(0, v - v * ((Number(form.percentual_desconto) || 0) / 100));
     return Math.max(0, v - (Number(form.percentual_desconto) || 0));
   };
   const calcDescontoParcela = () => (Number(form.valor) || 0) - calcParcelaFinal();
-  const calcValorTotal = () => calcParcelaFinal() * (Number(form.quantidade_parcelas) || 1);
+  const calcValorTotal = () => (Number(form.valor) || 0) * (Number(form.quantidade_parcelas) || 1);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.valor || Number(form.valor) <= 0) return setErro('Valor da parcela deve ser maior que zero');
+    if (!form.valor || Number(form.valor) <= 0) return setErro('Valor nominal da parcela deve ser maior que zero');
     if (!form.data_vencimento) return setErro('Data do primeiro vencimento é obrigatória');
     setSalvando(true); setErro('');
     try {
       const pctDesc = tipoDesconto === '%' ? (Number(form.percentual_desconto) || 0) : 0;
       const valDesc = tipoDesconto === 'R$' ? (Number(form.percentual_desconto) || 0) : Number(form.valor) * (pctDesc / 100);
-      // valor_total = parcela_final × qtd → API divide por qtd → cada parcela = parcela_final
-      const valorTotalEnviar = calcValorTotal();
+      
+      // A API existente espera receber em valor_total o valor final com desconto aplicado para persistir a regra atual.
+      const valorTotalComDesconto = calcParcelaFinal() * (Number(form.quantidade_parcelas) || 1);
+
       const res = await fetch('/api/admin-financeiro/ordens/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -689,7 +691,7 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
           aluno_id: aluno.id, tipo: 'carne',
           descricao: form.descricao.trim() || 'MENSALIDADE',
           referencia: form.periodo.trim() || null,
-          valor_total: valorTotalEnviar,
+          valor_total: valorTotalComDesconto,
           percentual_desconto: pctDesc,
           valor_desconto: valDesc,
           quantidade_parcelas: Number(form.quantidade_parcelas),
@@ -740,33 +742,35 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
           <p className="text-xs font-semibold text-teal-600 mb-1">Lançar carnê</p>
 
           <div className="grid grid-cols-2 gap-3">
-            {/* Valor da Parcela | Desconto */}
-            <FieldGroup label="Valor da Parcela *">
+            {/* Valor Nominal da Parcela | Desconto */}
+            <FieldGroup label="Valor Nominal da Parcela *">
               <input type="number" step="0.01" min="0" value={form.valor}
                 onChange={e => set('valor', e.target.value)}
                 className={inputCls} placeholder="0,00" />
             </FieldGroup>
-            <div className="flex items-stretch rounded-lg border border-teal-300 bg-teal-50 focus-within:border-teal-500">
-              <span className="px-3 py-2 text-xs font-semibold text-teal-700 bg-teal-100 border-r border-teal-300 flex items-center rounded-l-lg flex-shrink-0">Desconto</span>
-              <input type="number" step="0.01" min="0" max={tipoDesconto === '%' ? 100 : undefined} value={form.percentual_desconto}
-                onChange={e => set('percentual_desconto', e.target.value)}
-                className={inputCls} placeholder="0" />
-              <select
-                value={tipoDesconto}
-                onChange={e => { setTipoDesconto(e.target.value); set('percentual_desconto', ''); }}
-                className="px-2 py-2 text-xs font-bold text-teal-700 bg-teal-100 border-l border-teal-300 rounded-r-lg flex-shrink-0 focus:outline-none cursor-pointer">
-                <option value="%">%</option>
-                <option value="R$">R$</option>
-              </select>
+            <div className="flex flex-col">
+              <span className="text-xs font-semibold text-gray-600 mb-1">Desconto por Pontualidade</span>
+              <div className="flex items-stretch rounded-lg border border-teal-300 bg-teal-50 focus-within:border-teal-500 h-[38px]">
+                <input type="number" step="0.01" min="0" max={tipoDesconto === '%' ? 100 : undefined} value={form.percentual_desconto}
+                  onChange={e => set('percentual_desconto', e.target.value)}
+                  className={inputCls} placeholder="0" />
+                <select
+                  value={tipoDesconto}
+                  onChange={e => { setTipoDesconto(e.target.value); set('percentual_desconto', ''); }}
+                  className="px-2 py-2 text-xs font-bold text-teal-700 bg-teal-100 border-l border-teal-300 rounded-r-lg flex-shrink-0 focus:outline-none cursor-pointer">
+                  <option value="%">%</option>
+                  <option value="R$">R$</option>
+                </select>
+              </div>
             </div>
 
-            {/* 1º Vencimento | Vencimento do Desconto */}
+            {/* 1º Vencimento | Data limite do desconto */}
             <FieldGroup label="1º Vencimento *">
               <input type="date" value={form.data_vencimento}
                 onChange={e => set('data_vencimento', e.target.value)}
                 className={inputCls} />
             </FieldGroup>
-            <FieldGroup label="Vencimento do Desconto">
+            <FieldGroup label="Data limite do desconto">
               <input type="date" value={form.vencimento_desconto}
                 onChange={e => set('vencimento_desconto', e.target.value)}
                 className={inputCls} />
@@ -799,18 +803,33 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
             {Number(form.valor) > 0 ? (
               <div className="col-span-2 bg-purple-50 border border-purple-200 rounded-lg px-4 py-3 text-sm space-y-1">
                 <div className="flex justify-between text-gray-600">
-                  <span>Valor da parcela</span>
+                  <span>Valor nominal</span>
                   <span>R$ {(Number(form.valor) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                 </div>
-                {calcDescontoParcela() > 0 && (
-                  <div className="flex justify-between text-red-500">
-                    <span>Desconto por parcela {tipoDesconto === '%' ? `(${form.percentual_desconto || 0}%)` : ''}</span>
-                    <span>- R$ {calcDescontoParcela().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-purple-700 font-medium">
-                  <span>Valor final da parcela</span>
+                <div className="flex justify-between text-gray-600">
+                  <span>Desconto por pontualidade</span>
+                  <span>R$ {calcDescontoParcela().toLocaleString('pt-BR', { minimumFractionDigits: 2 })} {tipoDesconto === '%' ? `(${form.percentual_desconto || 0}%)` : ''}</span>
+                </div>
+                <div className="flex justify-between text-teal-700 font-semibold">
+                  <span>Valor a pagar até a data do desconto</span>
                   <span>R$ {calcParcelaFinal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between text-purple-700 font-medium">
+                  <span>Valor após a data do desconto</span>
+                  <span>R$ {(Number(form.valor) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="border-t border-purple-200 my-1" />
+                <div className="flex justify-between text-gray-500 text-xs">
+                  <span>Juros</span>
+                  <span>1% ao mês (0,033% ao dia)</span>
+                </div>
+                <div className="flex justify-between text-gray-500 text-xs">
+                  <span>Multa</span>
+                  <span>2,0%</span>
+                </div>
+                <div className="flex justify-between text-gray-500 text-xs">
+                  <span>Dias de tolerância</span>
+                  <span>0 dias</span>
                 </div>
                 <div className="border-t border-purple-200 my-1" />
                 <div className="flex justify-between text-gray-600">
