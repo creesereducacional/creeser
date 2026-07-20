@@ -659,9 +659,40 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
   const [sucesso, setSucesso] = useState('');
+  const [tipoDesconto, setTipoDesconto] = useState('%');
+
+  // Configurações carregadas da empresa
+  const [configFinanceira, setConfigFinanceira] = useState({
+    multa: 2.0,
+    juros: 0.033, // ao dia
+    tolerancia: 0,
+  });
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
-  const [tipoDesconto, setTipoDesconto] = useState('%');
+
+  // Carrega as configurações financeiras padrão
+  useEffect(() => {
+    fetch('/api/configuracoes/empresa', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d) {
+          const multaConf = d.financeiro?.multaGerencianet !== undefined ? Number(d.financeiro.multaGerencianet) : (Number(d.financeiro?.multa_percentual) || 2.0);
+          const jurosConf = d.financeiro?.jurosGerencianet !== undefined ? Number(d.financeiro.jurosGerencianet) : (Number(d.financeiro?.juros_percentual) / 30 || 0.033);
+          const toleranciaConf = d.financeiro?.tolerancia_dias !== undefined ? Number(d.financeiro.tolerancia_dias) : 0;
+          
+          setConfigFinanceira({
+            multa: multaConf,
+            juros: jurosConf,
+            tolerancia: toleranciaConf,
+          });
+
+          if (d.financeiro?.tipo_desconto_padrao) {
+            setTipoDesconto(d.financeiro.tipo_desconto_padrao);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // form.valor = valor Nominal da PARCELA
   const calcParcelaFinal = () => {
@@ -725,6 +756,16 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
   };
 
   const inputCls = 'flex-1 px-3 py-2 text-sm bg-transparent focus:outline-none text-gray-800 placeholder-gray-400';
+
+  const formatarData = (dataStr) => {
+    if (!dataStr) return '__/__/____';
+    try {
+      const parts = dataStr.split('-');
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    } catch {
+      return dataStr;
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -801,51 +842,57 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
                 placeholder="Caso deixe em branco, será inserido: 'MENSALIDADE'." />
             </FieldGroup>
             {Number(form.valor) > 0 ? (
-              <div className="col-span-2 bg-purple-50 border border-purple-200 rounded-lg px-4 py-3 text-sm space-y-1">
+              <div className="col-span-2 bg-purple-50 border border-purple-200 rounded-lg px-4 py-3 text-sm space-y-2">
                 <div className="flex justify-between text-gray-600">
-                  <span>Valor nominal</span>
-                  <span>R$ {(Number(form.valor) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  <span>Valor nominal da parcela</span>
+                  <span className="font-semibold text-gray-800">R$ {(Number(form.valor) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
-                  <span>Desconto por pontualidade</span>
-                  <span>R$ {calcDescontoParcela().toLocaleString('pt-BR', { minimumFractionDigits: 2 })} {tipoDesconto === '%' ? `(${form.percentual_desconto || 0}%)` : ''}</span>
+                  <span>Desconto concedido até {formatarData(form.vencimento_desconto)}</span>
+                  <span className="text-red-650 font-medium">- R$ {calcDescontoParcela().toLocaleString('pt-BR', { minimumFractionDigits: 2 })} {tipoDesconto === '%' ? `(${form.percentual_desconto || 0}%)` : ''}</span>
                 </div>
-                <div className="flex justify-between text-teal-700 font-semibold">
-                  <span>Valor a pagar até a data do desconto</span>
-                  <span>R$ {calcParcelaFinal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                <div className="flex justify-between items-center bg-green-50 border border-green-200 rounded-lg p-2 text-green-800 font-bold text-sm">
+                  <span>Valor para pagamento até a data limite</span>
+                  <span className="text-lg">R$ {calcParcelaFinal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                 </div>
-                <div className="flex justify-between text-purple-700 font-medium">
-                  <span>Valor após a data do desconto</span>
+                <div className="flex justify-between items-center bg-orange-50 border border-orange-200 rounded-lg p-2 text-orange-800 font-semibold text-sm">
+                  <span>Valor após a data limite</span>
                   <span>R$ {(Number(form.valor) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="border-t border-purple-200 my-1" />
-                <div className="flex justify-between text-gray-500 text-xs">
-                  <span>Juros</span>
-                  <span>1% ao mês (0,033% ao dia)</span>
+                <div className="space-y-1">
+                  <div className="text-xs font-semibold text-purple-900">Após o vencimento:</div>
+                  <div className="flex justify-between text-gray-600 text-xs pl-2">
+                    <span>• Multa</span>
+                    <span>{configFinanceira.multa.toFixed(1)}%</span>
+                  </div>
+                  <div className="flex justify-between text-gray-600 text-xs pl-2">
+                    <span>• Juros</span>
+                    <span>{configFinanceira.juros.toFixed(3)}% ao dia</span>
+                  </div>
                 </div>
-                <div className="flex justify-between text-gray-500 text-xs">
-                  <span>Multa</span>
-                  <span>2,0%</span>
-                </div>
-                <div className="flex justify-between text-gray-500 text-xs">
+                <div className="flex justify-between text-gray-600 text-xs">
                   <span>Dias de tolerância</span>
-                  <span>0 dias</span>
+                  <span>{configFinanceira.tolerancia} dias</span>
                 </div>
                 <div className="border-t border-purple-200 my-1" />
-                <div className="flex justify-between text-gray-600">
+                <div className="flex justify-between text-gray-600 text-xs">
                   <span>Quantidade de parcelas</span>
                   <span>{Number(form.quantidade_parcelas) || 1}×</span>
                 </div>
-                <div className="flex justify-between text-purple-800 font-bold text-base">
-                  <span>Total do carnê</span>
-                  <span>R$ {calcValorTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                <div className="flex justify-between items-center bg-purple-100 border border-purple-300 rounded-lg p-2 text-purple-800 font-extrabold text-base">
+                  <span>Total nominal do carnê</span>
+                  <span className="text-xl text-purple-900">R$ {calcValorTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                 </div>
+                <p className="text-[10px] text-gray-500 italic mt-2 text-center">
+                  "Este carnê será emitido com valor nominal. O desconto será aplicado automaticamente pelo gateway apenas para pagamentos realizados até a data limite."
+                </p>
               </div>
             ) : <div className="col-span-2" />}
           </div>
 
-          {erro && <p className="text-sm text-red-600">{erro}</p>}
-          {sucesso && <p className="text-sm text-green-600">{sucesso}</p>}
+          {erro && <p className="text-sm text-red-650 font-semibold">{erro}</p>}
+          {sucesso && <p className="text-sm text-green-650 font-semibold">{sucesso}</p>}
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100">Cancelar</button>
             <button type="submit" disabled={salvando} className="px-5 py-2 text-sm font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50">
