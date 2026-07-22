@@ -720,10 +720,10 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
     setSalvando(true); setErro('');
     try {
       const pctDesc = tipoDesconto === '%' ? (Number(form.percentual_desconto) || 0) : 0;
-      const valDesc = tipoDesconto === 'R$' ? (Number(form.percentual_desconto) || 0) : Number(form.valor) * (pctDesc / 100);
+      const valDescUnitario = calcDescontoParcela();
+      const valDescTotal = valDescUnitario * (Number(form.quantidade_parcelas) || 1);
       
-      // A API existente espera receber em valor_total o valor final com desconto aplicado para persistir a regra atual.
-      const valorTotalComDesconto = calcParcelaFinal() * (Number(form.quantidade_parcelas) || 1);
+      const valorTotalNominal = calcValorTotal();
 
       const res = await fetch('/api/admin-financeiro/ordens/create', {
         method: 'POST',
@@ -732,9 +732,9 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
           aluno_id: aluno.id, tipo: 'carne',
           descricao: form.descricao.trim() || 'MENSALIDADE',
           referencia: form.periodo.trim() || null,
-          valor_total: valorTotalComDesconto,
+          valor_total: valorTotalNominal,
           percentual_desconto: pctDesc,
-          valor_desconto: valDesc,
+          valor_desconto: valDescTotal,
           quantidade_parcelas: Number(form.quantidade_parcelas),
           intervalo_dias: 30,
           data_vencimento_primeira: form.data_vencimento,

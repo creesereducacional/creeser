@@ -129,10 +129,11 @@ export default async function handler(req, res) {
           ordem_pagamento_id: criadaOrdemId,
           aluno_id,
           numero_parcela: i,
-          valor: Number(valorParcelaFinal.toFixed(2)), // retro-compatibilidade: valor é o líquido
+          valor: Number(valorParcelaNominal.toFixed(2)), // padronizado: valor = valor_nominal para compatibilidade
           valor_nominal: Number(valorParcelaNominal.toFixed(2)),
           valor_desconto: Number(valorParcelaDesconto.toFixed(2)),
           valor_final: Number(valorParcelaFinal.toFixed(2)),
+          data_limite_desconto: dataVencimento.toISOString().split('T')[0],
           data_vencimento: dataVencimento.toISOString().split('T')[0],
           status: 'pendente'
         });

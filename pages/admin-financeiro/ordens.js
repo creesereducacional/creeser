@@ -6,6 +6,7 @@ import BarraFiltros from '@/components/AdminFinanceiro/BarraFiltros';
 import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState   from '@/components/ui/EmptyState';
 import { SkeletonTable } from '@/components/ui/LoadingSkeleton';
+import { FinanceEngine } from '../../lib/financeiro/FinanceEngine';
 
 export default function OrdensPage() {
   const [ordens, setOrdens] = useState([]);

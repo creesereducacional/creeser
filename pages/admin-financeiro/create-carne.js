@@ -96,17 +96,18 @@ export default function CreateCarnePage() {
         throw new Error('Data de vencimento da primeira parcela é obrigatória');
       }
 
-      const valorDesconto = FinanceEngine.calcularDescontoParcela(form.valor, form.percentual_desconto, '%');
-      const valorTotalComDesconto = FinanceEngine.calcularTotalLiquidoCarne(form.valor, form.percentual_desconto, '%', form.quantidade_parcelas);
+      const valorDescontoUnitario = FinanceEngine.calcularDescontoParcela(form.valor, form.percentual_desconto, '%');
+      const valorDescontoTotal = valorDescontoUnitario * (Number(form.quantidade_parcelas) || 1);
+      const valorTotalNominal = FinanceEngine.calcularTotalNominalCarne(form.valor, form.quantidade_parcelas);
 
       const payload = {
         aluno_id: Number(aluno_id),
         tipo: 'carne',
         descricao: form.descricao.trim(),
         referencia: form.referencia.trim() || null,
-        valor_total: valorTotalComDesconto,
+        valor_total: valorTotalNominal,
         percentual_desconto: Number(form.percentual_desconto) || 0,
-        valor_desconto: valorDesconto,
+        valor_desconto: valorDescontoTotal,
         quantidade_parcelas: Number(form.quantidade_parcelas),
         intervalo_dias: Number(form.intervalo_dias) || 30,
         data_vencimento_primeira: form.data_vencimento,
