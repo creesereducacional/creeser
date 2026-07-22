@@ -401,6 +401,16 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
       // Comportamento original
       if (!form.descricao.trim()) return setErro('Descrição é obrigatória');
       if (!form.valor || Number(form.valor) <= 0) return setErro('Valor deve ser maior que zero');
+      
+      // Validações preventivas no Frontend
+      const cpfSanitizado = (aluno.cpf || '').replace(/\D/g, '');
+      if (!cpfSanitizado || cpfSanitizado.length !== 11) {
+        return setErro('CPF do aluno é inválido ou incompleto (deve conter 11 dígitos). Ajuste o cadastro antes de prosseguir.');
+      }
+      if (!aluno.instituicao_id) {
+        return setErro('O aluno não possui vínculo com uma instituição cadastrada no sistema.');
+      }
+
       setSalvando(true); setErro('');
       try {
         const qtd = Number(form.quantidade_parcelas) || 1;

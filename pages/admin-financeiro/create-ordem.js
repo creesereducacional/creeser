@@ -77,6 +77,15 @@ export default function CreateOrdenPage() {
         throw new Error('Valor deve ser maior que zero');
       }
 
+      // Validações preventivas no Frontend
+      const cpfSanitizado = (aluno?.cpf || '').replace(/\D/g, '');
+      if (!cpfSanitizado || cpfSanitizado.length !== 11) {
+        throw new Error('CPF do aluno é inválido ou incompleto (deve conter 11 dígitos). Ajuste o cadastro antes de prosseguir.');
+      }
+      if (!aluno?.instituicao_id) {
+        throw new Error('O aluno não possui vínculo com uma instituição cadastrada no sistema.');
+      }
+
       const valorDesconto = FinanceEngine.calcularDescontoParcela(form.valor, form.percentual_desconto, '%');
 
       const payload = {

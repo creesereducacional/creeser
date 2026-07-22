@@ -142,10 +142,21 @@ async function criarCobranca(req, res) {
     console.log('[EFI cobranca] customer:', JSON.stringify(customer));
     console.log('[EFI cobranca] expire_at:', parcela.data_vencimento);
 
-    const billetData = await efi.associateBillet(chargeId, {
-      expire_at: parcela.data_vencimento,
-      customer,
-    });
+    let billetData;
+    try {
+      billetData = await efi.associateBillet(chargeId, {
+        expire_at: parcela.data_vencimento,
+        customer,
+      });
+    } catch (billetErr) {
+      console.error('[CRITICAL] Falha ao associar boleto na EFI, executando exclusão da cobrança EFI para evitar faturas em aberto:', chargeId, billetErr.message);
+      try {
+        await efi.cancelCharge(Number(chargeId));
+      } catch (cancelErr) {
+        console.error('[ROLLBACK WARNING] Falha ao cancelar cobrança órfã no gateway EFI:', chargeId, cancelErr.message);
+      }
+      throw billetErr;
+    }
 
     const billet = billetData.data;
     // A resposta do definePayMethod tem a estrutura:
@@ -155,33 +166,44 @@ async function criarCobranca(req, res) {
     // 4. Salvar na tabela financeiro_boletos
     const instituicaoId = parcela?.ordem?.instituicao_id || req.instituicaoId || null;
 
-    await supabase.from('financeiro_boletos').insert({
-      parcela_id,
-      instituicao_id: instituicaoId,
-      gateway: 'efi',
-      boleto_id_gateway: String(chargeId),
-      boleto_numero: barcode,
-      boleto_barcode: barcode,
-      boleto_url: boletoUrl,
-      status_gateway: 'waiting',
-      resposta_json: billet,
-    });
-
-    // 5. Atualizar parcela com dados do boleto
-    await supabase
-      .from('financeiro_parcelas')
-      .update({
-        efi_charge_id: String(chargeId),
+    try {
+      await supabase.from('financeiro_boletos').insert({
+        parcela_id,
+        instituicao_id: instituicaoId,
+        gateway: 'efi',
+        boleto_id_gateway: String(chargeId),
+        boleto_numero: barcode,
         boleto_barcode: barcode,
         boleto_url: boletoUrl,
-      })
-      .eq('id', parcela_id);
+        status_gateway: 'waiting',
+        resposta_json: billet,
+      });
 
-    // 6. Atualizar ordem com o charge_id
-    await supabase
-      .from('financeiro_ordens_pagamento')
-      .update({ efi_charge_id: String(chargeId), efi_status: 'waiting' })
-      .eq('id', parcela.ordem_pagamento_id);
+      // 5. Atualizar parcela com dados do boleto
+      await supabase
+        .from('financeiro_parcelas')
+        .update({
+          efi_charge_id: String(chargeId),
+          boleto_barcode: barcode,
+          boleto_url: boletoUrl,
+        })
+        .eq('id', parcela_id);
+
+      // 6. Atualizar ordem com o charge_id
+      await supabase
+        .from('financeiro_ordens_pagamento')
+        .update({ efi_charge_id: String(chargeId), efi_status: 'waiting' })
+        .eq('id', parcela.ordem_pagamento_id);
+        
+    } catch (dbPersistenceErr) {
+      console.error('[ROLLBACK EXECUTED] Erro ao persistir dados do boleto localmente. Solicitando cancelamento na EFI:', chargeId, dbPersistenceErr);
+      try {
+        await efi.cancelCharge(Number(chargeId));
+      } catch (cancelErr) {
+        console.error('[ROLLBACK WARNING] Falha ao cancelar cobrança órfã no gateway EFI:', chargeId, cancelErr.message);
+      }
+      throw dbPersistenceErr;
+    }
 
     return res.status(201).json({
       message: 'Boleto criado com sucesso.',
