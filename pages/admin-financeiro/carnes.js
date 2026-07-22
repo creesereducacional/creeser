@@ -3,6 +3,7 @@ import Link from 'next/link';
 import AdminFinanceiroLayout from '@/components/AdminFinanceiro/Layout';
 import ModalBaixaManual from '@/components/AdminFinanceiro/ModalBaixaManual';
 import BarraFiltros from '@/components/AdminFinanceiro/BarraFiltros';
+import { FinanceEngine } from '../../lib/financeiro/FinanceEngine';
 
 export default function CarnesPage() {
   const [carnes, setCarnes] = useState([]);
@@ -586,7 +587,7 @@ export default function CarnesPage() {
                                       </td>
                                       <td className="px-2 py-2 text-gray-900 font-semibold">{parcela.numero_parcela}</td>
                                       <td className="px-2 py-2 text-gray-600">{formataData(parcela.data_vencimento)}</td>
-                                      <td className="px-2 py-2 text-gray-900 font-semibold text-right">{formataValor(parcela.valor)}</td>
+                                      <td className="px-2 py-2 text-gray-900 font-semibold text-right">{formataValor(FinanceEngine.obterValorVigente(parcela))}</td>
                                       <td className="px-2 py-2.5"><StatusParcelaBadge status={parcela.status} dataVencimento={parcela.data_vencimento} /></td>
                                       <td className="px-2 py-2 text-center">
                                         <div className="flex items-center justify-center gap-1">

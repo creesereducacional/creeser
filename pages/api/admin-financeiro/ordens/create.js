@@ -112,7 +112,13 @@ export default async function handler(req, res) {
       // Gerar parcelas
       const parcelas = [];
       const qtd = quantidade_parcelas || 1;
-      const valorParcela = valor_total / qtd;
+      
+      // A API existente recebe 'valor_total' como o valor Nominal total que será parcelado,
+      // e o 'valor_desconto' como o desconto total a ser fracionado.
+      const totalDesconto = Number(valor_desconto) || 0;
+      const valorParcelaNominal = valor_total / qtd;
+      const valorParcelaDesconto = totalDesconto / qtd;
+      const valorParcelaFinal = valorParcelaNominal - valorParcelaDesconto;
 
       let dataVencimento = new Date(data_vencimento_primeira || Date.now());
       const dias = intervalo_dias || 30;
@@ -123,7 +129,10 @@ export default async function handler(req, res) {
           ordem_pagamento_id: criadaOrdemId,
           aluno_id,
           numero_parcela: i,
-          valor: Number(valorParcela.toFixed(2)),
+          valor: Number(valorParcelaFinal.toFixed(2)), // retro-compatibilidade: valor é o líquido
+          valor_nominal: Number(valorParcelaNominal.toFixed(2)),
+          valor_desconto: Number(valorParcelaDesconto.toFixed(2)),
+          valor_final: Number(valorParcelaFinal.toFixed(2)),
           data_vencimento: dataVencimento.toISOString().split('T')[0],
           status: 'pendente'
         });
