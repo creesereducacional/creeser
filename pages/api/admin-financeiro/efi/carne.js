@@ -124,7 +124,7 @@ async function criarCarne(req, res) {
     // 2. Buscar parcelas em ordem crescente
     let parcelasQuery = supabase
       .from('financeiro_parcelas')
-      .select('id, numero_parcela, valor, data_vencimento')
+      .select('id, numero_parcela, valor, valor_nominal, valor_desconto, valor_final, data_limite_desconto, data_vencimento')
       .eq('ordem_pagamento_id', ordem_id)
       .order('numero_parcela', { ascending: true });
 
@@ -156,8 +156,21 @@ async function criarCarne(req, res) {
       return res.status(422).json({ message: 'CPF do aluno inválido ou ausente.' });
     }
 
+    // Buscar configurações da empresa para juros/multa
+    const { data: configEmpresa } = await supabase
+      .from('configuracoes_empresa')
+      .select('financeiro')
+      .eq('instituicao_id', ordemSelecionada.instituicao_id)
+      .maybeSingle();
+
+    const configFinanceiro = configEmpresa?.financeiro || {};
+
     // Valor da 1ª parcela em centavos (todas devem ter o mesmo valor, mas usamos a 1ª de referência)
-    const valorCentavos = Math.round(Number(parcelas[0].valor) * 100);
+    // Usar valor_nominal com fallback para valor (legado)
+    const valorBase = parcelas[0].valor_nominal !== undefined && parcelas[0].valor_nominal !== null 
+      ? Number(parcelas[0].valor_nominal) 
+      : Number(parcelas[0].valor);
+    const valorCentavos = Math.round(valorBase * 100);
     const primeiroVencimento = parcelas[0].data_vencimento;
 
     const phoneDigits = (aluno.telefone_celular || '').replace(/\D/g, '');
@@ -172,19 +185,56 @@ async function criarCarne(req, res) {
     if (phoneDigits.length === 10 || phoneDigits.length === 11) customer.phone_number = phoneDigits;
     if (birth && /^\d{4}-\d{2}-\d{2}$/.test(birth)) customer.birth = birth;
 
+    // Configurações de encargos para o Carnê (Multa e Juros)
+    const configurations = {};
+    const multaPercentual = Number(configFinanceiro.multaGerencianet) || Number(configFinanceiro.multa) || 0;
+    if (multaPercentual > 0) {
+      configurations.fine = {
+        value: Math.round(multaPercentual * 100), // EFI recebe percentual em centavos: ex 2% = 200
+        type: 'percentage'
+      };
+    }
+
+    const jurosPercentualDiario = Number(configFinanceiro.jurosGerencianet) || Number(configFinanceiro.juros) || 0;
+    if (jurosPercentualDiario > 0) {
+      configurations.interest = {
+        value: Math.round(jurosPercentualDiario * 1000), // EFI recebe juros em milésimos de percentual: ex 0.033% = 33
+        type: 'percentage'
+      };
+    }
+
+    // Desconto Condicional do Carnê
+    const discountValue = Number(parcelas[0].valor_desconto) || 0;
+    const discount = {};
+    if (discountValue > 0 && parcelas[0].data_limite_desconto) {
+      discount.value = Math.round(discountValue * 100);
+      discount.type = 'currency';
+      discount.until_date = parcelas[0].data_limite_desconto;
+    }
+
     // URL do webhook para receber confirmações de pagamento de cada parcela
     const notificationUrl = process.env.EFI_WEBHOOK_URL ||
       `${process.env.NEXT_PUBLIC_URL}/api/admin-financeiro/efi/webhook`;
 
-    // 3. Criar carnê na EFI
-    const carnetData = await efi.createCarnet({
+    // Montar o payload final para criação do carnê
+    const carnetPayload = {
       items: [{ name: efiDescricao, value: valorCentavos, amount: 1 }],
       customer,
       expire_at: primeiroVencimento,
       repeats: parcelas.length,
       split_items: false,
       metadata: notificationUrl ? { notification_url: notificationUrl } : undefined,
-    });
+    };
+
+    if (Object.keys(configurations).length > 0) {
+      carnetPayload.configurations = configurations;
+    }
+    if (Object.keys(discount).length > 0) {
+      carnetPayload.discount = discount;
+    }
+
+    // 3. Criar carnê na EFI
+    const carnetData = await efi.createCarnet(carnetPayload);
 
     const carnet = carnetData.data;
     const carnetId = carnet.carnet_id;

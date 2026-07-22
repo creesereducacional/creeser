@@ -60,7 +60,7 @@ async function criarCobranca(req, res) {
     let parcelaQuery = supabase
       .from('financeiro_parcelas')
       .select(`
-        id, ordem_pagamento_id, numero_parcela, valor, data_vencimento, status,
+        id, ordem_pagamento_id, numero_parcela, valor, valor_nominal, valor_desconto, valor_final, data_limite_desconto, data_vencimento, status,
         ordem:financeiro_ordens_pagamento!inner ( id, tipo, efi_charge_id, instituicao_id ),
         aluno:alunos!inner ( id, nome, cpf, email, data_nascimento, telefone_celular )
       `)
@@ -95,8 +95,20 @@ async function criarCobranca(req, res) {
       return res.status(422).json({ message: 'CPF do aluno inválido ou ausente.' });
     }
 
-    // Valor em centavos (EFI sempre usa centavos)
-    const valorCentavos = Math.round(Number(parcela.valor) * 100);
+    // Buscar configurações da empresa para juros/multa
+    const { data: configEmpresa } = await supabase
+      .from('configuracoes_empresa')
+      .select('financeiro')
+      .eq('instituicao_id', parcela.ordem.instituicao_id)
+      .maybeSingle();
+
+    const configFinanceiro = configEmpresa?.financeiro || {};
+    
+    // Valor em centavos (EFI sempre usa centavos) - Usar valor_nominal com fallback para valor (legado)
+    const valorBase = parcela.valor_nominal !== undefined && parcela.valor_nominal !== null 
+      ? Number(parcela.valor_nominal) 
+      : Number(parcela.valor);
+    const valorCentavos = Math.round(valorBase * 100);
 
     // 2. Criar cobrança (charge) vazia na EFI
     const chargeData = await efi.createCharge([
@@ -139,14 +151,55 @@ async function criarCobranca(req, res) {
     // Só inclui birth se tiver formato YYYY-MM-DD válido
     if (birth && /^\d{4}-\d{2}-\d{2}$/.test(birth)) customer.birth = birth;
 
+    // Configurações do Boleto (Multa e Juros)
+    const configurations = {};
+    const multaPercentual = Number(configFinanceiro.multaGerencianet) || Number(configFinanceiro.multa) || 0;
+    if (multaPercentual > 0) {
+      configurations.fine = {
+        value: Math.round(multaPercentual * 100), // EFI recebe percentual em centavos: ex 2% = 200
+        type: 'percentage'
+      };
+    }
+
+    const jurosPercentualDiario = Number(configFinanceiro.jurosGerencianet) || Number(configFinanceiro.juros) || 0;
+    if (jurosPercentualDiario > 0) {
+      configurations.interest = {
+        value: Math.round(jurosPercentualDiario * 1000), // EFI recebe juros em milésimos de percentual: ex 0.033% = 33
+        type: 'percentage'
+      };
+    }
+
+    // Desconto Condicional por Pontualidade
+    const discountValue = Number(parcela.valor_desconto) || 0;
+    const discount = {};
+    if (discountValue > 0 && parcela.data_limite_desconto) {
+      discount.value = Math.round(discountValue * 100);
+      discount.type = 'currency';
+      discount.until_date = parcela.data_limite_desconto;
+    }
+
     console.log('[EFI cobranca] customer:', JSON.stringify(customer));
     console.log('[EFI cobranca] expire_at:', parcela.data_vencimento);
 
     let billetData;
     try {
-      billetData = await efi.associateBillet(chargeId, {
+      const bankingBilletPayload = {
         expire_at: parcela.data_vencimento,
         customer,
+      };
+
+      if (Object.keys(configurations).length > 0) {
+        bankingBilletPayload.configurations = configurations;
+      }
+      if (Object.keys(discount).length > 0) {
+        bankingBilletPayload.discount = discount;
+      }
+
+      // A EFI usa POST /charge/:id/pay com estrutura { payment: { banking_billet: { expire_at, customer, configurations, discount } } }
+      billetData = await efi._request('POST', `/v1/charge/${chargeId}/pay`, {
+        payment: {
+          banking_billet: bankingBilletPayload
+        }
       });
     } catch (billetErr) {
       console.error('[CRITICAL] Falha ao associar boleto na EFI, executando exclusão da cobrança EFI para evitar faturas em aberto:', chargeId, billetErr.message);
