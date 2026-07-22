@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { hasPerfil, requireAuth, requirePerfil, resolveInstituicaoId } from '../../../../lib/auth-server';
+import { hasPerfil, requireAuth, requirePerfil, resolveInstituicaoId, resolveInstitutionContext } from '../../../../lib/auth-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -20,10 +20,6 @@ export default async function handler(req, res) {
     const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
     const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
 
-    if (!instituicaoId && !isGroupAdmin) {
-      return res.status(400).json({ message: 'Instituicao obrigatoria para criar ordem' });
-    }
-
     const {
       aluno_id,
       tipo,
@@ -41,7 +37,7 @@ export default async function handler(req, res) {
 
     const { data: aluno, error: alunoError } = await supabase
       .from('alunos')
-      .select('id,instituicao_id,cpf,nome')
+      .select('id,instituicao_id,cpf,nome,turmaid,cursoid')
       .eq('id', aluno_id)
       .single();
 
@@ -57,17 +53,36 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'O aluno informado não possui um CPF válido com 11 dígitos cadastrado.' });
     }
 
-    const alunoInstituicaoId = aluno.instituicao_id || null;
-    if (!isGroupAdmin && alunoInstituicaoId && alunoInstituicaoId !== instituicaoId) {
+    // Tentar resolver a unidade/turma se o aluno não possuir instituicao_id diretamente
+    let unidadeInstituicaoId = null;
+    if (!aluno.instituicao_id && aluno.turmaid) {
+      const { data: turmaData } = await supabase
+        .from('turmas')
+        .select('unidade_id, unidades(instituicao_id)')
+        .eq('id', aluno.turmaid)
+        .maybeSingle();
+      if (turmaData?.unidades?.instituicao_id) {
+        unidadeInstituicaoId = turmaData.unidades.instituicao_id;
+      }
+    }
+
+    const instituicaoFinal = resolveInstitutionContext({
+      aluno: {
+        instituicao_id: aluno.instituicao_id,
+        unidade_instituicao_id: unidadeInstituicaoId
+      },
+      user: authUser,
+      requestedId: req.body.instituicao_id || instituicaoId
+    });
+
+    if (!isGroupAdmin && aluno.instituicao_id && aluno.instituicao_id !== instituicaoId && instituicaoFinal !== instituicaoId) {
       console.error('[SECURITY VIOLATION] Tentativa de acesso negado a aluno de outro tenant:', { authUser: authUser.email, aluno_id });
       return res.status(403).json({ message: 'Acesso negado para o aluno informado' });
     }
 
-    const instituicaoFinal = alunoInstituicaoId || instituicaoId;
-
     if (!instituicaoFinal) {
       console.error('[CRITICAL] Instituição ausente no processamento de ordem:', { aluno_id, authUser: authUser.email });
-      return res.status(400).json({ message: 'Instituicao obrigatoria para criar ordem' });
+      return res.status(400).json({ message: 'O aluno não possui vínculo com uma instituição cadastrada no sistema.' });
     }
 
     // Validações

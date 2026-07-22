@@ -407,9 +407,6 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
       if (!cpfSanitizado || cpfSanitizado.length !== 11) {
         return setErro('CPF do aluno é inválido ou incompleto (deve conter 11 dígitos). Ajuste o cadastro antes de prosseguir.');
       }
-      if (!aluno.instituicao_id) {
-        return setErro('O aluno não possui vínculo com uma instituição cadastrada no sistema.');
-      }
 
       setSalvando(true); setErro('');
       try {
