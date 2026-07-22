@@ -413,6 +413,9 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
         const qtd = Number(form.quantidade_parcelas) || 1;
         const pctDesc = tipoDesconto === '%' ? (Number(form.percentual_desconto) || 0) : 0;
         const valDesc = tipoDesconto === 'R$' ? (Number(form.percentual_desconto) || 0) : Number(form.valor) * (pctDesc / 100);
+
+        // Único fetch: ordens/create é responsável por criar a ordem, a parcela
+        // e emitir o boleto no gateway EFI em uma única transação controlada.
         const res = await fetch('/api/admin-financeiro/ordens/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -426,24 +429,13 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
             quantidade_parcelas: qtd,
             data_vencimento_primeira: form.data_vencimento,
             criado_por: 'financeiro',
+            // Solicita emissão imediata no gateway EFI
+            emitir_imediatamente: true,
+            descricao_boleto: form.descricao.trim(),
           }),
         });
         const resBody = await res.json();
         if (!res.ok) throw new Error(resBody.error || resBody.message || 'Erro ao criar ordem');
-
-        const parcela_id = resBody.parcelas?.[0]?.id;
-        if (parcela_id) {
-          setSucesso('⏳ Gerando boleto no banco EFI...');
-          const efiRes = await fetch('/api/admin-financeiro/efi/cobranca', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ parcela_id, descricao: form.descricao.trim() }),
-          });
-          if (!efiRes.ok) {
-            const efiBody = await efiRes.json();
-            throw new Error('Falha ao emitir boleto no gateway EFI (operação revertida): ' + (efiBody.message || 'erro desconhecido'));
-          }
-        }
 
         setSucesso('✅ Ordem e boleto EFI criados com sucesso!');
         setTimeout(() => { onSalvo(); onSuccess(); onClose(); }, 800);

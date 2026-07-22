@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { hasPerfil, requireAuth, requirePerfil, resolveInstituicaoId, resolveInstitutionContext } from '../../../../lib/auth-server';
+import { emitirBoletoEfi } from '../../../../lib/efi/EfiBillingService';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -32,7 +33,10 @@ export default async function handler(req, res) {
       observacoes,
       criado_por,
       data_vencimento_primeira,
-      intervalo_dias
+      intervalo_dias,
+      // Emissão imediata no gateway (somente para tipo === 'ordem_simples')
+      emitir_imediatamente = false,
+      descricao_boleto,
     } = req.body;
 
     const { data: aluno, error: alunoError } = await supabase
@@ -176,13 +180,65 @@ export default async function handler(req, res) {
         if (matriculaError) throw matriculaError;
       }
 
-      return res.status(201).json({
+      // ── Emissão imediata no gateway (somente para ordem_simples) ──────────────────
+      let gatewayResult = null;
+
+      if (tipo === 'ordem_simples' && emitir_imediatamente) {
+        const primeiraParcela = parcelasData[0];
+
+        if (!primeiraParcela) {
+          throw new Error('Parcela não encontrada após inserção. Não é possível emitir boleto.');
+        }
+
+        // Buscar configurações financeiras da instituição
+        const { data: configEmpresa } = await supabase
+          .from('configuracoes_empresa')
+          .select('financeiro')
+          .eq('instituicao_id', instituicaoFinal)
+          .maybeSingle();
+
+        const configFinanceiro = configEmpresa?.financeiro || {};
+        const notificationUrl =
+          process.env.EFI_WEBHOOK_URL ||
+          `${process.env.NEXT_PUBLIC_URL}/api/admin-financeiro/efi/webhook`;
+
+        // emitirBoletoEfi lança erro se falhar — o catch externo fará rollback
+        const efiData = await emitirBoletoEfi({
+          parcela: {
+            ...primeiraParcela,
+            ordem_pagamento_id: criadaOrdemId,
+          },
+          aluno,
+          descricao: descricao_boleto || descricao,
+          configFinanceiro,
+          supabase,
+          instituicaoId: instituicaoFinal,
+          notificationUrl,
+        });
+
+        gatewayResult = {
+          provider: 'EFI',
+          charge_id: efiData.charge_id,
+          boleto_url: efiData.boleto_url,
+          barcode: efiData.barcode,
+          status: 'EMITIDO',
+        };
+      }
+
+      // ── Resposta padronizada ────────────────────────────────────────────────────
+      const responseBody = {
         sucesso: true,
         ordem: ordemData,
         parcelas: parcelasData,
         total_parcelas: parcelasData.length,
-        mensagem: `${tipo === 'ordem_simples' ? 'Ordem' : 'Carnê'} criado com sucesso!`
-      });
+        mensagem: `${tipo === 'ordem_simples' ? 'Ordem' : 'Carnê'} criado com sucesso!`,
+      };
+
+      if (gatewayResult) {
+        responseBody.gateway = gatewayResult;
+      }
+
+      return res.status(201).json(responseBody);
 
     } catch (dbError) {
       // Rollback se algo falhar na persistência das parcelas ou status

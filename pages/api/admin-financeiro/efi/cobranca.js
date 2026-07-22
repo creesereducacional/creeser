@@ -12,7 +12,6 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import efi from '../../../../lib/efi-client';
 import {
   applyInstituicaoFilter,
   hasPerfil,
@@ -20,6 +19,7 @@ import {
   requirePerfil,
   resolveInstituicaoId,
 } from '../../../../lib/auth-server';
+import { emitirBoletoEfi } from '../../../../lib/efi/EfiBillingService';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -95,7 +95,7 @@ async function criarCobranca(req, res) {
       return res.status(422).json({ message: 'CPF do aluno inválido ou ausente.' });
     }
 
-    // Buscar configurações da empresa para juros/multa
+    // 2. Buscar configurações da empresa para juros/multa
     const { data: configEmpresa } = await supabase
       .from('configuracoes_empresa')
       .select('financeiro')
@@ -103,181 +103,34 @@ async function criarCobranca(req, res) {
       .maybeSingle();
 
     const configFinanceiro = configEmpresa?.financeiro || {};
-    
-    // Valor em centavos (EFI sempre usa centavos) - Usar valor_nominal com fallback para valor (legado)
-    const valorBase = parcela.valor_nominal !== undefined && parcela.valor_nominal !== null 
-      ? Number(parcela.valor_nominal) 
-      : Number(parcela.valor);
-    const valorCentavos = Math.round(valorBase * 100);
-
-    // 2. Criar cobrança (charge) vazia na EFI
-    const chargeData = await efi.createCharge([
-      { name: descricao, value: valorCentavos, amount: 1 },
-    ]);
-
-    console.log('[EFI createCharge] resposta:', JSON.stringify(chargeData));
-
-    // A EFI retorna { code: 200, data: { charge_id: ... } }
-    const chargeId = chargeData?.data?.charge_id ?? chargeData?.charge_id;
-
-    if (!chargeId) {
-      throw new Error(`charge_id não retornado pela EFI. Resposta: ${JSON.stringify(chargeData)}`);
-    }
-
-    // Registrar notification_url via metadata (após criação do charge)
-    const notificationUrl = process.env.EFI_WEBHOOK_URL ||
+    const instituicaoId = parcela?.ordem?.instituicao_id || req.instituicaoId || null;
+    const notificationUrl =
+      process.env.EFI_WEBHOOK_URL ||
       `${process.env.NEXT_PUBLIC_URL}/api/admin-financeiro/efi/webhook`;
 
-    if (notificationUrl) {
-      await efi.updateChargeMetadata(chargeId, notificationUrl)
-        .catch(err => console.warn('[EFI cobranca] Falha ao definir notification_url:', err.message));
-    }
-
-    // 3. Associar ao boleto bancário
-    // phone_number: EFI exige exatamente 10 ou 11 dígitos
-    const phoneDigits = (aluno.telefone_celular || '').replace(/\D/g, '');
-    // birth: EFI exige YYYY-MM-DD — extrair só a parte da data se vier com timestamp
-    const birthRaw = aluno.data_nascimento || null;
-    const birth = birthRaw ? String(birthRaw).substring(0, 10) : undefined;
-
-    const customer = {
-      name: aluno.nome,
-      cpf: cpfLimpo,
-    };
-    // Só inclui email se houver
-    if (aluno.email) customer.email = aluno.email;
-    // Só inclui phone se tiver 10 ou 11 dígitos
-    if (phoneDigits.length === 10 || phoneDigits.length === 11) customer.phone_number = phoneDigits;
-    // Só inclui birth se tiver formato YYYY-MM-DD válido
-    if (birth && /^\d{4}-\d{2}-\d{2}$/.test(birth)) customer.birth = birth;
-
-    // Configurações do Boleto (Multa e Juros)
-    const configurations = {};
-    const multaPercentual = Number(configFinanceiro.multaGerencianet) || Number(configFinanceiro.multa) || 0;
-    if (multaPercentual > 0) {
-      configurations.fine = {
-        value: Math.round(multaPercentual * 100), // EFI recebe percentual em centavos: ex 2% = 200
-        type: 'percentage'
-      };
-    }
-
-    const jurosPercentualDiario = Number(configFinanceiro.jurosGerencianet) || Number(configFinanceiro.juros) || 0;
-    if (jurosPercentualDiario > 0) {
-      configurations.interest = {
-        value: Math.round(jurosPercentualDiario * 1000), // EFI recebe juros em milésimos de percentual: ex 0.033% = 33
-        type: 'percentage'
-      };
-    }
-
-    // Desconto Condicional por Pontualidade
-    const discountValue = Number(parcela.valor_desconto) || 0;
-    const discount = {};
-    if (discountValue > 0 && parcela.data_limite_desconto) {
-      discount.value = Math.round(discountValue * 100);
-      discount.type = 'currency';
-      discount.until_date = parcela.data_limite_desconto;
-    }
-
-    console.log('[EFI cobranca] customer:', JSON.stringify(customer));
-    console.log('[EFI cobranca] expire_at:', parcela.data_vencimento);
-
-    let billetData;
-    try {
-      const bankingBilletPayload = {
-        expire_at: parcela.data_vencimento,
-        customer,
-      };
-
-      if (Object.keys(configurations).length > 0) {
-        bankingBilletPayload.configurations = configurations;
-      }
-      if (Object.keys(discount).length > 0) {
-        bankingBilletPayload.discount = discount;
-      }
-
-      // A EFI usa POST /charge/:id/pay com estrutura { payment: { banking_billet: { expire_at, customer, configurations, discount } } }
-      billetData = await efi._request('POST', `/v1/charge/${chargeId}/pay`, {
-        payment: {
-          banking_billet: bankingBilletPayload
-        }
-      });
-    } catch (billetErr) {
-      console.error('[CRITICAL] Falha ao associar boleto na EFI, executando exclusão da cobrança EFI para evitar faturas em aberto:', chargeId, billetErr.message);
-      try {
-        await efi.cancelCharge(Number(chargeId));
-      } catch (cancelErr) {
-        console.error('[ROLLBACK WARNING] Falha ao cancelar cobrança órfã no gateway EFI:', chargeId, cancelErr.message);
-      }
-      throw billetErr;
-    }
-
-    const billet = billetData.data;
-    // A resposta do definePayMethod tem a estrutura:
-    // { data: { charge_id, status, barcode, link, ... } }
-    const barcode = billet.barcode || billet.identifications?.barcode || null;
-    const boletoUrl = billet.link || billet.pdf?.charge || null;
-    // 4. Salvar na tabela financeiro_boletos
-    const instituicaoId = parcela?.ordem?.instituicao_id || req.instituicaoId || null;
-
-    try {
-      await supabase.from('financeiro_boletos').insert({
-        parcela_id,
-        instituicao_id: instituicaoId,
-        gateway: 'efi',
-        boleto_id_gateway: String(chargeId),
-        boleto_numero: barcode,
-        boleto_barcode: barcode,
-        boleto_url: boletoUrl,
-        status_gateway: 'waiting',
-        resposta_json: billet,
-      });
-
-      // 5. Atualizar parcela com dados do boleto
-      await supabase
-        .from('financeiro_parcelas')
-        .update({
-          efi_charge_id: String(chargeId),
-          boleto_barcode: barcode,
-          boleto_url: boletoUrl,
-        })
-        .eq('id', parcela_id);
-
-      // 6. Atualizar ordem com o charge_id
-      await supabase
-        .from('financeiro_ordens_pagamento')
-        .update({ efi_charge_id: String(chargeId), efi_status: 'waiting' })
-        .eq('id', parcela.ordem_pagamento_id);
-
-    } catch (dbPersistenceErr) {
-      console.error('[ROLLBACK EXECUTED] Erro ao persistir dados do boleto localmente. Solicitando cancelamento na EFI:', chargeId, dbPersistenceErr);
-      try {
-        await efi.cancelCharge(Number(chargeId));
-      } catch (cancelErr) {
-        console.error('[ROLLBACK WARNING] Falha ao cancelar cobrança órfã no gateway EFI:', chargeId, cancelErr.message);
-      }
-      throw dbPersistenceErr;
-    }
+    // 3. Delegar emissão ao EfiBillingService (sem lógica de rollback de ERP aqui)
+    const resultado = await emitirBoletoEfi({
+      parcela: { ...parcela, ordem_pagamento_id: parcela.ordem_pagamento_id },
+      aluno,
+      descricao,
+      configFinanceiro,
+      supabase,
+      instituicaoId,
+      notificationUrl,
+    });
 
     return res.status(201).json({
       message: 'Boleto criado com sucesso.',
-      charge_id: chargeId,
-      boleto_url: boletoUrl,
-      barcode,
+      charge_id: resultado.charge_id,
+      boleto_url: resultado.boleto_url,
+      barcode: resultado.barcode,
       vencimento: parcela.data_vencimento,
     });
   } catch (err) {
     console.error('[EFI cobranca POST]', JSON.stringify(err.efiResponse || err.message));
-
-    // Rollback no banco de dados se a emissão falhar no gateway
-    if (req.body?.parcela_id) {
-      const { data: p } = await supabase.from('financeiro_parcelas').select('ordem_pagamento_id').eq('id', req.body.parcela_id).maybeSingle();
-      if (p?.ordem_pagamento_id) {
-        console.log('[ROLLBACK DATABASE] Removendo parcela e ordem de pagamento após falha na emissão EFI:', { parcela_id: req.body.parcela_id, ordem_id: p.ordem_pagamento_id });
-        await supabase.from('financeiro_parcelas').delete().eq('ordem_pagamento_id', p.ordem_pagamento_id);
-        await supabase.from('financeiro_ordens_pagamento').delete().eq('id', p.ordem_pagamento_id);
-      }
-    }
-
+    // Nota: rollback de financeiro_parcelas / financeiro_ordens_pagamento é
+    // responsabilidade de ordens/create.js quando emitir_imediatamente=true.
+    // Este endpoint não executa rollback de entidades do ERP.
     const status = err.statusCode === 401 ? 502 : err.statusCode >= 400 && err.statusCode < 500 ? 422 : 500;
     const efiDetail = err.efiResponse
       ? (err.efiResponse.error_description || err.efiResponse.message || JSON.stringify(err.efiResponse))
