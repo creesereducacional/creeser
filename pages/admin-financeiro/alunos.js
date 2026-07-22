@@ -441,9 +441,7 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
           });
           if (!efiRes.ok) {
             const efiBody = await efiRes.json();
-            setSucesso('✅ Ordem criada, mas falha no boleto EFI: ' + (efiBody.message || 'erro desconhecido'));
-            setTimeout(() => { onSalvo(); onSuccess(); onClose(); }, 2000);
-            return;
+            throw new Error('Falha ao emitir boleto no gateway EFI (operação revertida): ' + (efiBody.message || 'erro desconhecido'));
           }
         }
 

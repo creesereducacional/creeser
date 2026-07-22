@@ -247,7 +247,7 @@ async function criarCobranca(req, res) {
         .from('financeiro_ordens_pagamento')
         .update({ efi_charge_id: String(chargeId), efi_status: 'waiting' })
         .eq('id', parcela.ordem_pagamento_id);
-        
+
     } catch (dbPersistenceErr) {
       console.error('[ROLLBACK EXECUTED] Erro ao persistir dados do boleto localmente. Solicitando cancelamento na EFI:', chargeId, dbPersistenceErr);
       try {
@@ -267,6 +267,17 @@ async function criarCobranca(req, res) {
     });
   } catch (err) {
     console.error('[EFI cobranca POST]', JSON.stringify(err.efiResponse || err.message));
+
+    // Rollback no banco de dados se a emissão falhar no gateway
+    if (req.body?.parcela_id) {
+      const { data: p } = await supabase.from('financeiro_parcelas').select('ordem_pagamento_id').eq('id', req.body.parcela_id).maybeSingle();
+      if (p?.ordem_pagamento_id) {
+        console.log('[ROLLBACK DATABASE] Removendo parcela e ordem de pagamento após falha na emissão EFI:', { parcela_id: req.body.parcela_id, ordem_id: p.ordem_pagamento_id });
+        await supabase.from('financeiro_parcelas').delete().eq('ordem_pagamento_id', p.ordem_pagamento_id);
+        await supabase.from('financeiro_ordens_pagamento').delete().eq('id', p.ordem_pagamento_id);
+      }
+    }
+
     const status = err.statusCode === 401 ? 502 : err.statusCode >= 400 && err.statusCode < 500 ? 422 : 500;
     const efiDetail = err.efiResponse
       ? (err.efiResponse.error_description || err.efiResponse.message || JSON.stringify(err.efiResponse))
@@ -311,7 +322,6 @@ async function cancelarCobranca(req, res) {
     }
 
     // 2. Cancelar no EFI (se existir charge_id)
-    // Sempre prossegue com cancelamento local, mesmo que EFI rejeite
     let efiCancelado = false;
     if (ordem.efi_charge_id) {
       try {
