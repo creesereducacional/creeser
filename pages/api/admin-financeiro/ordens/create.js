@@ -251,9 +251,14 @@ export default async function handler(req, res) {
     }
   } catch (error) {
     console.error('[CRITICAL] Erro ao criar ordem financeira:', error);
-    return res.status(500).json({ 
-      message: 'Erro ao criar ordem',
-      error: error.message 
+    // Propagar o status code do erro EFI quando disponível
+    const status = error.statusCode === 401 ? 502
+      : error.statusCode >= 400 && error.statusCode < 500 ? 422
+      : 500;
+    return res.status(status).json({ 
+      message: error.message || 'Erro ao criar ordem',
+      error: error.message,
+      efi: error.efiResponse || null,
     });
   }
 }
