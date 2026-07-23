@@ -289,13 +289,15 @@ async function criarCarne(req, res) {
       })),
     });
   } catch (err) {
-    console.error('[EFI carne POST]', JSON.stringify(err.efiResponse || err.message));
+    console.error('[EFI carne POST]', err.efiResponse ? JSON.stringify(err.efiResponse) : err.message);
     const status = err.statusCode === 401 ? 502 : err.statusCode >= 400 && err.statusCode < 500 ? 422 : 500;
     const efiDetail = err.efiResponse
       ? (err.efiResponse.error_description || err.efiResponse.message || JSON.stringify(err.efiResponse))
       : null;
+    // err.message já contém a mensagem legível — só concatenar efiDetail se for distinto
+    const mensagem = err.message || (efiDetail ? `Erro EFI: ${efiDetail}` : 'Erro ao emitir carnê');
     return res.status(status).json({
-      message: efiDetail ? `${err.message}: ${efiDetail}` : err.message,
+      message: mensagem,
       efi: err.efiResponse || null,
     });
   }

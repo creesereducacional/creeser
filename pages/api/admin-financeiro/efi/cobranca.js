@@ -12,6 +12,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import efi from '../../../../lib/efi-client';
 import {
   applyInstituicaoFilter,
   hasPerfil,
@@ -127,7 +128,7 @@ async function criarCobranca(req, res) {
       vencimento: parcela.data_vencimento,
     });
   } catch (err) {
-    console.error('[EFI cobranca POST]', JSON.stringify(err.efiResponse || err.message));
+    console.error('[EFI cobranca POST]', err.efiResponse ? JSON.stringify(err.efiResponse) : err.message);
     // Nota: rollback de financeiro_parcelas / financeiro_ordens_pagamento é
     // responsabilidade de ordens/create.js quando emitir_imediatamente=true.
     // Este endpoint não executa rollback de entidades do ERP.
@@ -135,8 +136,10 @@ async function criarCobranca(req, res) {
     const efiDetail = err.efiResponse
       ? (err.efiResponse.error_description || err.efiResponse.message || JSON.stringify(err.efiResponse))
       : null;
+    // err.message já contém o detalhe legível quando vindo do EfiBillingService
+    const mensagem = err.message || (efiDetail ? `Erro EFI: ${efiDetail}` : 'Erro ao emitir boleto');
     return res.status(status).json({
-      message: efiDetail ? `${err.message}: ${efiDetail}` : err.message,
+      message: mensagem,
       efi: err.efiResponse || null,
     });
   }
