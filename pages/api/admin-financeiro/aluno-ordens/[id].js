@@ -57,7 +57,7 @@ export default async function handler(req, res) {
             observacoes,
             created_at,
             updated_at,
-            financeiro_parcelas(id, numero_parcela, valor, data_vencimento, status, boleto_numero, boleto_url, efi_charge_id)
+            financeiro_parcelas!ordem_pagamento_id(id, numero_parcela, valor, data_vencimento, status, boleto_numero, boleto_url, efi_charge_id)
           `)
           .eq('aluno_id', id)
           .eq('tipo', 'ordem_simples')
@@ -78,7 +78,7 @@ export default async function handler(req, res) {
             status,
             efi_carnet_id,
             created_at,
-            financeiro_parcelas(id, numero_parcela, valor, data_vencimento, status, boleto_numero, boleto_url, efi_charge_id)
+            financeiro_parcelas!ordem_pagamento_id(id, numero_parcela, valor, data_vencimento, status, boleto_numero, boleto_url, efi_charge_id)
           `)
           .eq('aluno_id', id)
           .eq('tipo', 'carne')
