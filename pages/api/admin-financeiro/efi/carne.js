@@ -185,31 +185,24 @@ async function criarCarne(req, res) {
     if (phoneDigits.length === 10 || phoneDigits.length === 11) customer.phone_number = phoneDigits;
     if (birth && /^\d{4}-\d{2}-\d{2}$/.test(birth)) customer.birth = birth;
 
-    // Configurações de encargos para o Carnê (Multa e Juros)
+    // Configurações de encargos para o Carnê (Multa e Juros conforme spec /v1/carnet)
     const configurations = {};
     const multaPercentual = Number(configFinanceiro.multaGerencianet) || Number(configFinanceiro.multa) || 0;
     if (multaPercentual > 0) {
-      configurations.fine = {
-        value: Math.round(multaPercentual * 100), // EFI recebe percentual em centavos: ex 2% = 200
-        type: 'percentage'
-      };
+      configurations.fine = Math.round(multaPercentual * 100); // EFI recebe integer: ex 2% = 200
     }
 
     const jurosPercentualDiario = Number(configFinanceiro.jurosGerencianet) || Number(configFinanceiro.juros) || 0;
     if (jurosPercentualDiario > 0) {
-      configurations.interest = {
-        value: Math.round(jurosPercentualDiario * 1000), // EFI recebe juros em milésimos de percentual: ex 0.033% = 33
-        type: 'percentage'
-      };
+      configurations.interest = Math.round(jurosPercentualDiario * 1000); // EFI recebe integer: ex 0.033% = 33
     }
 
-    // Desconto Condicional do Carnê
+    // Desconto do Carnê (EFI /v1/carnet aceita value em centavos e type currency)
     const discountValue = Number(parcelas[0].valor_desconto) || 0;
     const discount = {};
-    if (discountValue > 0 && parcelas[0].data_limite_desconto) {
+    if (discountValue > 0) {
       discount.value = Math.round(discountValue * 100);
       discount.type = 'currency';
-      discount.until_date = parcelas[0].data_limite_desconto;
     }
 
     // URL do webhook para receber confirmações de pagamento de cada parcela
