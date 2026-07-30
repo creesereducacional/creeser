@@ -184,6 +184,35 @@ export default function CarnesPage() {
     }
   };
 
+  const handleCopiarLink = async (parcela) => {
+    let url = parcela.boleto_url || null;
+    
+    if (!url && parcela.id) {
+      try {
+        const res = await fetch(`/api/admin-financeiro/parcelas/${parcela.id}/whatsapp-info`);
+        if (res.ok) {
+          const data = await res.json();
+          url = data.payment_url || null;
+        }
+      } catch (e) {
+        console.error('Erro ao buscar link da parcela:', e);
+      }
+    }
+
+    if (!url) {
+      alert('A cobrança não possui link disponível.');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      alert('Link copiado com sucesso.');
+    } catch (err) {
+      console.error('Erro ao copiar para a área de transferência:', err);
+      alert('Link da parcela: ' + url);
+    }
+  };
+
   useEffect(() => {
     carregarCarnes();
     // Carregar opções de filtros
@@ -599,25 +628,52 @@ export default function CarnesPage() {
                                             </button>
                                           )}
                                           {(parcela.status === 'pendente' || parcela.status === 'vencido') && (
-                                            <div className="flex items-center rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 hover:bg-emerald-100 hover:shadow-sm transition-all duration-200 divide-x divide-emerald-250">
+                                            <>
+                                              {/* 1. WhatsApp */}
+                                              <div className="flex items-center rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 hover:bg-emerald-100 hover:shadow-sm transition-all duration-200 divide-x divide-emerald-250">
+                                                <button
+                                                  onClick={() => handleEnviarWhatsApp(parcela.id, true)}
+                                                  onContextMenu={(e) => { e.preventDefault(); handleEnviarWhatsApp(parcela.id, false); }}
+                                                  title="Enviar 2ª via rápida por WhatsApp (Clique com botão direito para editar)"
+                                                  className="w-9 h-9 flex items-center justify-center rounded-l-full hover:scale-105 transition-all duration-200 cursor-pointer">
+                                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.625 1.451 5.48-.002 9.932-4.453 9.935-9.934.002-2.657-1.03-5.155-2.905-7.03C16.426 1.768 13.932.735 11.28.735 5.798.735 1.346 5.188 1.343 10.669c-.001 1.554.415 3.076 1.203 4.437l-.988 3.606 3.693-.97c1.37.747 2.808 1.134 4.396 1.14l.003-.008zm10.153-6.885c-.29-.145-1.722-.85-1.99-.947-.267-.097-.463-.146-.658.145-.195.29-.757.947-.928 1.142-.17.195-.34.22-.63.075-.29-.145-1.228-.453-2.338-1.444-.864-.77-1.448-1.721-1.618-2.011-.17-.29-.018-.447.127-.592.13-.13.29-.34.436-.509.145-.17.195-.29.29-.485.097-.195.048-.364-.025-.509-.073-.145-.658-1.587-.9-2.17-.236-.569-.475-.491-.657-.5l-.558-.01c-.195 0-.51.072-.777.363-.267.29-1.02 1.02-1.02 2.485s1.07 2.871 1.218 3.064c.146.195 2.105 3.2 5.1 4.499.712.309 1.268.494 1.7.632.715.228 1.364.195 1.878.118.571-.085 1.722-.704 1.965-1.385.243-.68.243-1.261.17-1.385-.073-.122-.268-.195-.559-.34z"/>
+                                                  </svg>
+                                                </button>
+                                                <button
+                                                  onClick={() => handleEnviarWhatsApp(parcela.id, false)}
+                                                  title="Personalizar mensagem antes de enviar"
+                                                  className="w-5 h-9 flex items-center justify-center rounded-r-full hover:bg-emerald-100/50 hover:scale-105 transition-all duration-200 cursor-pointer">
+                                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                                                  </svg>
+                                                </button>
+                                              </div>
+
+                                              {/* 2. Copiar Link */}
                                               <button
-                                                onClick={() => handleEnviarWhatsApp(parcela.id, true)}
-                                                onContextMenu={(e) => { e.preventDefault(); handleEnviarWhatsApp(parcela.id, false); }}
-                                                title="Enviar 2ª via rápida por WhatsApp (Clique com botão direito para editar)"
-                                                className="w-9 h-9 flex items-center justify-center rounded-l-full hover:scale-105 transition-all duration-200 cursor-pointer">
-                                                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                                  <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.625 1.451 5.48-.002 9.932-4.453 9.935-9.934.002-2.657-1.03-5.155-2.905-7.03C16.426 1.768 13.932.735 11.28.735 5.798.735 1.346 5.188 1.343 10.669c-.001 1.554.415 3.076 1.203 4.437l-.988 3.606 3.693-.97c1.37.747 2.808 1.134 4.396 1.14l.003-.008zm10.153-6.885c-.29-.145-1.722-.85-1.99-.947-.267-.097-.463-.146-.658.145-.195.29-.757.947-.928 1.142-.17.195-.34.22-.63.075-.29-.145-1.228-.453-2.338-1.444-.864-.77-1.448-1.721-1.618-2.011-.17-.29-.018-.447.127-.592.13-.13.29-.34.436-.509.145-.17.195-.29.29-.485.097-.195.048-.364-.025-.509-.073-.145-.658-1.587-.9-2.17-.236-.569-.475-.491-.657-.5l-.558-.01c-.195 0-.51.072-.777.363-.267.29-1.02 1.02-1.02 2.485s1.07 2.871 1.218 3.064c.146.195 2.105 3.2 5.1 4.499.712.309 1.268.494 1.7.632.715.228 1.364.195 1.878.118.571-.085 1.722-.704 1.965-1.385.243-.68.243-1.261.17-1.385-.073-.122-.268-.195-.559-.34z"/>
+                                                onClick={() => handleCopiarLink(parcela)}
+                                                title="📋 Copiar Link da Parcela"
+                                                className="w-9 h-9 flex items-center justify-center rounded-full bg-blue-50 border border-blue-200 text-blue-600 hover:bg-blue-100 hover:scale-105 hover:shadow-sm transition-all duration-200 cursor-pointer">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                                                 </svg>
                                               </button>
-                                              <button
-                                                onClick={() => handleEnviarWhatsApp(parcela.id, false)}
-                                                title="Personalizar mensagem antes de enviar"
-                                                className="w-5 h-9 flex items-center justify-center rounded-r-full hover:bg-emerald-100/50 hover:scale-105 transition-all duration-200 cursor-pointer">
-                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                                                </svg>
-                                              </button>
-                                            </div>
+
+                                              {/* 3. Visualizar Boleto Parcela */}
+                                              {(parcela.boleto_url || carne.link) && (
+                                                <a
+                                                  href={parcela.boleto_url || carne.link}
+                                                  target="_blank"
+                                                  rel="noreferrer"
+                                                  title="📄 Visualizar Boleto da Parcela"
+                                                  className="w-9 h-9 flex items-center justify-center rounded-full bg-indigo-50 border border-indigo-200 text-indigo-600 hover:bg-indigo-100 hover:scale-105 hover:shadow-sm transition-all duration-200 cursor-pointer">
+                                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                  </svg>
+                                                </a>
+                                              )}
+                                            </>
                                           )}
                                           {cancelavel && (
                                             <>

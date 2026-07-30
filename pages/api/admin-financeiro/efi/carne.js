@@ -242,6 +242,8 @@ async function criarCarne(req, res) {
 
       const chargeId = chargeInfo.charge_id;
       const billet = chargeInfo.parcel || {};
+      const parcelUrl = chargeInfo.url || chargeInfo.parcel_link || chargeInfo.pdf?.charge || billet.link || null;
+      const barcode = chargeInfo.barcode || billet.barcode || null;
 
       // Registrar em financeiro_boletos
       await supabase.from('financeiro_boletos').insert({
@@ -249,8 +251,8 @@ async function criarCarne(req, res) {
         instituicao_id: instituicaoId,
         gateway: 'efi',
         boleto_id_gateway: String(chargeId),
-        boleto_barcode: billet.barcode || null,
-        boleto_url: billet.link || null,
+        boleto_barcode: barcode,
+        boleto_url: parcelUrl,
         status_gateway: 'waiting',
         resposta_json: chargeInfo,
       });
@@ -260,8 +262,8 @@ async function criarCarne(req, res) {
         .from('financeiro_parcelas')
         .update({
           efi_charge_id: String(chargeId),
-          boleto_barcode: billet.barcode || null,
-          boleto_url: billet.link || null,
+          boleto_barcode: barcode,
+          boleto_url: parcelUrl,
         })
         .eq('id', parcela.id);
     }
