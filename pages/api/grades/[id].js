@@ -15,6 +15,23 @@ const parseAno = (value) => {
   return parsed;
 };
 
+let modernSchemaCache = null;
+
+const checkIsModernSchema = async () => {
+  if (modernSchemaCache !== null) return modernSchemaCache;
+  try {
+    const { error } = await supabase.from('grades').select('curso_id').limit(1);
+    if (error && (error.code === 'PGRST204' || String(error.message).includes('column'))) {
+      modernSchemaCache = false;
+    } else {
+      modernSchemaCache = true;
+    }
+  } catch {
+    modernSchemaCache = false;
+  }
+  return modernSchemaCache;
+};
+
 export default async function handler(req, res) {
   const authUser = requireAuth(req, res);
   if (!authUser) return;
@@ -46,44 +63,52 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Ano deve conter 4 dígitos' });
     }
 
+    const rawCursoId = body.cursoId || body.curso_id;
+    let numericCursoId = undefined;
+    if (rawCursoId !== undefined && rawCursoId !== null && rawCursoId !== '') {
+      numericCursoId = Number(rawCursoId);
+      if (Number.isNaN(numericCursoId)) {
+        return res.status(400).json({ error: 'Identificador do Curso (cursoId) deve ser um número inteiro válido.' });
+      }
+    }
+
+    const isModern = await checkIsModernSchema();
     const updates = {};
-    if (body.instituicaoId  || body.instituicao_id)   updates.instituicao_id   = body.instituicaoId  || body.instituicao_id;
-    if (body.instituicaoNome || body.instituicao_nome) updates.instituicao_nome = body.instituicaoNome || body.instituicao_nome;
-    if (body.cursoId || body.curso_id) {
-      const cId = Number(body.cursoId || body.curso_id);
-      updates.curso_id = cId;
-      updates.cursoid = cId;
-    }
-    if (body.cursoNome || body.curso_nome)             updates.curso_nome       = body.cursoNome || body.curso_nome;
-    if (anoFoiInformado)                               updates.ano              = ano;
-    if (body.nome)                                     updates.nome             = body.nome;
-    if (body.situacao)                                 updates.situacao         = body.situacao;
-    updates.updated_at = new Date().toISOString();
 
-    let { data, error } = await supabase.from('grades').update(updates).eq('id', id).select().single();
-    if (error && error.message && error.message.includes('column')) {
-      const fallbackUpdates = {};
-      if (updates.cursoid) fallbackUpdates.cursoid = updates.cursoid;
-      if (updates.ano) fallbackUpdates.ano = updates.ano;
-      if (updates.nome) fallbackUpdates.nome = updates.nome;
-      fallbackUpdates.dataatualizacao = new Date().toISOString();
-
-      const fallbackResult = await supabase.from('grades').update(fallbackUpdates).eq('id', id).select().single();
-      if (fallbackResult.error) return res.status(500).json({ error: fallbackResult.error.message });
-      data = {
-        ...fallbackResult.data,
-        curso_id: Number(fallbackResult.data.cursoid || updates.cursoid),
-        cursoId: Number(fallbackResult.data.cursoid || updates.cursoid),
-        updated_at: fallbackResult.data.dataatualizacao,
-        situacao: 'ATIVO'
-      };
-      error = null;
+    if (isModern) {
+      if (body.instituicaoId || body.instituicao_id) updates.instituicao_id = body.instituicaoId || body.instituicao_id;
+      if (numericCursoId !== undefined)               updates.curso_id       = numericCursoId;
+      if (anoFoiInformado)                             updates.ano            = ano;
+      if (body.nome)                                   updates.nome           = body.nome;
+      if (body.descricao !== undefined)               updates.descricao      = body.descricao;
+      if (body.situacao)                               updates.situacao       = body.situacao;
+      updates.updated_at = new Date().toISOString();
+    } else {
+      if (numericCursoId !== undefined)               updates.cursoid        = numericCursoId;
+      if (anoFoiInformado)                             updates.ano            = ano;
+      if (body.nome)                                   updates.nome           = body.nome;
+      if (body.descricao !== undefined)               updates.descricao      = body.descricao;
+      updates.dataatualizacao = new Date().toISOString();
     }
-    if (error) return res.status(500).json({ error: error.message });
+
+    console.log('UPDATE ÚNICO GRADES (SCHEMA DETECTADO: ' + (isModern ? 'MODERNO' : 'LEGADO') + '):', updates);
+
+    const { data, error } = await supabase.from('grades').update(updates).eq('id', id).select().single();
+    
+    if (error) {
+      console.error('Erro no UPDATE da Tabela grades:', { id, updates, code: error.code, message: error.message });
+      if (['22P02', '23502', '23503', '23505'].includes(error.code)) {
+        return res.status(400).json({ error: `Dados inválidos para edição de grade: ${error.message}` });
+      }
+      return res.status(400).json({ error: `Falha ao editar grade: ${error.message}` });
+    }
+
     return res.status(200).json({
       ...data,
-      curso_id: data.curso_id !== undefined && data.curso_id !== null ? Number(data.curso_id) : data.cursoid !== undefined && data.cursoid !== null ? Number(data.cursoid) : null,
-      cursoId: data.curso_id !== undefined && data.curso_id !== null ? Number(data.curso_id) : data.cursoid !== undefined && data.cursoid !== null ? Number(data.cursoid) : null,
+      curso_id: data.curso_id !== undefined && data.curso_id !== null ? Number(data.curso_id) : data.cursoid !== undefined && data.cursoid !== null ? Number(data.cursoid) : numericCursoId,
+      cursoId: data.curso_id !== undefined && data.curso_id !== null ? Number(data.curso_id) : data.cursoid !== undefined && data.cursoid !== null ? Number(data.cursoid) : numericCursoId,
+      updated_at: data.updated_at || data.dataatualizacao || new Date().toISOString(),
+      situacao: data.situacao || 'ATIVO'
     });
   }
 
