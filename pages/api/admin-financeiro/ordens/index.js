@@ -49,7 +49,7 @@ export default async function handler(req, res) {
         created_at,
         updated_at,
         alunos(nome, cpf, email, turmaid, cursoid, ano_letivo),
-        financeiro_parcelas(id, numero_parcela, valor, data_vencimento, status, boleto_numero, efi_charge_id)
+        financeiro_parcelas!ordem_pagamento_id(id, numero_parcela, valor, data_vencimento, status, boleto_numero, boleto_url, efi_charge_id)
       `)
       .eq('tipo', 'ordem_simples')
       .order('created_at', { ascending: false });
@@ -75,6 +75,7 @@ export default async function handler(req, res) {
         status_parcela: parcela.status || o.status,
         cobranca: parcela.boleto_numero || parcela.efi_charge_id || o.efi_charge_id || '-',
         parcela_id: parcela.id || null,
+        boleto_url: parcela.boleto_url || null,
         parcela_efi_charge_id: parcela.efi_charge_id || null
       };
     });

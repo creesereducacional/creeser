@@ -94,7 +94,7 @@ export default async function handler(req, res) {
       // Fluxo antigo com ordemId
       let ordemQuery = supabase
         .from('financeiro_ordens_pagamento')
-        .select('id, instituicao_id, descricao, referencia, valor_total, aluno_id, financeiro_parcelas(id, numero_parcela, valor, valor_pago, data_vencimento, status, boleto_numero, updated_at, metodo_pagamento, detalhes_baixa_multipla)')
+        .select('id, instituicao_id, descricao, referencia, valor_total, aluno_id, financeiro_parcelas!ordem_pagamento_id(id, numero_parcela, valor, valor_pago, data_vencimento, status, boleto_numero, updated_at, metodo_pagamento, detalhes_baixa_multipla)')
         .eq('id', ordemId);
 
       ordemQuery = applyInstituicaoFilter(ordemQuery, instituicaoId);

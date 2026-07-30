@@ -31,7 +31,7 @@ export default async function handler(req, res) {
         quantidade_parcelas, status, criado_por, created_at,
         observacoes,
         alunos(nome, cpf, email, telefone_celular, captado_por_id),
-        financeiro_parcelas(id, numero_parcela, valor, data_vencimento, status)
+        financeiro_parcelas!ordem_pagamento_id(id, numero_parcela, valor, data_vencimento, status)
       `)
       .eq('referencia', 'MATRICULA')
       .order('created_at', { ascending: false });
