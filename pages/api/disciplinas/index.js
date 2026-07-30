@@ -41,17 +41,45 @@ export default async function handler(req, res) {
       }
     }
 
-    const { data, error } = await supabase.from('disciplinas').insert({
+    const cargaHorariaVal = body.cargaHoraria || body.carga_horaria || body.cargahoraria ? Number(body.cargaHoraria || body.carga_horaria || body.cargahoraria) : null;
+    const rawCursoId = body.cursoId || body.curso_id || body.curso;
+    const numericCursoId = rawCursoId ? Number(rawCursoId) : 1;
+
+    const payloadNormalizado = {
       codigo:        body.codigo        || null,
       nome:          body.nome,
       curso:         body.curso         || null,
+      cursoid:       numericCursoId,
       periodo:       body.periodo       || null,
-      carga_horaria: body.cargaHoraria  || body.carga_horaria || null,
+      carga_horaria: cargaHorariaVal,
+      cargahoraria:  cargaHorariaVal,
       matriz:        body.matriz        ?? true,
       grade:         body.grade         || null,
       situacao:      body.situacao      || 'ATIVO',
       instituicao_id: instId            || null,
-    }).select().single();
+    };
+
+    let { data, error } = await supabase.from('disciplinas').insert(payloadNormalizado).select().single();
+    if (error && error.message && error.message.includes('column')) {
+      const payloadLegado = {
+        codigo:        body.codigo        || null,
+        nome:          body.nome,
+        cursoid:       numericCursoId,
+        periodo:       body.periodo       ? Number(body.periodo) : null,
+        cargahoraria:  cargaHorariaVal,
+        situacao:      body.situacao      || 'ATIVO',
+      };
+      const fallback = await supabase.from('disciplinas').insert(payloadLegado).select().single();
+      if (fallback.error) return res.status(500).json({ error: fallback.error.message });
+      data = {
+        ...fallback.data,
+        carga_horaria: fallback.data.cargahoraria,
+        curso_id: fallback.data.cursoid,
+        grade: body.grade || null
+      };
+      error = null;
+    }
+
     if (error) return res.status(500).json({ error: error.message });
     return res.status(201).json(data);
   }

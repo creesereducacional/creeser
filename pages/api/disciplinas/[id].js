@@ -29,29 +29,58 @@ export default async function handler(req, res) {
     if (body.grade) {
       const { data: gradeData, error: gradeError } = await supabase
         .from('grades')
-        .select('curso_nome')
+        .select('id')
         .eq('id', body.grade)
-        .single();
+        .maybeSingle();
       
       if (gradeError || !gradeData) {
         return res.status(400).json({ error: 'Matriz Curricular selecionada não é válida' });
       }
-
-      if (body.curso && gradeData.curso_nome !== body.curso) {
-        return res.status(400).json({ error: 'A Matriz Curricular não pertence ao Curso selecionado' });
-      }
     }
 
-    const { data, error } = await supabase.from('disciplinas').update({
-      codigo:        body.codigo        || null,
+    const cargaHorariaVal = body.cargaHoraria || body.carga_horaria || body.cargahoraria ? Number(body.cargaHoraria || body.carga_horaria || body.cargahoraria) : undefined;
+    const rawCursoId = body.cursoId || body.curso_id || body.curso;
+    const numericCursoId = rawCursoId ? Number(rawCursoId) : undefined;
+
+    const updatesNormalizado = {
+      codigo:        body.codigo,
       nome:          body.nome,
-      curso:         body.curso         || null,
-      periodo:       body.periodo       || null,
-      carga_horaria: body.cargaHoraria  || body.carga_horaria || null,
-      matriz:        body.matriz        ?? true,
-      grade:         body.grade         || null,
-      situacao:      body.situacao      || 'ATIVO',
-    }).eq('id', id).select().single();
+      curso:         body.curso,
+      cursoid:       numericCursoId,
+      periodo:       body.periodo,
+      carga_horaria: cargaHorariaVal,
+      cargahoraria:  cargaHorariaVal,
+      matriz:        body.matriz,
+      grade:         body.grade,
+      situacao:      body.situacao,
+    };
+
+    // Remover propriedades undefined
+    Object.keys(updatesNormalizado).forEach(k => updatesNormalizado[k] === undefined && delete updatesNormalizado[k]);
+
+    let { data, error } = await supabase.from('disciplinas').update(updatesNormalizado).eq('id', id).select().single();
+    if (error && error.message && error.message.includes('column')) {
+      const updatesLegado = {
+        codigo:        body.codigo,
+        nome:          body.nome,
+        cursoid:       numericCursoId,
+        periodo:       body.periodo ? Number(body.periodo) : undefined,
+        cargahoraria:  cargaHorariaVal,
+        situacao:      body.situacao,
+      };
+      Object.keys(updatesLegado).forEach(k => updatesLegado[k] === undefined && delete updatesLegado[k]);
+
+      const fallback = await supabase.from('disciplinas').update(updatesLegado).eq('id', id).select().single();
+      if (fallback.error) return res.status(500).json({ error: fallback.error.message });
+      data = {
+        ...fallback.data,
+        carga_horaria: fallback.data.cargahoraria,
+        curso_id: fallback.data.cursoid,
+        grade: body.grade || null
+      };
+      error = null;
+    }
+
     if (error) return res.status(500).json({ error: error.message });
     return res.status(200).json(data);
   }
