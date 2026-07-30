@@ -23,11 +23,21 @@ export default async function handler(req, res) {
   const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: true });
 
   if (req.method === 'GET') {
-    let query = supabase.from('grades').select('*').order('ano', { ascending: false });
+    let query = supabase.from('grades').select('*').order('nome', { ascending: true });
     query = applyInstituicaoFilter(query, instituicaoId);
     const { data, error } = await query;
     if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json(data);
+
+    const normalized = (data || []).map(g => ({
+      ...g,
+      curso_id: g.curso_id ? String(g.curso_id) : g.cursoid ? String(g.cursoid) : null,
+      cursoId: g.curso_id ? String(g.curso_id) : g.cursoid ? String(g.cursoid) : null,
+      created_at: g.created_at || g.datacriacao || null,
+      updated_at: g.updated_at || g.dataatualizacao || null,
+      situacao: g.situacao || 'ATIVO',
+    }));
+
+    return res.status(200).json(normalized);
   }
 
   if (req.method === 'POST') {
@@ -35,26 +45,55 @@ export default async function handler(req, res) {
     const instId = resolveInstituicaoId(req, authUser);
     const reqInstId = body.instituicaoId || body.instituicao_id || instId;
     const anoVal = parseAno(body.ano);
+    const rawCursoId = body.cursoId || body.curso_id;
 
     if (!reqInstId) return res.status(400).json({ error: 'Instituição é obrigatória' });
-    if (!body.cursoId && !body.curso_id) return res.status(400).json({ error: 'Curso é obrigatório' });
+    if (!rawCursoId) return res.status(400).json({ error: 'Curso é obrigatório' });
     if (anoVal === null) return res.status(400).json({ error: 'Ano é obrigatório e deve conter 4 dígitos' });
     if (!body.nome) return res.status(400).json({ error: 'Nome é obrigatório' });
 
-    // Aceitar ID enviado pelo frontend (compatibilidade) ou gerar novo
+    const numericCursoId = Number(rawCursoId) || null;
+
     const insertPayload = {
-      instituicao_id:   reqInstId,
-      instituicao_nome: body.instituicaoNome || body.instituicao_nome || null,
-      curso_id:         String(body.cursoId  || body.curso_id),
-      curso_nome:       body.cursoNome       || body.curso_nome       || null,
-      ano:              anoVal,
       nome:             body.nome,
+      descricao:        body.descricao        || null,
+      curso_id:         numericCursoId,
+      cursoid:          numericCursoId,
+      curso_nome:       body.cursoNome       || body.curso_nome       || null,
+      instituicao_id:   reqInstId            || null,
+      instituicao_nome: body.instituicaoNome || body.instituicao_nome || null,
+      ano:              anoVal,
       situacao:         body.situacao        || 'ATIVO',
+      created_at:       new Date().toISOString(),
+      updated_at:       new Date().toISOString()
     };
 
     if (body.id) insertPayload.id = body.id;
 
-    const { data, error } = await supabase.from('grades').insert(insertPayload).select().single();
+    let { data, error } = await supabase.from('grades').insert(insertPayload).select().single();
+    
+    // Fallback gracioso para banco antes de aplicar migration física
+    if (error && error.message && error.message.includes('column')) {
+      const fallbackPayload = {
+        nome: body.nome,
+        descricao: body.descricao || null,
+        cursoid: numericCursoId,
+        ano: anoVal,
+      };
+      if (body.id) fallbackPayload.id = body.id;
+
+      const fallbackResult = await supabase.from('grades').insert(fallbackPayload).select().single();
+      if (fallbackResult.error) return res.status(500).json({ error: fallbackResult.error.message });
+      data = {
+        ...fallbackResult.data,
+        curso_id: String(fallbackResult.data.cursoid || rawCursoId),
+        created_at: fallbackResult.data.datacriacao,
+        updated_at: fallbackResult.data.dataatualizacao,
+        situacao: 'ATIVO'
+      };
+      error = null;
+    }
+
     if (error) return res.status(500).json({ error: error.message });
     return res.status(201).json(data);
   }

@@ -32,16 +32,12 @@ export default async function handler(req, res) {
     if (body.grade) {
       const { data: gradeData, error: gradeError } = await supabase
         .from('grades')
-        .select('curso_nome')
+        .select('id')
         .eq('id', body.grade)
-        .single();
+        .maybeSingle();
       
       if (gradeError || !gradeData) {
         return res.status(400).json({ error: 'Matriz Curricular selecionada não é válida' });
-      }
-
-      if (body.curso && gradeData.curso_nome !== body.curso) {
-        return res.status(400).json({ error: 'A Matriz Curricular não pertence ao Curso selecionado' });
       }
     }
 

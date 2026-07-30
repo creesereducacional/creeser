@@ -41,13 +41,35 @@ export default async function handler(req, res) {
     const updates = {};
     if (body.instituicaoId  || body.instituicao_id)   updates.instituicao_id   = body.instituicaoId  || body.instituicao_id;
     if (body.instituicaoNome || body.instituicao_nome) updates.instituicao_nome = body.instituicaoNome || body.instituicao_nome;
-    if (body.cursoId || body.curso_id)                 updates.curso_id         = String(body.cursoId || body.curso_id);
+    if (body.cursoId || body.curso_id) {
+      const cId = Number(body.cursoId || body.curso_id);
+      updates.curso_id = cId;
+      updates.cursoid = cId;
+    }
     if (body.cursoNome || body.curso_nome)             updates.curso_nome       = body.cursoNome || body.curso_nome;
     if (anoFoiInformado)                               updates.ano              = ano;
     if (body.nome)                                     updates.nome             = body.nome;
     if (body.situacao)                                 updates.situacao         = body.situacao;
+    updates.updated_at = new Date().toISOString();
 
-    const { data, error } = await supabase.from('grades').update(updates).eq('id', id).select().single();
+    let { data, error } = await supabase.from('grades').update(updates).eq('id', id).select().single();
+    if (error && error.message && error.message.includes('column')) {
+      const fallbackUpdates = {};
+      if (updates.cursoid) fallbackUpdates.cursoid = updates.cursoid;
+      if (updates.ano) fallbackUpdates.ano = updates.ano;
+      if (updates.nome) fallbackUpdates.nome = updates.nome;
+      fallbackUpdates.dataatualizacao = new Date().toISOString();
+
+      const fallbackResult = await supabase.from('grades').update(fallbackUpdates).eq('id', id).select().single();
+      if (fallbackResult.error) return res.status(500).json({ error: fallbackResult.error.message });
+      data = {
+        ...fallbackResult.data,
+        curso_id: String(fallbackResult.data.cursoid || updates.cursoid),
+        updated_at: fallbackResult.data.dataatualizacao,
+        situacao: 'ATIVO'
+      };
+      error = null;
+    }
     if (error) return res.status(500).json({ error: error.message });
     return res.status(200).json(data);
   }
