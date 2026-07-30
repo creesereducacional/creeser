@@ -25,7 +25,15 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const { data, error } = await supabase.from('grades').select('*').eq('id', id).single();
     if (error) return res.status(404).json({ error: 'Grade não encontrada' });
-    return res.status(200).json(data);
+    const normalized = {
+      ...data,
+      curso_id: data.curso_id !== undefined && data.curso_id !== null ? Number(data.curso_id) : data.cursoid !== undefined && data.cursoid !== null ? Number(data.cursoid) : null,
+      cursoId: data.curso_id !== undefined && data.curso_id !== null ? Number(data.curso_id) : data.cursoid !== undefined && data.cursoid !== null ? Number(data.cursoid) : null,
+      created_at: data.created_at || data.datacriacao || null,
+      updated_at: data.updated_at || data.dataatualizacao || null,
+      situacao: data.situacao || 'ATIVO',
+    };
+    return res.status(200).json(normalized);
   }
 
   if (req.method === 'PUT') {
@@ -64,14 +72,19 @@ export default async function handler(req, res) {
       if (fallbackResult.error) return res.status(500).json({ error: fallbackResult.error.message });
       data = {
         ...fallbackResult.data,
-        curso_id: String(fallbackResult.data.cursoid || updates.cursoid),
+        curso_id: Number(fallbackResult.data.cursoid || updates.cursoid),
+        cursoId: Number(fallbackResult.data.cursoid || updates.cursoid),
         updated_at: fallbackResult.data.dataatualizacao,
         situacao: 'ATIVO'
       };
       error = null;
     }
     if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json(data);
+    return res.status(200).json({
+      ...data,
+      curso_id: data.curso_id !== undefined && data.curso_id !== null ? Number(data.curso_id) : data.cursoid !== undefined && data.cursoid !== null ? Number(data.cursoid) : null,
+      cursoId: data.curso_id !== undefined && data.curso_id !== null ? Number(data.curso_id) : data.cursoid !== undefined && data.cursoid !== null ? Number(data.cursoid) : null,
+    });
   }
 
   if (req.method === 'DELETE') {

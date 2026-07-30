@@ -30,8 +30,8 @@ export default async function handler(req, res) {
 
     const normalized = (data || []).map(g => ({
       ...g,
-      curso_id: g.curso_id ? String(g.curso_id) : g.cursoid ? String(g.cursoid) : null,
-      cursoId: g.curso_id ? String(g.curso_id) : g.cursoid ? String(g.cursoid) : null,
+      curso_id: g.curso_id !== undefined && g.curso_id !== null ? Number(g.curso_id) : g.cursoid !== undefined && g.cursoid !== null ? Number(g.cursoid) : null,
+      cursoId: g.curso_id !== undefined && g.curso_id !== null ? Number(g.curso_id) : g.cursoid !== undefined && g.cursoid !== null ? Number(g.cursoid) : null,
       created_at: g.created_at || g.datacriacao || null,
       updated_at: g.updated_at || g.dataatualizacao || null,
       situacao: g.situacao || 'ATIVO',
@@ -86,7 +86,8 @@ export default async function handler(req, res) {
       if (fallbackResult.error) return res.status(500).json({ error: fallbackResult.error.message });
       data = {
         ...fallbackResult.data,
-        curso_id: String(fallbackResult.data.cursoid || rawCursoId),
+        curso_id: Number(fallbackResult.data.cursoid || rawCursoId),
+        cursoId: Number(fallbackResult.data.cursoid || rawCursoId),
         created_at: fallbackResult.data.datacriacao,
         updated_at: fallbackResult.data.dataatualizacao,
         situacao: 'ATIVO'
@@ -95,7 +96,11 @@ export default async function handler(req, res) {
     }
 
     if (error) return res.status(500).json({ error: error.message });
-    return res.status(201).json(data);
+    return res.status(200).json({
+      ...data,
+      curso_id: data.curso_id !== undefined && data.curso_id !== null ? Number(data.curso_id) : data.cursoid !== undefined && data.cursoid !== null ? Number(data.cursoid) : null,
+      cursoId: data.curso_id !== undefined && data.curso_id !== null ? Number(data.curso_id) : data.cursoid !== undefined && data.cursoid !== null ? Number(data.cursoid) : null,
+    });
   }
 
   res.setHeader('Allow', ['GET', 'POST']);
