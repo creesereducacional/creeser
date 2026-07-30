@@ -266,6 +266,27 @@ export default async function handler(req, res) {
         return res.status(400).json({ message: 'Instituicao obrigatoria para criar aluno' });
       }
 
+      if (!formData.nome || !String(formData.nome).trim()) {
+        return res.status(400).json({ message: 'Nome do aluno é obrigatório' });
+      }
+
+      // Validação de duplicidade de CPF por instituição
+      if (formData.cpf) {
+        const cleanCpf = String(formData.cpf).trim();
+        if (cleanCpf) {
+          const { data: existingCpf } = await supabase
+            .from('alunos')
+            .select('id, nome')
+            .eq('cpf', cleanCpf)
+            .eq('instituicao_id', instituicaoId)
+            .maybeSingle();
+
+          if (existingCpf) {
+            return res.status(400).json({ message: `Já existe um aluno matriculado com este CPF (${cleanCpf}): ${existingCpf.nome}` });
+          }
+        }
+      }
+
       const alunoData = {
         // ===== IDENTIFICAÇÃO =====
         nome: toUppercase(formData.nome) || '',
