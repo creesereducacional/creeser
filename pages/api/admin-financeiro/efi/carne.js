@@ -197,12 +197,26 @@ async function criarCarne(req, res) {
       configurations.interest = Math.round(jurosPercentualDiario * 1000); // EFI recebe integer: ex 0.033% = 33
     }
 
-    // Desconto do Carnê (EFI /v1/carnet aceita value em centavos e type currency)
+    // RC37.3 — HOMOLOGAÇÃO: Desconto por pontualidade (conditional_discount) vs incondicional
+    // Espelha exatamente a lógica do EfiBillingService.js para boletos avulsos.
+    // SE existir data_limite_desconto → conditional_discount (preserva valor nominal no boleto)
+    // SE NÃO existir data_limite_desconto → discount incondicional (comportamento anterior)
     const discountValue = Number(parcelas[0].valor_desconto) || 0;
+    const dataLimiteDesconto = parcelas[0].data_limite_desconto || null;
     const discount = {};
+    const conditionalDiscount = {};
+
     if (discountValue > 0) {
-      discount.value = Math.round(discountValue * 100);
-      discount.type = 'currency';
+      if (dataLimiteDesconto) {
+        // Desconto CONDICIONAL por pontualidade — mantém valor nominal no boleto
+        conditionalDiscount.type = 'currency';
+        conditionalDiscount.value = Math.round(discountValue * 100);
+        conditionalDiscount.until_date = dataLimiteDesconto;
+      } else {
+        // Desconto INCONDICIONAL — comportamento anterior
+        discount.value = Math.round(discountValue * 100);
+        discount.type = 'currency';
+      }
     }
 
     // URL do webhook para receber confirmações de pagamento de cada parcela
@@ -222,12 +236,30 @@ async function criarCarne(req, res) {
     if (Object.keys(configurations).length > 0) {
       carnetPayload.configurations = configurations;
     }
-    if (Object.keys(discount).length > 0) {
+    if (Object.keys(conditionalDiscount).length > 0) {
+      carnetPayload.conditional_discount = conditionalDiscount;
+    } else if (Object.keys(discount).length > 0) {
       carnetPayload.discount = discount;
     }
 
+    // RC37.3 — LOG 1: Payload EXATO enviado ao POST /v1/carnet (serializado)
+    console.log('[RC37.3][POST /v1/carnet] PAYLOAD ENVIADO:', JSON.stringify(carnetPayload, null, 2));
+    console.log('[RC37.3] discount_value_original:', discountValue);
+    console.log('[RC37.3] data_limite_desconto:', dataLimiteDesconto);
+    console.log('[RC37.3] modo_desconto:', Object.keys(conditionalDiscount).length > 0 ? 'conditional_discount' : Object.keys(discount).length > 0 ? 'discount_incondicional' : 'sem_desconto');
+
     // 3. Criar carnê na EFI
-    const carnetData = await efi.createCarnet(carnetPayload);
+    let carnetData;
+    try {
+      carnetData = await efi.createCarnet(carnetPayload);
+    } catch (efiErr) {
+      // RC37.3 — LOG 2: Erro completo da EFI
+      console.error('[RC37.3][POST /v1/carnet] ERRO EFI:', JSON.stringify(efiErr.efiResponse || efiErr.message, null, 2));
+      throw efiErr;
+    }
+
+    // RC37.3 — LOG 3: Resposta completa da EFI ao criar carnê
+    console.log('[RC37.3][POST /v1/carnet] RESPOSTA EFI:', JSON.stringify(carnetData, null, 2));
 
     const carnet = carnetData.data;
     const carnetId = carnet.carnet_id;
@@ -273,6 +305,25 @@ async function criarCarne(req, res) {
       .from('financeiro_ordens_pagamento')
       .update({ efi_carnet_id: String(carnetId), efi_status: 'waiting' })
       .eq('id', ordem_id);
+
+    // RC37.3 — LOG 4: GET /v1/carnet/:id para validar dados consolidados
+    try {
+      const carnetDetalhe = await efi.getCarnet(Number(carnetId));
+      console.log('[RC37.3][GET /v1/carnet/' + carnetId + '] RESPOSTA EFI:', JSON.stringify(carnetDetalhe, null, 2));
+    } catch (getCarnetErr) {
+      console.warn('[RC37.3][GET /v1/carnet] falha ao consultar carnê:', getCarnetErr.message);
+    }
+
+    // RC37.3 — LOG 5: GET /v1/charge/:id para a primeira parcela (valida campo discount na cobrança)
+    const primeiraCharge = charges[0];
+    if (primeiraCharge?.charge_id) {
+      try {
+        const chargeDetalhe = await efi.getCharge(Number(primeiraCharge.charge_id));
+        console.log('[RC37.3][GET /v1/charge/' + primeiraCharge.charge_id + '] RESPOSTA EFI:', JSON.stringify(chargeDetalhe, null, 2));
+      } catch (getChargeErr) {
+        console.warn('[RC37.3][GET /v1/charge] falha ao consultar cobrança:', getChargeErr.message);
+      }
+    }
 
     return res.status(201).json({
       message: 'Carnê criado com sucesso.',
