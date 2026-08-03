@@ -162,9 +162,15 @@ export default async function handler(req, res) {
         // Gerar parcelas
         const parcelas = [];
         const baseDate = new Date(periodo_inicio);
+        const diaTargetLote = Number(dia_vencimento);
 
         for (let i = 0; i < Number(qtd_parcelas); i++) {
-          const dateVenc = new Date(Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth() + i, Number(dia_vencimento)));
+          const anoBase = baseDate.getUTCFullYear();
+          const mesBase = baseDate.getUTCMonth() + i;
+          const maxDiasMes = new Date(Date.UTC(anoBase, mesBase + 1, 0)).getUTCDate();
+          const diaFinalLote = Math.min(diaTargetLote, maxDiasMes);
+          const dateVenc = new Date(Date.UTC(anoBase, mesBase, diaFinalLote));
+
           parcelas.push({
             instituicao_id: instFinal,
             ordem_pagamento_id: ordem.id,

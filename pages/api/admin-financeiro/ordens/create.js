@@ -139,10 +139,29 @@ export default async function handler(req, res) {
       const valorParcelaDesconto = totalDesconto / qtd;
       const valorParcelaFinal = valorParcelaNominal - valorParcelaDesconto;
 
-      let dataVencimento = new Date(data_vencimento_primeira || Date.now());
-      const dias = intervalo_dias || 30;
+      // Função para calcular a data de vencimento preservando o dia desejado (competência mensal)
+      // Trata meses com 28, 29, 30 ou 31 dias ajustando para o último dia válido quando necessário.
+      function calcularVencimentoMensal(dataInicialStr, iIndex) {
+        const [anoStr, mesStr, diaStr] = dataInicialStr.split('-');
+        const anoOrig = parseInt(anoStr, 10);
+        const mesOrig = parseInt(mesStr, 10) - 1; // 0-indexed
+        const diaTarget = parseInt(diaStr, 10);
+
+        const targetDate = new Date(Date.UTC(anoOrig, mesOrig + iIndex, 1));
+        const maxDias = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth() + 1, 0)).getUTCDate();
+        const diaFinal = Math.min(diaTarget, maxDias);
+
+        const resDate = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), diaFinal));
+        return resDate.toISOString().split('T')[0];
+      }
+
+      const dataInicial = data_vencimento_primeira 
+        ? String(data_vencimento_primeira).split('T')[0]
+        : new Date().toISOString().split('T')[0];
 
       for (let i = 1; i <= qtd; i++) {
+        const vencimentoStr = calcularVencimentoMensal(dataInicial, i - 1);
+
         parcelas.push({
           instituicao_id: instituicaoFinal,
           ordem_pagamento_id: criadaOrdemId,
@@ -152,13 +171,10 @@ export default async function handler(req, res) {
           valor_nominal: Number(valorParcelaNominal.toFixed(2)),
           valor_desconto: Number(valorParcelaDesconto.toFixed(2)),
           valor_final: Number(valorParcelaFinal.toFixed(2)),
-          data_limite_desconto: dataVencimento.toISOString().split('T')[0],
-          data_vencimento: dataVencimento.toISOString().split('T')[0],
+          data_limite_desconto: vencimentoStr,
+          data_vencimento: vencimentoStr,
           status: 'pendente'
         });
-
-        // Próximo vencimento (incremente os dias)
-        dataVencimento.setDate(dataVencimento.getDate() + dias);
       }
 
       // Inserir todas as parcelas
