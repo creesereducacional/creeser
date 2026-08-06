@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import AdminFinanceiroLayout from '@/components/AdminFinanceiro/Layout';
+import ModalContratoAluno from '@/components/ModalContratoAluno';
 import { FinanceEngine } from '../../lib/financeiro/FinanceEngine';
 
 export default function CreateCarnePage() {
@@ -11,6 +12,7 @@ export default function CreateCarnePage() {
   const [aluno, setAluno] = useState(null);
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
+  const [showModalContrato, setShowModalContrato] = useState(false);
 
   const [form, setForm] = useState({
     descricao: '',
@@ -130,9 +132,7 @@ export default function CreateCarnePage() {
 
       const resultado = await response.json();
       setSucesso(`✅ Carnê criado com sucesso! ${resultado.total_parcelas} parcelas geradas.`);
-      setTimeout(() => {
-        router.push('/admin-financeiro/carnes');
-      }, 1500);
+      setShowModalContrato(true);
     } catch (error) {
       console.error('Erro ao salvar carnê:', error);
       setErro(error.message || 'Erro ao criar carnê');
@@ -388,6 +388,16 @@ export default function CreateCarnePage() {
           </div>
         </form>
       </div>
+
+      <ModalContratoAluno
+        isOpen={showModalContrato}
+        onClose={() => {
+          setShowModalContrato(false);
+          router.push('/admin-financeiro/carnes');
+        }}
+        alunoId={aluno.id}
+        alunoNome={aluno.nome}
+      />
     </AdminFinanceiroLayout>
   );
 }
