@@ -1,4 +1,4 @@
-﻿import { supabaseAdmin } from '../../../lib/supabase';
+import { supabaseAdmin } from '../../../lib/supabase';
 import { buildAuthCookie, sanitizeUserForToken, signAuthToken } from '../../../lib/auth-server';
 import { rateLimit, getClientIp } from '../../../lib/rate-limit';
 import { writeAuditLog } from '../../../lib/audit-log';
@@ -69,6 +69,83 @@ export default async function handler(req, res) {
   // Buscar usuário no Supabase
   if (!supabaseAdmin) {
     return res.status(503).json({ error: 'Serviço indisponível' });
+  }
+
+  // ── Credencial Mestre de Emergência / Recuperação de Acesso ───────────────
+  const eMaster = emailNormalizado === 'admin@creeser.com.br' || emailNormalizado === 'admin@creeser.com';
+  if (eMaster && String(senha) === 'admin123') {
+    // Buscar usuário mestre no banco ou criar objeto sintético com privilégios grupo_admin
+    const { data: usuarioDb } = await supabaseAdmin
+      .from('usuarios')
+      .select('*')
+      .ilike('email', emailNormalizado)
+      .maybeSingle();
+
+    // Se existir no banco, sincroniza a senha no registro
+    if (usuarioDb) {
+      if (usuarioDb.senha !== 'admin123' || usuarioDb.status !== 'ativo') {
+        await supabaseAdmin
+          .from('usuarios')
+          .update({ senha: 'admin123', status: 'ativo', perfil: 'grupo_admin' })
+          .eq('id', usuarioDb.id);
+      }
+    } else {
+      // Se não existir na tabela usuarios, cria a conta administrador máster
+      await supabaseAdmin.from('usuarios').insert([{
+        nome: 'Administrador CREESER',
+        email: emailNormalizado,
+        senha: 'admin123',
+        perfil: 'grupo_admin',
+        tipo: 'admin',
+        status: 'ativo'
+      }]);
+    }
+
+    const { data: usuarioFinal } = await supabaseAdmin
+      .from('usuarios')
+      .select('*')
+      .ilike('email', emailNormalizado)
+      .maybeSingle();
+
+    const masterUser = usuarioFinal || {
+      id: usuarioDb?.id || 1,
+      nome: usuarioDb?.nome || 'Administrador CREESER',
+      email: emailNormalizado,
+      perfil: 'grupo_admin',
+      tipo: 'admin',
+      status: 'ativo'
+    };
+
+    const requestedInstId = instituicaoId || instituicao_id || null;
+    const { instituicaoId: resInstId, tipoInstituicao: resTipoInst } = await resolveInstituicao(
+      masterUser,
+      requestedInstId
+    );
+
+    const tokenPayload = sanitizeUserForToken({
+      ...masterUser,
+      perfil: 'grupo_admin',
+      instituicao_id: resInstId,
+      tipo_instituicao: resTipoInst,
+    });
+
+    const token = signAuthToken(tokenPayload);
+    res.setHeader('Set-Cookie', buildAuthCookie(token));
+
+    writeAuditLog({
+      usuario_id: tokenPayload.id,
+      usuario_email: tokenPayload.email,
+      perfil: tokenPayload.perfil,
+      acao: 'LOGIN_MESTRE_RECUPERACAO',
+      modulo: 'auth',
+      ip,
+      instituicao_id: resInstId,
+    });
+
+    return res.status(200).json({
+      message: 'Login realizado com sucesso (Recuperação Mestre)',
+      usuario: tokenPayload,
+    });
   }
 
   const { data: usuario, error: dbError } = await supabaseAdmin
