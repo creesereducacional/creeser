@@ -84,6 +84,8 @@ const mapRowToResponse = (row) => {
         : meta.limiteCadastroAlunos || '',
     iesRegistradoraDiploma: row.iesregistradoradiploma || meta.iesRegistradoraDiploma || '',
     situacao: row.situacao || 'ATIVO',
+    contratoId: row.contrato_id || row.contratoid || null,
+    contrato_id: row.contrato_id || row.contratoid || null,
     descricao: descricaoDireta,
     dataInicio: row.datainicio || '',
     dataFim: row.datafim || '',
@@ -97,6 +99,7 @@ const mapBodyToPayload = (body) => {
   const unidadeId = parseInteger(body.unidadeId || body.unidadeid || body.unidade);
   const cursoId = parseInteger(body.cursoId || body.cursoid || body.curso);
   const gradeId = parseInteger(body.gradeId || body.gradeid || body.grade);
+  const contratoId = normalizeText(body.contratoId || body.contrato_id || body.contratoid);
   const capacidadeMaxima = parseInteger(body.limiteCadastroAlunos || body.capacidadeMaxima || body.capacidademaxima);
   const mesesContrato = parseInteger(body.mesesContrato || body.mesescontrato);
 
@@ -105,6 +108,7 @@ const mapBodyToPayload = (body) => {
     unidade: body.unidade || '',
     curso: body.curso || '',
     grade: body.grade || '',
+    contratoId: contratoId || '',
     cargaHoraria: body.cargaHoraria || '',
     processoSeletivo: body.processoSeletivo || '',
     edittalProcessoSeletivo: body.edittalProcessoSeletivo || '',
@@ -127,6 +131,7 @@ const mapBodyToPayload = (body) => {
     unidadeid: unidadeId,
     cursoid: cursoId,
     gradeid: gradeId,
+    contrato_id: contratoId || null,
     situacao: body.situacao || 'ATIVO',
     datainicio: body.processoSeletivo || body.dataInicio || null,
     datafim: body.dataFim || null,
@@ -268,6 +273,22 @@ export default async function handler(req, res) {
 
       if (String(gradeData.curso_id) !== String(payloadNormalizado.cursoid)) {
         return res.status(400).json({ error: 'A Matriz Curricular selecionada não pertence ao mesmo Curso da Turma.' });
+      }
+
+      if (payloadNormalizado.contrato_id) {
+        const { data: contratoData, error: contratoError } = await supabase
+          .from('contratos_instituicao')
+          .select('instituicao_id')
+          .eq('id', payloadNormalizado.contrato_id)
+          .single();
+
+        if (contratoError || !contratoData) {
+          return res.status(400).json({ error: 'Modelo de contrato selecionado não existe ou é inválido.' });
+        }
+
+        if (String(contratoData.instituicao_id) !== String(payloadNormalizado.instituicao_id)) {
+          return res.status(400).json({ error: 'O Modelo de Contrato selecionado não pertence à mesma Instituição da Turma.' });
+        }
       }
 
       let data = null;
