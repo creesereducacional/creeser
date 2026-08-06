@@ -1,11 +1,15 @@
-import { supabaseAdmin } from '../../lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import { hasPerfil, requireAuth, requirePerfil, resolveInstituicaoId, applyInstituicaoFilter } from '../../lib/auth-server';
 
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
 export default async function handler(req, res) {
-  const supabase = supabaseAdmin;
-  if (!supabase) {
-    return res.status(503).json({ error: 'Serviço de banco de dados indisponível' });
+  if (!supabaseUrl || !supabaseKey) {
+    return res.status(503).json({ error: 'Configuração do banco de dados ausente' });
   }
+
+  const supabase = createClient(supabaseUrl, supabaseKey);
   const authUser = requireAuth(req, res);
   if (!authUser) return;
   if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'admin', 'coordenador', 'secretaria'])) return;
