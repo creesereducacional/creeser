@@ -1716,7 +1716,7 @@ export default function AlunosFinanceiroPage() {
   const getNomeTurma = (id) => turmas.find(t => t.id === id)?.nome || 'Sem turma';
   const getNomeCurso = (id) => cursos.find(c => c.id === id)?.nome || 'Sem curso';
   const formataValor = (v) => Number(v||0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  const formataData = (d) => { if (!d) return '-'; try { return new Date(d).toLocaleDateString('pt-BR'); } catch { return '-'; } };
+  const formataData = (d) => { if (!d) return '-'; try { return new Date(String(d).split('T')[0] + 'T12:00:00').toLocaleDateString('pt-BR'); } catch { return '-'; } };
 
   const StatusBadge = ({ status }) => {
     const cfg = {
@@ -1941,7 +1941,7 @@ export default function AlunosFinanceiroPage() {
                                   <p className="text-sm text-gray-400 py-4 text-center">Nenhum carnê cadastrado para este aluno.</p>
                                 );
                                 const fmtV = (v) => Number(v||0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                                const fmtD = (d) => d ? new Date(d).toLocaleDateString('pt-BR') : '-';
+                                const fmtD = (d) => d ? new Date(String(d).split('T')[0] + 'T12:00:00').toLocaleDateString('pt-BR') : '-';
                                 const CoresCarne = { ativo:'bg-green-100 text-green-800', cancelado:'bg-red-100 text-red-800', encerrado:'bg-gray-100 text-gray-800' };
                                 const CoresParcela = { pendente:'bg-amber-100 text-amber-800', pago:'bg-green-100 text-green-800', vencido:'bg-red-100 text-red-800', cancelado:'bg-gray-100 text-gray-800' };
                                 return (

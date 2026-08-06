@@ -310,7 +310,8 @@ export default function CarnesPage() {
   const formataData = (data) => {
     if (!data) return '-';
     try {
-      return new Date(data).toLocaleDateString('pt-BR');
+      const dStr = String(data).split('T')[0];
+      return new Date(dStr + 'T12:00:00').toLocaleDateString('pt-BR');
     } catch {
       return '-';
     }
