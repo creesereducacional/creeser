@@ -268,14 +268,37 @@ export default async function handler(req, res) {
       });
     }
 
-    const contrato = await findContratoPadraoInstituicao(instituicao.id);
+    // 1. Localizar a turma do aluno
+    const turma = await findTurmaDoAluno(aluno);
+
+    // 2. Resolver o modelo de contrato:
+    // a) Prioridade: contrato vinculado à Turma (contrato_id / contratoid)
+    // b) Fallback: contrato Padrão da Instituição
+    let contrato = null;
+    const turmaContratoId = parseId(turma?.contrato_id || turma?.contratoid) || (turma?.contrato_id || turma?.contratoid || null);
+
+    if (turmaContratoId) {
+      const { data: cTurma, error: cTurmaErr } = await supabase
+        .from('contratos_instituicao')
+        .select('*')
+        .eq('id', turmaContratoId)
+        .single();
+
+      if (!cTurmaErr && cTurma && cTurma.ativo !== false) {
+        contrato = cTurma;
+      }
+    }
+
+    if (!contrato) {
+      contrato = await findContratoPadraoInstituicao(instituicao.id);
+    }
+
     if (!contrato) {
       return res.status(404).json({
         error: 'Não há modelo de contrato cadastrado para esta instituição.'
       });
     }
 
-    const turma = await findTurmaDoAluno(aluno);
     const curso = await findCursoDaTurma(turma);
     const responsavel = await findResponsavelDoAluno(alunoId);
 
