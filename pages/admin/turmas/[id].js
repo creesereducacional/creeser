@@ -6,7 +6,7 @@ import DashboardLayout from '../../../components/DashboardLayout';
 export default function EditarTurma() {
   const router = useRouter();
   const { id } = router.query;
-  const [opcoes, setOpcoes] = useState({ instituicoes: [], unidades: [], cursos: [], grades: [] });
+  const [opcoes, setOpcoes] = useState({ instituicoes: [], unidades: [], cursos: [], grades: [], contratos: [] });
   const [loadingOpcoes, setLoadingOpcoes] = useState(true);
   const [formData, setFormData] = useState({
     nome: '',
@@ -14,6 +14,7 @@ export default function EditarTurma() {
     unidadeId: '',
     cursoId: '',
     gradeId: '',
+    contratoId: '',
     cargaHoraria: '',
     processoSeletivo: '',
     edittalProcessoSeletivo: '',
@@ -141,6 +142,7 @@ export default function EditarTurma() {
         unidades: Array.isArray(data.unidades) ? data.unidades : [],
         cursos: Array.isArray(data.cursos) ? data.cursos : [],
         grades: Array.isArray(data.grades) ? data.grades : [],
+        contratos: Array.isArray(data.contratos) ? data.contratos : [],
       });
     } catch (error) {
       console.error('Erro ao carregar opções de turmas:', error);
@@ -554,6 +556,46 @@ export default function EditarTurma() {
                 />
               </div>
             </div>
+          </div>
+
+          {/* Seção: Contrato da Turma */}
+          <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
+            <h3 className="text-lg font-bold text-teal-600 mb-4 flex items-center gap-2">
+              📄 Contrato da Turma
+            </h3>
+
+            {opcoes.contratos.length === 0 ? (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 font-medium">
+                Nenhum modelo de contrato cadastrado para esta instituição.
+              </div>
+            ) : (
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">MODELO DE CONTRATO *</label>
+                <div className="flex gap-2">
+                  <select
+                    name="contratoId"
+                    value={formData.contratoId}
+                    onChange={handleChange}
+                    className="flex-1 px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                  >
+                    <option value="">Selecione o Modelo de Contrato</option>
+                    {opcoes.contratos.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nome} {c.padrao ? '(Padrão)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    title="Em desenvolvimento"
+                    onClick={() => alert('Visualização de contrato em desenvolvimento')}
+                    className="px-4 py-2 text-sm font-semibold text-teal-700 bg-teal-50 border border-teal-300 rounded-lg hover:bg-teal-100 flex items-center gap-1 transition"
+                  >
+                    👁 Visualizar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Seção: Registro */}
