@@ -2,8 +2,25 @@ import { createClient } from '@supabase/supabase-js';
 import { hasPerfil, requireAuth, requirePerfil, resolveInstituicaoId, applyInstituicaoFilter } from '../../lib/auth-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const chosenKeyType = serviceRoleKey ? 'SERVICE_ROLE' : (anonKey ? 'ANON' : 'NENHUMA');
+const selectedKey = serviceRoleKey || anonKey || '';
+
+console.log('================ SUPABASE RUNTIME =================');
+console.log('NEXT_PUBLIC_SUPABASE_URL:', supabaseUrl || 'NÃO CONFIGURADA');
+console.log('SUPABASE_SERVICE_ROLE_KEY existe:', Boolean(serviceRoleKey));
+console.log('NEXT_PUBLIC_SUPABASE_ANON_KEY existe:', Boolean(anonKey));
+console.log('Chave escolhida pelo código:', chosenKeyType);
+console.log('Prefixo da chave utilizada:', selectedKey.slice(0, 15));
+console.log('Primeiros 25 caracteres:', selectedKey.slice(0, 25));
+console.log('Últimos 10 caracteres:', selectedKey.slice(-10));
+console.log('===================================================');
+
+const supabase = (supabaseUrl && selectedKey) ? createClient(supabaseUrl, selectedKey) : null;
+if (supabase) {
+  console.log('Cliente Supabase criado com sucesso.');
+}
 
 export default async function handler(req, res) {
   if (!supabase) {
@@ -39,15 +56,12 @@ export default async function handler(req, res) {
       return true;
     }
     if (operadorPerfil === 'instituicao_admin') {
-      // instituicao_admin pode criar todos exceto grupo_admin e instituicao_admin
       return alvo !== 'grupo_admin' && alvo !== 'instituicao_admin';
     }
     if (operadorPerfil === 'coordenador') {
-      // coordenador pode criar apenas professor e aluno
       return alvo === 'professor' || alvo === 'aluno';
     }
     if (operadorPerfil === 'secretaria') {
-      // secretaria pode criar apenas aluno
       return alvo === 'aluno';
     }
     return false;
@@ -55,13 +69,20 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     const { tipo } = req.query;
+    console.log('Executando SELECT em public.usuarios');
     let query = supabase.from('usuarios').select('*');
     query = applyInstituicaoFilter(query, instituicaoId);
     if (tipo) query = query.eq('tipo', tipo);
 
     const { data, error } = await query;
     if (error) {
-      console.error('[GET /api/usuarios] Erro na consulta:', error);
+      console.error('[RC40.2][GET /api/usuarios] ERRO COMPLETO:', error);
+      console.error('error.code:', error.code);
+      console.error('error.message:', error.message);
+      console.error('error.details:', error.details);
+      console.error('error.hint:', error.hint);
+      console.error('status HTTP:', error.status || 500);
+      console.error('response body:', JSON.stringify(error));
       return res.status(500).json({ error: error.message || 'Erro ao buscar usuarios no banco' });
     }
 
