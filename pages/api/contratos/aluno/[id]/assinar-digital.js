@@ -1,5 +1,6 @@
 import { supabase } from '../../_shared';
 import { requireAuth, requirePerfil } from '../../../../../lib/auth-server';
+import { ContratoResolverService } from '../../../../../lib/contracts/ContratoResolverService';
 
 const ASSINAFY_BASE_URL = process.env.ASSINAFY_BASE_URL || 'https://api.assinafy.com.br/v1';
 
@@ -378,13 +379,13 @@ export default async function handler(req, res) {
 
     assinaturaContext.alunoId = alunoId;
 
-    const baseUrl = getInternalBaseUrl(req);
-    const contratoResponse = await fetch(`${baseUrl}/api/contratos/aluno/${alunoId}`);
-    const contratoPayload = await contratoResponse.json().catch(() => ({}));
-
-    if (!contratoResponse.ok) {
-      return res.status(contratoResponse.status).json({
-        error: contratoPayload?.error || 'Não foi possível gerar o contrato do aluno.'
+    let contratoPayload;
+    try {
+      contratoPayload = await ContratoResolverService.resolveContratoAluno(alunoId);
+    } catch (resolveErr) {
+      const statusCode = resolveErr.statusCode || 500;
+      return res.status(statusCode).json({
+        error: resolveErr.message || 'Não foi possível gerar o contrato do aluno.'
       });
     }
 
