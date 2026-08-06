@@ -52,13 +52,26 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     const { tipo } = req.query;
-    let query = supabase.from('usuarios').select('*').order('nomecompleto');
+    let query = supabase.from('usuarios').select('*');
     query = applyInstituicaoFilter(query, instituicaoId);
     if (tipo) query = query.eq('tipo', tipo);
+
     const { data, error } = await query;
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      console.error('[GET /api/usuarios] Erro na consulta:', error);
+      return res.status(500).json({ error: error.message || 'Erro ao buscar usuarios no banco' });
+    }
+
+    const lista = Array.isArray(data) ? data : [];
+    // Ordenar em memória para garantir compatibilidade com nome / nomecompleto
+    lista.sort((a, b) => {
+      const nA = String(a.nomecompleto || a.nome || a.email || '').toLowerCase();
+      const nB = String(b.nomecompleto || b.nome || b.email || '').toLowerCase();
+      return nA.localeCompare(nB);
+    });
+
     // Omitir campo senha da resposta
-    return res.status(200).json(data.map(u => { const { senha, ...rest } = u; return rest; }));
+    return res.status(200).json(lista.map(u => { const { senha, ...rest } = u; return rest; }));
   }
 
   if (req.method === 'POST') {
