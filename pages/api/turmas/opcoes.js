@@ -133,6 +133,16 @@ export default async function handler(req, res) {
       unidadesQuery = unidadesQuery.eq('instituicao_id', instituicaoIdNormalizado);
     }
 
+    let contratosQuery = supabase
+      .from('contratos_instituicao')
+      .select('id,nome,padrao,ativo')
+      .eq('ativo', true)
+      .order('nome', { ascending: true });
+
+    if (instituicaoIdNormalizado) {
+      contratosQuery = contratosQuery.eq('instituicao_id', instituicaoIdNormalizado);
+    }
+
     let instituicoesQuery = supabase
       .from('instituicoes')
       .select('id,nome,ativa')
@@ -143,10 +153,11 @@ export default async function handler(req, res) {
       instituicoesQuery = instituicoesQuery.eq('id', instituicaoIdNormalizado);
     }
 
-    const [instituicoesResp, unidadesResp, gradesResp] = await Promise.all([
+    const [instituicoesResp, unidadesResp, gradesResp, contratosResp] = await Promise.all([
       instituicoesQuery,
       unidadesQuery,
       supabase.from('grades').select('id,nome,cursoid').order('nome', { ascending: true }),
+      contratosQuery,
     ]);
 
     const cursos = unidadeId ? await getCursosByUnidade(unidadeId) : [];
@@ -160,12 +171,23 @@ export default async function handler(req, res) {
     if (gradesResp.error) {
       throw gradesResp.error;
     }
+    if (contratosResp.error && contratosResp.error.code !== '42P01') {
+      throw contratosResp.error;
+    }
+
+    const contratosFormatados = (contratosResp.data || []).map((c) => ({
+      id: c.id,
+      nome: c.nome,
+      padrao: Boolean(c.padrao),
+      status: c.ativo ? 'ativo' : 'inativo',
+    }));
 
     return res.status(200).json({
       instituicoes: (instituicoesResp.data || []).filter((instituicao) => instituicao.ativa !== false),
       unidades: unidadesResp.data || [],
       cursos,
       grades: gradesResp.data || [],
+      contratos: contratosFormatados,
     });
   } catch (error) {
     console.error('Erro ao carregar opções de turmas:', error);
