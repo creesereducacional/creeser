@@ -1,12 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '../../lib/supabase';
 import { hasPerfil, requireAuth, requirePerfil, resolveInstituicaoId, applyInstituicaoFilter } from '../../lib/auth-server';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
 export default async function handler(req, res) {
+  const supabase = supabaseAdmin;
+  if (!supabase) {
+    return res.status(503).json({ error: 'Serviço de banco de dados indisponível' });
+  }
   const authUser = requireAuth(req, res);
   if (!authUser) return;
   if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'admin', 'coordenador', 'secretaria'])) return;
