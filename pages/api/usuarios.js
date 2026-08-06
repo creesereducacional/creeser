@@ -99,8 +99,7 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Acesso negado: Perfil de acesso não permitido para o seu cargo.' });
     }
 
-    const { data, error } = await supabase.from('usuarios').insert({
-      nomecompleto:    nomeCompleto,
+    let insertData = {
       email,
       senha,
       cpf:             cpf || null,
@@ -110,12 +109,31 @@ export default async function handler(req, res) {
       perfil:          perfilResolvido,
       instituicao_id:  instId || null,
       status:          status || 'ativo',
-    }).select('id, nomecompleto, email, cpf, tipo, perfil, status, instituicao_id').single();
-    if (error) {
-      if (error.code === '23505') return res.status(409).json({ error: 'CPF ou email já cadastrado' });
-      return res.status(500).json({ error: error.message });
+    };
+
+    // Tentar inserir primeiro com nomecompleto
+    let resInsert = await supabase.from('usuarios').insert({
+      ...insertData,
+      nomecompleto: nomeCompleto
+    }).select('*').single();
+
+    // Se houver erro de coluna inexistente (ex: nomecompleto vs nome), tenta com campo nome
+    if (resInsert.error && resInsert.error.message && resInsert.error.message.includes('nomecompleto')) {
+      resInsert = await supabase.from('usuarios').insert({
+        ...insertData,
+        nome: nomeCompleto
+      }).select('*').single();
     }
-    return res.status(201).json({ message: 'Usuário criado com sucesso', usuario: data });
+
+    const { data, error } = resInsert;
+
+    if (error) {
+      console.error('[POST /api/usuarios] Erro na inserção:', error);
+      if (error.code === '23505') return res.status(409).json({ error: 'CPF ou email já cadastrado' });
+      return res.status(500).json({ error: error.message || 'Erro ao criar usuário' });
+    }
+    const { senha: _, ...userNoSenha } = data || {};
+    return res.status(201).json({ message: 'Usuário criado com sucesso', usuario: userNoSenha });
   }
 
   if (req.method === 'PUT') {
@@ -179,9 +197,19 @@ export default async function handler(req, res) {
     if (body.tipo)           updates.tipo            = body.tipo;
     if (body.perfil)         updates.perfil          = body.perfil;
     if (body.status)         updates.status          = body.status;
-    const { data, error } = await supabase.from('usuarios').update(updates).eq('id', id).select('id, nomecompleto, email, cpf, tipo, perfil, status').single();
-    if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json({ message: 'Usuário atualizado com sucesso', usuario: data });
+
+    let resUpdate = await supabase.from('usuarios').update(updates).eq('id', id).select('*').single();
+    if (resUpdate.error && resUpdate.error.message && resUpdate.error.message.includes('nomecompleto')) {
+      if (updates.nomecompleto) {
+        delete updates.nomecompleto;
+        updates.nome = body.nomeCompleto;
+      }
+      resUpdate = await supabase.from('usuarios').update(updates).eq('id', id).select('*').single();
+    }
+    const { data, error } = resUpdate;
+    if (error) return res.status(500).json({ error: error.message || 'Erro ao atualizar usuário' });
+    const { senha: _, ...userNoSenha } = data || {};
+    return res.status(200).json({ message: 'Usuário atualizado com sucesso', usuario: userNoSenha });
   }
 
   if (req.method === 'DELETE') {
