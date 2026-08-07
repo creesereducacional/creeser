@@ -545,6 +545,51 @@ export default function NovoTurma() {
                     👁 Visualizar
                   </button>
                 </div>
+
+                {(() => {
+                  const contratoSel = opcoes.contratos.find((c) => String(c.id) === String(formData.contratoId));
+                  if (!contratoSel) return null;
+
+                  return (
+                    <div className="mt-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-2 shadow-inner">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-800 text-sm">📌 {contratoSel.nome}</span>
+                          {contratoSel.padrao && (
+                            <span className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold text-[10px] rounded-full">
+                              Modelo Padrão
+                            </span>
+                          )}
+                        </div>
+                        <span className="px-2 py-0.5 bg-slate-200 text-slate-700 font-semibold text-[10px] rounded-full uppercase">
+                          {contratoSel.status || 'Ativo'}
+                        </span>
+                      </div>
+
+                      {contratoSel.descricao && (
+                        <p className="text-slate-600 italic border-l-2 border-slate-300 pl-2 py-0.5">
+                          "{contratoSel.descricao}"
+                        </p>
+                      )}
+
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/60">
+                        <span>
+                          📅 Última atualização:{' '}
+                          {contratoSel.updatedAt
+                            ? new Date(contratoSel.updatedAt).toLocaleDateString('pt-BR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              })
+                            : '-'}
+                        </span>
+                        {contratoSel.qtdPlaceholders !== undefined && (
+                          <span>🧩 {contratoSel.qtdPlaceholders} variáveis configuradas</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>

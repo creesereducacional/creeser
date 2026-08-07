@@ -135,7 +135,7 @@ export default async function handler(req, res) {
 
     let contratosQuery = supabase
       .from('contratos_instituicao')
-      .select('id,nome,padrao,ativo')
+      .select('id,nome,padrao,ativo,updated_at,created_at,descricao,placeholders')
       .eq('ativo', true)
       .order('nome', { ascending: true });
 
@@ -178,8 +178,11 @@ export default async function handler(req, res) {
     const contratosFormatados = (contratosResp.data || []).map((c) => ({
       id: c.id,
       nome: c.nome,
+      descricao: c.descricao || '',
       padrao: Boolean(c.padrao),
       status: c.ativo ? 'ativo' : 'inativo',
+      updatedAt: c.updated_at || c.created_at || null,
+      qtdPlaceholders: Array.isArray(c.placeholders) ? c.placeholders.length : 0,
     }));
 
     return res.status(200).json({
