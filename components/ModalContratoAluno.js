@@ -1,8 +1,38 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function ModalContratoAluno({ isOpen, onClose, alunoId, alunoNome }) {
+  const [loadingContrato, setLoadingContrato] = useState(false);
+  const [contratoInfo, setContratoInfo] = useState(null);
+  const [erroContrato, setErroContrato] = useState('');
   const [enviandoAssinafy, setEnviandoAssinafy] = useState(false);
   const [feedback, setFeedback] = useState(null);
+
+  useEffect(() => {
+    if (!isOpen || !alunoId) return;
+
+    const carregarInformacoesContrato = async () => {
+      setLoadingContrato(true);
+      setErroContrato('');
+      setContratoInfo(null);
+
+      try {
+        const response = await fetch(`/api/contratos/aluno/${alunoId}`);
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(data?.error || 'Nenhum modelo de contrato foi encontrado para esta turma.');
+        }
+
+        setContratoInfo(data);
+      } catch (err) {
+        setErroContrato(err.message || 'Nenhum modelo de contrato foi encontrado para esta turma.');
+      } finally {
+        setLoadingContrato(false);
+      }
+    };
+
+    carregarInformacoesContrato();
+  }, [isOpen, alunoId]);
 
   if (!isOpen) return null;
 
@@ -35,6 +65,8 @@ export default function ModalContratoAluno({ isOpen, onClose, alunoId, alunoNome
     }
   };
 
+  const isTurmaContrato = contratoInfo?.contrato?.origem === 'turma';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center border border-slate-100 transform transition-all animate-fadeIn">
@@ -49,19 +81,58 @@ export default function ModalContratoAluno({ isOpen, onClose, alunoId, alunoNome
         </h3>
 
         {alunoNome && (
-          <div className="inline-block px-3 py-1 bg-teal-50 border border-teal-200/60 rounded-full mb-4">
+          <div className="inline-block px-3 py-1 bg-teal-50 border border-teal-200/60 rounded-full mb-3">
             <p className="text-xs font-bold text-teal-800 uppercase tracking-wide">
               {alunoNome}
             </p>
           </div>
         )}
 
+        {/* Card Informativo do Modelo do Contrato */}
+        <div className="my-4 p-4 bg-slate-50 border border-slate-200/80 rounded-xl text-left shadow-inner">
+          {loadingContrato ? (
+            <p className="text-xs text-slate-500 text-center animate-pulse py-2">
+              Carregando detalhes do contrato...
+            </p>
+          ) : erroContrato ? (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 font-medium text-center">
+              ⚠️ {erroContrato}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Modelo:</span>
+                <span className="text-xs font-bold text-slate-800 truncate">
+                  📌 {contratoInfo?.contrato?.nome || '-'}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Origem:</span>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    isTurmaContrato
+                      ? 'bg-blue-50 border-blue-200 text-blue-700'
+                      : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                  }`}
+                >
+                  {isTurmaContrato ? 'Contrato específico da Turma' : 'Contrato padrão da Instituição'}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/60">
+                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Instituição:</span>
+                <span className="text-xs font-semibold text-slate-700 truncate">
+                  🏢 {contratoInfo?.instituicao?.nome || '-'}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Texto Orientado à Ação */}
-        <p className="text-sm font-medium text-slate-700 mb-1">
-          Deseja emitir o contrato deste aluno agora?
-        </p>
-        <p className="text-xs text-slate-500 mb-6">
-          Você pode imprimir o contrato ou enviá-lo para assinatura digital.
+        <p className="text-xs text-slate-500 mb-5">
+          Você pode imprimir este modelo ou enviá-lo para assinatura digital.
         </p>
 
         {/* Feedback Alert */}
@@ -83,8 +154,8 @@ export default function ModalContratoAluno({ isOpen, onClose, alunoId, alunoNome
           <button
             type="button"
             onClick={handleImprimir}
-            disabled={enviandoAssinafy}
-            className="w-full py-3.5 px-4 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 disabled:opacity-50 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-md shadow-teal-600/20 transition-all cursor-pointer"
+            disabled={enviandoAssinafy || loadingContrato || Boolean(erroContrato)}
+            className="w-full py-3.5 px-4 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-md shadow-teal-600/20 transition-all cursor-pointer"
           >
             <span>🖨️</span> Imprimir Contrato
           </button>
@@ -93,8 +164,8 @@ export default function ModalContratoAluno({ isOpen, onClose, alunoId, alunoNome
           <button
             type="button"
             onClick={handleEnviarAssinafy}
-            disabled={enviandoAssinafy}
-            className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-md shadow-blue-600/20 transition-all cursor-pointer"
+            disabled={enviandoAssinafy || loadingContrato || Boolean(erroContrato)}
+            className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-md shadow-blue-600/20 transition-all cursor-pointer"
           >
             {enviandoAssinafy ? (
               <>
