@@ -3,11 +3,13 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import DashboardLayout from '../../../components/DashboardLayout';
 import CustomModal from '../../../components/CustomModal';
+import ModalPreviewContrato from '@/components/ModalPreviewContrato';
 
 export default function NovoTurma() {
   const router = useRouter();
   const [opcoes, setOpcoes] = useState({ instituicoes: [], unidades: [], cursos: [], grades: [], contratos: [] });
   const [loadingOpcoes, setLoadingOpcoes] = useState(true);
+  const [showPreviewContrato, setShowPreviewContrato] = useState(false);
   const [formData, setFormData] = useState({
     nome: '',
     instituicaoId: '',
@@ -537,9 +539,8 @@ export default function NovoTurma() {
                   </select>
                   <button
                     type="button"
-                    title="Em desenvolvimento"
-                    onClick={() => alert('Visualização de contrato em desenvolvimento')}
-                    className="px-4 py-2 text-sm font-semibold text-teal-700 bg-teal-50 border border-teal-300 rounded-lg hover:bg-teal-100 flex items-center gap-1 transition"
+                    onClick={() => setShowPreviewContrato(true)}
+                    className="px-4 py-2 text-sm font-semibold text-teal-700 bg-teal-50 border border-teal-300 rounded-lg hover:bg-teal-100 flex items-center gap-1 transition cursor-pointer"
                   >
                     👁 Visualizar
                   </button>
@@ -608,6 +609,13 @@ export default function NovoTurma() {
         message={modal.message}
         type={modal.type}
         onClose={fecharModal}
+      />
+
+      <ModalPreviewContrato
+        isOpen={showPreviewContrato}
+        onClose={() => setShowPreviewContrato(false)}
+        contratoId={formData.contratoId}
+        instituicaoNome={opcoes.instituicoes.find((i) => String(i.id) === String(formData.instituicaoId))?.nome}
       />
     </DashboardLayout>
   );
