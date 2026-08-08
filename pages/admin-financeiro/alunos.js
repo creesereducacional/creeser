@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import AdminFinanceiroLayout from '@/components/AdminFinanceiro/Layout';
 import BarraFiltros from '@/components/AdminFinanceiro/BarraFiltros';
+import ModalContratoAluno from '@/components/ModalContratoAluno';
 import { FinanceEngine } from '../../lib/financeiro/FinanceEngine';
 
 const PLANOS_FINANCEIROS = [
@@ -1246,100 +1247,6 @@ function ModalRecibo({ ordem, onClose }) {
   );
 }
 
-function ModalContrato({ aluno, onClose }) {
-  const [enviando, setEnviando] = useState(false);
-  const [resultado, setResultado] = useState(null);
-  const [erro, setErro] = useState(null);
-
-  const handleAssinarDigital = async () => {
-    setEnviando(true);
-    setErro(null);
-    setResultado(null);
-    try {
-      const res = await fetch(`/api/contratos/aluno/${aluno.id}/assinar-digital`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        if (res.status === 422 && json?.error?.includes('configur')) {
-          setErro('Assinatura digital não configurada para esta instituição. Configure as variáveis ASSINAFY nas configurações.');
-        } else {
-          setErro(json?.error || 'Erro ao enviar para assinatura digital.');
-        }
-      } else {
-        setResultado(json?.mensagem || 'Documento enviado com sucesso para assinatura digital.');
-      }
-    } catch (e) {
-      setErro('Erro de conexão. Tente novamente.');
-    } finally {
-      setEnviando(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h3 className="text-base font-bold text-gray-800">Contrato — {aluno.nome}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="px-6 py-5 space-y-3">
-          <button
-            onClick={() => window.open(`/admin/alunos/contrato/${aluno.id}?autoprint=1`, '_blank')}
-            className="w-full flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition text-sm font-medium text-gray-700">
-            <svg className="w-5 h-5 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-            </svg>
-            Imprimir Contrato
-          </button>
-
-          <button
-            onClick={handleAssinarDigital}
-            disabled={enviando}
-            className="w-full flex items-center gap-3 px-4 py-3 bg-blue-600 rounded-lg hover:bg-blue-700 transition text-sm font-medium text-white disabled:opacity-60">
-            {enviando ? (
-              <svg className="w-5 h-5 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-              </svg>
-            )}
-            {enviando ? 'Enviando...' : 'Enviar para Assinatura Digital'}
-          </button>
-
-          {resultado && (
-            <div className="px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
-              {resultado}
-            </div>
-          )}
-          {erro && (
-            <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
-              {erro}
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-end px-6 py-4 border-t bg-gray-50 rounded-b-xl">
-          <button onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
-            Fechar
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function AlunosFinanceiroPage() {
   const router = useRouter();
 
@@ -2300,7 +2207,12 @@ export default function AlunosFinanceiroPage() {
         <ModalRecibo ordem={modalRecibo} onClose={() => setModalRecibo(null)} />
       )}
       {modalContrato && (
-        <ModalContrato aluno={modalContrato} onClose={() => setModalContrato(null)} />
+        <ModalContratoAluno
+          isOpen={!!modalContrato}
+          onClose={() => setModalContrato(null)}
+          alunoId={modalContrato.id}
+          alunoNome={modalContrato.nome}
+        />
       )}
       {modalTrancar && (
         <ModalTrancar

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import AdminFinanceiroLayout from '@/components/AdminFinanceiro/Layout';
-import ModalContratoAluno from '@/components/ModalContratoAluno';
 import { FinanceEngine } from '../../lib/financeiro/FinanceEngine';
 
 export default function CreateOrdenPage() {
@@ -12,7 +11,6 @@ export default function CreateOrdenPage() {
   const [aluno, setAluno] = useState(null);
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
-  const [showModalContrato, setShowModalContrato] = useState(false);
 
   const [form, setForm] = useState({
     descricao: '',
@@ -114,7 +112,9 @@ export default function CreateOrdenPage() {
       }
 
       setSucesso('✅ Ordem criada com sucesso!');
-      setShowModalContrato(true);
+      setTimeout(() => {
+        router.push('/admin-financeiro/ordens');
+      }, 1500);
     } catch (error) {
       console.error('Erro ao salvar ordem:', error);
       setErro(error.message || 'Erro ao criar ordem');
@@ -314,16 +314,6 @@ export default function CreateOrdenPage() {
           </div>
         </form>
       </div>
-
-      <ModalContratoAluno
-        isOpen={showModalContrato}
-        onClose={() => {
-          setShowModalContrato(false);
-          router.push('/admin-financeiro/ordens');
-        }}
-        alunoId={aluno.id}
-        alunoNome={aluno.nome}
-      />
     </AdminFinanceiroLayout>
   );
 }
