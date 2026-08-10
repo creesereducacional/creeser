@@ -567,7 +567,7 @@ export default function EditarTurma() {
               📄 Contrato da Turma
             </h3>
 
-            {opcoes.contratos.length === 0 ? (
+            {(!Array.isArray(opcoes.contratos) || opcoes.contratos.length === 0) ? (
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 font-medium">
                 Nenhum modelo de contrato cadastrado para esta instituição.
               </div>
@@ -598,6 +598,7 @@ export default function EditarTurma() {
                 </div>
 
                 {(() => {
+                  if (!Array.isArray(opcoes.contratos)) return null;
                   const contratoSel = opcoes.contratos.find((c) => String(c.id) === String(formData.contratoId));
                   if (!contratoSel) return null;
 
