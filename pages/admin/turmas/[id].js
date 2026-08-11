@@ -37,6 +37,37 @@ export default function EditarTurma() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const [modal, setModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'success',
+    redirectTo: null,
+  });
+
+  const abrirModal = (title, message, type = 'success', redirectTo = null) => {
+    setModal({
+      isOpen: true,
+      title,
+      message,
+      type,
+      redirectTo,
+    });
+  };
+
+  const fecharModal = () => {
+    const redirectTo = modal.redirectTo;
+    setModal((prev) => ({
+      ...prev,
+      isOpen: false,
+      redirectTo: null,
+    }));
+
+    if (redirectTo) {
+      router.push(redirectTo);
+    }
+  };
+
   useEffect(() => {
     if (id) {
       carregarTurma();
