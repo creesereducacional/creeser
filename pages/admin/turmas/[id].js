@@ -257,14 +257,14 @@ export default function EditarTurma() {
       });
 
       if (res.ok) {
-        alert('Turma atualizada com sucesso!');
-        router.push('/admin/turmas');
+        abrirModal('Atualização realizada', 'Turma atualizada com sucesso!', 'success', '/admin/turmas');
       } else {
-        alert('Erro ao atualizar turma');
+        const erro = await res.json().catch(() => null);
+        abrirModal('Falha na atualização', erro?.error || erro?.detail || 'Erro ao atualizar turma.', 'error');
       }
     } catch (error) {
       console.error('Erro ao atualizar turma:', error);
-      alert('Erro ao atualizar turma');
+      abrirModal('Falha na atualização', error.message || 'Erro ao atualizar turma. Tente novamente.', 'error');
     } finally {
       setSaving(false);
     }
