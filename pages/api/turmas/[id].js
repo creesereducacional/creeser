@@ -310,15 +310,30 @@ export default async function handler(req, res) {
         .single());
 
       if (error && isMissingColumnError(error)) {
+        // Tentar payload sem contrato_id caso a coluna contrato_id/contratoid ainda não exista na tabela turmas
+        const { contrato_id: _c1, ...payloadNormalizadoSemContrato } = payloadNormalizado;
         ({ data, error } = await supabase
           .from('turmas')
           .update({
-            ...payloadLegado,
+            ...payloadNormalizadoSemContrato,
             dataatualizacao: new Date().toISOString(),
           })
           .eq('id', turmaId)
           .select(selectTurma)
           .single());
+
+        if (error && isMissingColumnError(error)) {
+          const { contrato_id: _c2, ...payloadLegadoSemContrato } = payloadLegado;
+          ({ data, error } = await supabase
+            .from('turmas')
+            .update({
+              ...payloadLegadoSemContrato,
+              dataatualizacao: new Date().toISOString(),
+            })
+            .eq('id', turmaId)
+            .select(selectTurma)
+            .single());
+        }
       }
 
       if (error) {

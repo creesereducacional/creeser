@@ -318,11 +318,21 @@ export default async function handler(req, res) {
         .single());
 
       if (error && isMissingColumnError(error)) {
+        const { contrato_id: _c1, ...payloadNormalizadoSemContrato } = payloadNormalizado;
         ({ data, error } = await supabase
           .from('turmas')
-          .insert([payloadLegado])
+          .insert([payloadNormalizadoSemContrato])
           .select(selectTurmas)
           .single());
+
+        if (error && isMissingColumnError(error)) {
+          const { contrato_id: _c2, ...payloadLegadoSemContrato } = payloadLegado;
+          ({ data, error } = await supabase
+            .from('turmas')
+            .insert([payloadLegadoSemContrato])
+            .select(selectTurmas)
+            .single());
+        }
       }
 
       if (error) {
