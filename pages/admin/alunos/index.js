@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import DashboardLayout from '@/components/DashboardLayout';
 import Link from 'next/link';
 import PageHeader from '@/components/ui/PageHeader';
+import ModalContratoAluno from '@/components/ModalContratoAluno';
 
 export default function ListagemAlunos() {
   const router = useRouter();
@@ -11,6 +12,7 @@ export default function ListagemAlunos() {
   const [alunos, setAlunos] = useState([]);
   const [filteredAlunos, setFilteredAlunos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [modalContratoAluno, setModalContratoAluno] = useState(null);
   const [instituicoes, setInstituicoes] = useState([]);
   const [loadingInstituicoes, setLoadingInstituicoes] = useState(true);
   const [anosLetivos, setAnosLetivos] = useState([]);
@@ -171,13 +173,13 @@ export default function ListagemAlunos() {
     } catch (_) {}
   };
 
-  const abrirContratoAluno = (alunoId) => {
-    if (!alunoId) {
+  const abrirContratoAluno = (aluno) => {
+    if (!aluno?.id) {
       alert('Aluno não identificado para gerar contrato');
       return;
     }
 
-    window.open(`/admin/alunos/contrato/${alunoId}?autoprint=1`, '_blank', 'noopener,noreferrer');
+    setModalContratoAluno(aluno);
   };
 
   const iniciarAssinaturaDigital = async (alunoId) => {
@@ -498,7 +500,7 @@ export default function ListagemAlunos() {
                               </span>
                               <div className="flex gap-1 flex-wrap">
                                 <button
-                                  onClick={() => { abrirContratoAluno(aluno.id); marcarContratoGerado(aluno.id); }}
+                                  onClick={() => { abrirContratoAluno(aluno); marcarContratoGerado(aluno.id); }}
                                   className="px-1.5 py-0.5 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
                                   title="Gerar contrato"
                                 >Gerar</button>
@@ -571,7 +573,7 @@ export default function ListagemAlunos() {
                             ☁️
                           </button>
                           <button
-                            onClick={() => abrirContratoAluno(aluno.id)}
+                            onClick={() => abrirContratoAluno(aluno)}
                             className="p-2 text-gray-600 hover:text-gray-800 transition"
                             title="Contrato para impressão"
                           >
@@ -727,6 +729,15 @@ export default function ListagemAlunos() {
           </div>
         )}
       </div>
+
+      {modalContratoAluno && (
+        <ModalContratoAluno
+          isOpen={!!modalContratoAluno}
+          onClose={() => setModalContratoAluno(null)}
+          alunoId={modalContratoAluno.id}
+          alunoNome={modalContratoAluno.nome}
+        />
+      )}
     </DashboardLayout>
   );
 }
