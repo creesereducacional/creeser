@@ -504,8 +504,14 @@ export default function CadastroAluno() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setMessage({ type: '', text: '' });
+
+    if (!formData.turma || !String(formData.turma).trim()) {
+      setMessage({ type: 'error', text: 'A seleção de uma Turma é obrigatória para o cadastro do aluno.' });
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const method = isEditando ? 'PUT' : 'POST';
@@ -641,11 +647,12 @@ export default function CadastroAluno() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-teal-600 mb-1 block">TURMA</label>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">TURMA *</label>
                 <select
                   name="turma"
                   value={formData.turma}
                   onChange={handleInputChange}
+                  required
                   disabled={!formData.instituicao || loadingTurmas}
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50 disabled:opacity-50"
                 >

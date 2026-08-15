@@ -270,6 +270,26 @@ export default async function handler(req, res) {
         return res.status(400).json({ message: 'Nome do aluno é obrigatório' });
       }
 
+      const turmaIdVal = parseInteger(formData.turma || formData.turmaId || formData.turmaid);
+      if (!turmaIdVal) {
+        return res.status(400).json({ message: 'A seleção de uma Turma é obrigatória para o cadastro do aluno.' });
+      }
+
+      const { data: turmaData, error: turmaError } = await supabase
+        .from('turmas')
+        .select('*')
+        .eq('id', turmaIdVal)
+        .single();
+
+      if (turmaError || !turmaData) {
+        return res.status(400).json({ message: 'A turma selecionada não existe ou é inválida.' });
+      }
+
+      const turmaInstId = turmaData.instituicao_id || turmaData.instituicaoid;
+      if (turmaInstId && String(turmaInstId) !== String(instituicaoId)) {
+        return res.status(400).json({ message: 'A turma selecionada não pertence à instituição do aluno.' });
+      }
+
       // Validação de duplicidade de CPF por instituição
       if (formData.cpf) {
         const cleanCpf = String(formData.cpf).trim();
