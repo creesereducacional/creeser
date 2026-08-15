@@ -295,7 +295,7 @@ export default async function handler(req, res) {
       if (payloadNormalizado.contrato_id) {
         const { data: contratoData, error: contratoError } = await supabase
           .from('contratos_instituicao')
-          .select('instituicao_id')
+          .select('*')
           .eq('id', payloadNormalizado.contrato_id)
           .single();
 
@@ -303,7 +303,8 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: 'Modelo de contrato selecionado não existe ou é inválido.' });
         }
 
-        if (String(contratoData.instituicao_id) !== String(payloadNormalizado.instituicao_id)) {
+        const contratoInstituicaoId = contratoData.instituicao_id || contratoData.instituicaoid;
+        if (contratoInstituicaoId && String(contratoInstituicaoId) !== String(payloadNormalizado.instituicao_id)) {
           return res.status(400).json({ error: 'O Modelo de Contrato selecionado não pertence à mesma Instituição da Turma.' });
         }
       }

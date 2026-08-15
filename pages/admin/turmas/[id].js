@@ -132,6 +132,7 @@ export default function EditarTurma() {
       const res = await fetch(`/api/turmas/${id}`);
       if (res.ok) {
         const data = await res.json();
+        const cid = data.contratoId || data.contrato_id || data.contratoid ? String(data.contratoId || data.contrato_id || data.contratoid) : '';
         setFormData((prev) => ({
           ...prev,
           ...data,
@@ -139,6 +140,7 @@ export default function EditarTurma() {
           unidadeId: data.unidadeId ? String(data.unidadeId) : '',
           cursoId: data.cursoId ? String(data.cursoId) : '',
           gradeId: data.gradeId ? String(data.gradeId) : '',
+          contratoId: cid,
         }));
         if (data.gradeId) {
           setOriginalGradeId(String(data.gradeId));
@@ -195,6 +197,7 @@ export default function EditarTurma() {
         unidadeId: '',
         cursoId: '',
         gradeId: '',
+        contratoId: '',
       }));
       return;
     }
