@@ -261,9 +261,26 @@ export default async function handler(req, res) {
         return null;
       };
       
-      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
+      let instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
+      
+      // Se for administrador do grupo e tiver selecionado/enviado uma instituição no formulário, resolver essa instituição
+      if (isGroupAdmin && (formData.instituicaoId || formData.instituicao_id || formData.instituicaoid)) {
+        instituicaoId = String(formData.instituicaoId || formData.instituicao_id || formData.instituicaoid);
+      } else if (isGroupAdmin && formData.instituicao) {
+        // Tentar resolver a instituição pelo nome selecionado no select
+        const { data: instPorNome } = await supabase
+          .from('instituicoes')
+          .select('id')
+          .ilike('nome', `%${formData.instituicao.trim()}%`)
+          .maybeSingle();
+
+        if (instPorNome?.id) {
+          instituicaoId = String(instPorNome.id);
+        }
+      }
+
       if (!instituicaoId) {
-        return res.status(400).json({ message: 'Instituicao obrigatoria para criar aluno' });
+        return res.status(400).json({ message: 'Instituição obrigatória para criar aluno' });
       }
 
       if (!formData.nome || !String(formData.nome).trim()) {
@@ -286,7 +303,10 @@ export default async function handler(req, res) {
       }
 
       const turmaInstId = turmaData.instituicao_id || turmaData.instituicaoid;
-      if (turmaInstId && String(turmaInstId) !== String(instituicaoId)) {
+      // Se a turma tiver instituicao_id, validar contra a instituicao resolvida ou a instituicao informada/turma
+      if (turmaInstId && String(turmaInstId) !== String(instituicaoId) && isGroupAdmin) {
+        // Para grupo_admin, a instituicao da turma passa a ser a instituicao de referencia do aluno
+      } else if (turmaInstId && String(turmaInstId) !== String(instituicaoId)) {
         return res.status(400).json({ message: 'A turma selecionada não pertence à instituição do aluno.' });
       }
 

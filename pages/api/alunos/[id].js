@@ -250,9 +250,25 @@ export default async function handler(req, res) {
 
       // ✅ MAPEAMENTO COMPLETO E DEFINITIVO (42 CAMPOS)
       // Referência: MAPEAMENTO_COMPLETO_ALUNOS.md
-      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
+      const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+      let instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
+      
+      if (isGroupAdmin && (formData.instituicaoId || formData.instituicao_id || formData.instituicaoid)) {
+        instituicaoId = String(formData.instituicaoId || formData.instituicao_id || formData.instituicaoid);
+      } else if (isGroupAdmin && formData.instituicao) {
+        const { data: instPorNome } = await supabase
+          .from('instituicoes')
+          .select('id')
+          .ilike('nome', `%${formData.instituicao.trim()}%`)
+          .maybeSingle();
+
+        if (instPorNome?.id) {
+          instituicaoId = String(instPorNome.id);
+        }
+      }
+
       if (!instituicaoId) {
-        return res.status(400).json({ message: 'Instituicao obrigatoria para atualizar aluno' });
+        return res.status(400).json({ message: 'Instituição obrigatória para atualizar aluno' });
       }
 
       const turmaIdVal = parseInteger(formData.turma || formData.turmaId || formData.turmaid);
@@ -271,7 +287,7 @@ export default async function handler(req, res) {
       }
 
       const turmaInstId = turmaData.instituicao_id || turmaData.instituicaoid;
-      if (turmaInstId && String(turmaInstId) !== String(instituicaoId)) {
+      if (turmaInstId && String(turmaInstId) !== String(instituicaoId) && !isGroupAdmin) {
         return res.status(400).json({ message: 'A turma selecionada não pertence à instituição do aluno.' });
       }
 
