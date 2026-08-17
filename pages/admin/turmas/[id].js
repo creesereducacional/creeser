@@ -173,12 +173,25 @@ export default function EditarTurma() {
       if (!res.ok) return;
 
       const data = await res.json();
+      const contratosList = Array.isArray(data.contratos) ? data.contratos : [];
+
       setOpcoes({
         instituicoes: Array.isArray(data.instituicoes) ? data.instituicoes : [],
         unidades: Array.isArray(data.unidades) ? data.unidades : [],
         cursos: Array.isArray(data.cursos) ? data.cursos : [],
         grades: Array.isArray(data.grades) ? data.grades : [],
-        contratos: Array.isArray(data.contratos) ? data.contratos : [],
+        contratos: contratosList,
+      });
+
+      // Se a turma não tiver um contratoId persistido previamente, seleciona o contrato padrão se houver
+      setFormData((prev) => {
+        if (!prev.contratoId && contratosList.length > 0) {
+          const contratoPadrao = contratosList.find((c) => c.padrao && c.ativo !== false) || contratosList[0];
+          if (contratoPadrao) {
+            return { ...prev, contratoId: String(contratoPadrao.id) };
+          }
+        }
+        return prev;
       });
     } catch (error) {
       console.error('Erro ao carregar opções de turmas:', error);
@@ -197,7 +210,8 @@ export default function EditarTurma() {
         unidadeId: '',
         cursoId: '',
         gradeId: '',
-        contratoId: '',
+        // Só limpa o contratoId se a instituição tiver mudado manualmente pelo usuário
+        ...(value !== prev.instituicaoId ? { contratoId: '' } : {}),
       }));
       return;
     }
