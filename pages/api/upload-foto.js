@@ -30,42 +30,46 @@ export default async function handler(req, res) {
       keepExtensions: true,
       maxFileSize: 5 * 1024 * 1024, // 5MB
       filename: (name, ext, part, form) => {
-        return `${Date.now()}-${part.originalFilename}`;
+        const cleanName = (part?.originalFilename || 'foto.jpg').replace(/[^a-zA-Z0-9.-]/g, '_');
+        return `${Date.now()}-${cleanName}`;
       },
     });
 
-    form.parse(req, (err, fields, files) => {
-      if (err) {
-        console.error('Erro ao fazer upload:', err);
-        return res.status(500).json({ error: 'Erro ao fazer upload da foto' });
-      }
+    const [fields, files] = await form.parse(req);
 
-      const file = files.foto;
-      if (!file) {
-        return res.status(400).json({ error: 'Nenhum arquivo enviado' });
-      }
+    const file = files.foto;
+    if (!file) {
+      return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+    }
 
-      // Verificar tipo de arquivo
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
-      const fileArray = Array.isArray(file) ? file : [file];
-      const uploadedFile = fileArray[0];
+    const fileArray = Array.isArray(file) ? file : [file];
+    const uploadedFile = fileArray[0];
 
-      if (!allowedTypes.includes(uploadedFile.mimetype)) {
+    if (!uploadedFile) {
+      return res.status(400).json({ error: 'Arquivo inválido' });
+    }
+
+    // Verificar tipo de arquivo
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+    const mimetype = uploadedFile.mimetype || '';
+
+    if (!allowedTypes.includes(mimetype.toLowerCase())) {
+      if (uploadedFile.filepath && fs.existsSync(uploadedFile.filepath)) {
         fs.unlinkSync(uploadedFile.filepath);
-        return res.status(400).json({ error: 'Tipo de arquivo não permitido. Use imagem JPG ou PNG' });
       }
+      return res.status(400).json({ error: 'Tipo de arquivo não permitido. Use imagem JPG ou PNG' });
+    }
 
-      const filename = path.basename(uploadedFile.filepath);
-      const url = `/uploads/fotos/${filename}`;
+    const filename = path.basename(uploadedFile.filepath);
+    const url = `/uploads/fotos/${filename}`;
 
-      return res.status(200).json({
-        success: true,
-        url,
-        nome: uploadedFile.originalFilename
-      });
+    return res.status(200).json({
+      success: true,
+      url,
+      nome: uploadedFile.originalFilename || filename
     });
   } catch (error) {
     console.error('Erro no upload:', error);
-    return res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: error.message || 'Erro ao fazer upload da foto' });
   }
 }
