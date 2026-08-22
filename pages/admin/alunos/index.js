@@ -4,6 +4,7 @@ import DashboardLayout from '@/components/DashboardLayout';
 import Link from 'next/link';
 import PageHeader from '@/components/ui/PageHeader';
 import ModalContratoAluno from '@/components/ModalContratoAluno';
+import ConfirmModal from '@/components/ConfirmModal';
 
 export default function ListagemAlunos() {
   const router = useRouter();
@@ -13,6 +14,7 @@ export default function ListagemAlunos() {
   const [filteredAlunos, setFilteredAlunos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalContratoAluno, setModalContratoAluno] = useState(null);
+  const [modalDelete, setModalDelete] = useState({ isOpen: false, id: null, nome: '' });
   const [instituicoes, setInstituicoes] = useState([]);
   const [loadingInstituicoes, setLoadingInstituicoes] = useState(true);
   const [anosLetivos, setAnosLetivos] = useState([]);
@@ -135,8 +137,18 @@ export default function ListagemAlunos() {
     setFilteredAlunos(filtered);
   };
 
-  const deletarAluno = async (id) => {
-    if (!confirm('Tem certeza que deseja deletar este aluno?')) return;
+  const solicitarDeletar = (aluno) => {
+    setModalDelete({
+      isOpen: true,
+      id: aluno.id,
+      nome: aluno.nome || 'este aluno',
+    });
+  };
+
+  const executarDeletar = async () => {
+    const id = modalDelete.id;
+    setModalDelete({ isOpen: false, id: null, nome: '' });
+    if (!id) return;
 
     try {
       const response = await fetch(`/api/alunos/${id}`, {
@@ -144,12 +156,10 @@ export default function ListagemAlunos() {
       });
 
       if (response.ok) {
-        setAlunos(alunos.filter(a => a.id !== id));
-        alert('Aluno deletado com sucesso!');
+        setAlunos(prev => prev.filter(a => a.id !== id));
       }
     } catch (error) {
       console.error('Erro ao deletar aluno:', error);
-      alert('Erro ao deletar aluno');
     }
   };
 
@@ -626,8 +636,8 @@ export default function ListagemAlunos() {
                             👁️
                           </button>
                           <button
-                            onClick={() => deletarAluno(aluno.id)}
-                            className="p-2 text-red-600 hover:text-red-800 transition"
+                            onClick={() => solicitarDeletar(aluno)}
+                            className="p-2 text-red-600 hover:text-red-800 transition cursor-pointer"
                             title="Deletar"
                           >
                             ❌
@@ -738,6 +748,16 @@ export default function ListagemAlunos() {
           alunoNome={modalContratoAluno.nome}
         />
       )}
+
+      {/* Modal de Confirmação de Exclusão */}
+      <ConfirmModal
+        isOpen={modalDelete.isOpen}
+        onClose={() => setModalDelete({ isOpen: false, id: null, nome: '' })}
+        onConfirm={executarDeletar}
+        title="Excluir Aluno"
+        message={`Tem certeza que deseja deletar o aluno "${modalDelete.nome}"? Esta ação não poderá ser desfeita.`}
+        type="delete"
+      />
     </DashboardLayout>
   );
 }
