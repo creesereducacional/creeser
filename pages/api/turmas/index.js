@@ -16,10 +16,7 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const isMissingColumnError = (error) => {
-  const message = String(error?.message || '').toLowerCase();
-  return error?.code === '42703' || message.includes('does not exist') || message.includes('could not find');
-};
+
 
 const parseInteger = (value) => {
   const parsed = Number.parseInt(value, 10);
@@ -254,7 +251,7 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
       const body = req.body || {};
-      const { payloadNormalizado, payloadLegado } = mapBodyToPayload(body);
+      const { payloadNormalizado } = mapBodyToPayload(body);
       let instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
 
       if (isGroupAdmin && (body.instituicaoId || body.instituicao_id || body.instituicaoid)) {
@@ -266,7 +263,6 @@ export default async function handler(req, res) {
       }
 
       payloadNormalizado.instituicao_id = instituicaoId;
-      payloadLegado.instituicao_id = instituicaoId;
 
       if (!payloadNormalizado.nome) {
         return res.status(400).json({ error: 'Nome é obrigatório' });
@@ -313,36 +309,44 @@ export default async function handler(req, res) {
         }
       }
 
-      let data = null;
-      let error = null;
+      // RC41.24 — INSERT único seguido de SELECT separado.
+      // O INSERT retorna apenas o id do registro criado; o SELECT subsequente
+      // busca o registro completo com os joins necessários para mapRowToResponse.
+      // Dessa forma, qualquer erro no SELECT/join NÃO dispara um segundo INSERT.
 
-      ({ data, error } = await supabase
+      // Etapa 1: INSERT — executa exatamente uma vez, retorna apenas o id.
+      const {
+        data: insertData,
+        error: insertError,
+      } = await supabase
         .from('turmas')
         .insert([payloadNormalizado])
-        .select(selectTurmas)
-        .single());
+        .select('id')
+        .single();
 
-      if (error && isMissingColumnError(error)) {
-        const { contrato_id: _c1, ...payloadNormalizadoSemContrato } = payloadNormalizado;
-        ({ data, error } = await supabase
-          .from('turmas')
-          .insert([payloadNormalizadoSemContrato])
-          .select(selectTurmas)
-          .single());
-
-        if (error && isMissingColumnError(error)) {
-          const { contrato_id: _c2, ...payloadLegadoSemContrato } = payloadLegado;
-          ({ data, error } = await supabase
-            .from('turmas')
-            .insert([payloadLegadoSemContrato])
-            .select(selectTurmas)
-            .single());
-        }
+      if (insertError) {
+        console.error('Supabase POST turmas insert error:', insertError);
+        return res.status(500).json({ error: 'Erro ao criar turma', detail: insertError.message });
       }
 
-      if (error) {
-        console.error('Supabase POST turmas error:', error);
-        return res.status(500).json({ error: 'Erro ao criar turma', detail: error.message });
+      const newId = insertData?.id;
+      if (!newId) {
+        console.error('Supabase POST turmas: INSERT não retornou id');
+        return res.status(500).json({ error: 'Erro ao criar turma: id não retornado pelo banco.' });
+      }
+
+      // Etapa 2: SELECT separado — busca o registro recém-criado com todos os joins.
+      // Um erro aqui significa problema de leitura, não de criação — o registro já existe.
+      const { data, error: selectError } = await supabase
+        .from('turmas')
+        .select(selectTurmas)
+        .eq('id', newId)
+        .single();
+
+      if (selectError || !data) {
+        console.error('Supabase POST turmas select error (turma criada com id', newId, '):', selectError);
+        // A turma foi criada com sucesso; retornamos 201 com dados mínimos para não bloquear o fluxo.
+        return res.status(201).json({ id: newId, nome: payloadNormalizado.nome, contratoId: payloadNormalizado.contrato_id || null });
       }
 
       return res.status(201).json(mapRowToResponse(data));
