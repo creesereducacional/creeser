@@ -353,8 +353,9 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'DELETE') {
-      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
-      if (!instituicaoId) {
+      const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+      if (!isGroupAdmin && !instituicaoId) {
         return res.status(400).json({ error: 'Instituicao obrigatoria' });
       }
 
@@ -363,7 +364,9 @@ export default async function handler(req, res) {
         .delete()
         .eq('id', turmaId);
 
-      deleteQuery = applyInstituicaoFilter(deleteQuery, instituicaoId);
+      if (!isGroupAdmin) {
+        deleteQuery = applyInstituicaoFilter(deleteQuery, instituicaoId);
+      }
 
       const { error } = await deleteQuery;
 
