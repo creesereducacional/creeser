@@ -222,6 +222,7 @@ export default async function handler(req, res) {
 
     if (req.method === 'PUT') {
       const body = req.body || {};
+      const { payloadNormalizado, payloadLegado } = mapBodyToPayload(body);
       const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
       let instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
 
