@@ -4,6 +4,7 @@ import DashboardLayout from '../../../components/DashboardLayout';
 import PageHeader from '@/components/ui/PageHeader';
 import EmptyState   from '@/components/ui/EmptyState';
 import { SkeletonTable } from '@/components/ui/LoadingSkeleton';
+import ConfirmModal from '@/components/ConfirmModal';
 
 export default function ListagemTurmas() {
   const [turmas, setTurmas] = useState([]);
@@ -12,6 +13,11 @@ export default function ListagemTurmas() {
   const [loading, setLoading] = useState(true);
   const [searchUnidade, setSearchUnidade] = useState('');
   const [searchSituacao, setSearchSituacao] = useState('');
+  const [modalConfirm, setModalConfirm] = useState({
+    isOpen: false,
+    idTurma: null,
+    nomeTurma: '',
+  });
 
   useEffect(() => {
     carregarTurmas();
@@ -70,8 +76,19 @@ export default function ListagemTurmas() {
     setSearchSituacao('');
   };
 
-  const deletarTurma = async (id) => {
-    if (!confirm('Tem certeza que deseja deletar esta turma?')) return;
+  const solicitarDeletar = (turma) => {
+    setModalConfirm({
+      isOpen: true,
+      idTurma: turma.id,
+      nomeTurma: turma.nome,
+    });
+  };
+
+  const executarDeletar = async () => {
+    const id = modalConfirm.idTurma;
+    setModalConfirm({ isOpen: false, idTurma: null, nomeTurma: '' });
+
+    if (!id) return;
 
     try {
       const res = await fetch(`/api/turmas/${id}`, { method: 'DELETE' });
@@ -227,7 +244,7 @@ export default function ListagemTurmas() {
                             </button>
                           </Link>
                           <button
-                            onClick={() => deletarTurma(turma.id)}
+                            onClick={() => solicitarDeletar(turma)}
                             className="p-2 text-red-600 hover:text-red-800 transition"
                             title="Deletar"
                           >
@@ -242,6 +259,16 @@ export default function ListagemTurmas() {
             </div>
           )}
         </div>
+
+        {/* Modal de Confirmação de Exclusão */}
+        <ConfirmModal
+          isOpen={modalConfirm.isOpen}
+          onClose={() => setModalConfirm({ isOpen: false, idTurma: null, nomeTurma: '' })}
+          onConfirm={executarDeletar}
+          title="Excluir Turma"
+          message={`Tem certeza que deseja deletar a turma "${modalConfirm.nomeTurma}"? Esta ação não poderá ser desfeita.`}
+          type="delete"
+        />
       </div>
     </DashboardLayout>
   );
