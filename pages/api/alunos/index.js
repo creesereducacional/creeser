@@ -492,8 +492,16 @@ export default async function handler(req, res) {
         if (error) {
           console.error('❌ ERRO SUPABASE:', error.message);
           console.error('   Detalhes:', error);
+
+          if (error.code === '23505' || String(error.message || '').includes('alunos_cpf_key') || String(error.message || '').includes('duplicate key')) {
+            return res.status(409).json({
+              message: 'Já existe um aluno cadastrado com este CPF.',
+              error: 'CPF duplicado'
+            });
+          }
+
           return res.status(500).json({ 
-            message: 'Erro ao inserir aluno', 
+            message: 'Erro ao inserir aluno: ' + error.message, 
             error: error.message,
             hint: error.hint
           });

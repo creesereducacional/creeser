@@ -443,6 +443,12 @@ export default async function handler(req, res) {
 
         if (error) {
           console.error('❌ ERRO AO ATUALIZAR:', error.message);
+          if (error.code === '23505' || String(error.message || '').includes('alunos_cpf_key') || String(error.message || '').includes('duplicate key')) {
+            return res.status(409).json({
+              message: 'Já existe um aluno cadastrado com este CPF.',
+              error: 'CPF duplicado'
+            });
+          }
           throw error;
         }
 
