@@ -1,6 +1,7 @@
 import formidable from 'formidable';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { requireAuth } from '../../lib/auth-server';
 
 export const config = {
@@ -18,12 +19,8 @@ export default async function handler(req, res) {
   if (!user) return;
 
   try {
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'fotos');
-    
-    // Criar diretório se não existir
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
+    // No Vercel/Serverless, /var/task é read-only. Usamos os.tmpdir() (/tmp)
+    const uploadDir = os.tmpdir();
 
     const form = formidable({
       uploadDir,
@@ -51,7 +48,7 @@ export default async function handler(req, res) {
 
     // Verificar tipo de arquivo
     const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
-    const mimetype = uploadedFile.mimetype || '';
+    const mimetype = uploadedFile.mimetype || 'image/jpeg';
 
     if (!allowedTypes.includes(mimetype.toLowerCase())) {
       if (uploadedFile.filepath && fs.existsSync(uploadedFile.filepath)) {
@@ -60,13 +57,20 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Tipo de arquivo não permitido. Use imagem JPG ou PNG' });
     }
 
-    const filename = path.basename(uploadedFile.filepath);
-    const url = `/uploads/fotos/${filename}`;
+    // Converter para Data URL / Base64 otimizada para persistência segura em banco serverless
+    const fileBuffer = fs.readFileSync(uploadedFile.filepath);
+    const base64Data = fileBuffer.toString('base64');
+    const dataUrl = `data:${mimetype};base64,${base64Data}`;
+
+    // Limpar arquivo temporário de /tmp
+    if (uploadedFile.filepath && fs.existsSync(uploadedFile.filepath)) {
+      fs.unlinkSync(uploadedFile.filepath);
+    }
 
     return res.status(200).json({
       success: true,
-      url,
-      nome: uploadedFile.originalFilename || filename
+      url: dataUrl,
+      nome: uploadedFile.originalFilename || 'foto.jpg'
     });
   } catch (error) {
     console.error('Erro no upload:', error);
