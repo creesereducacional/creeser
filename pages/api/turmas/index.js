@@ -255,7 +255,11 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const body = req.body || {};
       const { payloadNormalizado, payloadLegado } = mapBodyToPayload(body);
-      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
+      let instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
+
+      if (isGroupAdmin && (body.instituicaoId || body.instituicao_id || body.instituicaoid)) {
+        instituicaoId = normalizeText(body.instituicaoId || body.instituicao_id || body.instituicaoid);
+      }
 
       if (!instituicaoId) {
         return res.status(400).json({ error: 'Instituicao obrigatoria' });
