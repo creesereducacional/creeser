@@ -349,6 +349,7 @@ export default function NovoTurma() {
                   <option value="Matutino">Matutino</option>
                   <option value="Vespertino">Vespertino</option>
                   <option value="Noturno">Noturno</option>
+                  <option value="EAD - Online">EAD - Online</option>
                 </select>
               </div>
             </div>

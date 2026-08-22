@@ -337,6 +337,7 @@ export default async function handler(req, res) {
         complemento: toUppercase(formData.complemento) || null,
         naturalidade: toUppercase(formData.naturalidade) || null,
         uf_naturalidade: toUppercase(formData.ufNaturalidade) || null,
+        nacionalidade: toUppercase(formData.nacionalidade) || null,
 
         // ===== REGISTRO DE NASCIMENTO =====
         termo: toUppercase(formData.termo) || null,

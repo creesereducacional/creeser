@@ -96,6 +96,7 @@ export default function CadastroAluno() {
     complemento: '',
     naturalidade: '',
     ufNaturalidade: '',
+    nacionalidade: '',
     email: '',
     
     // Registro de Nascimento
@@ -349,6 +350,7 @@ export default function CadastroAluno() {
           complemento: data.complemento || '',
           naturalidade: data.naturalidade || '',
           ufNaturalidade: data.uf_naturalidade || '',
+          nacionalidade: data.nacionalidade || '',
           email: data.email || '',
           
           // REGISTRO DE NASCIMENTO
