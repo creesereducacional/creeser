@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import DashboardLayout from '@/components/DashboardLayout';
 import Link from 'next/link';
+import { validarCPF } from '@/utils/validacoes';
+import ConfirmModal from '@/components/ConfirmModal';
 
 const UF_OPTIONS = [
   'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
@@ -57,7 +59,7 @@ export default function CadastroAluno() {
   const [anosLetivos, setAnosLetivos] = useState([]);
   const [loadingAnosLetivos, setLoadingAnosLetivos] = useState(true);
 
-  const [formData, setFormData] = useState({
+  const ESTADO_INICIAL_FORM = {
     // Identificação
     instituicao: '',
     curso: '',
@@ -145,7 +147,10 @@ export default function CadastroAluno() {
     
     // Status
     status: 'ATIVO'
-  });
+  };
+
+  const [formData, setFormData] = useState(ESTADO_INICIAL_FORM);
+  const [modalAlerta, setModalAlerta] = useState({ isOpen: false, title: '', message: '', type: 'error' });
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -418,6 +423,64 @@ export default function CadastroAluno() {
       setMessage({ type: 'error', text: 'Erro: ' + error.message });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const reiniciarCadastro = () => {
+    setFormData(ESTADO_INICIAL_FORM);
+    setFotoAluno(null);
+    setFotoFile(null);
+  };
+
+  const handleCpfBlur = async (e) => {
+    const valor = e.target.value;
+    const cpfLimpo = valor.replace(/\D/g, '');
+
+    if (!cpfLimpo) return;
+
+    // 1. Valida se o formato e dígitos verificadores do CPF são válidos
+    if (cpfLimpo.length === 11) {
+      if (!validarCPF(cpfLimpo)) {
+        setModalAlerta({
+          isOpen: true,
+          title: 'CPF Inválido',
+          message: 'O número de CPF informado não é válido. Por favor, verifique os dígitos digitados.',
+          type: 'error'
+        });
+        setFormData(prev => ({ ...prev, cpf: '' }));
+        return;
+      }
+
+      // 2. Se for novo cadastro, verifica se o CPF já está cadastrado no sistema
+      if (!isEditando) {
+        try {
+          const res = await fetch(`/api/alunos?cpf=${cpfLimpo}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.existe) {
+              const nomeExistente = data.aluno?.nome ? ` (${data.aluno.nome})` : '';
+              setModalAlerta({
+                isOpen: true,
+                title: 'CPF Já Cadastrado',
+                message: `Já existe um aluno cadastrado no sistema com este CPF${nomeExistente}. O formulário será reiniciado.`,
+                type: 'error'
+              });
+              reiniciarCadastro();
+              return;
+            }
+          }
+        } catch (err) {
+          console.error('Erro ao verificar duplicidade de CPF:', err);
+        }
+      }
+    } else if (cpfLimpo.length > 0 && cpfLimpo.length < 11) {
+      setModalAlerta({
+        isOpen: true,
+        title: 'CPF Incompleto',
+        message: 'O CPF precisa conter 11 dígitos.',
+        type: 'error'
+      });
+      setFormData(prev => ({ ...prev, cpf: '' }));
     }
   };
 
@@ -851,6 +914,7 @@ export default function CadastroAluno() {
                   name="cpf"
                   value={formData.cpf}
                   onChange={handleInputChange}
+                  onBlur={handleCpfBlur}
                   placeholder="000.000.000-00"
                   inputMode="numeric"
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
@@ -1521,6 +1585,15 @@ export default function CadastroAluno() {
           </div>
         </form>
       </div>
+
+      {/* Modal de Alerta / Validação */}
+      <ConfirmModal
+        isOpen={modalAlerta.isOpen}
+        onClose={() => setModalAlerta(prev => ({ ...prev, isOpen: false }))}
+        title={modalAlerta.title}
+        message={modalAlerta.message}
+        type={modalAlerta.type}
+      />
     </DashboardLayout>
   );
 }

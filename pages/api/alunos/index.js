@@ -190,6 +190,31 @@ export default async function handler(req, res) {
         return res.status(200).json(data || []);
       }
 
+      const { cpf } = req.query;
+      if (cpf) {
+        const cpfLimpo = String(cpf).replace(/\D/g, '');
+        const cpfFormatado = cpfLimpo.length === 11 
+          ? `${cpfLimpo.slice(0,3)}.${cpfLimpo.slice(3,6)}.${cpfLimpo.slice(6,9)}-${cpfLimpo.slice(9)}`
+          : cpfLimpo;
+
+        const { data: alunoExistente, error: cpfError } = await supabase
+          .from('alunos')
+          .select('id, nome, cpf, statusmatricula, turmaid')
+          .or(`cpf.eq.${cpfLimpo},cpf.eq.${cpfFormatado}`)
+          .limit(1);
+
+        if (cpfError) {
+          console.error('Erro ao verificar CPF:', cpfError);
+          return res.status(500).json({ error: 'Erro ao verificar CPF' });
+        }
+
+        const existe = Array.isArray(alunoExistente) && alunoExistente.length > 0;
+        return res.status(200).json({
+          existe,
+          aluno: existe ? alunoExistente[0] : null
+        });
+      }
+
       let query = supabase
         .from('alunos')
         .select('*, turmas(gradeid)')
