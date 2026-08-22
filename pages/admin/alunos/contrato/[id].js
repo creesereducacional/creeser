@@ -128,23 +128,13 @@ export default function ContratoAlunoImpressao() {
               <p className="text-slate-700">{error}</p>
             </div>
           ) : (
-            <article className="contrato-paper bg-white rounded-lg shadow px-10 py-10 print:shadow-none print:rounded-none print:px-8 print:py-8">
-              <header className="mb-8 border-b border-slate-200 pb-4">
-                <h1 className="text-2xl font-bold text-slate-800">{payload?.contrato?.nome || 'Contrato'}</h1>
-                <p className="text-sm text-slate-600 mt-1">
-                  Aluno: {payload?.aluno?.nome || '-'}
-                </p>
-                <p className="text-sm text-slate-600">
-                  Instituição: {payload?.instituicao?.nome || '-'}
-                </p>
-              </header>
-
+            <article className="contrato-paper bg-white rounded-lg shadow px-10 py-10 print:shadow-none print:rounded-none print:px-0 print:py-0">
               <section
-                className="contrato-html text-[15px] leading-7 text-slate-900"
+                className="contrato-html text-[14px] leading-relaxed text-slate-900"
                 dangerouslySetInnerHTML={{ __html: payload?.contrato?.html || '<p>Modelo sem conteúdo.</p>' }}
               />
 
-              <footer className="mt-10 pt-6 border-t border-slate-200 text-xs text-slate-500">
+              <footer className="mt-8 pt-4 border-t border-slate-200 text-xs text-slate-500 print:hidden">
                 Documento gerado em {new Date(payload?.generatedAt || Date.now()).toLocaleString('pt-BR')}.
                 {' '}Imprima em PDF para assinatura manual.
               </footer>
@@ -154,15 +144,21 @@ export default function ContratoAlunoImpressao() {
       </div>
 
       <style jsx global>{`
+        .contrato-html {
+          font-family: Arial, Helvetica, sans-serif;
+          color: #1a1a1a;
+          line-height: 1.5;
+        }
+
         .contrato-html ul {
           list-style: disc;
-          margin: 0.5rem 0;
+          margin: 0.4rem 0;
           padding-left: 1.5rem;
         }
 
         .contrato-html ol {
           list-style: decimal;
-          margin: 0.5rem 0;
+          margin: 0.4rem 0;
           padding-left: 1.5rem;
         }
 
@@ -170,29 +166,66 @@ export default function ContratoAlunoImpressao() {
         .contrato-html h2,
         .contrato-html h3,
         .contrato-html h4 {
-          margin-top: 1rem;
-          margin-bottom: 0.5rem;
+          margin-top: 0.8rem;
+          margin-bottom: 0.4rem;
           font-weight: 700;
+          break-after: avoid;
+          page-break-after: avoid;
         }
 
         .contrato-html p {
-          margin-bottom: 0.75rem;
+          margin-bottom: 0.5rem;
+          orphans: 3;
+          widows: 3;
+        }
+
+        .contrato-html table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 0.5rem 0;
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        .contrato-html tr {
+          break-inside: avoid;
+          page-break-inside: avoid;
         }
 
         @page {
           size: A4;
-          margin: 14mm;
+          margin: 12mm 15mm 12mm 15mm;
         }
 
         @media print {
           html,
           body {
             background: #fff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            font-size: 13px !important;
           }
 
           .contrato-paper {
-            width: 100%;
-            min-height: auto;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-shadow: none !important;
+          }
+
+          .contrato-html {
+            font-size: 12.5px !important;
+            line-height: 1.45 !important;
+          }
+
+          .contrato-html p {
+            margin-bottom: 0.4rem !important;
+          }
+
+          .contrato-html div,
+          .contrato-html section,
+          .contrato-html table {
+            break-inside: auto;
           }
         }
       `}</style>
