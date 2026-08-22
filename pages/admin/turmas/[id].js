@@ -182,17 +182,6 @@ export default function EditarTurma() {
         grades: Array.isArray(data.grades) ? data.grades : [],
         contratos: contratosList,
       });
-
-      // Se a turma não tiver um contratoId persistido previamente, seleciona o contrato padrão se houver
-      setFormData((prev) => {
-        if (!prev.contratoId && contratosList.length > 0) {
-          const contratoPadrao = contratosList.find((c) => c.padrao && c.ativo !== false) || contratosList[0];
-          if (contratoPadrao) {
-            return { ...prev, contratoId: String(contratoPadrao.id) };
-          }
-        }
-        return prev;
-      });
     } catch (error) {
       console.error('Erro ao carregar opções de turmas:', error);
     } finally {
