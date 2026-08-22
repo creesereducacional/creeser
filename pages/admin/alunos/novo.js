@@ -486,20 +486,40 @@ export default function CadastroAluno() {
     }
   };
 
+  const [fotoFile, setFotoFile] = useState(null);
+
   const handleFotoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      setFotoFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setFotoAluno(reader.result);
-        // ✅ Guardar foto em base64 no formData também
-        setFormData(prev => ({
-          ...prev,
-          foto: reader.result
-        }));
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const uploadFotoSeNecessario = async () => {
+    if (!fotoFile) {
+      return formData.foto || null;
+    }
+
+    const uploadFormData = new FormData();
+    uploadFormData.append('foto', fotoFile);
+
+    const uploadRes = await fetch('/api/upload-foto', {
+      method: 'POST',
+      body: uploadFormData,
+    });
+
+    if (!uploadRes.ok) {
+      const errData = await uploadRes.json().catch(() => null);
+      throw new Error(errData?.error || 'Falha ao fazer upload da foto');
+    }
+
+    const uploadData = await uploadRes.json();
+    return uploadData.url || null;
   };
 
   const handleSubmit = async (e) => {
@@ -514,6 +534,24 @@ export default function CadastroAluno() {
     setLoading(true);
 
     try {
+      // 1. Faz upload da foto para obter a URL (se novo arquivo foi selecionado)
+      let fotoUrl = formData.foto || null;
+      if (fotoFile) {
+        try {
+          fotoUrl = await uploadFotoSeNecessario();
+        } catch (uploadErr) {
+          setMessage({ type: 'error', text: 'Erro no envio da foto: ' + uploadErr.message });
+          setLoading(false);
+          return;
+        }
+      }
+
+      // 2. Monta o payload limpo com a URL da foto (sem Base64 pesado)
+      const payload = {
+        ...formData,
+        foto: fotoUrl,
+      };
+
       const method = isEditando ? 'PUT' : 'POST';
       const url = isEditando ? `/api/alunos/${id}` : '/api/alunos';
 
@@ -522,7 +560,7 @@ export default function CadastroAluno() {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
 
       if (response.ok) {
@@ -537,8 +575,8 @@ export default function CadastroAluno() {
           router.push('/admin/alunos');
         }, 1500);
       } else {
-        const error = await response.json();
-        setMessage({ type: 'error', text: error.message || 'Erro ao salvar aluno' });
+        const error = await response.json().catch(() => null);
+        setMessage({ type: 'error', text: error?.message || error?.error || 'Erro ao salvar aluno' });
       }
     } catch (error) {
       setMessage({ type: 'error', text: 'Erro: ' + error.message });
