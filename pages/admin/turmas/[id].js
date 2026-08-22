@@ -75,7 +75,9 @@ export default function EditarTurma() {
   }, [id]);
 
   useEffect(() => {
-    carregarOpcoes(formData.instituicaoId, formData.unidadeId);
+    if (formData.instituicaoId) {
+      carregarOpcoes(formData.instituicaoId, formData.unidadeId);
+    }
   }, [formData.instituicaoId, formData.unidadeId]);
 
   useEffect(() => {
@@ -133,17 +135,25 @@ export default function EditarTurma() {
       if (res.ok) {
         const data = await res.json();
         const cid = data.contratoId || data.contrato_id || data.contratoid ? String(data.contratoId || data.contrato_id || data.contratoid) : '';
+        const instId = data.instituicaoId ? String(data.instituicaoId) : '';
+        const unId = data.unidadeId ? String(data.unidadeId) : '';
+
         setFormData((prev) => ({
           ...prev,
           ...data,
-          instituicaoId: data.instituicaoId ? String(data.instituicaoId) : '',
-          unidadeId: data.unidadeId ? String(data.unidadeId) : '',
+          instituicaoId: instId,
+          unidadeId: unId,
           cursoId: data.cursoId ? String(data.cursoId) : '',
           gradeId: data.gradeId ? String(data.gradeId) : '',
           contratoId: cid,
         }));
+
         if (data.gradeId) {
           setOriginalGradeId(String(data.gradeId));
+        }
+
+        if (instId) {
+          carregarOpcoes(instId, unId);
         }
       } else {
         alert('Turma não encontrada');
