@@ -48,6 +48,8 @@ export default async function handler(req, res) {
 
       const normalized = (data || []).map(g => ({
         ...g,
+        instituicao_id: g.instituicao_id || g.instituicaoid || null,
+        instituicaoId: g.instituicao_id || g.instituicaoid || null,
         curso_id: g.curso_id !== undefined && g.curso_id !== null ? Number(g.curso_id) : g.cursoid !== undefined && g.cursoid !== null ? Number(g.cursoid) : null,
         cursoId: g.curso_id !== undefined && g.curso_id !== null ? Number(g.curso_id) : g.cursoid !== undefined && g.cursoid !== null ? Number(g.cursoid) : null,
         created_at: g.created_at || g.datacriacao || null,

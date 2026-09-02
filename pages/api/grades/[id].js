@@ -44,6 +44,8 @@ export default async function handler(req, res) {
     if (error) return res.status(404).json({ error: 'Grade não encontrada' });
     const normalized = {
       ...data,
+      instituicao_id: data.instituicao_id || data.instituicaoid || null,
+      instituicaoId: data.instituicao_id || data.instituicaoid || null,
       curso_id: data.curso_id !== undefined && data.curso_id !== null ? Number(data.curso_id) : data.cursoid !== undefined && data.cursoid !== null ? Number(data.cursoid) : null,
       cursoId: data.curso_id !== undefined && data.curso_id !== null ? Number(data.curso_id) : data.cursoid !== undefined && data.cursoid !== null ? Number(data.cursoid) : null,
       created_at: data.created_at || data.datacriacao || null,

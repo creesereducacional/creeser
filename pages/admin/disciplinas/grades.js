@@ -300,16 +300,34 @@ export default function GerenciarGrades() {
   };
 
   const handleEdit = (grade) => {
-    const instituicaoId = String(getValue(grade, 'instituicaoId') || getValue(grade, 'instituicaoid') || '');
+    let instituicaoId = String(getValue(grade, 'instituicaoId') || getValue(grade, 'instituicaoid') || '');
     const cursoId = String(getValue(grade, 'cursoId') || getValue(grade, 'cursoid') || '');
     const ano = String(getValue(grade, 'ano') || '');
+
+    // Se a grade legada não tiver instituicaoId gravado diretamente, deduz pelo curso selecionado
+    if (!instituicaoId && cursoId) {
+      const cursoVinculado = cursos.find(c => String(getValue(c, 'id')) === cursoId);
+      if (cursoVinculado) {
+        const instCurso = String(getValue(cursoVinculado, 'instituicaoId') || getValue(cursoVinculado, 'instituicao_id') || '');
+        if (instCurso) {
+          instituicaoId = instCurso;
+        } else {
+          const unidadeIdsRaw = getValue(cursoVinculado, 'unidadeIds') || getValue(cursoVinculado, 'unidadeids') || [];
+          const unidadeIds = Array.isArray(unidadeIdsRaw) ? unidadeIdsRaw.map(id => String(id)) : [];
+          if (unidadeIds.length > 0) {
+            const instUnidade = unidadesById.get(unidadeIds[0]);
+            if (instUnidade) instituicaoId = instUnidade;
+          }
+        }
+      }
+    }
 
     setFormData({
       instituicaoId,
       cursoId,
       ano,
-      nome: grade.nome,
-      situacao: grade.situacao
+      nome: grade.nome || '',
+      situacao: grade.situacao || 'ATIVO'
     });
     setEditingId(grade.id);
     setShowForm(true);
