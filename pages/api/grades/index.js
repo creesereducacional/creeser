@@ -105,7 +105,12 @@ export default async function handler(req, res) {
         };
       }
 
-      if (body.id) insertPayload.id = body.id;
+      if (body.id !== undefined && body.id !== null) {
+        const parsedId = Number(body.id);
+        if (!Number.isNaN(parsedId) && Number.isInteger(parsedId)) {
+          insertPayload.id = parsedId;
+        }
+      }
 
       console.log('PERSISTÊNCIA ÚNICA GRADES (SCHEMA DETECTADO: ' + (isModern ? 'MODERNO' : 'LEGADO') + '):', insertPayload);
 

@@ -3,7 +3,6 @@ import Link from 'next/link';
 import DashboardLayout from '../../../components/DashboardLayout';
 import CustomModal from '../../../components/CustomModal';
 import ConfirmModal from '../../../components/ConfirmModal';
-import { v4 as uuidv4 } from 'uuid';
 
 export default function GerenciarGrades() {
   const [grades, setGrades] = useState([]);
@@ -258,10 +257,7 @@ export default function GerenciarGrades() {
         const res = await fetch('/api/grades', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...payload,
-            id: uuidv4()
-          })
+          body: JSON.stringify(payload)
         });
 
         console.log('Create response:', res.status);
