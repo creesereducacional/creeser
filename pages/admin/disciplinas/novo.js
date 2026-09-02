@@ -211,7 +211,19 @@ export default function NovaDisciplina() {
                 >
                   <option value="">Escolha uma Grade *</option>
                   {grades
-                    .filter(g => !formData.curso || g.curso_nome === formData.curso)
+                    .filter(g => {
+                      if (!formData.curso) return true;
+                      const cursoObj = cursos.find(c => c.nome === formData.curso || String(c.id) === String(formData.curso));
+                      const cursoId = cursoObj ? Number(cursoObj.id) : null;
+                      const gCursoId = g.curso_id || g.cursoId || g.cursoid;
+                      const gCursoNome = g.curso_nome || g.cursoNome || g.cursonome;
+
+                      return (
+                        (gCursoNome && gCursoNome === formData.curso) ||
+                        (cursoId && gCursoId && Number(gCursoId) === cursoId) ||
+                        (!gCursoNome && !gCursoId)
+                      );
+                    })
                     .map(g => (
                       <option key={g.id} value={g.id}>{g.nome} ({g.ano})</option>
                     ))}

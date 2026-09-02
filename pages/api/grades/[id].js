@@ -42,12 +42,21 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const { data, error } = await supabase.from('grades').select('*').eq('id', id).single();
     if (error) return res.status(404).json({ error: 'Grade não encontrada' });
+    let cursoNome = data.curso_nome || data.cursonome || null;
+    if (!cursoNome && (data.curso_id || data.cursoid)) {
+      const cId = data.curso_id || data.cursoid;
+      const { data: cursoItem } = await supabase.from('cursos').select('nome').eq('id', cId).maybeSingle();
+      if (cursoItem?.nome) cursoNome = cursoItem.nome;
+    }
+
     const normalized = {
       ...data,
       instituicao_id: data.instituicao_id || data.instituicaoid || null,
       instituicaoId: data.instituicao_id || data.instituicaoid || null,
       curso_id: data.curso_id !== undefined && data.curso_id !== null ? Number(data.curso_id) : data.cursoid !== undefined && data.cursoid !== null ? Number(data.cursoid) : null,
       cursoId: data.curso_id !== undefined && data.curso_id !== null ? Number(data.curso_id) : data.cursoid !== undefined && data.cursoid !== null ? Number(data.cursoid) : null,
+      curso_nome: cursoNome,
+      cursoNome: cursoNome,
       created_at: data.created_at || data.datacriacao || null,
       updated_at: data.updated_at || data.dataatualizacao || null,
       situacao: data.situacao || 'ATIVO',

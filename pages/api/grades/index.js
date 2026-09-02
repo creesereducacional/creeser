@@ -46,16 +46,26 @@ export default async function handler(req, res) {
       const { data, error } = await query;
       if (error) return res.status(500).json({ error: error.message });
 
-      const normalized = (data || []).map(g => ({
-        ...g,
-        instituicao_id: g.instituicao_id || g.instituicaoid || null,
-        instituicaoId: g.instituicao_id || g.instituicaoid || null,
-        curso_id: g.curso_id !== undefined && g.curso_id !== null ? Number(g.curso_id) : g.cursoid !== undefined && g.cursoid !== null ? Number(g.cursoid) : null,
-        cursoId: g.curso_id !== undefined && g.curso_id !== null ? Number(g.curso_id) : g.cursoid !== undefined && g.cursoid !== null ? Number(g.cursoid) : null,
-        created_at: g.created_at || g.datacriacao || null,
-        updated_at: g.updated_at || g.dataatualizacao || null,
-        situacao: g.situacao || 'ATIVO',
-      }));
+      // Buscar cursos para garantir preenchimento de curso_nome nas grades
+      const { data: cursosData } = await supabase.from('cursos').select('id, nome');
+      const cursosMap = new Map((cursosData || []).map(c => [Number(c.id), c.nome]));
+
+      const normalized = (data || []).map(g => {
+        const cId = g.curso_id !== undefined && g.curso_id !== null ? Number(g.curso_id) : g.cursoid !== undefined && g.cursoid !== null ? Number(g.cursoid) : null;
+        const cursoNome = g.curso_nome || g.cursonome || (cId ? cursosMap.get(cId) : null) || null;
+        return {
+          ...g,
+          instituicao_id: g.instituicao_id || g.instituicaoid || null,
+          instituicaoId: g.instituicao_id || g.instituicaoid || null,
+          curso_id: cId,
+          cursoId: cId,
+          curso_nome: cursoNome,
+          cursoNome: cursoNome,
+          created_at: g.created_at || g.datacriacao || null,
+          updated_at: g.updated_at || g.dataatualizacao || null,
+          situacao: g.situacao || 'ATIVO',
+        };
+      });
 
       return res.status(200).json(normalized);
     }
