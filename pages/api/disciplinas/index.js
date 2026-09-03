@@ -42,13 +42,58 @@ export default async function handler(req, res) {
     }
 
     const cargaHorariaVal = body.cargaHoraria || body.carga_horaria || body.cargahoraria ? Number(body.cargaHoraria || body.carga_horaria || body.cargahoraria) : null;
-    const rawCursoId = body.cursoId || body.curso_id || body.curso;
-    const numericCursoId = rawCursoId ? Number(rawCursoId) : 1;
+    
+    // Resolver cursoid numérico válido buscando na tabela cursos
+    let numericCursoId = null;
+    let cursoNome = body.curso || null;
+
+    if (body.cursoId || body.curso_id) {
+      const parsed = Number(body.cursoId || body.curso_id);
+      if (!Number.isNaN(parsed)) numericCursoId = parsed;
+    }
+
+    if (!numericCursoId && body.curso) {
+      const { data: cursoEncontrado } = await supabase
+        .from('cursos')
+        .select('id, nome')
+        .ilike('nome', body.curso.trim())
+        .maybeSingle();
+
+      if (cursoEncontrado) {
+        numericCursoId = Number(cursoEncontrado.id);
+        cursoNome = cursoEncontrado.nome;
+      }
+    }
+
+    // Se ainda não encontrou, deduz pelo curso vinculado à grade
+    if (!numericCursoId && body.grade) {
+      const { data: gradeInfo } = await supabase
+        .from('grades')
+        .select('curso_id, cursoid')
+        .eq('id', body.grade)
+        .maybeSingle();
+
+      if (gradeInfo) {
+        const cId = gradeInfo.curso_id || gradeInfo.cursoid;
+        if (cId) numericCursoId = Number(cId);
+      }
+    }
+
+    // Se ainda assim não encontrou, busca o primeiro curso cadastrado
+    if (!numericCursoId) {
+      const { data: primeiroCurso } = await supabase.from('cursos').select('id, nome').limit(1).maybeSingle();
+      if (primeiroCurso) {
+        numericCursoId = Number(primeiroCurso.id);
+        if (!cursoNome) cursoNome = primeiroCurso.nome;
+      } else {
+        numericCursoId = 1;
+      }
+    }
 
     const payloadNormalizado = {
       codigo:        body.codigo        || null,
       nome:          body.nome,
-      curso:         body.curso         || null,
+      curso:         cursoNome,
       cursoid:       numericCursoId,
       periodo:       body.periodo       || null,
       carga_horaria: cargaHorariaVal,

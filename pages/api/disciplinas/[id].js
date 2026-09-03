@@ -39,13 +39,46 @@ export default async function handler(req, res) {
     }
 
     const cargaHorariaVal = body.cargaHoraria || body.carga_horaria || body.cargahoraria ? Number(body.cargaHoraria || body.carga_horaria || body.cargahoraria) : undefined;
-    const rawCursoId = body.cursoId || body.curso_id || body.curso;
-    const numericCursoId = rawCursoId ? Number(rawCursoId) : undefined;
+    
+    // Resolver cursoid numérico
+    let numericCursoId = undefined;
+    let cursoNome = body.curso !== undefined ? body.curso : undefined;
+
+    if (body.cursoId || body.curso_id) {
+      const parsed = Number(body.cursoId || body.curso_id);
+      if (!Number.isNaN(parsed)) numericCursoId = parsed;
+    }
+
+    if (numericCursoId === undefined && body.curso) {
+      const { data: cursoEncontrado } = await supabase
+        .from('cursos')
+        .select('id, nome')
+        .ilike('nome', body.curso.trim())
+        .maybeSingle();
+
+      if (cursoEncontrado) {
+        numericCursoId = Number(cursoEncontrado.id);
+        cursoNome = cursoEncontrado.nome;
+      }
+    }
+
+    if (numericCursoId === undefined && body.grade) {
+      const { data: gradeInfo } = await supabase
+        .from('grades')
+        .select('curso_id, cursoid')
+        .eq('id', body.grade)
+        .maybeSingle();
+
+      if (gradeInfo) {
+        const cId = gradeInfo.curso_id || gradeInfo.cursoid;
+        if (cId) numericCursoId = Number(cId);
+      }
+    }
 
     const updatesNormalizado = {
       codigo:        body.codigo,
       nome:          body.nome,
-      curso:         body.curso,
+      curso:         cursoNome,
       cursoid:       numericCursoId,
       periodo:       body.periodo,
       carga_horaria: cargaHorariaVal,
