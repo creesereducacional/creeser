@@ -113,7 +113,6 @@ export default async function handler(req, res) {
         cursoid:       numericCursoId,
         periodo:       body.periodo,
         cargahoraria:  cargaHorariaVal,
-        matriz:        compoeMatrizVal,
         situacao:      body.situacao,
       };
       Object.keys(updatesLegado).forEach(k => updatesLegado[k] === undefined && delete updatesLegado[k]);

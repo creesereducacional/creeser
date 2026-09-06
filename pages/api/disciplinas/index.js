@@ -165,7 +165,6 @@ export default async function handler(req, res) {
         cursoid:       numericCursoId,
         periodo:       body.periodo || null,
         cargahoraria:  cargaHorariaVal,
-        matriz:        compoeMatrizVal,
         situacao:      body.situacao || 'ATIVO',
       };
       const fallback = await supabase.from('disciplinas').insert(payloadLegado).select().single();
