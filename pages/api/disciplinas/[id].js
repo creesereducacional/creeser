@@ -123,30 +123,9 @@ export default async function handler(req, res) {
       if (!retry.error) {
         data = retry.data;
         error = null;
+      } else {
+        error = retry.error;
       }
-    }
-
-    if (error && error.message && (error.message.includes('column') || error.message.includes('schema cache'))) {
-      const updatesLegado = {
-        codigo:        body.codigo,
-        nome:          body.nome,
-        cursoid:       numericCursoId,
-        periodo:       rawPeriodo,
-        cargahoraria:  cargaHorariaVal,
-        situacao:      body.situacao,
-      };
-      Object.keys(updatesLegado).forEach(k => updatesLegado[k] === undefined && delete updatesLegado[k]);
-
-      let fallback = await supabase.from('disciplinas').update(updatesLegado).eq('id', id).select().single();
-      if (fallback.error && fallback.error.message && fallback.error.message.includes('invalid input syntax')) {
-        const updatesLegadoInt = { ...updatesLegado, periodo: parsedPeriodoNum };
-        if (parsedPeriodoNum === undefined) delete updatesLegadoInt.periodo;
-        fallback = await supabase.from('disciplinas').update(updatesLegadoInt).eq('id', id).select().single();
-      }
-
-      if (fallback.error) return res.status(500).json({ error: fallback.error.message });
-      data = fallback.data;
-      error = null;
     }
 
     if (error) return res.status(500).json({ error: error.message });

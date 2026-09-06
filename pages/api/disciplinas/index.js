@@ -171,28 +171,9 @@ export default async function handler(req, res) {
       if (!retry.error) {
         data = retry.data;
         error = null;
+      } else {
+        error = retry.error;
       }
-    }
-
-    if (error && error.message && (error.message.includes('column') || error.message.includes('schema cache'))) {
-      // Fallback gracioso removendo colunas não encontradas caso migration não tenha rodado
-      const payloadLegado = {
-        codigo:        body.codigo || null,
-        nome:          body.nome,
-        cursoid:       numericCursoId,
-        periodo:       rawPeriodo,
-        cargahoraria:  cargaHorariaVal,
-        situacao:      body.situacao || 'ATIVO',
-      };
-      let fallback = await supabase.from('disciplinas').insert(payloadLegado).select().single();
-      if (fallback.error && fallback.error.message && fallback.error.message.includes('invalid input syntax')) {
-        const payloadLegadoInt = { ...payloadLegado, periodo: parsedPeriodoNum };
-        fallback = await supabase.from('disciplinas').insert(payloadLegadoInt).select().single();
-      }
-
-      if (fallback.error) return res.status(500).json({ error: fallback.error.message });
-      data = fallback.data;
-      error = null;
     }
 
     if (error) return res.status(500).json({ error: error.message });
