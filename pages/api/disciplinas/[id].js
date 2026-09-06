@@ -106,7 +106,7 @@ export default async function handler(req, res) {
     Object.keys(updatesNormalizado).forEach(k => updatesNormalizado[k] === undefined && delete updatesNormalizado[k]);
 
     let { data, error } = await supabase.from('disciplinas').update(updatesNormalizado).eq('id', id).select().single();
-    if (error && error.message && error.message.includes('column')) {
+    if (error && error.message && (error.message.includes('column') || error.message.includes('schema cache'))) {
       const updatesLegado = {
         codigo:        body.codigo,
         nome:          body.nome,
@@ -114,8 +114,6 @@ export default async function handler(req, res) {
         periodo:       body.periodo,
         cargahoraria:  cargaHorariaVal,
         matriz:        compoeMatrizVal,
-        grade:         body.grade,
-        ementa:        body.ementa,
         situacao:      body.situacao,
       };
       Object.keys(updatesLegado).forEach(k => updatesLegado[k] === undefined && delete updatesLegado[k]);

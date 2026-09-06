@@ -157,7 +157,7 @@ export default async function handler(req, res) {
     };
 
     let { data, error } = await supabase.from('disciplinas').insert(payloadNormalizado).select().single();
-    if (error && error.message && error.message.includes('column')) {
+    if (error && error.message && (error.message.includes('column') || error.message.includes('schema cache'))) {
       // Fallback gracioso removendo colunas não encontradas caso migration não tenha rodado
       const payloadLegado = {
         codigo:        body.codigo || null,
@@ -166,8 +166,6 @@ export default async function handler(req, res) {
         periodo:       body.periodo || null,
         cargahoraria:  cargaHorariaVal,
         matriz:        compoeMatrizVal,
-        grade:         body.grade || null,
-        ementa:        body.ementa || null,
         situacao:      body.situacao || 'ATIVO',
       };
       const fallback = await supabase.from('disciplinas').insert(payloadLegado).select().single();
