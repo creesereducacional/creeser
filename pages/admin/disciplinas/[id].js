@@ -283,16 +283,15 @@ export default function EditarDisciplina() {
             </div>
 
             <div>
-              <label className="text-xs font-medium text-teal-600 mb-1 block">GRADE DA DISCIPLINA</label>
+              <label className="text-xs font-medium text-teal-600 mb-1 block">GRADE DA DISCIPLINA <span className="text-gray-400 font-normal">(opcional)</span></label>
               <div className="flex flex-col gap-3">
                 <select
                   name="grade"
                   value={formData.grade}
                   onChange={handleChange}
-                  required
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 >
-                  <option value="">Escolha uma Grade *</option>
+                  <option value="">Escolha uma Grade</option>
                   {grades
                     .filter(g => {
                       if (!formData.curso) return true;

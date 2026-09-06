@@ -27,19 +27,15 @@ export default async function handler(req, res) {
   if (req.method === 'PUT') {
     const body = req.body || {};
 
-    if (!body.grade) {
-      return res.status(400).json({ error: 'Matriz Curricular (grade) é obrigatória' });
-    }
-
-    // Validar se a grade existe
-    const { data: gradeData, error: gradeError } = await supabase
-      .from('grades')
-      .select('id, curso_id, cursoid')
-      .eq('id', body.grade)
-      .maybeSingle();
-
-    if (gradeError || !gradeData) {
-      return res.status(400).json({ error: 'Matriz Curricular selecionada não é válida' });
+    // Grade é opcional na edição — se informada, tenta buscar o cursoid dela
+    let gradeInfo = null;
+    if (body.grade) {
+      const { data: gradeData } = await supabase
+        .from('grades')
+        .select('id, curso_id, cursoid')
+        .eq('id', body.grade)
+        .maybeSingle();
+      gradeInfo = gradeData || null;
     }
 
     // Resolver cursoid obrigatório (NOT NULL no banco)
@@ -54,15 +50,17 @@ export default async function handler(req, res) {
       if (c) numericCursoId = Number(c.id);
     }
 
-    if (!numericCursoId) {
+    if (!numericCursoId && gradeInfo) {
       // Deduzir pelo curso da grade
-      const cId = gradeData.curso_id || gradeData.cursoid;
+      const cId = gradeInfo.curso_id || gradeInfo.cursoid;
       if (cId) numericCursoId = Number(cId);
     }
 
     if (!numericCursoId) {
-      const { data: primeiro } = await supabase.from('cursos').select('id').limit(1).maybeSingle();
-      if (primeiro) numericCursoId = Number(primeiro.id);
+      // Último recurso: manter o cursoid que já está salvo no registro
+      const { data: current } = await supabase
+        .from('disciplinas').select('cursoid').eq('id', id).single();
+      if (current?.cursoid) numericCursoId = Number(current.cursoid);
     }
 
     if (!numericCursoId) {
