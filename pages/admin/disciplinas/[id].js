@@ -11,6 +11,7 @@ export default function EditarDisciplina() {
     codigo: '',
     nome: '',
     curso: '',
+    cursoId: null,
     periodo: '',
     cargaHoraria: '',
     credito: '',
@@ -57,17 +58,18 @@ export default function EditarDisciplina() {
           codigo: data.codigo || '',
           nome: data.nome || '',
           curso: data.curso || '',
-          periodo: data.periodo || '',
-          cargaHoraria: data.cargaHoraria !== undefined && data.cargaHoraria !== null ? String(data.cargaHoraria) : (data.carga_horaria !== undefined && data.carga_horaria !== null ? String(data.carga_horaria) : ''),
+          cursoId: data.cursoid || data.cursoId || null,
+          periodo: data.periodo !== undefined && data.periodo !== null ? String(data.periodo) : '',
+          cargaHoraria: data.cargaHoraria !== undefined && data.cargaHoraria !== null ? String(data.cargaHoraria) : '',
           credito: data.credito !== undefined && data.credito !== null ? String(data.credito) : '',
-          qtdAulas: data.qtdAulas !== undefined && data.qtdAulas !== null ? String(data.qtdAulas) : (data.qtd_aulas !== undefined && data.qtd_aulas !== null ? String(data.qtd_aulas) : ''),
+          qtdAulas: data.qtdAulas !== undefined && data.qtdAulas !== null ? String(data.qtdAulas) : '',
           grade: data.grade ? String(data.grade) : '',
           matriz: data.matriz !== undefined ? Boolean(data.matriz) : true,
           ementa: data.ementa || '',
           complementar: Boolean(data.complementar),
           optativa: Boolean(data.optativa),
-          compoeMatriz: data.compoeMatriz !== undefined ? Boolean(data.compoeMatriz) : (data.matriz !== undefined ? Boolean(data.matriz) : true),
-          requerDeferimento: data.requerDeferimento !== undefined ? Boolean(data.requerDeferimento) : (data.requer_deferimento !== undefined ? Boolean(data.requer_deferimento) : false),
+          compoeMatriz: data.compoeMatriz !== undefined ? Boolean(data.compoeMatriz) : Boolean(data.matriz !== undefined ? data.matriz : true),
+          requerDeferimento: Boolean(data.requerDeferimento),
           avaliacoes: data.avaliacoes !== undefined && data.avaliacoes !== null ? String(data.avaliacoes) : '',
           estagio: Boolean(data.estagio),
           situacao: data.situacao || 'ATIVO',
@@ -96,10 +98,19 @@ export default function EditarDisciplina() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+    if (name === 'curso') {
+      const cursoObj = cursos.find(c => c.nome === value);
+      setFormData(prev => ({
+        ...prev,
+        curso: value,
+        cursoId: cursoObj ? cursoObj.id : prev.cursoId,
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      }));
+    }
   };
 
   const handleSubmit = async (e) => {

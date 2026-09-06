@@ -10,6 +10,7 @@ export default function NovaDisciplina() {
     codigo: '',
     nome: '',
     curso: '',
+    cursoId: null,
     periodo: '',
     cargaHoraria: '',
     credito: '',
@@ -43,10 +44,20 @@ export default function NovaDisciplina() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+    if (name === 'curso') {
+      // Quando seleciona um curso pelo nome, guarda também o ID
+      const cursoObj = cursos.find(c => c.nome === value);
+      setFormData(prev => ({
+        ...prev,
+        curso: value,
+        cursoId: cursoObj ? cursoObj.id : null,
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      }));
+    }
   };
 
   const handleSubmit = async (e) => {
