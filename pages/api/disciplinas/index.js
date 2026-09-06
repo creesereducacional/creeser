@@ -134,12 +134,19 @@ export default async function handler(req, res) {
       }
     }
 
+    const rawPeriodo = body.periodo ? String(body.periodo) : null;
+    let parsedPeriodoNum = null;
+    if (rawPeriodo) {
+      const match = rawPeriodo.match(/\d+/);
+      if (match) parsedPeriodoNum = parseInt(match[0], 10);
+    }
+
     const payloadNormalizado = {
       codigo:             body.codigo || null,
       nome:               body.nome,
       curso:              cursoNome,
       cursoid:            numericCursoId,
-      periodo:            body.periodo || null,
+      periodo:            rawPeriodo,
       carga_horaria:      cargaHorariaVal,
       cargahoraria:       cargaHorariaVal,
       credito:            creditoVal,
@@ -157,17 +164,32 @@ export default async function handler(req, res) {
     };
 
     let { data, error } = await supabase.from('disciplinas').insert(payloadNormalizado).select().single();
+
+    if (error && error.message && (error.message.includes('invalid input syntax for type integer') || error.message.includes('periodo'))) {
+      const retryPayload = { ...payloadNormalizado, periodo: parsedPeriodoNum };
+      const retry = await supabase.from('disciplinas').insert(retryPayload).select().single();
+      if (!retry.error) {
+        data = retry.data;
+        error = null;
+      }
+    }
+
     if (error && error.message && (error.message.includes('column') || error.message.includes('schema cache'))) {
       // Fallback gracioso removendo colunas não encontradas caso migration não tenha rodado
       const payloadLegado = {
         codigo:        body.codigo || null,
         nome:          body.nome,
         cursoid:       numericCursoId,
-        periodo:       body.periodo || null,
+        periodo:       rawPeriodo,
         cargahoraria:  cargaHorariaVal,
         situacao:      body.situacao || 'ATIVO',
       };
-      const fallback = await supabase.from('disciplinas').insert(payloadLegado).select().single();
+      let fallback = await supabase.from('disciplinas').insert(payloadLegado).select().single();
+      if (fallback.error && fallback.error.message && fallback.error.message.includes('invalid input syntax')) {
+        const payloadLegadoInt = { ...payloadLegado, periodo: parsedPeriodoNum };
+        fallback = await supabase.from('disciplinas').insert(payloadLegadoInt).select().single();
+      }
+
       if (fallback.error) return res.status(500).json({ error: fallback.error.message });
       data = fallback.data;
       error = null;

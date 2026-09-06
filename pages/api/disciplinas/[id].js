@@ -81,12 +81,20 @@ export default async function handler(req, res) {
       }
     }
 
+    // Tratar periodo: se for enviada uma string tipo "03º Período", se o banco for integer a API nao falha
+    const rawPeriodo = body.periodo !== undefined ? String(body.periodo) : undefined;
+    let parsedPeriodoNum = undefined;
+    if (rawPeriodo) {
+      const match = rawPeriodo.match(/\d+/);
+      if (match) parsedPeriodoNum = parseInt(match[0], 10);
+    }
+
     const updatesNormalizado = {
       codigo:             body.codigo,
       nome:               body.nome,
       curso:              cursoNome,
       cursoid:            numericCursoId,
-      periodo:            body.periodo,
+      periodo:            rawPeriodo,
       carga_horaria:      cargaHorariaVal,
       cargahoraria:       cargaHorariaVal,
       credito:            creditoVal,
@@ -106,18 +114,36 @@ export default async function handler(req, res) {
     Object.keys(updatesNormalizado).forEach(k => updatesNormalizado[k] === undefined && delete updatesNormalizado[k]);
 
     let { data, error } = await supabase.from('disciplinas').update(updatesNormalizado).eq('id', id).select().single();
+
+    if (error && error.message && (error.message.includes('invalid input syntax for type integer') || error.message.includes('periodo'))) {
+      // Se a coluna periodo no banco for do tipo INTEGER e recebeu string "03º Período"
+      const retryUpdates = { ...updatesNormalizado, periodo: parsedPeriodoNum };
+      if (parsedPeriodoNum === undefined) delete retryUpdates.periodo;
+      const retry = await supabase.from('disciplinas').update(retryUpdates).eq('id', id).select().single();
+      if (!retry.error) {
+        data = retry.data;
+        error = null;
+      }
+    }
+
     if (error && error.message && (error.message.includes('column') || error.message.includes('schema cache'))) {
       const updatesLegado = {
         codigo:        body.codigo,
         nome:          body.nome,
         cursoid:       numericCursoId,
-        periodo:       body.periodo,
+        periodo:       rawPeriodo,
         cargahoraria:  cargaHorariaVal,
         situacao:      body.situacao,
       };
       Object.keys(updatesLegado).forEach(k => updatesLegado[k] === undefined && delete updatesLegado[k]);
 
-      const fallback = await supabase.from('disciplinas').update(updatesLegado).eq('id', id).select().single();
+      let fallback = await supabase.from('disciplinas').update(updatesLegado).eq('id', id).select().single();
+      if (fallback.error && fallback.error.message && fallback.error.message.includes('invalid input syntax')) {
+        const updatesLegadoInt = { ...updatesLegado, periodo: parsedPeriodoNum };
+        if (parsedPeriodoNum === undefined) delete updatesLegadoInt.periodo;
+        fallback = await supabase.from('disciplinas').update(updatesLegadoInt).eq('id', id).select().single();
+      }
+
       if (fallback.error) return res.status(500).json({ error: fallback.error.message });
       data = fallback.data;
       error = null;
