@@ -84,7 +84,25 @@ export default async function handler(req, res) {
       .select('*')
       .order('nome');
     if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json((data || []).map(normalizeDisciplina));
+
+    const normalized = (data || []).map(normalizeDisciplina);
+    const cursoIds = Array.from(new Set(normalized.map(d => d.cursoid).filter(Boolean)));
+    if (cursoIds.length > 0) {
+      const { data: cursos } = await supabase
+        .from('cursos')
+        .select('id, nome')
+        .in('id', cursoIds);
+      if (cursos && cursos.length > 0) {
+        const mapaCursos = Object.fromEntries(cursos.map(c => [c.id, c.nome]));
+        normalized.forEach(d => {
+          if (d.cursoid && mapaCursos[d.cursoid]) {
+            d.curso = mapaCursos[d.cursoid];
+          }
+        });
+      }
+    }
+
+    return res.status(200).json(normalized);
   }
 
   if (req.method === 'POST') {
