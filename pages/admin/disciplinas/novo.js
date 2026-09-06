@@ -158,9 +158,16 @@ export default function NovaDisciplina() {
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 >
                   <option value="">- ESCOLHA UM PERÍODO -</option>
-                  <option value="01º Período">01º Período</option>
-                  <option value="02º Período">02º Período</option>
-                  <option value="03º Período">03º Período</option>
+                  <option value="1">01º Período</option>
+                  <option value="2">02º Período</option>
+                  <option value="3">03º Período</option>
+                  <option value="4">04º Período</option>
+                  <option value="5">05º Período</option>
+                  <option value="6">06º Período</option>
+                  <option value="7">07º Período</option>
+                  <option value="8">08º Período</option>
+                  <option value="9">09º Período</option>
+                  <option value="10">10º Período</option>
                 </select>
               </div>
 

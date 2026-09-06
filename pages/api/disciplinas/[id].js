@@ -21,7 +21,19 @@ export default async function handler(req, res) {
       .eq('id', id)
       .single();
     if (error || !data) return res.status(404).json({ error: 'Disciplina não encontrada' });
-    return res.status(200).json(normalizeDisciplina(data));
+
+    // Buscar nome do curso pelo cursoid (a tabela disciplinas não tem coluna "curso", só cursoid)
+    let cursoNome = '';
+    if (data.cursoid) {
+      const { data: cursoData } = await supabase
+        .from('cursos')
+        .select('nome')
+        .eq('id', data.cursoid)
+        .maybeSingle();
+      if (cursoData) cursoNome = cursoData.nome;
+    }
+
+    return res.status(200).json(normalizeDisciplina({ ...data, curso: cursoNome }));
   }
 
   if (req.method === 'PUT') {
