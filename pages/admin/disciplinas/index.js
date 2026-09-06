@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import DashboardLayout from '../../../components/DashboardLayout';
+import ConfirmModal from '../../../components/ConfirmModal';
+import CustomModal from '../../../components/CustomModal';
 
 export default function ListagemDisciplinas() {
   const [disciplinas, setDisciplinas] = useState([]);
@@ -11,6 +13,8 @@ export default function ListagemDisciplinas() {
   const [searchPeriodo, setSearchPeriodo] = useState('');
   const [searchNome, setSearchNome] = useState('');
   const [searchSituacao, setSearchSituacao] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, id: null });
+  const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'success' });
 
   useEffect(() => {
     carregarDisciplinas();
@@ -77,16 +81,40 @@ export default function ListagemDisciplinas() {
     setSearchSituacao('');
   };
 
-  const deletarDisciplina = async (id) => {
-    if (!confirm('Tem certeza que deseja deletar esta disciplina?')) return;
+  const solicitarExclusao = (id) => {
+    setConfirmDelete({ isOpen: true, id });
+  };
+
+  const handleConfirmDelete = async () => {
+    const id = confirmDelete.id;
+    setConfirmDelete({ isOpen: false, id: null });
 
     try {
       const res = await fetch(`/api/disciplinas/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        setDisciplinas(disciplinas.filter(disciplina => disciplina.id !== id));
+        setDisciplinas(prev => prev.filter(disciplina => disciplina.id !== id));
+        setModal({
+          isOpen: true,
+          title: 'Sucesso!',
+          message: 'Disciplina excluída com sucesso!',
+          type: 'success'
+        });
+      } else {
+        setModal({
+          isOpen: true,
+          title: 'Erro!',
+          message: 'Erro ao excluir disciplina.',
+          type: 'error'
+        });
       }
     } catch (error) {
       console.error('Erro ao deletar disciplina:', error);
+      setModal({
+        isOpen: true,
+        title: 'Erro!',
+        message: 'Erro ao excluir disciplina.',
+        type: 'error'
+      });
     }
   };
 
@@ -286,7 +314,7 @@ export default function ListagemDisciplinas() {
                             </button>
                           </Link>
                           <button
-                            onClick={() => deletarDisciplina(disciplina.id)}
+                            onClick={() => solicitarExclusao(disciplina.id)}
                             className="p-2 text-red-600 hover:text-red-800 transition"
                             title="Deletar"
                           >
@@ -302,6 +330,23 @@ export default function ListagemDisciplinas() {
           )}
         </div>
       </div>
+
+      <CustomModal
+        isOpen={modal.isOpen}
+        title={modal.title}
+        message={modal.message}
+        type={modal.type}
+        onClose={() => setModal(prev => ({ ...prev, isOpen: false }))}
+      />
+
+      <ConfirmModal
+        isOpen={confirmDelete.isOpen}
+        title="Confirmar Exclusão"
+        message="Tem certeza que deseja excluir esta disciplina? Esta ação não poderá ser desfeita."
+        type="delete"
+        onConfirm={handleConfirmDelete}
+        onClose={() => setConfirmDelete({ isOpen: false, id: null })}
+      />
     </DashboardLayout>
   );
 }

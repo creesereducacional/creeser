@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import DashboardLayout from '../../../components/DashboardLayout';
+import CustomModal from '../../../components/CustomModal';
 
 export default function NovaDisciplina() {
   const router = useRouter();
@@ -11,12 +12,14 @@ export default function NovaDisciplina() {
     curso: '',
     periodo: '',
     cargaHoraria: '',
+    credito: '',
+    qtdAulas: '',
     grade: '',
-    matriz: false,
+    matriz: true,
     ementa: '',
     complementar: false,
     optativa: false,
-    compoeMatriz: false,
+    compoeMatriz: true,
     requerDeferimento: false,
     avaliacoes: '',
     estagio: false,
@@ -26,8 +29,9 @@ export default function NovaDisciplina() {
   const [loading, setLoading] = useState(false);
   const [cursos, setCursos] = useState([]);
   const [grades, setGrades] = useState([]);
+  const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'success', redirectOnClose: null });
 
-  useState(() => {
+  useEffect(() => {
     Promise.all([
       fetch('/api/cursos'),
       fetch('/api/grades')
@@ -59,14 +63,29 @@ export default function NovaDisciplina() {
       });
 
       if (res.ok) {
-        alert('Disciplina cadastrada com sucesso!');
-        router.push('/admin/disciplinas');
+        setModal({
+          isOpen: true,
+          title: 'Sucesso!',
+          message: 'Disciplina cadastrada com sucesso!',
+          type: 'success',
+          redirectOnClose: '/admin/disciplinas'
+        });
       } else {
-        alert('Erro ao cadastrar disciplina');
+        setModal({
+          isOpen: true,
+          title: 'Erro!',
+          message: 'Erro ao cadastrar disciplina.',
+          type: 'error'
+        });
       }
     } catch (error) {
       console.error('Erro ao cadastrar disciplina:', error);
-      alert('Erro ao cadastrar disciplina');
+      setModal({
+        isOpen: true,
+        title: 'Erro!',
+        message: 'Erro ao cadastrar disciplina.',
+        type: 'error'
+      });
     } finally {
       setLoading(false);
     }
@@ -167,6 +186,8 @@ export default function NovaDisciplina() {
                 <input
                   type="text"
                   name="credito"
+                  value={formData.credito || ''}
+                  onChange={handleChange}
                   placeholder="Crédito"
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 />
@@ -177,6 +198,8 @@ export default function NovaDisciplina() {
                 <input
                   type="text"
                   name="qtdAulas"
+                  value={formData.qtdAulas || ''}
+                  onChange={handleChange}
                   placeholder="Qtd. Aulas"
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 />
@@ -372,6 +395,18 @@ export default function NovaDisciplina() {
           </div>
         </form>
       </div>
+
+      <CustomModal
+        isOpen={modal.isOpen}
+        title={modal.title}
+        message={modal.message}
+        type={modal.type}
+        onClose={() => {
+          const redirect = modal.redirectOnClose;
+          setModal(prev => ({ ...prev, isOpen: false }));
+          if (redirect) router.push(redirect);
+        }}
+      />
     </DashboardLayout>
   );
 }

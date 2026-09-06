@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import DashboardLayout from '../../../components/DashboardLayout';
+import CustomModal from '../../../components/CustomModal';
 
 export default function EditarDisciplina() {
   const router = useRouter();
@@ -12,12 +13,14 @@ export default function EditarDisciplina() {
     curso: '',
     periodo: '',
     cargaHoraria: '',
+    credito: '',
+    qtdAulas: '',
     grade: '',
-    matriz: false,
+    matriz: true,
     ementa: '',
     complementar: false,
     optativa: false,
-    compoeMatriz: false,
+    compoeMatriz: true,
     requerDeferimento: false,
     avaliacoes: '',
     estagio: false,
@@ -27,6 +30,7 @@ export default function EditarDisciplina() {
   const [saving, setSaving] = useState(false);
   const [cursos, setCursos] = useState([]);
   const [grades, setGrades] = useState([]);
+  const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'success', redirectOnClose: null });
 
   useEffect(() => {
     Promise.all([
@@ -49,14 +53,42 @@ export default function EditarDisciplina() {
       const res = await fetch(`/api/disciplinas/${id}`);
       if (res.ok) {
         const data = await res.json();
-        setFormData(data);
+        setFormData({
+          codigo: data.codigo || '',
+          nome: data.nome || '',
+          curso: data.curso || '',
+          periodo: data.periodo || '',
+          cargaHoraria: data.cargaHoraria !== undefined && data.cargaHoraria !== null ? String(data.cargaHoraria) : (data.carga_horaria !== undefined && data.carga_horaria !== null ? String(data.carga_horaria) : ''),
+          credito: data.credito !== undefined && data.credito !== null ? String(data.credito) : '',
+          qtdAulas: data.qtdAulas !== undefined && data.qtdAulas !== null ? String(data.qtdAulas) : (data.qtd_aulas !== undefined && data.qtd_aulas !== null ? String(data.qtd_aulas) : ''),
+          grade: data.grade ? String(data.grade) : '',
+          matriz: data.matriz !== undefined ? Boolean(data.matriz) : true,
+          ementa: data.ementa || '',
+          complementar: Boolean(data.complementar),
+          optativa: Boolean(data.optativa),
+          compoeMatriz: data.compoeMatriz !== undefined ? Boolean(data.compoeMatriz) : (data.matriz !== undefined ? Boolean(data.matriz) : true),
+          requerDeferimento: data.requerDeferimento !== undefined ? Boolean(data.requerDeferimento) : (data.requer_deferimento !== undefined ? Boolean(data.requer_deferimento) : false),
+          avaliacoes: data.avaliacoes !== undefined && data.avaliacoes !== null ? String(data.avaliacoes) : '',
+          estagio: Boolean(data.estagio),
+          situacao: data.situacao || 'ATIVO',
+        });
       } else {
-        alert('Disciplina não encontrada');
-        router.push('/admin/disciplinas');
+        setModal({
+          isOpen: true,
+          title: 'Ops!',
+          message: 'Disciplina não encontrada.',
+          type: 'error',
+          redirectOnClose: '/admin/disciplinas'
+        });
       }
     } catch (error) {
       console.error('Erro ao carregar disciplina:', error);
-      alert('Erro ao carregar disciplina');
+      setModal({
+        isOpen: true,
+        title: 'Erro!',
+        message: 'Erro ao carregar disciplina.',
+        type: 'error'
+      });
     } finally {
       setLoading(false);
     }
@@ -84,14 +116,29 @@ export default function EditarDisciplina() {
       });
 
       if (res.ok) {
-        alert('Disciplina atualizada com sucesso!');
-        router.push('/admin/disciplinas');
+        setModal({
+          isOpen: true,
+          title: 'Sucesso!',
+          message: 'Disciplina atualizada com sucesso!',
+          type: 'success',
+          redirectOnClose: '/admin/disciplinas'
+        });
       } else {
-        alert('Erro ao atualizar disciplina');
+        setModal({
+          isOpen: true,
+          title: 'Erro!',
+          message: 'Erro ao atualizar disciplina.',
+          type: 'error'
+        });
       }
     } catch (error) {
       console.error('Erro ao atualizar disciplina:', error);
-      alert('Erro ao atualizar disciplina');
+      setModal({
+        isOpen: true,
+        title: 'Erro!',
+        message: 'Erro ao atualizar disciplina.',
+        type: 'error'
+      });
     } finally {
       setSaving(false);
     }
@@ -188,6 +235,8 @@ export default function EditarDisciplina() {
                 <input
                   type="text"
                   name="credito"
+                  value={formData.credito || ''}
+                  onChange={handleChange}
                   placeholder="Crédito"
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 />
@@ -198,6 +247,8 @@ export default function EditarDisciplina() {
                 <input
                   type="text"
                   name="qtdAulas"
+                  value={formData.qtdAulas || ''}
+                  onChange={handleChange}
                   placeholder="Qtd. Aulas"
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 />
@@ -393,6 +444,18 @@ export default function EditarDisciplina() {
           </div>
         </form>
       </div>
+
+      <CustomModal
+        isOpen={modal.isOpen}
+        title={modal.title}
+        message={modal.message}
+        type={modal.type}
+        onClose={() => {
+          const redirect = modal.redirectOnClose;
+          setModal(prev => ({ ...prev, isOpen: false }));
+          if (redirect) router.push(redirect);
+        }}
+      />
     </DashboardLayout>
   );
 }
