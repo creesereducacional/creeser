@@ -562,30 +562,6 @@ export default function ListagemAlunos() {
                           </button>
                           <button
                             className="p-2 text-gray-600 hover:text-gray-800 transition"
-                            title="Pesquisar"
-                          >
-                            🔍
-                          </button>
-                          <button
-                            className="p-2 text-gray-600 hover:text-gray-800 transition"
-                            title="Configurar"
-                          >
-                            ⚙️
-                          </button>
-                          <button
-                            className="p-2 text-gray-600 hover:text-gray-800 transition"
-                            title="Compartilhar"
-                          >
-                            🔗
-                          </button>
-                          <button
-                            className="p-2 text-gray-600 hover:text-gray-800 transition"
-                            title="Megafone"
-                          >
-                            📢
-                          </button>
-                          <button
-                            className="p-2 text-gray-600 hover:text-gray-800 transition"
                             title="Armazenamento"
                           >
                             ☁️
@@ -635,13 +611,6 @@ export default function ListagemAlunos() {
                             title="Iniciar assinatura digital"
                           >
                             🔒
-                          </button>
-                          <button
-                            onClick={() => consultarAssinaturaDigital(aluno.id)}
-                            className="p-2 text-gray-600 hover:text-gray-800 transition"
-                            title="Consultar status da assinatura digital"
-                          >
-                            👁️
                           </button>
                           <button
                             onClick={() => setModalRematricula(aluno)}
