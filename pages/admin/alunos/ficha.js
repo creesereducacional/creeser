@@ -33,11 +33,12 @@ export default function FichaAlunoPage() {
       const html2pdf = (await import('html2pdf.js')).default;
       const element = fichaRef.current;
       const opt = {
-        margin: [8, 8, 8, 8],
+        margin: [4, 4, 4, 4],
         filename: `ficha_cadastral_${aluno?.nome ? aluno.nome.toLowerCase().replace(/\s+/g, '_') : id}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
       };
 
       await html2pdf().set(opt).from(element).save();
@@ -117,13 +118,13 @@ export default function FichaAlunoPage() {
       {/* Papel Timbrado / Documento Oficial */}
       <main
         ref={fichaRef}
-        className="flex-1 max-w-4xl mx-auto w-full p-8 md:p-10 bg-white my-6 shadow-md border border-slate-200 print:border-0 print:shadow-none print:my-0 print:p-0"
+        className="flex-1 max-w-4xl mx-auto w-full p-6 md:p-8 bg-white my-4 shadow-md border border-slate-200 print:border-0 print:shadow-none print:my-0 print:p-0"
       >
         
         {/* Cabeçalho Oficial com Logo */}
-        <div className="flex justify-between items-center pb-6 mb-6 border-b-2 border-teal-800">
-          <div className="flex items-center gap-4">
-            <div className="w-40 h-16 flex items-center justify-center">
+        <div className="flex justify-between items-center pb-4 mb-4 border-b-2 border-teal-800">
+          <div className="flex items-center gap-3">
+            <div className="w-36 h-14 flex items-center justify-center">
               <img
                 src="/images/logo_creeser.png"
                 alt="CREESER"
@@ -134,20 +135,20 @@ export default function FichaAlunoPage() {
               />
             </div>
             <div>
-              <h1 className="text-lg font-extrabold text-teal-900 tracking-tight">
+              <h1 className="text-base font-extrabold text-teal-900 tracking-tight">
                 GRUPO CREESER EDUCACIONAL
               </h1>
-              <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">
+              <p className="text-[11px] text-slate-500 font-medium uppercase tracking-wider">
                 Ficha Individual de Cadastro de Aluno
               </p>
-              <p className="text-[10px] text-slate-400">
+              <p className="text-[9px] text-slate-400">
                 Emitido em: {dataImpressao}
               </p>
             </div>
           </div>
 
           {/* Foto do Aluno */}
-          <div className="w-28 h-36 border-2 border-slate-300 rounded-lg overflow-hidden bg-slate-50 flex flex-col items-center justify-center shadow-inner text-slate-400 flex-shrink-0">
+          <div className="w-24 h-32 border-2 border-slate-300 rounded-lg overflow-hidden bg-slate-50 flex flex-col items-center justify-center shadow-inner text-slate-400 flex-shrink-0">
             {aluno.foto ? (
               <img
                 src={aluno.foto}
@@ -155,161 +156,161 @@ export default function FichaAlunoPage() {
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="text-center p-2">
-                <span className="text-3xl block mb-1">👤</span>
-                <span className="text-[9px] font-semibold uppercase text-slate-400">Foto 3x4</span>
+              <div className="text-center p-1.5">
+                <span className="text-2xl block mb-0.5">👤</span>
+                <span className="text-[8px] font-semibold uppercase text-slate-400">Foto 3x4</span>
               </div>
             )}
           </div>
         </div>
 
         {/* Resumo do Aluno */}
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
           <div>
-            <span className="text-slate-400 font-semibold uppercase block text-[10px]">Matrícula</span>
-            <span className="font-bold text-teal-800 text-sm">{aluno.matricula || aluno.numero_id || `#${aluno.id}`}</span>
+            <span className="text-slate-400 font-semibold uppercase block text-[9px]">Matrícula</span>
+            <span className="font-bold text-teal-800 text-xs">{aluno.matricula || aluno.numero_id || `#${aluno.id}`}</span>
           </div>
           <div>
-            <span className="text-slate-400 font-semibold uppercase block text-[10px]">Status</span>
-            <span className="font-bold text-slate-800">{aluno.statusmatricula || aluno.status || 'ATIVO'}</span>
+            <span className="text-slate-400 font-semibold uppercase block text-[9px]">Status</span>
+            <span className="font-bold text-slate-800 text-xs">{aluno.statusmatricula || aluno.status || 'ATIVO'}</span>
           </div>
           <div>
-            <span className="text-slate-400 font-semibold uppercase block text-[10px]">Ano Letivo</span>
-            <span className="font-bold text-slate-800">{aluno.ano_letivo || aluno.anoLetivo || '—'}</span>
+            <span className="text-slate-400 font-semibold uppercase block text-[9px]">Ano Letivo</span>
+            <span className="font-bold text-slate-800 text-xs">{aluno.ano_letivo || aluno.anoLetivo || '—'}</span>
           </div>
           <div>
-            <span className="text-slate-400 font-semibold uppercase block text-[10px]">Turma / Curso</span>
-            <span className="font-bold text-slate-800 truncate block">{aluno.turma || aluno.turmaid || '—'}</span>
+            <span className="text-slate-400 font-semibold uppercase block text-[9px]">Turma / Curso</span>
+            <span className="font-bold text-slate-800 text-xs truncate block">{aluno.turma || aluno.turmaid || '—'}</span>
           </div>
         </div>
 
         {/* Seção 1: Dados Pessoais */}
-        <div className="mb-6">
-          <h3 className="text-xs font-extrabold text-teal-800 uppercase tracking-wider bg-teal-50 px-3 py-1.5 rounded-md border-l-4 border-teal-600 mb-3">
+        <div className="mb-4">
+          <h3 className="text-[11px] font-extrabold text-teal-800 uppercase tracking-wider bg-teal-50 px-2.5 py-1 rounded-md border-l-4 border-teal-600 mb-2">
             1. Dados Pessoais do Estudante
           </h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2.5 text-xs text-slate-700">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-2 text-xs text-slate-700">
             <div className="col-span-2 md:col-span-3">
-              <span className="text-slate-400 font-medium block text-[10px] uppercase">Nome Completo</span>
-              <span className="font-bold text-slate-900 text-sm">{aluno.nome}</span>
+              <span className="text-slate-400 font-medium block text-[9px] uppercase">Nome Completo</span>
+              <span className="font-bold text-slate-900 text-xs">{aluno.nome}</span>
             </div>
             <div>
-              <span className="text-slate-400 font-medium block text-[10px] uppercase">CPF</span>
+              <span className="text-slate-400 font-medium block text-[9px] uppercase">CPF</span>
               <span className="font-semibold">{aluno.cpf || '—'}</span>
             </div>
             <div>
-              <span className="text-slate-400 font-medium block text-[10px] uppercase">RG / UF</span>
+              <span className="text-slate-400 font-medium block text-[9px] uppercase">RG / UF</span>
               <span className="font-semibold">{aluno.rg ? `${aluno.rg} ${aluno.uf_rg ? `/ ${aluno.uf_rg}` : ''}` : '—'}</span>
             </div>
             <div>
-              <span className="text-slate-400 font-medium block text-[10px] uppercase">Data de Nascimento</span>
+              <span className="text-slate-400 font-medium block text-[9px] uppercase">Data de Nascimento</span>
               <span className="font-semibold">{formatData(aluno.data_nascimento)}</span>
             </div>
             <div>
-              <span className="text-slate-400 font-medium block text-[10px] uppercase">Sexo</span>
+              <span className="text-slate-400 font-medium block text-[9px] uppercase">Sexo</span>
               <span className="font-semibold">{aluno.sexo || '—'}</span>
             </div>
             <div>
-              <span className="text-slate-400 font-medium block text-[10px] uppercase">Estado Civil</span>
+              <span className="text-slate-400 font-medium block text-[9px] uppercase">Estado Civil</span>
               <span className="font-semibold">{aluno.estadocivil || '—'}</span>
             </div>
             <div>
-              <span className="text-slate-400 font-medium block text-[10px] uppercase">Telefone / Celular</span>
+              <span className="text-slate-400 font-medium block text-[9px] uppercase">Telefone / Celular</span>
               <span className="font-semibold">{aluno.telefone_celular || aluno.telefone || '—'}</span>
             </div>
             <div className="col-span-2">
-              <span className="text-slate-400 font-medium block text-[10px] uppercase">E-mail</span>
+              <span className="text-slate-400 font-medium block text-[9px] uppercase">E-mail</span>
               <span className="font-semibold">{aluno.email || '—'}</span>
             </div>
             <div>
-              <span className="text-slate-400 font-medium block text-[10px] uppercase">Naturalidade / UF</span>
+              <span className="text-slate-400 font-medium block text-[9px] uppercase">Naturalidade / UF</span>
               <span className="font-semibold">{aluno.naturalidade ? `${aluno.naturalidade} ${aluno.uf_naturalidade ? `/ ${aluno.uf_naturalidade}` : ''}` : '—'}</span>
             </div>
             <div>
-              <span className="text-slate-400 font-medium block text-[10px] uppercase">Nacionalidade</span>
+              <span className="text-slate-400 font-medium block text-[9px] uppercase">Nacionalidade</span>
               <span className="font-semibold">{aluno.nacionalidade || 'Brasileira'}</span>
             </div>
           </div>
         </div>
 
         {/* Seção 2: Filiação */}
-        <div className="mb-6">
-          <h3 className="text-xs font-extrabold text-teal-800 uppercase tracking-wider bg-teal-50 px-3 py-1.5 rounded-md border-l-4 border-teal-600 mb-3">
+        <div className="mb-4">
+          <h3 className="text-[11px] font-extrabold text-teal-800 uppercase tracking-wider bg-teal-50 px-2.5 py-1 rounded-md border-l-4 border-teal-600 mb-2">
             2. Filiação e Responsáveis
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-700">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-700">
             <div>
-              <span className="text-slate-400 font-medium block text-[10px] uppercase">Nome da Mãe</span>
+              <span className="text-slate-400 font-medium block text-[9px] uppercase">Nome da Mãe</span>
               <span className="font-bold text-slate-800">{aluno.mae || '—'}</span>
             </div>
             <div>
-              <span className="text-slate-400 font-medium block text-[10px] uppercase">Nome do Pai</span>
+              <span className="text-slate-400 font-medium block text-[9px] uppercase">Nome do Pai</span>
               <span className="font-bold text-slate-800">{aluno.pai || '—'}</span>
             </div>
           </div>
         </div>
 
         {/* Seção 3: Endereço Residencial */}
-        <div className="mb-6">
-          <h3 className="text-xs font-extrabold text-teal-800 uppercase tracking-wider bg-teal-50 px-3 py-1.5 rounded-md border-l-4 border-teal-600 mb-3">
+        <div className="mb-4">
+          <h3 className="text-[11px] font-extrabold text-teal-800 uppercase tracking-wider bg-teal-50 px-2.5 py-1 rounded-md border-l-4 border-teal-600 mb-2">
             3. Endereço Residencial
           </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2.5 text-xs text-slate-700">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2 text-xs text-slate-700">
             <div className="col-span-2">
-              <span className="text-slate-400 font-medium block text-[10px] uppercase">Logradouro</span>
+              <span className="text-slate-400 font-medium block text-[9px] uppercase">Logradouro</span>
               <span className="font-semibold">{aluno.endereco ? `${aluno.endereco}, ${aluno.numeroendereco || 'S/N'}` : '—'}</span>
             </div>
             <div>
-              <span className="text-slate-400 font-medium block text-[10px] uppercase">Bairro</span>
+              <span className="text-slate-400 font-medium block text-[9px] uppercase">Bairro</span>
               <span className="font-semibold">{aluno.bairro || '—'}</span>
             </div>
             <div>
-              <span className="text-slate-400 font-medium block text-[10px] uppercase">CEP</span>
+              <span className="text-slate-400 font-medium block text-[9px] uppercase">CEP</span>
               <span className="font-semibold">{aluno.cep || '—'}</span>
             </div>
             <div className="col-span-2">
-              <span className="text-slate-400 font-medium block text-[10px] uppercase">Cidade / UF</span>
+              <span className="text-slate-400 font-medium block text-[9px] uppercase">Cidade / UF</span>
               <span className="font-semibold">{aluno.cidade ? `${aluno.cidade} / ${aluno.estado || ''}` : '—'}</span>
             </div>
             <div className="col-span-2">
-              <span className="text-slate-400 font-medium block text-[10px] uppercase">Complemento</span>
+              <span className="text-slate-400 font-medium block text-[9px] uppercase">Complemento</span>
               <span className="font-semibold">{aluno.complemento || '—'}</span>
             </div>
           </div>
         </div>
 
         {/* Seção 4: Dados Financeiros & Adicionais */}
-        <div className="mb-6">
-          <h3 className="text-xs font-extrabold text-teal-800 uppercase tracking-wider bg-teal-50 px-3 py-1.5 rounded-md border-l-4 border-teal-600 mb-3">
+        <div className="mb-4">
+          <h3 className="text-[11px] font-extrabold text-teal-800 uppercase tracking-wider bg-teal-50 px-2.5 py-1 rounded-md border-l-4 border-teal-600 mb-2">
             4. Dados Financeiros & Adicionais
           </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2.5 text-xs text-slate-700">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2 text-xs text-slate-700">
             <div>
-              <span className="text-slate-400 font-medium block text-[10px] uppercase">Plano Financeiro</span>
+              <span className="text-slate-400 font-medium block text-[9px] uppercase">Plano Financeiro</span>
               <span className="font-semibold">{aluno.plano_financeiro || '—'}</span>
             </div>
             <div>
-              <span className="text-slate-400 font-medium block text-[10px] uppercase">Valor Mensalidade</span>
+              <span className="text-slate-400 font-medium block text-[9px] uppercase">Valor Mensalidade</span>
               <span className="font-semibold">{aluno.valor_mensalidade ? `R$ ${Number(aluno.valor_mensalidade).toFixed(2)}` : '—'}</span>
             </div>
             <div>
-              <span className="text-slate-400 font-medium block text-[10px] uppercase">Pessoa com Deficiência</span>
+              <span className="text-slate-400 font-medium block text-[9px] uppercase">Pessoa com Deficiência</span>
               <span className="font-semibold">{aluno.pessoa_com_deficiencia ? `Sim (${aluno.tipo_deficiencia || 'Não especificada'})` : 'Não'}</span>
             </div>
             <div>
-              <span className="text-slate-400 font-medium block text-[10px] uppercase">Título Eleitoral</span>
+              <span className="text-slate-400 font-medium block text-[9px] uppercase">Título Eleitoral</span>
               <span className="font-semibold">{aluno.titulo_eleitoral || '—'}</span>
             </div>
           </div>
         </div>
 
         {/* Assinatura / Validação */}
-        <div className="mt-12 pt-8 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center text-xs text-slate-500 gap-6">
+        <div className="mt-8 pt-6 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center text-xs text-slate-500 gap-4">
           <div className="text-center md:text-left">
             <p className="font-semibold text-slate-700">CREESER Educacional</p>
-            <p className="text-[10px]">Documento gerado eletronicamente pelo Sistema de Gestão Escolar.</p>
+            <p className="text-[9px]">Documento gerado eletronicamente pelo Sistema de Gestão Escolar.</p>
           </div>
-          <div className="w-64 border-t border-slate-400 pt-1 text-center text-[11px]">
+          <div className="w-56 border-t border-slate-400 pt-1 text-center text-[10px]">
             <span>Assinatura do Responsável / Secretaria</span>
           </div>
         </div>
