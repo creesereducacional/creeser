@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 
@@ -9,6 +9,8 @@ export default function FichaAlunoPage() {
   const [aluno, setAluno] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState('');
+  const [gerandoPdf, setGerandoPdf] = useState(false);
+  const fichaRef = useRef(null);
 
   useEffect(() => {
     if (id) {
@@ -23,8 +25,29 @@ export default function FichaAlunoPage() {
     }
   }, [id]);
 
-  const handlePrint = () => {
-    window.print();
+  const handleGerarPDF = async () => {
+    if (!fichaRef.current || gerandoPdf) return;
+    setGerandoPdf(true);
+
+    try {
+      const html2pdf = (await import('html2pdf.js')).default;
+      const element = fichaRef.current;
+      const opt = {
+        margin: [8, 8, 8, 8],
+        filename: `ficha_cadastral_${aluno?.nome ? aluno.nome.toLowerCase().replace(/\s+/g, '_') : id}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      await html2pdf().set(opt).from(element).save();
+    } catch (err) {
+      console.error('Erro ao gerar PDF:', err);
+      // Fallback para impressão nativa do navegador se o canvas falhar
+      window.print();
+    } finally {
+      setGerandoPdf(false);
+    }
   };
 
   if (loading) {
@@ -70,16 +93,32 @@ export default function FichaAlunoPage() {
         </div>
         <div className="flex gap-3">
           <button
-            onClick={handlePrint}
-            className="px-4 py-2 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-bold rounded-xl text-xs transition shadow flex items-center gap-2 cursor-pointer"
+            onClick={handleGerarPDF}
+            disabled={gerandoPdf}
+            className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 disabled:opacity-50 text-white font-bold rounded-xl text-xs transition shadow flex items-center gap-2 cursor-pointer"
           >
-            <span>📄</span> Gerar PDF da Ficha
+            {gerandoPdf ? (
+              <>
+                <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Gerando PDF...
+              </>
+            ) : (
+              <>
+                <span>📥</span> Baixar PDF Oficial
+              </>
+            )}
           </button>
         </div>
       </header>
 
       {/* Papel Timbrado / Documento Oficial */}
-      <main className="flex-1 max-w-4xl mx-auto w-full p-8 md:p-10 bg-white my-6 shadow-md border border-slate-200 print:border-0 print:shadow-none print:my-0 print:p-0">
+      <main
+        ref={fichaRef}
+        className="flex-1 max-w-4xl mx-auto w-full p-8 md:p-10 bg-white my-6 shadow-md border border-slate-200 print:border-0 print:shadow-none print:my-0 print:p-0"
+      >
         
         {/* Cabeçalho Oficial com Logo */}
         <div className="flex justify-between items-center pb-6 mb-6 border-b-2 border-teal-800">
