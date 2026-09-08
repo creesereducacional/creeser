@@ -470,10 +470,35 @@ export default async function handler(req, res) {
         return res.status(400).json({ message: 'Instituição obrigatória para excluir aluno' });
       }
 
+      const alunoIdNum = parseInt(id);
+
+      // 1. Obter IDs das matrículas do aluno
+      const { data: mats } = await supabase
+        .from('matriculas')
+        .select('id')
+        .eq('aluno_id', alunoIdNum);
+
+      if (mats && mats.length > 0) {
+        const matIds = mats.map(m => m.id);
+        
+        // 2. Excluir movimentações vinculadas às matrículas
+        await supabase
+          .from('movimentacoes_matricula')
+          .delete()
+          .in('matricula_id', matIds);
+
+        // 3. Excluir as matrículas do aluno
+        await supabase
+          .from('matriculas')
+          .delete()
+          .eq('aluno_id', alunoIdNum);
+      }
+
+      // 4. Excluir da tabela alunos
       let deleteQuery = supabase
         .from('alunos')
         .delete()
-        .eq('id', parseInt(id));
+        .eq('id', alunoIdNum);
 
       if (instituicaoId) {
         deleteQuery = applyInstituicaoFilter(deleteQuery, instituicaoId);
@@ -484,7 +509,7 @@ export default async function handler(req, res) {
       if (error) {
         console.error('❌ Erro Supabase ao deletar aluno:', error);
         return res.status(400).json({
-          message: 'Não foi possível excluir o aluno. Ele pode ter vínculos acadêmicos ou financeiros ativos (ex: matrículas, contratos, parcelas ou notas).',
+          message: 'Não foi possível excluir o aluno. Ele possui contratos, parcelas financeiras ou dados históricos vinculados.',
           error: error.message
         });
       }
