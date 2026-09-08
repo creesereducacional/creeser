@@ -471,30 +471,67 @@ export default async function handler(req, res) {
       }
 
       const alunoIdNum = parseInt(id);
+      const isForce = req.query.force === 'true' || req.query.force === true;
 
-      // 1. Obter IDs das matrículas do aluno
-      const { data: mats } = await supabase
+      // 1. Verificar se o aluno possui matrículas vinculadas
+      const { data: mats, error: matsError } = await supabase
         .from('matriculas')
         .select('id')
         .eq('aluno_id', alunoIdNum);
 
-      if (mats && mats.length > 0) {
-        const matIds = mats.map(m => m.id);
-        
-        // 2. Excluir movimentações vinculadas às matrículas
-        await supabase
-          .from('movimentacoes_matricula')
-          .delete()
-          .in('matricula_id', matIds);
-
-        // 3. Excluir as matrículas do aluno
-        await supabase
-          .from('matriculas')
-          .delete()
-          .eq('aluno_id', alunoIdNum);
+      if (matsError) {
+        console.error('❌ Erro ao verificar matrículas do aluno:', matsError);
+        return res.status(500).json({ message: 'Erro ao verificar histórico de matrículas do aluno', error: matsError.message });
       }
 
-      // 4. Excluir da tabela alunos
+      const temMatriculas = Array.isArray(mats) && mats.length > 0;
+
+      // REGRA 1 — Exclusão normal sem force=true
+      if (temMatriculas && !isForce) {
+        return res.status(409).json({
+          message: 'Exclusão não permitida: O aluno possui histórico acadêmico ou de matrículas vinculado. Utilize os fluxos de cancelamento, desistência ou inativação de matrícula para preservar o histórico escolar.',
+          error: 'HISTORICO_ACADEMICO_VINCULADO'
+        });
+      }
+
+      // REGRA 2 — Expurgo administrativo controlado
+      if (isForce) {
+        const canForcePurge = hasPerfil(authUser, ['grupo_admin', 'admin']);
+        if (!canForcePurge) {
+          return res.status(403).json({
+            message: 'Acesso negado: Apenas administradores do sistema possuem permissão para realizar o expurgo de dados com força (force=true).',
+            error: 'PERMISSAO_EXPURGO_NEGADA'
+          });
+        }
+
+        if (temMatriculas) {
+          const matIds = mats.map(m => m.id);
+
+          // 2.1 Excluir movimentações vinculadas às matrículas do aluno
+          const { error: errMov } = await supabase
+            .from('movimentacoes_matricula')
+            .delete()
+            .in('matricula_id', matIds);
+
+          if (errMov) {
+            console.error('❌ Erro ao expurgar movimentações de matrícula:', errMov);
+            return res.status(500).json({ message: 'Erro ao expurgar movimentações acadêmicas do aluno', error: errMov.message });
+          }
+
+          // 2.2 Excluir as matrículas do aluno
+          const { error: errMat } = await supabase
+            .from('matriculas')
+            .delete()
+            .eq('aluno_id', alunoIdNum);
+
+          if (errMat) {
+            console.error('❌ Erro ao expurgar matrículas:', errMat);
+            return res.status(500).json({ message: 'Erro ao expurgar registros de matrícula do aluno', error: errMat.message });
+          }
+        }
+      }
+
+      // 3. Excluir o registro do aluno
       let deleteQuery = supabase
         .from('alunos')
         .delete()
@@ -509,7 +546,7 @@ export default async function handler(req, res) {
       if (error) {
         console.error('❌ Erro Supabase ao deletar aluno:', error);
         return res.status(400).json({
-          message: 'Não foi possível excluir o aluno. Ele possui contratos, parcelas financeiras ou dados históricos vinculados.',
+          message: 'Não foi possível excluir o aluno. Ele possui contratos, parcelas financeiras ou dados vinculados.',
           error: error.message
         });
       }
