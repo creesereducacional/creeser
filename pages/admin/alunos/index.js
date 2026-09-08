@@ -157,11 +157,16 @@ export default function ListagemAlunos() {
         method: 'DELETE'
       });
 
+      const data = await response.json().catch(() => ({}));
+
       if (response.ok) {
         setAlunos(prev => prev.filter(a => a.id !== id));
+      } else {
+        alert(data.message || data.error || 'Erro ao excluir aluno do banco de dados.');
       }
     } catch (error) {
       console.error('Erro ao deletar aluno:', error);
+      alert('Falha na comunicação ao tentar excluir o aluno.');
     }
   };
 
@@ -541,13 +546,14 @@ export default function ListagemAlunos() {
                               ✏️
                             </button>
                           </Link>
-                          <button
-                            onClick={() => window.print()}
-                            className="p-2 text-gray-600 hover:text-gray-800 transition"
-                            title="Imprimir"
-                          >
-                            🖨️
-                          </button>
+                          <Link href={`/admin/alunos/ficha?id=${aluno.id}`}>
+                            <button
+                              className="p-2 text-gray-600 hover:text-gray-800 transition"
+                              title="Imprimir Ficha do Aluno (PDF)"
+                            >
+                              🖨️
+                            </button>
+                          </Link>
                           <button
                             className="p-2 text-gray-600 hover:text-gray-800 transition"
                             title="Resetar Senha"
