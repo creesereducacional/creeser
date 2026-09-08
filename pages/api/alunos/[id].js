@@ -465,9 +465,9 @@ export default async function handler(req, res) {
     } 
     else if (req.method === 'DELETE') {
       // Deletar aluno
-      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
-      if (!instituicaoId) {
-        return res.status(400).json({ message: 'Instituicao obrigatoria para excluir aluno' });
+      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+      if (!isGroupAdmin && !instituicaoId) {
+        return res.status(400).json({ message: 'Instituição obrigatória para excluir aluno' });
       }
 
       let deleteQuery = supabase
@@ -475,13 +475,21 @@ export default async function handler(req, res) {
         .delete()
         .eq('id', parseInt(id));
 
-      deleteQuery = applyInstituicaoFilter(deleteQuery, instituicaoId);
+      if (instituicaoId) {
+        deleteQuery = applyInstituicaoFilter(deleteQuery, instituicaoId);
+      }
 
-      const { error } = await deleteQuery;
+      const { data, error } = await deleteQuery.select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Erro Supabase ao deletar aluno:', error);
+        return res.status(400).json({
+          message: 'Não foi possível excluir o aluno. Ele pode ter vínculos acadêmicos ou financeiros ativos (ex: matrículas, contratos, parcelas ou notas).',
+          error: error.message
+        });
+      }
 
-      res.status(200).json({ message: 'Aluno deletado com sucesso' });
+      res.status(200).json({ message: 'Aluno deletado com sucesso', deleted: data });
     } 
     else {
       res.status(405).json({ message: 'Método não permitido' });
