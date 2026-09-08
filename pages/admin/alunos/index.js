@@ -4,6 +4,7 @@ import DashboardLayout from '@/components/DashboardLayout';
 import Link from 'next/link';
 import PageHeader from '@/components/ui/PageHeader';
 import ModalContratoAluno from '@/components/ModalContratoAluno';
+import ModalRematricula from '@/components/ModalRematricula';
 import ConfirmModal from '@/components/ConfirmModal';
 
 export default function ListagemAlunos() {
@@ -14,6 +15,7 @@ export default function ListagemAlunos() {
   const [filteredAlunos, setFilteredAlunos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalContratoAluno, setModalContratoAluno] = useState(null);
+  const [modalRematricula, setModalRematricula] = useState(null);
   const [modalDelete, setModalDelete] = useState({ isOpen: false, id: null, nome: '' });
   const [instituicoes, setInstituicoes] = useState([]);
   const [loadingInstituicoes, setLoadingInstituicoes] = useState(true);
@@ -636,6 +638,13 @@ export default function ListagemAlunos() {
                             👁️
                           </button>
                           <button
+                            onClick={() => setModalRematricula(aluno)}
+                            className="p-2 text-teal-600 hover:text-teal-800 hover:bg-teal-50 rounded-lg transition"
+                            title="Rematricular Aluno (Novo Ano Letivo)"
+                          >
+                            🔄
+                          </button>
+                          <button
                             onClick={() => solicitarDeletar(aluno)}
                             className="p-2 text-red-600 hover:text-red-800 transition cursor-pointer"
                             title="Deletar"
@@ -746,6 +755,15 @@ export default function ListagemAlunos() {
           onClose={() => setModalContratoAluno(null)}
           alunoId={modalContratoAluno.id}
           alunoNome={modalContratoAluno.nome}
+        />
+      )}
+
+      {modalRematricula && (
+        <ModalRematricula
+          isOpen={!!modalRematricula}
+          onClose={() => setModalRematricula(null)}
+          aluno={modalRematricula}
+          onSuccess={() => carregarAlunos()}
         />
       )}
 
