@@ -73,7 +73,7 @@ export default function FichaAlunoPage() {
             onClick={handlePrint}
             className="px-4 py-2 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-bold rounded-xl text-xs transition shadow flex items-center gap-2 cursor-pointer"
           >
-            <span>🖨️</span> Imprimir / Salvar PDF
+            <span>📄</span> Gerar PDF da Ficha
           </button>
         </div>
       </header>

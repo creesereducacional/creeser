@@ -546,10 +546,10 @@ export default function ListagemAlunos() {
                               ✏️
                             </button>
                           </Link>
-                          <Link href={`/admin/alunos/ficha?id=${aluno.id}`}>
+                          <Link href={`/admin/alunos/ficha?id=${aluno.id}`} target="_blank" rel="noopener noreferrer">
                             <button
                               className="p-2 text-gray-600 hover:text-gray-800 transition"
-                              title="Imprimir Ficha do Aluno (PDF)"
+                              title="Gerar PDF da Ficha do Aluno"
                             >
                               🖨️
                             </button>
