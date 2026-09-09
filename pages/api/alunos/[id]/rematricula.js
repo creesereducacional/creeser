@@ -2,15 +2,16 @@
  * POST /api/alunos/[id]/rematricula
  *
  * Endpoint backend para rematrícula transacional de aluno.
- * Invoca a RPC PostgreSQL fn_executar_rematricula_aluno.
+ * Suporta pré-checagem de débitos operacionais e confirmação explícita.
  *
  * Body: {
- *   novo_ano_letivo, (obrigatório, ex: 2027)
+ *   novo_ano_letivo, (obrigatório, ex: 2026)
  *   novo_semestre, (opcional, default '1')
  *   nova_turma_id, (opcional, se null mantém a mesma turma)
  *   plano_financeiro, (opcional)
  *   valor_mensalidade, (opcional)
- *   observacao (opcional)
+ *   observacao, (opcional)
+ *   confirmar_debito (opcional, boolean: true para prosseguir mesmo com débitos)
  * }
  *
  * Perfis permitidos: grupo_admin, instituicao_admin, admin, secretaria, coordenador
@@ -56,6 +57,7 @@ export default async function handler(req, res) {
     plano_financeiro,
     valor_mensalidade,
     observacao,
+    confirmar_debito,
   } = req.body || {};
 
   const anoLetivoNum = Number(novo_ano_letivo);
@@ -64,7 +66,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Validar existência do aluno e isolamento multi-tenant
+    // 1. Validar existência do aluno e isolamento multi-tenant
     const { data: aluno, error: errAluno } = await supabase
       .from('alunos')
       .select('id, nome, instituicao_id')
@@ -83,7 +85,60 @@ export default async function handler(req, res) {
       return res.status(403).json({ message: 'Acesso negado: aluno pertence a outra instituição.' });
     }
 
-    // Executar exclusivamente a RPC PostgreSQL fn_executar_rematricula_aluno
+    // 2. PRÉ-VERIFICAÇÃO DE DÉBITOS FINANCEIROS OPERACIONAIS ('pendente', 'vencido')
+    const { data: parcelasEmAberto, error: errParcelas } = await supabase
+      .from('financeiro_parcelas')
+      .select('id, numero_parcela, valor, data_vencimento, status, observacoes')
+      .eq('aluno_id', alunoIdNum)
+      .in('status', ['pendente', 'vencido']);
+
+    if (errParcelas) {
+      console.error('❌ Erro ao consultar parcelas do aluno:', errParcelas);
+      return res.status(500).json({ message: 'Erro ao verificar débitos financeiros do aluno', error: errParcelas.message });
+    }
+
+    const temDebitos = Array.isArray(parcelasEmAberto) && parcelasEmAberto.length > 0;
+    const isConfirmadoExplicitamente = confirmar_debito === true || confirmar_debito === 'true';
+
+    // Se existirem débitos e NÃO houver confirmação explícita do operador
+    if (temDebitos && !isConfirmadoExplicitamente) {
+      const quantidadeParcelas = parcelasEmAberto.length;
+      const valorTotalEmAberto = parcelasEmAberto.reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
+
+      const parcelasResumidas = parcelasEmAberto.map((p) => ({
+        id: p.id,
+        numero_parcela: p.numero_parcela,
+        valor: p.valor,
+        data_vencimento: p.data_vencimento,
+        status: p.status,
+      }));
+
+      return res.status(200).json({
+        requer_confirmacao_debito: true,
+        tem_debitos: true,
+        quantidade_parcelas: quantidadeParcelas,
+        valor_total_em_aberto: valorTotalEmAberto,
+        parcelas: parcelasResumidas,
+        mensagem: `Atenção: O aluno ${aluno.nome} possui ${quantidadeParcelas} parcela(s) financeira(s) em aberto totalizando R$ ${valorTotalEmAberto.toFixed(2)}. É necessária a confirmação explícita do operador para prosseguir com a rematrícula.`,
+      });
+    }
+
+    // Se houver confirmação explícita com débitos, exije/valida a observação do operador
+    let observacaoFinal = observacao ? String(observacao).trim() : '';
+    if (temDebitos && isConfirmadoExplicitamente) {
+      if (!observacaoFinal) {
+        return res.status(400).json({
+          message: 'Ao confirmar a rematrícula de aluno com débitos em aberto, é obrigatório informar uma observação de justificativa/autorização.',
+        });
+      }
+      observacaoFinal = `[AUTORIZADO COM DÉBITOS] ${observacaoFinal}`;
+    }
+
+    if (!observacaoFinal) {
+      observacaoFinal = 'Rematrícula realizada via sistema web';
+    }
+
+    // 3. Executar exclusivamente a RPC PostgreSQL fn_executar_rematricula_aluno
     const { data: matriculaId, error: rpcError } = await supabase.rpc('fn_executar_rematricula_aluno', {
       p_aluno_id: alunoIdNum,
       p_novo_ano_letivo: anoLetivoNum,
@@ -91,7 +146,7 @@ export default async function handler(req, res) {
       p_nova_turma_id: nova_turma_id ? Number(nova_turma_id) : null,
       p_plano_financeiro: plano_financeiro ? String(plano_financeiro) : null,
       p_valor_mensalidade: valor_mensalidade ? Number(valor_mensalidade) : null,
-      p_observacao: observacao ? String(observacao) : 'Rematrícula realizada via sistema web',
+      p_observacao: observacaoFinal,
     });
 
     if (rpcError) {
@@ -104,6 +159,7 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({
+      requer_confirmacao_debito: false,
       mensagem: 'Rematrícula realizada com sucesso',
       matricula_id: matriculaId,
     });
