@@ -1,28 +1,65 @@
 import { useState, useEffect } from 'react';
 
 export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) {
+  // Estado dos campos do formulário
+  const [anosLetivosOptions, setAnosLetivosOptions] = useState([]);
+  const [loadingAnos, setLoadingAnos] = useState(false);
   const [novoAnoLetivo, setNovoAnoLetivo] = useState('');
   const [novoSemestre, setNovoSemestre] = useState('1');
+
+  // Checkbox e seleção de outra turma
+  const [trocarTurma, setTrocarTurma] = useState(false);
   const [novaTurmaId, setNovaTurmaId] = useState('');
+  const [turmasOptions, setTurmasOptions] = useState([]);
+  const [loadingTurmas, setLoadingTurmas] = useState(false);
+
+  // Condições financeiras e observação
   const [planoFinanceiro, setPlanoFinanceiro] = useState('');
   const [valorMensalidade, setValorMensalidade] = useState('');
   const [observacao, setObservacao] = useState('');
 
-  // Estado de confirmação financeira
+  // Estado de confirmação financeira de débitos
   const [alertaDebitos, setAlertaDebitos] = useState(null);
   const [justificativaDebito, setJustificativaDebito] = useState('');
 
-  const [turmas, setTurmas] = useState([]);
-  const [loadingTurmas, setLoadingTurmas] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
+  // EFETUA A BUSCA DE ANOS LETIVOS CADASTRADOS E VÁLIDOS
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const fetchAnosLetivos = async () => {
+      setLoadingAnos(true);
+      try {
+        const res = await fetch('/api/configuracoes/anos-letivos');
+        if (res.ok) {
+          const data = await res.json();
+          // Mapeia e filtra apenas anos numéricos válidos e ordena em ordem crescente
+          const listaAnos = Array.isArray(data)
+            ? data
+                .map((item) => Number.parseInt(item.nome || item.ano, 10))
+                .filter((num) => !Number.isNaN(num))
+            : [];
+
+          // Remover duplicados e ordenar crescente
+          const anosUnicos = [...new Set(listaAnos)].sort((a, b) => a - b);
+          setAnosLetivosOptions(anosUnicos);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar anos letivos:', err);
+      } finally {
+        setLoadingAnos(false);
+      }
+    };
+
+    fetchAnosLetivos();
+  }, [isOpen]);
+
+  // DEFINE OS VALORES INICIAIS AO ABRIR O MODAL OU ALTERAR O ALUNO
   useEffect(() => {
     if (!isOpen || !aluno) return;
 
-    // Sugestão automática do próximo período sequencial:
-    // 2026/1 -> 2026/2
-    // 2026/2 -> 2027/1
     const anoAtualVal = Number(aluno.anoLetivo || aluno.ano_letivo || aluno.ano || new Date().getFullYear());
     const semestreAtualVal = String(aluno.semestre || '1').trim();
 
@@ -36,6 +73,7 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
 
     setNovoAnoLetivo(sugAno.toString());
     setNovoSemestre(sugSem);
+    setTrocarTurma(false);
     setNovaTurmaId('');
     setPlanoFinanceiro('');
     setValorMensalidade('');
@@ -43,24 +81,59 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
     setAlertaDebitos(null);
     setJustificativaDebito('');
     setFeedback(null);
-
-    carregarTurmas();
   }, [isOpen, aluno]);
 
-  const carregarTurmas = async () => {
-    setLoadingTurmas(true);
-    try {
-      const res = await fetch('/api/turmas');
-      if (res.ok) {
-        const data = await res.json();
-        setTurmas(Array.isArray(data) ? data : []);
+  // SE SUGERIDO/SELECIONADO UM ANO NÃO CONTIDO EM anosLetivosOptions, AJUSTA OU ADICIONA PARA NÃO QUEBRAR O SELECT
+  useEffect(() => {
+    if (novoAnoLetivo && anosLetivosOptions.length > 0) {
+      const numAno = Number.parseInt(novoAnoLetivo, 10);
+      if (!anosLetivosOptions.includes(numAno)) {
+        // Se a sugestão calculada (ex: próximo ano) ainda não estiver na lista de anos cadastrados,
+        // adiciona temporariamente no select para permitir a seleção sequencial sem perder a lista do banco
+        setAnosLetivosOptions((prev) => [...new Set([...prev, numAno])].sort((a, b) => a - b));
       }
-    } catch (err) {
-      console.error('Erro ao carregar turmas:', err);
-    } finally {
-      setLoadingTurmas(false);
     }
-  };
+  }, [novoAnoLetivo, anosLetivosOptions]);
+
+  // RECARREGA AS TURMAS DINAMICAMENTE APENAS SE O CHECKBOX ESTIVER MARCADO
+  useEffect(() => {
+    if (!isOpen || !trocarTurma) {
+      setTurmasOptions([]);
+      setNovaTurmaId('');
+      return;
+    }
+
+    const carregarTurmas = async () => {
+      setLoadingTurmas(true);
+      try {
+        const res = await fetch('/api/turmas');
+        if (res.ok) {
+          const data = await res.json();
+          let lista = Array.isArray(data) ? data : [];
+
+          // Filtrar turmas ativas
+          lista = lista.filter((t) => !t.situacao || t.situacao === 'ATIVO');
+
+          // Se o aluno tiver curso_id definido, pode filtrar prioritariamente pelo mesmo curso
+          const alunoCursoId = aluno.curso_id || aluno.cursoId;
+          if (alunoCursoId) {
+            const turmasMesmoCurso = lista.filter((t) => String(t.cursoId || t.curso_id || t.cursoid) === String(alunoCursoId));
+            if (turmasMesmoCurso.length > 0) {
+              lista = turmasMesmoCurso;
+            }
+          }
+
+          setTurmasOptions(lista);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar turmas:', err);
+      } finally {
+        setLoadingTurmas(false);
+      }
+    };
+
+    carregarTurmas();
+  }, [isOpen, trocarTurma, aluno]);
 
   if (!isOpen || !aluno) return null;
 
@@ -70,8 +143,13 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
     if (low.includes('já possui uma matrícula') || low.includes('ja possui uma matricula')) {
       return `O aluno ${aluno.nome || ''} já possui uma matrícula cadastrada para o período informado.`;
     }
-    if (low.includes('não pode ser inferior') || low.includes('mesmo período') || low.includes('não pode ser anterior') || low.includes('estritamente posterior')) {
-      return msg; // Retorna mensagem de regra de período explicativa
+    if (
+      low.includes('não pode ser inferior') ||
+      low.includes('mesmo período') ||
+      low.includes('não pode ser anterior') ||
+      low.includes('estritamente posterior')
+    ) {
+      return msg;
     }
     if (low.includes('não foi encontrada') || low.includes('nao foi encontrada')) {
       return 'Matrícula de origem ativa não encontrada para realizar a renovação.';
@@ -83,19 +161,17 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
   };
 
   const executarRequisicaoRematricula = async (confirmarDebitoFlag = false) => {
-    if (submitting) return; // Proteção contra duplo envio
+    if (submitting) return;
     setSubmitting(true);
     setFeedback(null);
 
     try {
-      const obsFinal = confirmarDebitoFlag
-        ? justificativaDebito.trim()
-        : observacao.trim();
+      const obsFinal = confirmarDebitoFlag ? justificativaDebito.trim() : observacao.trim();
 
       const bodyPayload = {
         novo_ano_letivo: Number(novoAnoLetivo),
         novo_semestre: novoSemestre || '1',
-        nova_turma_id: novaTurmaId ? Number(novaTurmaId) : null,
+        nova_turma_id: trocarTurma && novaTurmaId ? Number(novaTurmaId) : null,
         plano_financeiro: planoFinanceiro || null,
         valor_mensalidade: valorMensalidade !== '' && valorMensalidade !== null ? Number(valorMensalidade) : null,
         observacao: obsFinal || null,
@@ -114,13 +190,11 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
         throw new Error(data.message || data.error || 'Erro ao processar a rematrícula.');
       }
 
-      // Interceptação de Débitos Financeiros (Etapa de Alerta)
       if (data.requer_confirmacao_debito) {
         setAlertaDebitos(data);
         return;
       }
 
-      // Sucesso real da RPC
       setAlertaDebitos(null);
       setFeedback({
         type: 'success',
@@ -140,10 +214,17 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
     if (!novoAnoLetivo) {
-      setFeedback({ type: 'error', message: 'Por favor, informe o Novo Ano Letivo.' });
+      setFeedback({ type: 'error', message: 'Por favor, selecione o Novo Ano Letivo.' });
       return;
     }
+
+    if (trocarTurma && !novaTurmaId) {
+      setFeedback({ type: 'error', message: 'Como você optou por matricular em outra turma, por favor selecione a Turma de destino.' });
+      return;
+    }
+
     executarRequisicaoRematricula(false);
   };
 
@@ -187,7 +268,7 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
           </div>
         </div>
 
-        {/* Bloco de Contexto do Aluno Selecionado */}
+        {/* Bloco DADOS DO ALUNO / Contexto do Aluno Selecionado */}
         <div className="p-4 bg-gradient-to-r from-teal-50/60 to-slate-50 border border-teal-100 rounded-xl mb-4 text-xs space-y-1.5 shadow-sm">
           <div className="flex justify-between items-center pb-1.5 border-b border-teal-100/60">
             <span className="font-semibold text-teal-800 uppercase tracking-wider">Aluno Selecionado</span>
@@ -340,40 +421,54 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
           /* FORMULÁRIO PRINCIPAL DE REMATRÍCULA */
           <form onSubmit={handleSubmit} className="space-y-4">
             
-            {/* Mensagem Explicativa de Impacto */}
-            <div className="p-3 bg-teal-50/80 border border-teal-200/80 rounded-xl text-xs text-teal-900 flex items-start gap-2.5">
-              <span className="text-base leading-none">ℹ️</span>
-              <p className="leading-relaxed">
-                Esta ação encerrará o ciclo atual ({anoAtual}/{semestreAtual}) e iniciará a rematrícula ativa para o período sequencial selecionado.
+            {/* Mensagem Explicativa de Impacto Pedagógico (Item 5) */}
+            <div className="p-3 bg-teal-50/80 border border-teal-200/80 rounded-xl text-xs text-teal-900 space-y-1">
+              <div className="flex items-start gap-2">
+                <span className="text-base leading-none">ℹ️</span>
+                <p className="leading-relaxed font-medium">
+                  Você encerrará o ciclo acadêmico atual ({anoAtual}/{semestreAtual}) e iniciará uma nova matrícula para o período selecionado.
+                </p>
+              </div>
+              <p className="pl-6 text-[11px] text-teal-700 italic">
+                {!trocarTurma
+                  ? 'O aluno permanecerá vinculado à turma atual.'
+                  : 'O aluno será rematriculado para a turma de destino selecionada.'}
               </p>
             </div>
 
-            {/* Seção 1: Dados Acadêmicos Principais */}
+            {/* Novo Período Acadêmico */}
             <div className="bg-slate-50/50 p-3.5 rounded-xl border border-slate-200/60 space-y-3">
-              <h4 className="text-[11px] font-bold text-teal-700 uppercase tracking-wider">1. Dados do Novo Período</h4>
+              <h4 className="text-[11px] font-bold text-teal-700 uppercase tracking-wider">Novo período acadêmico</h4>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Novo Ano Letivo * */}
+                {/* Novo Ano Letivo (SELECT - Requisito 1) */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 mb-1 block">
                     Novo Ano Letivo <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="number"
+                  <select
                     required
-                    min="2020"
-                    max="2100"
                     value={novoAnoLetivo}
                     onChange={(e) => setNovoAnoLetivo(e.target.value)}
-                    placeholder="Ex: 2026"
+                    disabled={loadingAnos}
                     className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
-                  />
+                  >
+                    {anosLetivosOptions.length === 0 ? (
+                      <option value="">{loadingAnos ? 'Carregando anos...' : 'Nenhum ano disponível'}</option>
+                    ) : (
+                      anosLetivosOptions.map((anoNum) => (
+                        <option key={anoNum} value={anoNum}>
+                          {anoNum}
+                        </option>
+                      ))
+                    )}
+                  </select>
                 </div>
 
-                {/* Novo Semestre */}
+                {/* Novo Semestre (SELECT) */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 mb-1 block">
-                    Novo Semestre
+                    Semestre <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={novoSemestre}
@@ -385,33 +480,54 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
                   </select>
                 </div>
               </div>
-
-              {/* Nova Turma (opcional) */}
-              <div>
-                <label className="text-xs font-semibold text-slate-700 mb-1 block flex items-center justify-between">
-                  <span>Nova Turma</span>
-                  <span className="text-[10px] font-normal text-slate-400">(opcional)</span>
-                </label>
-                <select
-                  value={novaTurmaId}
-                  onChange={(e) => setNovaTurmaId(e.target.value)}
-                  disabled={loadingTurmas}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white disabled:opacity-50"
-                >
-                  <option value="">Manter turma atual / Definir posteriormente</option>
-                  {turmas.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.nome} {t.codigo ? `(${t.codigo})` : ''} {t.ano_letivo ? `- Ano ${t.ano_letivo}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
             </div>
 
-            {/* Seção 2: Condições Financeiras (Opcionais) */}
+            {/* Seção Troca de Turma / Checkbox (Requisitos 2 e 3) */}
+            <div className="bg-slate-50/50 p-3.5 rounded-xl border border-slate-200/60 space-y-3">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="chkTrocarTurma"
+                  checked={trocarTurma}
+                  onChange={(e) => setTrocarTurma(e.target.checked)}
+                  className="w-4 h-4 text-teal-600 rounded border-slate-300 focus:ring-teal-500 cursor-pointer"
+                />
+                <label htmlFor="chkTrocarTurma" className="text-xs font-bold text-slate-800 cursor-pointer select-none">
+                  Matricular em outra turma?
+                </label>
+              </div>
+
+              {!trocarTurma ? (
+                <p className="text-[11px] text-slate-500 pl-6 italic">
+                  Manterá o aluno na turma atual ({turmaNome || 'Turma Ativa'}).
+                </p>
+              ) : (
+                <div className="pl-6 pt-1 space-y-1 animate-fadeIn">
+                  <label className="text-xs font-semibold text-slate-700 block">
+                    Turma de destino <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={novaTurmaId}
+                    onChange={(e) => setNovaTurmaId(e.target.value)}
+                    disabled={loadingTurmas}
+                    required={trocarTurma}
+                    className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white disabled:opacity-50"
+                  >
+                    <option value="">-- Selecione a turma de destino --</option>
+                    {turmasOptions.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.nome} {t.codigo ? `(${t.codigo})` : ''} {t.curso ? `- ${t.curso}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Condições Financeiras (Opcionais) */}
             <div className="bg-slate-50/50 p-3.5 rounded-xl border border-slate-200/60 space-y-3">
               <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
-                <span>2. Condições Financeiras</span>
+                <span>Condições financeiras</span>
                 <span className="text-[10px] font-normal text-slate-400 lowercase">(opcional)</span>
               </h4>
 
@@ -448,7 +564,7 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
               </div>
             </div>
 
-            {/* Observação (opcional) */}
+            {/* Observações (opcional) */}
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block flex items-center justify-between">
                 <span>Observações</span>
@@ -499,3 +615,4 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
     </div>
   );
 }
+
