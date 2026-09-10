@@ -25,7 +25,7 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
-  // EFETUA A BUSCA DE ANOS LETIVOS CADASTRADOS E VÁLIDOS
+  // EFETUA A BUSCA DE ANOS LETIVOS CADASTRADOS E VÁLIDOS (EXCLUSIVAMENTE DO BANCO)
   useEffect(() => {
     if (!isOpen) return;
 
@@ -71,6 +71,7 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
       sugSem = '1';
     }
 
+    // Apenas seleciona a sugestão se o ano já existir nos anos cadastrados (ou temporariamente define e valida na renderização)
     setNovoAnoLetivo(sugAno.toString());
     setNovoSemestre(sugSem);
     setTrocarTurma(false);
@@ -82,18 +83,6 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
     setJustificativaDebito('');
     setFeedback(null);
   }, [isOpen, aluno]);
-
-  // SE SUGERIDO/SELECIONADO UM ANO NÃO CONTIDO EM anosLetivosOptions, AJUSTA OU ADICIONA PARA NÃO QUEBRAR O SELECT
-  useEffect(() => {
-    if (novoAnoLetivo && anosLetivosOptions.length > 0) {
-      const numAno = Number.parseInt(novoAnoLetivo, 10);
-      if (!anosLetivosOptions.includes(numAno)) {
-        // Se a sugestão calculada (ex: próximo ano) ainda não estiver na lista de anos cadastrados,
-        // adiciona temporariamente no select para permitir a seleção sequencial sem perder a lista do banco
-        setAnosLetivosOptions((prev) => [...new Set([...prev, numAno])].sort((a, b) => a - b));
-      }
-    }
-  }, [novoAnoLetivo, anosLetivosOptions]);
 
   // RECARREGA AS TURMAS DINAMICAMENTE APENAS SE O CHECKBOX ESTIVER MARCADO
   useEffect(() => {
@@ -217,6 +206,14 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
 
     if (!novoAnoLetivo) {
       setFeedback({ type: 'error', message: 'Por favor, selecione o Novo Ano Letivo.' });
+      return;
+    }
+
+    if (anosLetivosOptions.length > 0 && !anosLetivosOptions.includes(Number(novoAnoLetivo))) {
+      setFeedback({
+        type: 'error',
+        message: `O ano letivo ${novoAnoLetivo} ainda não está cadastrado. Acesse Configurações > Anos Letivos para cadastrá-lo antes de prosseguir.`,
+      });
       return;
     }
 
@@ -441,7 +438,7 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
               <h4 className="text-[11px] font-bold text-teal-700 uppercase tracking-wider">Novo período acadêmico</h4>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Novo Ano Letivo (SELECT - Requisito 1) */}
+                {/* Novo Ano Letivo (SELECT - Carregado exclusivamente do banco) */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 mb-1 block">
                     Novo Ano Letivo <span className="text-red-500">*</span>
@@ -454,15 +451,23 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
                     className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
                   >
                     {anosLetivosOptions.length === 0 ? (
-                      <option value="">{loadingAnos ? 'Carregando anos...' : 'Nenhum ano disponível'}</option>
+                      <option value="">{loadingAnos ? 'Carregando anos...' : 'Nenhum ano cadastrado'}</option>
                     ) : (
-                      anosLetivosOptions.map((anoNum) => (
-                        <option key={anoNum} value={anoNum}>
-                          {anoNum}
-                        </option>
-                      ))
+                      <>
+                        <option value="">-- Selecione o Ano Letivo --</option>
+                        {anosLetivosOptions.map((anoNum) => (
+                          <option key={anoNum} value={anoNum}>
+                            {anoNum}
+                          </option>
+                        ))}
+                      </>
                     )}
                   </select>
+                  {novoAnoLetivo && anosLetivosOptions.length > 0 && !anosLetivosOptions.includes(Number(novoAnoLetivo)) && (
+                    <p className="text-[11px] text-amber-700 mt-1 font-medium bg-amber-50 p-2 rounded-lg border border-amber-200">
+                      ⚠️ O ano letivo <strong>{novoAnoLetivo}</strong> ainda não está cadastrado no sistema. Por favor, cadastre o ano em <em>Configurações &gt; Anos Letivos</em> antes de prosseguir.
+                    </p>
+                  )}
                 </div>
 
                 {/* Novo Semestre (SELECT) */}
