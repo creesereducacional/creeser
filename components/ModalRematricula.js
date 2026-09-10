@@ -141,8 +141,8 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
     ) {
       return msg;
     }
-    if (low.includes('não foi encontrada') || low.includes('nao foi encontrada')) {
-      return 'Matrícula de origem ativa não encontrada para realizar a renovação.';
+    if (low.includes('não possui uma matrícula principal') || low.includes('nao possui uma matricula principal') || low.includes('não foi encontrada') || low.includes('nao foi encontrada')) {
+      return `O aluno ${aluno.nome || ''} não possui uma matrícula ativa/principal registrada para realizar a renovação de período.`;
     }
     if (low.includes('permissão') || low.includes('acesso negado')) {
       return 'Você não possui permissão para rematricular alunos nesta instituição.';

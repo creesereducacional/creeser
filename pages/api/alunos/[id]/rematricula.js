@@ -152,7 +152,7 @@ export default async function handler(req, res) {
     if (rpcError) {
       console.error('❌ Erro na RPC fn_executar_rematricula_aluno:', rpcError);
       return res.status(422).json({
-        message: 'Erro ao executar rematrícula',
+        message: rpcError.message || 'Erro ao executar rematrícula',
         error: rpcError.message,
         hint: rpcError.hint,
       });
