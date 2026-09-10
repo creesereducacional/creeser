@@ -104,13 +104,13 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
           const alunoTurmaId = aluno.turma_id || aluno.turmaid || aluno.turmaId || null;
           lista = lista.filter((t) => (!t.situacao || t.situacao === 'ATIVO') && String(t.id) !== String(alunoTurmaId));
 
-          // Se o aluno tiver curso_id definido, pode filtrar prioritariamente pelo mesmo curso
-          const alunoCursoId = aluno.curso_id || aluno.cursoId;
+          // Se o aluno tiver curso_id definido (cursoid, curso_id, cursoId), filtrar OBRIGATORIAMENTE pelo mesmo curso
+          const alunoCursoId = aluno.cursoid || aluno.curso_id || aluno.cursoId || null;
           if (alunoCursoId) {
-            const turmasMesmoCurso = lista.filter((t) => String(t.cursoId || t.curso_id || t.cursoid) === String(alunoCursoId));
-            if (turmasMesmoCurso.length > 0) {
-              lista = turmasMesmoCurso;
-            }
+            lista = lista.filter((t) => {
+              const turmaCursoId = t.cursoid || t.curso_id || t.cursoId || null;
+              return turmaCursoId && String(turmaCursoId) === String(alunoCursoId);
+            });
           }
 
           setTurmasOptions(lista);
@@ -509,20 +509,26 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
                   <label className="text-xs font-semibold text-slate-700 block">
                     Turma de destino <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    value={novaTurmaId}
-                    onChange={(e) => setNovaTurmaId(e.target.value)}
-                    disabled={loadingTurmas}
-                    required={trocarTurma}
-                    className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white disabled:opacity-50"
-                  >
-                    <option value="">-- Selecione a turma de destino --</option>
-                    {turmasOptions.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.nome} {t.codigo ? `(${t.codigo})` : ''} {t.curso ? `- ${t.curso}` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  {turmasOptions.length === 0 && !loadingTurmas ? (
+                    <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+                      ℹ️ Nenhuma outra turma ativa encontrada para o curso deste aluno.
+                    </div>
+                  ) : (
+                    <select
+                      value={novaTurmaId}
+                      onChange={(e) => setNovaTurmaId(e.target.value)}
+                      disabled={loadingTurmas}
+                      required={trocarTurma}
+                      className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white disabled:opacity-50"
+                    >
+                      <option value="">-- Selecione a turma de destino --</option>
+                      {turmasOptions.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.nome} {t.codigo ? `(${t.codigo})` : ''} {t.curso ? `- ${t.curso}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               )}
             </div>
