@@ -100,8 +100,9 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
           const data = await res.json();
           let lista = Array.isArray(data) ? data : [];
 
-          // Filtrar turmas ativas
-          lista = lista.filter((t) => !t.situacao || t.situacao === 'ATIVO');
+          // Filtrar turmas ativas e EXCLUIR a turma atual do aluno
+          const alunoTurmaId = aluno.turma_id || aluno.turmaid || aluno.turmaId || null;
+          lista = lista.filter((t) => (!t.situacao || t.situacao === 'ATIVO') && String(t.id) !== String(alunoTurmaId));
 
           // Se o aluno tiver curso_id definido, pode filtrar prioritariamente pelo mesmo curso
           const alunoCursoId = aluno.curso_id || aluno.cursoId;
@@ -209,7 +210,20 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
       return;
     }
 
-    if (anosLetivosOptions.length > 0 && !anosLetivosOptions.includes(Number(novoAnoLetivo))) {
+    // Validação de período sequencial posterior (Ano/Semestre)
+    const semAtualNum = (semestreAtual === '2' || semestreAtual === '2º' || semestreAtual === '2º Semestre') ? 2 : 1;
+    const semNovoNum = Number(novoSemestre) || 1;
+    const anoNovoNum = Number(novoAnoLetivo);
+
+    if (anoNovoNum < anoAtual || (anoNovoNum === anoAtual && semNovoNum <= semAtualNum)) {
+      setFeedback({
+        type: 'error',
+        message: `O novo período (${anoNovoNum}/${semNovoNum}) deve ser estritamente posterior ao período atual do aluno (${anoAtual}/${semAtualNum}).`,
+      });
+      return;
+    }
+
+    if (anosLetivosOptions.length > 0 && !anosLetivosOptions.includes(anoNovoNum)) {
       setFeedback({
         type: 'error',
         message: `O ano letivo ${novoAnoLetivo} ainda não está cadastrado. Acesse Configurações > Anos Letivos para cadastrá-lo antes de prosseguir.`,
@@ -438,7 +452,7 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
               <h4 className="text-[11px] font-bold text-teal-700 uppercase tracking-wider">Novo período acadêmico</h4>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Novo Ano Letivo (SELECT - Carregado exclusivamente do banco) */}
+                {/* Novo Ano Letivo (SELECT - Apenas anos válidos >= ano atual do aluno) */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 mb-1 block">
                     Novo Ano Letivo <span className="text-red-500">*</span>
@@ -446,7 +460,14 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
                   <select
                     required
                     value={novoAnoLetivo}
-                    onChange={(e) => setNovoAnoLetivo(e.target.value)}
+                    onChange={(e) => {
+                      const selAno = e.target.value;
+                      setNovoAnoLetivo(selAno);
+                      // Se selecionar o ano atual do aluno e o aluno já estiver no 1º semestre, auto-ajusta semestre para 2
+                      if (Number(selAno) === anoAtual && (semestreAtual === '1' || semestreAtual === '1º' || semestreAtual === '1º Semestre')) {
+                        setNovoSemestre('2');
+                      }
+                    }}
                     disabled={loadingAnos}
                     className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
                   >
@@ -455,17 +476,19 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
                     ) : (
                       <>
                         <option value="">-- Selecione o Ano Letivo --</option>
-                        {anosLetivosOptions.map((anoNum) => (
-                          <option key={anoNum} value={anoNum}>
-                            {anoNum}
-                          </option>
-                        ))}
+                        {anosLetivosOptions
+                          .filter((anoNum) => anoNum >= anoAtual)
+                          .map((anoNum) => (
+                            <option key={anoNum} value={anoNum}>
+                              {anoNum}
+                            </option>
+                          ))}
                       </>
                     )}
                   </select>
                   {novoAnoLetivo && anosLetivosOptions.length > 0 && !anosLetivosOptions.includes(Number(novoAnoLetivo)) && (
                     <p className="text-[11px] text-amber-700 mt-1 font-medium bg-amber-50 p-2 rounded-lg border border-amber-200">
-                      ⚠️ O ano letivo <strong>{novoAnoLetivo}</strong> ainda não está cadastrado no sistema. Por favor, cadastre o ano em <em>Configurações &gt; Anos Letivos</em> antes de prosseguir.
+                      ⚠️ O próximo ano letivo (<strong>{novoAnoLetivo}</strong>) ainda não está cadastrado. Acesse <em>Configurações &gt; Anos Letivos</em> para cadastrá-lo.
                     </p>
                   )}
                 </div>
@@ -480,7 +503,10 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
                     onChange={(e) => setNovoSemestre(e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
                   >
-                    <option value="1">1º Semestre</option>
+                    {/* Se o ano for o mesmo do aluno e o aluno já estiver no 1º semestre, bloqueia opção de 1º semestre */}
+                    {!(Number(novoAnoLetivo) === anoAtual && (semestreAtual === '1' || semestreAtual === '1º' || semestreAtual === '1º Semestre')) && (
+                      <option value="1">1º Semestre</option>
+                    )}
                     <option value="2">2º Semestre</option>
                   </select>
                 </div>
