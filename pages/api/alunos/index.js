@@ -238,10 +238,6 @@ export default async function handler(req, res) {
           turmas (
             id,
             nome,
-            cursoid,
-            gradeid,
-            ano_letivo,
-            unidadeid,
             unidades (
               id,
               nome
@@ -293,7 +289,6 @@ export default async function handler(req, res) {
               turmas (
                 id,
                 nome,
-                unidadeid,
                 unidades (
                   id,
                   nome

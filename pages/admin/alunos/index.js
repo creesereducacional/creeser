@@ -49,9 +49,12 @@ export default function ListagemAlunos() {
       if (response.ok) {
         setAlunos(Array.isArray(data) ? data : []);
       } else {
-        const msg = data?.message || data?.error || `Erro ${response.status} ao carregar alunos.`;
+        const errorDetail = data?.error ? (typeof data.error === 'string' ? data.error : JSON.stringify(data.error)) : '';
+        const msg = data?.message 
+          ? `${data.message}${errorDetail && errorDetail !== data.message ? `: ${errorDetail}` : ''}`
+          : (errorDetail || `Erro ${response.status} ao carregar alunos.`);
         setErrorMsg(msg);
-        console.error('❌ Falha ao carregar alunos:', msg);
+        console.error('❌ Falha ao carregar alunos:', msg, data);
         setAlunos([]);
       }
     } catch (error) {
