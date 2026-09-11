@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 
 export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) {
+  // Modalidade da operação: 'REMATRICULA' | 'NOVO_CURSO'
+  const [tipoModalidade, setTipoModalidade] = useState('REMATRICULA');
+
   // Estado dos campos do formulário
   const [anosLetivosOptions, setAnosLetivosOptions] = useState([]);
   const [loadingAnos, setLoadingAnos] = useState(false);
   const [novoAnoLetivo, setNovoAnoLetivo] = useState('');
   const [novoSemestre, setNovoSemestre] = useState('1');
 
-  // Checkbox e seleção de outra turma
+  // Checkbox e seleção de turma
   const [trocarTurma, setTrocarTurma] = useState(false);
   const [novaTurmaId, setNovaTurmaId] = useState('');
   const [turmasOptions, setTurmasOptions] = useState([]);
@@ -35,14 +38,12 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
         const res = await fetch('/api/configuracoes/anos-letivos');
         if (res.ok) {
           const data = await res.json();
-          // Mapeia e filtra apenas anos numéricos válidos e ordena em ordem crescente
           const listaAnos = Array.isArray(data)
             ? data
                 .map((item) => Number.parseInt(item.nome || item.ano, 10))
                 .filter((num) => !Number.isNaN(num))
             : [];
 
-          // Remover duplicados e ordenar crescente
           const anosUnicos = [...new Set(listaAnos)].sort((a, b) => a - b);
           setAnosLetivosOptions(anosUnicos);
         }
@@ -60,6 +61,8 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
   useEffect(() => {
     if (!isOpen || !aluno) return;
 
+    setTipoModalidade('REMATRICULA');
+
     const anoAtualVal = Number(aluno.anoLetivo || aluno.ano_letivo || aluno.ano || new Date().getFullYear());
     const semestreAtualVal = String(aluno.semestre || '1').trim();
 
@@ -71,7 +74,6 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
       sugSem = '1';
     }
 
-    // Apenas seleciona a sugestão se o ano já existir nos anos cadastrados (ou temporariamente define e valida na renderização)
     setNovoAnoLetivo(sugAno.toString());
     setNovoSemestre(sugSem);
     setTrocarTurma(false);
@@ -84,9 +86,40 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
     setFeedback(null);
   }, [isOpen, aluno]);
 
-  // RECARREGA AS TURMAS DINAMICAMENTE APENAS SE O CHECKBOX ESTIVER MARCADO
+  // REAJUSTA O PERÍODO QUANDO O USUÁRIO ALTERNA ENTRE REMATRÍCULA E NOVO CURSO
+  const handleTrocarModalidade = (novaModalidade) => {
+    setTipoModalidade(novaModalidade);
+    setNovaTurmaId('');
+    setFeedback(null);
+    setAlertaDebitos(null);
+
+    const anoAtualVal = Number(aluno.anoLetivo || aluno.ano_letivo || aluno.ano || new Date().getFullYear());
+    const semestreAtualVal = String(aluno.semestre || '1').trim();
+
+    if (novaModalidade === 'REMATRICULA') {
+      let sugAno = anoAtualVal;
+      let sugSem = '2';
+      if (semestreAtualVal === '2' || semestreAtualVal === '2º' || semestreAtualVal === '2º Semestre') {
+        sugAno = anoAtualVal + 1;
+        sugSem = '1';
+      }
+      setNovoAnoLetivo(sugAno.toString());
+      setNovoSemestre(sugSem);
+      setTrocarTurma(false);
+    } else {
+      // NOVO CURSO: Padrão ano letivo corrente e 1º semestre (editável pelo operador)
+      setNovoAnoLetivo(new Date().getFullYear().toString());
+      setNovoSemestre('1');
+      setTrocarTurma(true);
+    }
+  };
+
+  // RECARREGA AS TURMAS DINAMICAMENTE
   useEffect(() => {
-    if (!isOpen || !trocarTurma) {
+    if (!isOpen || !aluno) return;
+
+    // Se for rematrícula e não estiver trocando de turma, não precisa carregar opções
+    if (tipoModalidade === 'REMATRICULA' && !trocarTurma) {
       setTurmasOptions([]);
       setNovaTurmaId('');
       return;
@@ -100,17 +133,29 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
           const data = await res.json();
           let lista = Array.isArray(data) ? data : [];
 
-          // Filtrar turmas ativas e EXCLUIR a turma atual do aluno
-          const alunoTurmaId = aluno.turma_id || aluno.turmaid || aluno.turmaId || null;
-          lista = lista.filter((t) => (!t.situacao || t.situacao === 'ATIVO') && String(t.id) !== String(alunoTurmaId));
+          // Filtrar apenas turmas com situação ATIVO
+          lista = lista.filter((t) => !t.situacao || t.situacao === 'ATIVO');
 
-          // Se o aluno tiver curso_id definido (cursoid, curso_id, cursoId), filtrar OBRIGATORIAMENTE pelo mesmo curso
+          const alunoTurmaId = aluno.turma_id || aluno.turmaid || aluno.turmaId || null;
           const alunoCursoId = aluno.cursoid || aluno.curso_id || aluno.cursoId || null;
-          if (alunoCursoId) {
-            lista = lista.filter((t) => {
-              const turmaCursoId = t.cursoid || t.curso_id || t.cursoId || null;
-              return turmaCursoId && String(turmaCursoId) === String(alunoCursoId);
-            });
+
+          if (tipoModalidade === 'REMATRICULA') {
+            // REMATRÍCULA COM TROCA: Deve ser do MESMO curso e EXCLUIR a turma atual do aluno
+            lista = lista.filter((t) => String(t.id) !== String(alunoTurmaId));
+            if (alunoCursoId) {
+              lista = lista.filter((t) => {
+                const turmaCursoId = t.cursoid || t.curso_id || t.cursoId || null;
+                return turmaCursoId && String(turmaCursoId) === String(alunoCursoId);
+              });
+            }
+          } else {
+            // NOVO CURSO: Deve listar turmas de OUTROS cursos (diferentes do curso atual do aluno)
+            if (alunoCursoId) {
+              lista = lista.filter((t) => {
+                const turmaCursoId = t.cursoid || t.curso_id || t.cursoId || null;
+                return turmaCursoId && String(turmaCursoId) !== String(alunoCursoId);
+              });
+            }
           }
 
           setTurmasOptions(lista);
@@ -123,15 +168,15 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
     };
 
     carregarTurmas();
-  }, [isOpen, trocarTurma, aluno]);
+  }, [isOpen, tipoModalidade, trocarTurma, aluno]);
 
   if (!isOpen || !aluno) return null;
 
   const traduzirErroTecnico = (msg) => {
-    if (!msg) return 'Ocorreu um erro inesperado ao processar a rematrícula.';
+    if (!msg) return 'Ocorreu um erro inesperado ao processar a operação.';
     const low = msg.toLowerCase();
     if (low.includes('já possui uma matrícula') || low.includes('ja possui uma matricula')) {
-      return `O aluno ${aluno.nome || ''} já possui uma matrícula cadastrada para o período informado.`;
+      return msg;
     }
     if (
       low.includes('não pode ser inferior') ||
@@ -145,12 +190,12 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
       return `O aluno ${aluno.nome || ''} não possui uma matrícula ativa/principal registrada para realizar a renovação de período.`;
     }
     if (low.includes('permissão') || low.includes('acesso negado')) {
-      return 'Você não possui permissão para rematricular alunos nesta instituição.';
+      return 'Você não possui permissão para realizar esta operação.';
     }
     return msg;
   };
 
-  const executarRequisicaoRematricula = async (confirmarDebitoFlag = false) => {
+  const executarRequisicao = async (confirmarDebitoFlag = false) => {
     if (submitting) return;
     setSubmitting(true);
     setFeedback(null);
@@ -158,38 +203,75 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
     try {
       const obsFinal = confirmarDebitoFlag ? justificativaDebito.trim() : observacao.trim();
 
-      const bodyPayload = {
-        novo_ano_letivo: Number(novoAnoLetivo),
-        novo_semestre: novoSemestre || '1',
-        nova_turma_id: trocarTurma && novaTurmaId ? Number(novaTurmaId) : null,
-        plano_financeiro: planoFinanceiro || null,
-        valor_mensalidade: valorMensalidade !== '' && valorMensalidade !== null ? Number(valorMensalidade) : null,
-        observacao: obsFinal || null,
-        confirmar_debito: confirmarDebitoFlag,
-      };
+      if (tipoModalidade === 'REMATRICULA') {
+        // FLUXO REMATRÍCULA SEQUENCIAL
+        const bodyPayload = {
+          novo_ano_letivo: Number(novoAnoLetivo),
+          novo_semestre: novoSemestre || '1',
+          nova_turma_id: trocarTurma && novaTurmaId ? Number(novaTurmaId) : null,
+          plano_financeiro: planoFinanceiro || null,
+          valor_mensalidade: valorMensalidade !== '' && valorMensalidade !== null ? Number(valorMensalidade) : null,
+          observacao: obsFinal || null,
+          confirmar_debito: confirmarDebitoFlag,
+        };
 
-      const res = await fetch(`/api/alunos/${aluno.id}/rematricula`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyPayload),
-      });
+        const res = await fetch(`/api/alunos/${aluno.id}/rematricula`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyPayload),
+        });
 
-      const data = await res.json().catch(() => ({}));
+        const data = await res.json().catch(() => ({}));
 
-      if (!res.ok) {
-        throw new Error(data.message || data.error || 'Erro ao processar a rematrícula.');
+        if (!res.ok) {
+          throw new Error(data.message || data.error || 'Erro ao processar a rematrícula.');
+        }
+
+        if (data.requer_confirmacao_debito) {
+          setAlertaDebitos(data);
+          return;
+        }
+
+        setAlertaDebitos(null);
+        setFeedback({
+          type: 'success',
+          message: `✅ Rematrícula de ${aluno.nome} realizada com sucesso para o período ${novoAnoLetivo}/${novoSemestre}!`,
+        });
+      } else {
+        // FLUXO NOVO CURSO SIMULTÂNEO
+        const bodyPayload = {
+          turma_id: Number(novaTurmaId),
+          ano_letivo: Number(novoAnoLetivo),
+          semestre: novoSemestre || '1',
+          plano_financeiro: planoFinanceiro || null,
+          valor_mensalidade: valorMensalidade !== '' && valorMensalidade !== null ? Number(valorMensalidade) : null,
+          observacao: obsFinal || null,
+          confirmar_debito: confirmarDebitoFlag,
+        };
+
+        const res = await fetch(`/api/alunos/${aluno.id}/nova-matricula`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyPayload),
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          throw new Error(data.message || data.error || 'Erro ao processar a nova matrícula.');
+        }
+
+        if (data.requer_confirmacao_debito) {
+          setAlertaDebitos(data);
+          return;
+        }
+
+        setAlertaDebitos(null);
+        setFeedback({
+          type: 'success',
+          message: `✅ Nova matrícula em curso simultâneo para ${aluno.nome} criada com sucesso!`,
+        });
       }
-
-      if (data.requer_confirmacao_debito) {
-        setAlertaDebitos(data);
-        return;
-      }
-
-      setAlertaDebitos(null);
-      setFeedback({
-        type: 'success',
-        message: `✅ Rematrícula de ${aluno.nome} realizada com sucesso para o período ${novoAnoLetivo}/${novoSemestre}!`,
-      });
 
       setTimeout(() => {
         if (onSuccess) onSuccess();
@@ -206,45 +288,54 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
     e.preventDefault();
 
     if (!novoAnoLetivo) {
-      setFeedback({ type: 'error', message: 'Por favor, selecione o Novo Ano Letivo.' });
+      setFeedback({ type: 'error', message: 'Por favor, informe o Ano Letivo.' });
       return;
     }
 
-    // Validação de período sequencial posterior (Ano/Semestre)
-    const semAtualNum = (semestreAtual === '2' || semestreAtual === '2º' || semestreAtual === '2º Semestre') ? 2 : 1;
-    const semNovoNum = Number(novoSemestre) || 1;
     const anoNovoNum = Number(novoAnoLetivo);
-
-    if (anoNovoNum < anoAtual || (anoNovoNum === anoAtual && semNovoNum <= semAtualNum)) {
-      setFeedback({
-        type: 'error',
-        message: `O novo período (${anoNovoNum}/${semNovoNum}) deve ser estritamente posterior ao período atual do aluno (${anoAtual}/${semAtualNum}).`,
-      });
-      return;
-    }
 
     if (anosLetivosOptions.length > 0 && !anosLetivosOptions.includes(anoNovoNum)) {
       setFeedback({
         type: 'error',
-        message: `O ano letivo ${novoAnoLetivo} ainda não está cadastrado. Acesse Configurações > Anos Letivos para cadastrá-lo antes de prosseguir.`,
+        message: `O ano letivo ${novoAnoLetivo} ainda não está cadastrado no sistema. Acesse Configurações > Anos Letivos para cadastrá-lo antes de prosseguir.`,
       });
       return;
     }
 
-    if (trocarTurma && !novaTurmaId) {
-      setFeedback({ type: 'error', message: 'Como você optou por matricular em outra turma, por favor selecione a Turma de destino.' });
-      return;
+    if (tipoModalidade === 'REMATRICULA') {
+      // Validação de período sequencial posterior (Ano/Semestre)
+      const semAtualNum = (semestreAtual === '2' || semestreAtual === '2º' || semestreAtual === '2º Semestre') ? 2 : 1;
+      const semNovoNum = Number(novoSemestre) || 1;
+
+      if (anoNovoNum < anoAtual || (anoNovoNum === anoAtual && semNovoNum <= semAtualNum)) {
+        setFeedback({
+          type: 'error',
+          message: `O novo período (${anoNovoNum}/${semNovoNum}) deve ser estritamente posterior ao período atual do aluno (${anoAtual}/${semAtualNum}).`,
+        });
+        return;
+      }
+
+      if (trocarTurma && !novaTurmaId) {
+        setFeedback({ type: 'error', message: 'Como você optou por matricular em outra turma, por favor selecione a Turma de destino.' });
+        return;
+      }
+    } else {
+      // Validação para Novo Curso
+      if (!novaTurmaId) {
+        setFeedback({ type: 'error', message: 'Por favor, selecione a Turma do novo curso.' });
+        return;
+      }
     }
 
-    executarRequisicaoRematricula(false);
+    executarRequisicao(false);
   };
 
   const handleConfirmarComDebitos = () => {
     if (!justificativaDebito.trim()) {
-      setFeedback({ type: 'error', message: 'Por favor, preencha a justificativa para autorizar a rematrícula com débitos.' });
+      setFeedback({ type: 'error', message: 'Por favor, preencha a justificativa para autorizar a operação com débitos.' });
       return;
     }
-    executarRequisicaoRematricula(true);
+    executarRequisicao(true);
   };
 
   const handleCancelarDebitos = () => {
@@ -267,15 +358,48 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
         {/* Cabeçalho Visual */}
         <div className="flex items-center gap-3 pb-4 mb-4 border-b border-slate-100">
           <div className="w-12 h-12 bg-teal-50 text-teal-600 rounded-xl flex items-center justify-center text-2xl shadow-sm border border-teal-100 flex-shrink-0">
-            🔄
+            {tipoModalidade === 'REMATRICULA' ? '🔄' : '🎓'}
           </div>
           <div>
             <h3 className="text-lg font-extrabold text-slate-800 tracking-tight">
-              Rematrícula Individual
+              {tipoModalidade === 'REMATRICULA' ? 'Rematrícula Individual' : 'Nova Matrícula em Outro Curso'}
             </h3>
             <p className="text-xs text-slate-500">
-              Renovação transacional de matrícula para o novo período escolar
+              {tipoModalidade === 'REMATRICULA'
+                ? 'Renovação e progressão de período acadêmico do aluno'
+                : 'Ingresso simultâneo em um curso adicional mantendo o atual ativo'}
             </p>
+          </div>
+        </div>
+
+        {/* SELEÇÃO DE MODALIDADE (Item Requisitado) */}
+        <div className="mb-4">
+          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">
+            Tipo de Operação
+          </label>
+          <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+            <button
+              type="button"
+              onClick={() => handleTrocarModalidade('REMATRICULA')}
+              className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                tipoModalidade === 'REMATRICULA'
+                  ? 'bg-white text-teal-700 shadow-sm border border-teal-200'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>🔄</span> Rematrícula / Progressão
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTrocarModalidade('NOVO_CURSO')}
+              className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                tipoModalidade === 'NOVO_CURSO'
+                  ? 'bg-white text-teal-700 shadow-sm border border-teal-200'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>🎓</span> Novo Curso (Simultâneo)
+            </button>
           </div>
         </div>
 
@@ -295,7 +419,7 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
             )}
             {cursoNome && (
               <div>
-                <span className="font-medium text-slate-400 block text-[10px] uppercase">Curso</span>
+                <span className="font-medium text-slate-400 block text-[10px] uppercase">Curso Atual</span>
                 <span className="font-semibold text-slate-700">{cursoNome}</span>
               </div>
             )}
@@ -378,7 +502,7 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
               )}
 
               <p className="text-xs text-amber-800 leading-relaxed font-medium pt-1">
-                Existem débitos financeiros vinculados a este aluno. A rematrícula pode ser cancelada ou autorizada mediante justificativa obrigatoriamente preenchida.
+                Existem débitos financeiros vinculados a este aluno. A operação pode ser cancelada ou autorizada mediante justificativa preenchida.
               </p>
 
               {/* Campo Justificativa Obrigatório */}
@@ -404,7 +528,7 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
                 disabled={submitting}
                 className="flex-1 py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs rounded-xl transition-colors cursor-pointer disabled:opacity-50"
               >
-                Cancelar Rematrícula
+                Cancelar Operação
               </button>
               <button
                 type="button"
@@ -429,109 +553,172 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
             </div>
           </div>
         ) : (
-          /* FORMULÁRIO PRINCIPAL DE REMATRÍCULA */
+          /* FORMULÁRIO PRINCIPAL */
           <form onSubmit={handleSubmit} className="space-y-4">
             
-            {/* Mensagem Explicativa de Impacto Pedagógico (Item 5) */}
+            {/* Mensagem Explicativa de Impacto Pedagógico */}
             <div className="p-3 bg-teal-50/80 border border-teal-200/80 rounded-xl text-xs text-teal-900 space-y-1">
               <div className="flex items-start gap-2">
                 <span className="text-base leading-none">ℹ️</span>
                 <p className="leading-relaxed font-medium">
-                  Você encerrará o ciclo acadêmico atual ({anoAtual}/{semestreAtual}) e iniciará uma nova matrícula para o período selecionado.
+                  {tipoModalidade === 'REMATRICULA'
+                    ? `Você encerrará o ciclo acadêmico atual (${anoAtual}/${semestreAtual}) e iniciará uma nova matrícula para o período sequencial.`
+                    : `Você criará uma matrícula adicional em um novo curso. O curso atual (${cursoNome || 'Curso Atual'}) permanecerá ativo e intocado.`}
                 </p>
               </div>
               <p className="pl-6 text-[11px] text-teal-700 italic">
-                {!trocarTurma
-                  ? 'O aluno permanecerá vinculado à turma atual.'
-                  : 'O aluno será rematriculado para a turma de destino selecionada.'}
+                {tipoModalidade === 'REMATRICULA'
+                  ? (!trocarTurma
+                      ? 'O aluno permanecerá vinculado à turma atual.'
+                      : 'O aluno será rematriculado para a turma de destino selecionada do mesmo curso.')
+                  : 'O aluno passará a cursar dois cursos simultâneos com matrículas independentes.'}
               </p>
             </div>
 
-            {/* Próximo Período Acadêmico Sequencial Imediato */}
+            {/* Período Acadêmico */}
             <div className="bg-slate-50/50 p-3.5 rounded-xl border border-slate-200/60 space-y-3">
-              <h4 className="text-[11px] font-bold text-teal-700 uppercase tracking-wider">Novo período acadêmico (Sequencial)</h4>
+              <h4 className="text-[11px] font-bold text-teal-700 uppercase tracking-wider">
+                {tipoModalidade === 'REMATRICULA' ? 'Novo período acadêmico (Sequencial)' : 'Período Inicial no Novo Curso'}
+              </h4>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Novo Ano Letivo (Calculado Imediato & Exclusivo do banco) */}
+                {/* Ano Letivo */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 mb-1 block">
-                    Novo Ano Letivo <span className="text-red-500">*</span>
+                    Ano Letivo <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    readOnly
-                    value={novoAnoLetivo}
-                    className="w-full px-3 py-2 text-sm font-bold border border-teal-300 rounded-lg bg-teal-50/50 text-teal-900 cursor-not-allowed"
-                  />
+                  {tipoModalidade === 'REMATRICULA' ? (
+                    <input
+                      type="text"
+                      readOnly
+                      value={novoAnoLetivo}
+                      className="w-full px-3 py-2 text-sm font-bold border border-teal-300 rounded-lg bg-teal-50/50 text-teal-900 cursor-not-allowed"
+                    />
+                  ) : (
+                    <select
+                      value={novoAnoLetivo}
+                      onChange={(e) => setNovoAnoLetivo(e.target.value)}
+                      disabled={loadingAnos}
+                      className="w-full px-3 py-2 text-sm font-medium border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                    >
+                      {anosLetivosOptions.map((ano) => (
+                        <option key={ano} value={ano}>{ano}</option>
+                      ))}
+                    </select>
+                  )}
                   {novoAnoLetivo && anosLetivosOptions.length > 0 && !anosLetivosOptions.includes(Number(novoAnoLetivo)) && (
                     <p className="text-[11px] text-amber-700 mt-1.5 font-medium bg-amber-50 p-2 rounded-lg border border-amber-200">
-                      ⚠️ O próximo ano letivo (<strong>{novoAnoLetivo}</strong>) ainda não está cadastrado no sistema. Por favor, cadastre-o em <em>Configurações &gt; Anos Letivos</em> para liberar a rematrícula.
+                      ⚠️ O ano letivo (<strong>{novoAnoLetivo}</strong>) ainda não está cadastrado. Por favor, cadastre-o em <em>Configurações &gt; Anos Letivos</em>.
                     </p>
                   )}
                 </div>
 
-                {/* Novo Semestre (Calculado Imediato) */}
+                {/* Semestre */}
                 <div>
                   <label className="text-xs font-semibold text-slate-700 mb-1 block">
                     Semestre <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    readOnly
-                    value={`${novoSemestre}º Semestre`}
-                    className="w-full px-3 py-2 text-sm font-bold border border-teal-300 rounded-lg bg-teal-50/50 text-teal-900 cursor-not-allowed"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Seção Troca de Turma / Checkbox (Requisitos 2 e 3) */}
-            <div className="bg-slate-50/50 p-3.5 rounded-xl border border-slate-200/60 space-y-3">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="chkTrocarTurma"
-                  checked={trocarTurma}
-                  onChange={(e) => setTrocarTurma(e.target.checked)}
-                  className="w-4 h-4 text-teal-600 rounded border-slate-300 focus:ring-teal-500 cursor-pointer"
-                />
-                <label htmlFor="chkTrocarTurma" className="text-xs font-bold text-slate-800 cursor-pointer select-none">
-                  Matricular em outra turma?
-                </label>
-              </div>
-
-              {!trocarTurma ? (
-                <p className="text-[11px] text-slate-500 pl-6 italic">
-                  Manterá o aluno na turma atual ({turmaNome || 'Turma Ativa'}).
-                </p>
-              ) : (
-                <div className="pl-6 pt-1 space-y-1 animate-fadeIn">
-                  <label className="text-xs font-semibold text-slate-700 block">
-                    Turma de destino <span className="text-red-500">*</span>
-                  </label>
-                  {turmasOptions.length === 0 && !loadingTurmas ? (
-                    <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
-                      ℹ️ Nenhuma outra turma ativa encontrada para o curso deste aluno.
-                    </div>
+                  {tipoModalidade === 'REMATRICULA' ? (
+                    <input
+                      type="text"
+                      readOnly
+                      value={`${novoSemestre}º Semestre`}
+                      className="w-full px-3 py-2 text-sm font-bold border border-teal-300 rounded-lg bg-teal-50/50 text-teal-900 cursor-not-allowed"
+                    />
                   ) : (
                     <select
-                      value={novaTurmaId}
-                      onChange={(e) => setNovaTurmaId(e.target.value)}
-                      disabled={loadingTurmas}
-                      required={trocarTurma}
-                      className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white disabled:opacity-50"
+                      value={novoSemestre}
+                      onChange={(e) => setNovoSemestre(e.target.value)}
+                      className="w-full px-3 py-2 text-sm font-medium border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
                     >
-                      <option value="">-- Selecione a turma de destino --</option>
-                      {turmasOptions.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.nome} {t.codigo ? `(${t.codigo})` : ''} {t.curso ? `- ${t.curso}` : ''}
-                        </option>
-                      ))}
+                      <option value="1">1º Semestre</option>
+                      <option value="2">2º Semestre</option>
                     </select>
                   )}
                 </div>
-              )}
+              </div>
             </div>
+
+            {/* SELEÇÃO DE TURMA */}
+            {tipoModalidade === 'REMATRICULA' ? (
+              /* SEÇÃO REMATRÍCULA: Checkbox de troca opcional */
+              <div className="bg-slate-50/50 p-3.5 rounded-xl border border-slate-200/60 space-y-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="chkTrocarTurma"
+                    checked={trocarTurma}
+                    onChange={(e) => setTrocarTurma(e.target.checked)}
+                    className="w-4 h-4 text-teal-600 rounded border-slate-300 focus:ring-teal-500 cursor-pointer"
+                  />
+                  <label htmlFor="chkTrocarTurma" className="text-xs font-bold text-slate-800 cursor-pointer select-none">
+                    Matricular em outra turma do mesmo curso?
+                  </label>
+                </div>
+
+                {!trocarTurma ? (
+                  <p className="text-[11px] text-slate-500 pl-6 italic">
+                    Manterá o aluno na turma atual ({turmaNome || 'Turma Ativa'}).
+                  </p>
+                ) : (
+                  <div className="pl-6 pt-1 space-y-1 animate-fadeIn">
+                    <label className="text-xs font-semibold text-slate-700 block">
+                      Turma de destino <span className="text-red-500">*</span>
+                    </label>
+                    {turmasOptions.length === 0 && !loadingTurmas ? (
+                      <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+                        ℹ️ Nenhuma outra turma ativa encontrada para o curso deste aluno.
+                      </div>
+                    ) : (
+                      <select
+                        value={novaTurmaId}
+                        onChange={(e) => setNovaTurmaId(e.target.value)}
+                        disabled={loadingTurmas}
+                        required={trocarTurma}
+                        className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white disabled:opacity-50"
+                      >
+                        <option value="">-- Selecione a turma de destino --</option>
+                        {turmasOptions.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.nome} {t.codigo ? `(${t.codigo})` : ''} {t.curso ? `- ${t.curso}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* SEÇÃO NOVO CURSO: Seleção de turma obrigatória de outros cursos */
+              <div className="bg-slate-50/50 p-3.5 rounded-xl border border-slate-200/60 space-y-2">
+                <label className="text-xs font-bold text-teal-800 block">
+                  Turma do Novo Curso <span className="text-red-500">*</span>
+                </label>
+                <p className="text-[11px] text-slate-500 pb-1">
+                  Selecione a turma pertencente ao novo curso em que o aluno será matriculado:
+                </p>
+                {turmasOptions.length === 0 && !loadingTurmas ? (
+                  <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+                    ℹ️ Não foram encontradas turmas ativas cadastradas para outros cursos.
+                  </div>
+                ) : (
+                  <select
+                    value={novaTurmaId}
+                    onChange={(e) => setNovaTurmaId(e.target.value)}
+                    disabled={loadingTurmas}
+                    required
+                    className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white disabled:opacity-50"
+                  >
+                    <option value="">-- Selecione a turma do novo curso --</option>
+                    {turmasOptions.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.curso ? `[${t.curso}] ` : ''}{t.nome} {t.codigo ? `(${t.codigo})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
 
             {/* Condições Financeiras (Opcionais) */}
             <div className="bg-slate-50/50 p-3.5 rounded-xl border border-slate-200/60 space-y-3">
@@ -583,7 +770,7 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
                 rows={2}
                 value={observacao}
                 onChange={(e) => setObservacao(e.target.value)}
-                placeholder="Anotações internas sobre a rematrícula..."
+                placeholder={tipoModalidade === 'REMATRICULA' ? "Anotações internas sobre a rematrícula..." : "Anotações internas sobre a nova matrícula no curso..."}
                 className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white resize-none"
               />
             </div>
@@ -613,7 +800,8 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
                   </>
                 ) : (
                   <>
-                    <span>🔄</span> Confirmar Rematrícula
+                    <span>{tipoModalidade === 'REMATRICULA' ? '🔄' : '🎓'}</span>
+                    {tipoModalidade === 'REMATRICULA' ? 'Confirmar Rematrícula' : 'Confirmar Matrícula no Novo Curso'}
                   </>
                 )}
               </button>
@@ -624,4 +812,3 @@ export default function ModalRematricula({ isOpen, onClose, aluno, onSuccess }) 
     </div>
   );
 }
-
