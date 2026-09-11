@@ -231,6 +231,10 @@ export default async function handler(req, res) {
         .from('alunos')
         .select(`
           *,
+          cursos (
+            id,
+            nome
+          ),
           turmas (
             id,
             nome,
@@ -238,18 +242,10 @@ export default async function handler(req, res) {
             gradeid,
             ano_letivo,
             unidadeid,
-            cursos (
-              id,
-              nome
-            ),
             unidades (
               id,
               nome
             )
-          ),
-          cursos (
-            id,
-            nome
           )
         `)
         .order('id', { ascending: false });
@@ -260,7 +256,11 @@ export default async function handler(req, res) {
 
       if (alunosError) {
         console.error('Supabase GET alunos error:', alunosError);
-        return res.status(500).json({ message: 'Erro ao recuperar alunos', error: alunosError.message });
+        return res.status(500).json({ 
+          message: 'Erro ao recuperar alunos', 
+          error: alunosError?.message || alunosError,
+          code: alunosError?.code || null
+        });
       }
 
       const alunos = alunosData || [];
