@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import DashboardLayout from '@/components/DashboardLayout';
 import Link from 'next/link';
 import PageHeader from '@/components/ui/PageHeader';
+import BarraFiltros from '@/components/AdminFinanceiro/BarraFiltros';
 import ModalContratoAluno from '@/components/ModalContratoAluno';
 import ModalRematricula from '@/components/ModalRematricula';
 import ConfirmModal from '@/components/ConfirmModal';
@@ -12,32 +13,29 @@ export default function ListagemAlunos() {
   const currentYear = new Date().getFullYear().toString();
   const [abaAtiva, setAbaAtiva] = useState('listar');
   const [alunos, setAlunos] = useState([]);
-  const [filteredAlunos, setFilteredAlunos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalContratoAluno, setModalContratoAluno] = useState(null);
   const [modalRematricula, setModalRematricula] = useState(null);
   const [modalDelete, setModalDelete] = useState({ isOpen: false, id: null, nome: '' });
-  const [instituicoes, setInstituicoes] = useState([]);
-  const [loadingInstituicoes, setLoadingInstituicoes] = useState(true);
+
+  // Opções para os filtros
+  const [unidades, setUnidades] = useState([]);
+  const [cursos, setCursos] = useState([]);
+  const [turmas, setTurmas] = useState([]);
   const [anosLetivos, setAnosLetivos] = useState([]);
-  const [loadingAnosLetivos, setLoadingAnosLetivos] = useState(true);
-  const [searchNome, setSearchNome] = useState('');
-  const [searchMatricula, setSearchMatricula] = useState('');
-  const [searchInstituicao, setSearchInstituicao] = useState('');
-  const [searchAnoLetivo, setSearchAnoLetivo] = useState('');
-  const [searchTurma, setSearchTurma] = useState('');
-  const [searchStatus, setSearchStatus] = useState('');
-  const [searchCPF, setSearchCPF] = useState('');
+
+  // Estados dos filtros
+  const [searchVal, setSearchVal] = useState('');
+  const [statusVal, setStatusVal] = useState('');
+  const [unidadeVal, setUnidadeVal] = useState('');
+  const [cursoVal, setCursoVal] = useState('');
+  const [turmaVal, setTurmaVal] = useState('');
+  const [anoLetivoVal, setAnoLetivoVal] = useState('');
 
   useEffect(() => {
     carregarAlunos();
-    carregarInstituicoes();
-    carregarAnosLetivos();
+    carregarOpcoesFiltros();
   }, []);
-
-  useEffect(() => {
-    filtrarAlunos();
-  }, [alunos, searchNome, searchMatricula, searchInstituicao, searchAnoLetivo, searchTurma, searchStatus, searchCPF]);
 
   const carregarAlunos = async () => {
     try {
@@ -45,7 +43,7 @@ export default function ListagemAlunos() {
       const response = await fetch('/api/alunos');
       if (response.ok) {
         const data = await response.json();
-        setAlunos(data);
+        setAlunos(Array.isArray(data) ? data : []);
       }
     } catch (error) {
       console.error('Erro ao carregar alunos:', error);
@@ -54,90 +52,127 @@ export default function ListagemAlunos() {
     }
   };
 
-  const carregarInstituicoes = async () => {
+  const carregarOpcoesFiltros = async () => {
     try {
-      setLoadingInstituicoes(true);
-      const response = await fetch('/api/instituicoes');
+      const [resOpcoes, resTurmas, resCursos, resAnos] = await Promise.all([
+        fetch('/api/turmas/opcoes'),
+        fetch('/api/turmas'),
+        fetch('/api/cursos'),
+        fetch('/api/configuracoes/anos-letivos'),
+      ]);
 
-      if (response.ok) {
-        const data = await response.json();
-        const lista = Array.isArray(data) ? data : [];
-        setInstituicoes(lista);
+      if (resOpcoes.ok) {
+        const data = await resOpcoes.json();
+        if (Array.isArray(data.unidades)) setUnidades(data.unidades);
+      }
+
+      if (resTurmas.ok) {
+        const data = await resTurmas.json();
+        setTurmas(Array.isArray(data) ? data : (data.turmas || []));
+      }
+
+      if (resCursos.ok) {
+        const data = await resCursos.json();
+        setCursos(Array.isArray(data) ? data : (data.cursos || []));
+      }
+
+      if (resAnos.ok) {
+        const data = await resAnos.json();
+        const lista = Array.isArray(data)
+          ? data.map(a => (a.nome ?? a.ano ?? '').toString()).filter(Boolean)
+          : [];
+        setAnosLetivos([...new Set(lista)].sort());
       }
     } catch (error) {
-      console.error('Erro ao carregar instituições:', error);
-    } finally {
-      setLoadingInstituicoes(false);
+      console.error('Erro ao carregar opções de filtros:', error);
     }
   };
 
-  const carregarAnosLetivos = async () => {
-    try {
-      setLoadingAnosLetivos(true);
-      const response = await fetch('/api/configuracoes/anos-letivos');
+  // Filtragem dinâmica de turmas baseada no curso / unidade selecionados
+  const turmasFiltradasOpcoes = useMemo(() => {
+    let list = turmas;
+    if (cursoVal) {
+      list = list.filter(t => String(t.cursoId || t.cursoid || t.curso_id) === String(cursoVal));
+    }
+    if (unidadeVal) {
+      list = list.filter(t => String(t.unidadeId || t.unidadeid || t.unidade_id) === String(unidadeVal));
+    }
+    return list;
+  }, [turmas, cursoVal, unidadeVal]);
 
-      if (response.ok) {
-        const data = await response.json();
-        const lista = Array.isArray(data) ? data : [];
-        setAnosLetivos(lista);
+  const limparFiltros = () => {
+    setSearchVal('');
+    setStatusVal('');
+    setUnidadeVal('');
+    setCursoVal('');
+    setTurmaVal('');
+    setAnoLetivoVal('');
+  };
+
+  // Filtragem dos registros de alunos / matrículas
+  const filteredAlunos = useMemo(() => {
+    return alunos.filter((aluno) => {
+      // 1. Busca por Texto: Nome, Matrícula, CPF, Responsável
+      if (searchVal && searchVal.trim()) {
+        const term = searchVal.trim().toLowerCase();
+        const nome = String(aluno.nome || '').toLowerCase();
+        const cpf = String(aluno.cpf || '').replace(/\D/g, '');
+        const matNum = String(aluno.numero_id || aluno.matricula_codigo || aluno.matricula || '').toLowerCase();
+        const respNome = String(aluno.nome_responsavel || aluno.responsavel || aluno.mae || aluno.pai || '').toLowerCase();
+
+        const matchNome = nome.includes(term);
+        const matchCpf = cpf.includes(term.replace(/\D/g, '')) || String(aluno.cpf || '').toLowerCase().includes(term);
+        const matchMat = matNum.includes(term);
+        const matchResp = respNome.includes(term);
+
+        if (!matchNome && !matchCpf && !matchMat && !matchResp) {
+          return false;
+        }
       }
-    } catch (error) {
-      console.error('Erro ao carregar anos letivos:', error);
-    } finally {
-      setLoadingAnosLetivos(false);
-    }
-  };
 
-  const filtrarAlunos = () => {
-    let filtered = alunos;
+      // 2. Filtro de Status
+      if (statusVal) {
+        const statusAtual = String(aluno.status || aluno.status_administrativo || aluno.statusmatricula || '').toUpperCase();
+        if (statusAtual !== statusVal.toUpperCase()) {
+          return false;
+        }
+      }
 
-    if (searchNome) {
-      filtered = filtered.filter(a =>
-        a.nome.toLowerCase().includes(searchNome.toLowerCase())
-      );
-    }
+      // 3. Filtro de Unidade
+      if (unidadeVal) {
+        const unidId = String(aluno.unidade_id || aluno.unidadeId || '');
+        if (unidId !== String(unidadeVal)) {
+          return false;
+        }
+      }
 
-    if (searchMatricula) {
-      filtered = filtered.filter(a =>
-        (a.numero_id && a.numero_id.toString().includes(searchMatricula)) ||
-        (a.matricula && a.matricula.toString().includes(searchMatricula))
-      );
-    }
+      // 4. Filtro de Curso
+      if (cursoVal) {
+        const cId = String(aluno.curso_id || aluno.cursoid || aluno.cursoId || '');
+        if (cId !== String(cursoVal)) {
+          return false;
+        }
+      }
 
-    if (searchInstituicao) {
-      const filtroInstituicao = searchInstituicao.toLowerCase();
-      filtered = filtered.filter(a =>
-        a.instituicao && a.instituicao.toLowerCase().includes(filtroInstituicao)
-      );
-    }
+      // 5. Filtro de Turma
+      if (turmaVal) {
+        const tId = String(aluno.turma_id || aluno.turmaid || aluno.turmaId || '');
+        if (tId !== String(turmaVal)) {
+          return false;
+        }
+      }
 
-    if (searchAnoLetivo) {
-      const filtroAno = searchAnoLetivo.toString();
-      filtered = filtered.filter(a => {
-        const ano = a.anoLetivo ?? a.ano_letivo ?? a.anoLetivoAtual ?? a.ano;
-        if (ano === null || ano === undefined) return false;
-        return ano.toString() === filtroAno;
-      });
-    }
+      // 6. Filtro de Ano Letivo
+      if (anoLetivoVal) {
+        const aLet = String(aluno.ano_letivo ?? aluno.anoLetivo ?? aluno.ano ?? '');
+        if (aLet !== String(anoLetivoVal)) {
+          return false;
+        }
+      }
 
-    if (searchTurma) {
-      filtered = filtered.filter(a =>
-        a.turma && a.turma.toLowerCase().includes(searchTurma.toLowerCase())
-      );
-    }
-
-    if (searchCPF) {
-      filtered = filtered.filter(a =>
-        a.cpf && a.cpf.includes(searchCPF)
-      );
-    }
-
-    if (searchStatus) {
-      filtered = filtered.filter(a => a.status === searchStatus);
-    }
-
-    setFilteredAlunos(filtered);
-  };
+      return true;
+    });
+  }, [alunos, searchVal, statusVal, unidadeVal, cursoVal, turmaVal, anoLetivoVal]);
 
   const solicitarDeletar = (aluno) => {
     setModalDelete({
@@ -168,16 +203,6 @@ export default function ListagemAlunos() {
       console.error('Erro ao deletar aluno:', error);
       alert('Falha na comunicação ao tentar excluir o aluno.');
     }
-  };
-
-  const limparFiltros = () => {
-    setSearchNome('');
-    setSearchMatricula('');
-    setSearchInstituicao('');
-    setSearchAnoLetivo('');
-    setSearchTurma('');
-    setSearchStatus('');
-    setSearchCPF('');
   };
 
   const marcarContratoGerado = async (alunoId) => {
@@ -271,18 +296,40 @@ export default function ListagemAlunos() {
     }
   };
 
+  const StatusBadge = ({ status }) => {
+    const cfg = {
+      ATIVO:                          { cls: 'bg-green-100 text-green-800 border-green-200',   label: 'Ativo' },
+      INATIVO:                        { cls: 'bg-red-100 text-red-800 border-red-200',       label: 'Inativo' },
+      PRE_CADASTRO:                   { cls: 'bg-gray-100 text-gray-700 border-gray-200',     label: 'Pré-Cadastro' },
+      AGUARDANDO_PAGAMENTO:           { cls: 'bg-purple-100 text-purple-800 border-purple-200', label: 'Ag. Pagamento' },
+      AGUARDANDO_PAGAMENTO_MATRICULA: { cls: 'bg-purple-100 text-purple-800 border-purple-200', label: 'Ag. Pagamento' },
+      AGUARDANDO_TURMA:               { cls: 'bg-indigo-100 text-indigo-800 border-indigo-200', label: 'Ag. Turma' },
+      AGUARDANDO_FORMACAO_TURMA:      { cls: 'bg-indigo-100 text-indigo-800 border-indigo-200', label: 'Ag. Turma' },
+      TRANCADO:                       { cls: 'bg-amber-100 text-amber-800 border-amber-200',   label: 'Trancado' },
+      DESISTENTE:                     { cls: 'bg-orange-100 text-orange-800 border-orange-200', label: 'Desistente' },
+      CANCELADO:                      { cls: 'bg-rose-100 text-rose-800 border-rose-200',     label: 'Cancelado' },
+      CONCLUIDO:                      { cls: 'bg-teal-100 text-teal-800 border-teal-200',     label: 'Concluído' },
+    }[String(status).toUpperCase()] || { cls: 'bg-gray-100 text-gray-800 border-gray-200', label: status || '—' };
+
+    return (
+      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold border ${cfg.cls}`}>
+        {cfg.label}
+      </span>
+    );
+  };
+
   return (
     <DashboardLayout>
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Cabeçalho */}
         <PageHeader
           icon="👨‍🎓"
           title="Gerenciar Alunos"
-          subtitle={loading ? 'Carregando...' : `${filteredAlunos.length} aluno${filteredAlunos.length !== 1 ? 's' : ''} encontrado${filteredAlunos.length !== 1 ? 's' : ''}`}
+          subtitle={loading ? 'Carregando...' : `${filteredAlunos.length} registro${filteredAlunos.length !== 1 ? 's' : ''} de matrícula encontrado${filteredAlunos.length !== 1 ? 's' : ''}`}
           breadcrumbs={[{ label: 'Admin', href: '/admin/dashboard' }, { label: 'Alunos' }]}
           actions={
             <Link href="/admin/alunos/novo">
-              <button className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-xl transition-colors">
+              <button className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-xl transition-colors cursor-pointer shadow-sm">
                 + Novo Aluno
               </button>
             </Link>
@@ -290,10 +337,10 @@ export default function ListagemAlunos() {
         />
 
         {/* Abas - Listar, Inserir e Importação */}
-        <div className="mb-6 flex gap-2 border-b border-gray-200">
+        <div className="flex gap-2 border-b border-gray-200">
           <button 
             onClick={() => setAbaAtiva('listar')}
-            className={`px-6 py-3 font-semibold flex items-center gap-2 transition ${
+            className={`px-6 py-3 font-semibold flex items-center gap-2 transition cursor-pointer ${
               abaAtiva === 'listar' 
                 ? 'text-teal-600 border-b-2 border-teal-600' 
                 : 'text-gray-500 hover:text-teal-600'
@@ -302,13 +349,13 @@ export default function ListagemAlunos() {
             📋 Listar
           </button>
           <Link href="/admin/alunos/novo">
-            <button className="px-6 py-3 text-gray-500 hover:text-teal-600 font-semibold flex items-center gap-2 transition">
+            <button className="px-6 py-3 text-gray-500 hover:text-teal-600 font-semibold flex items-center gap-2 transition cursor-pointer">
               ➕ Inserir
             </button>
           </Link>
           <button 
             onClick={() => setAbaAtiva('importacao')}
-            className={`px-6 py-3 font-semibold flex items-center gap-2 transition ${
+            className={`px-6 py-3 font-semibold flex items-center gap-2 transition cursor-pointer ${
               abaAtiva === 'importacao' 
                 ? 'text-teal-600 border-b-2 border-teal-600' 
                 : 'text-gray-500 hover:text-teal-600'
@@ -318,330 +365,234 @@ export default function ListagemAlunos() {
           </button>
         </div>
 
-        {/* ABA LISTAR - Filtro de Busca e Listagem */}
+        {/* ABA LISTAR - Barra de Filtros Padronizada e Listagem */}
         {abaAtiva === 'listar' && (
-          <>
-            {/* Filtro de Busca */}
-            <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 md:p-6 mb-6">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="text-teal-600 text-xl">🔍</span>
-                <h2 className="text-lg font-semibold text-gray-700">Filtro de Busca</h2>
-              </div>
+          <div className="space-y-6">
+            {/* Barra de Filtros Padronizada */}
+            <BarraFiltros
+              searchPlaceholder="🔍 Aluno, Matrícula, CPF ou Responsável..."
+              searchValue={searchVal}
+              onSearchChange={setSearchVal}
+              statusValue={statusVal}
+              onStatusChange={setStatusVal}
+              statusOptions={[
+                { value: "ATIVO", label: "Ativo" },
+                { value: "PRE_CADASTRO", label: "Pré-Cadastro" },
+                { value: "AGUARDANDO_PAGAMENTO", label: "Aguardando Pagamento" },
+                { value: "AGUARDANDO_TURMA", label: "Aguardando Turma" },
+                { value: "TRANCADO", label: "Trancado" },
+                { value: "CANCELADO", label: "Cancelado" },
+                { value: "DESISTENTE", label: "Desistente" },
+                { value: "CONCLUIDO", label: "Concluído" },
+                { value: "INATIVO", label: "Inativo" }
+              ]}
+              unidadeValue={unidadeVal}
+              onUnidadeChange={setUnidadeVal}
+              unidades={unidades}
+              cursoValue={cursoVal}
+              onCursoChange={setCursoVal}
+              cursos={cursos}
+              turmaValue={turmaVal}
+              onTurmaChange={setTurmaVal}
+              turmas={turmasFiltradasOpcoes}
+              anoLetivoValue={anoLetivoVal}
+              onAnoLetivoChange={setAnoLetivoVal}
+              anosLetivos={anosLetivos}
+              onClear={limparFiltros}
+            />
 
-              <div className="space-y-4">
-                {/* Linha 1: Instituição, Ano Letivo, Turma, Status */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="text-xs font-medium text-teal-600 mb-1 block">INSTITUIÇÃO</label>
-                    <select
-                      value={searchInstituicao}
-                      onChange={(e) => setSearchInstituicao(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
-                    >
-                      <option value="">- Instituição -</option>
-                      {loadingInstituicoes ? (
-                        <option value="" disabled>Carregando...</option>
-                      ) : instituicoes.length > 0 ? (
-                        instituicoes.map((inst) => (
-                          <option key={inst.id || inst.nome} value={inst.nome}>
-                            {inst.nome}
-                          </option>
-                        ))
-                      ) : (
-                        <option value="CREESER">CREESER</option>
-                      )}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-teal-600 mb-1 block">ANO LETIVO</label>
-                    <select
-                      value={searchAnoLetivo}
-                      onChange={(e) => setSearchAnoLetivo(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
-                    >
-                      <option value="">- Escolha o ano letivo -</option>
-                      {loadingAnosLetivos ? (
-                        <option value="" disabled>Carregando...</option>
-                      ) : anosLetivos.length > 0 ? (
-                        anosLetivos.map((ano) => {
-                          const valorAno = (ano.nome ?? ano.ano ?? '').toString();
-                          if (!valorAno) return null;
-                          return (
-                            <option key={ano.id || valorAno} value={valorAno}>
-                              {valorAno}
-                            </option>
-                          );
-                        })
-                      ) : (
-                        <option value={currentYear}>{currentYear}</option>
-                      )}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-teal-600 mb-1 block">TURMA</label>
-                    <select
-                      value={searchTurma}
-                      onChange={(e) => setSearchTurma(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
-                    >
-                      <option value="">Selecione a turma</option>
-                      <option value="1A">1A</option>
-                      <option value="1B">1B</option>
-                      <option value="2A">2A</option>
-                      <option value="2B">2B</option>
-                      <option value="3A">3A</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-teal-600 mb-1 block">STATUS</label>
-                    <select
-                      value={searchStatus}
-                      onChange={(e) => setSearchStatus(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
-                    >
-                      <option value="">- Todos -</option>
-                      <option value="ATIVO">ATIVO</option>
-                      <option value="INATIVO">INATIVO</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Linha 2: Nome/Matrícula e CPF */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-xs font-medium text-teal-600 mb-1 block">NOME OU MATRÍCULA</label>
-                    <input
-                      type="text"
-                      placeholder="Nome do aluno ou Número de Matrícula"
-                      value={searchNome || searchMatricula}
-                      onChange={(e) => {
-                        setSearchNome(e.target.value);
-                        setSearchMatricula(e.target.value);
-                      }}
-                      className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-teal-600 mb-1 block">CPF</label>
-                    <input
-                      type="text"
-                      placeholder="CPF do aluno"
-                      value={searchCPF}
-                      onChange={(e) => setSearchCPF(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
-                    />
-                  </div>
-
-                  <div className="flex items-end">
-                    <button
-                      onClick={limparFiltros}
-                      className="w-full px-6 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold transition text-sm"
-                    >
-                      LIMPAR
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Listagem */}
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            {/* Listagem em Tabela */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-700 flex items-center gap-2">
-                  📚 Listagem de Alunos
+                  📚 Listagem de Alunos e Matrículas
                 </h2>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600">
-                Quantidade de Alunos: <strong>{filteredAlunos.length}</strong>
-              </span>
-              <button className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-semibold transition text-sm">
-                IMPRIMIR
-              </button>
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-gray-600">
+                    Registros Exibidos: <strong>{filteredAlunos.length}</strong>
+                  </span>
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="p-12 text-center text-gray-500 font-medium">Carregando alunos e matrículas...</div>
+              ) : filteredAlunos.length === 0 ? (
+                <div className="p-12 text-center text-gray-500">Nenhum aluno ou matrícula encontrado com os filtros selecionados.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-teal-50 border-b border-teal-200">
+                        <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">#ID ALUNO</th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Nome do Aluno</th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">A. Letivo</th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Turma</th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Curso</th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Matrícula</th>
+                        <th className="text-center px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Status</th>
+                        <th className="text-center px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Contrato</th>
+                        <th className="text-center px-4 py-3 text-xs font-bold text-teal-900">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {filteredAlunos.map((aluno) => {
+                        const rowKey = aluno.matricula_id ? `${aluno.id}-${aluno.matricula_id}` : `${aluno.id}-${aluno.turmaid || 'legado'}`;
+                        const turmaNomeExibicao = aluno.turma_nome || aluno.turma || 'Sem turma';
+                        const cursoNomeExibicao = aluno.curso_nome || aluno.curso || '—';
+
+                        return (
+                          <tr key={rowKey} className="hover:bg-teal-50/50 transition">
+                            <td className="px-4 py-3 text-sm font-bold text-teal-800 border-r border-gray-200 whitespace-nowrap">
+                              #{aluno.numero_id || aluno.id}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-900 font-semibold border-r border-gray-200">
+                              {aluno.nome}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200 whitespace-nowrap">
+                              {aluno.ano_letivo ?? aluno.anoLetivo ?? '—'}{aluno.semestre ? `/${aluno.semestre}` : ''}
+                            </td>
+                            <td className="px-4 py-3 text-sm font-medium text-gray-800 border-r border-gray-200">
+                              {turmaNomeExibicao}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">
+                              <div className="flex items-center gap-1.5">
+                                <span>{cursoNomeExibicao}</span>
+                                {aluno.is_principal === false && (
+                                  <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold" title="Matrícula Simultânea Adicional">
+                                    Simultâneo
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-sm font-mono text-gray-700 border-r border-gray-200 whitespace-nowrap">
+                              {aluno.matricula_codigo || aluno.matricula || aluno.numero_id || '—'}
+                            </td>
+                            <td className="px-4 py-3 text-center border-r border-gray-200 whitespace-nowrap">
+                              <StatusBadge status={aluno.status || aluno.status_administrativo} />
+                            </td>
+                            <td className="px-4 py-3 border-r border-gray-200">
+                              {/* Badge status_contrato */}
+                              {(() => {
+                                const sc = aluno.status_contrato || 'NAO_GERADO';
+                                const BADGE = {
+                                  NAO_GERADO:         'bg-gray-100 text-gray-500 border-gray-300',
+                                  GERADO:             'bg-blue-100 text-blue-700 border-blue-300',
+                                  ENVIADO_ASSINATURA: 'bg-yellow-100 text-yellow-700 border-yellow-300',
+                                  ASSINADO:           'bg-green-100 text-green-700 border-green-300',
+                                  RECUSADO:           'bg-red-100 text-red-700 border-red-300',
+                                  EXPIRADO:           'bg-orange-100 text-orange-700 border-orange-300',
+                                };
+                                const LABEL = {
+                                  NAO_GERADO:         'Não Gerado',
+                                  GERADO:             'Gerado',
+                                  ENVIADO_ASSINATURA: 'Enviado',
+                                  ASSINADO:           'Assinado',
+                                  RECUSADO:           'Recusado',
+                                  EXPIRADO:           'Expirado',
+                                };
+                                return (
+                                  <div className="flex flex-col gap-1.5">
+                                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold border ${BADGE[sc] || 'bg-gray-100 text-gray-500 border-gray-200'}`}>
+                                      {LABEL[sc] || sc}
+                                    </span>
+                                    <div className="flex gap-1 flex-wrap">
+                                      <button
+                                        onClick={() => { abrirContratoAluno(aluno); marcarContratoGerado(aluno.id); }}
+                                        className="px-1.5 py-0.5 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+                                        title="Gerar contrato"
+                                      >Gerar</button>
+                                      <button
+                                        onClick={() => iniciarAssinaturaDigital(aluno.id)}
+                                        className="px-1.5 py-0.5 text-xs rounded border border-blue-300 text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                                        title="Enviar para Assinafy"
+                                      >Assinafy</button>
+                                      <button
+                                        onClick={() => consultarAssinaturaDigital(aluno.id)}
+                                        className="px-1.5 py-0.5 text-xs rounded border border-teal-300 text-teal-600 hover:bg-teal-50 transition-colors cursor-pointer"
+                                        title="Ver status da assinatura"
+                                      >Status</button>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <div className="flex items-center justify-center gap-1 flex-wrap">
+                                <Link href={`/admin/alunos/${aluno.id}`}>
+                                  <button
+                                    className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition cursor-pointer"
+                                    title="Editar Dados do Aluno"
+                                  >
+                                    ✏️
+                                  </button>
+                                </Link>
+                                <Link href={`/admin/alunos/ficha?id=${aluno.id}`} target="_blank" rel="noopener noreferrer">
+                                  <button
+                                    className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition cursor-pointer"
+                                    title="Gerar PDF da Ficha do Aluno"
+                                  >
+                                    🖨️
+                                  </button>
+                                </Link>
+                                <button
+                                  className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition cursor-pointer"
+                                  title="Resetar Senha"
+                                >
+                                  🔑
+                                </button>
+                                <button
+                                  onClick={() => abrirContratoAluno(aluno)}
+                                  className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition cursor-pointer"
+                                  title="Contrato para impressão"
+                                >
+                                  📄
+                                </button>
+                                <Link href={`/admin/alunos/historico?id=${aluno.id}`}>
+                                  <button
+                                    className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition cursor-pointer"
+                                    title="Histórico Escolar"
+                                  >
+                                    📜
+                                  </button>
+                                </Link>
+                                <Link href={`/admin/alunos/declaracao?id=${aluno.id}&tipo=matricula`}>
+                                  <button
+                                    className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition cursor-pointer"
+                                    title="Declaração de Matrícula"
+                                  >
+                                    📝
+                                  </button>
+                                </Link>
+                                <button
+                                  onClick={() => setModalRematricula(aluno)}
+                                  className="p-1.5 text-teal-600 hover:text-teal-800 hover:bg-teal-50 rounded transition cursor-pointer"
+                                  title="Transferência / Rematrícula / Novo Curso"
+                                >
+                                  🔄
+                                </button>
+                                <button
+                                  onClick={() => solicitarDeletar(aluno)}
+                                  className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition cursor-pointer"
+                                  title="Deletar"
+                                >
+                                  ❌
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
-
-          {loading ? (
-            <div className="p-6 text-center text-gray-500">Carregando...</div>
-          ) : filteredAlunos.length === 0 ? (
-            <div className="p-6 text-center text-gray-500">Nenhum aluno encontrado</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-teal-100 border-b border-teal-300">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-teal-800 border-r border-teal-300">#ID</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-teal-800 border-r border-teal-300">A. Letivo</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-teal-800 border-r border-teal-300">Turma</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-teal-800 border-r border-teal-300">Matrícula</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-teal-800 border-r border-teal-300">Nome</th>
-                    <th className="text-center px-4 py-3 text-xs font-semibold text-teal-800 border-r border-teal-300">Contrato</th>
-                    <th className="text-center px-4 py-3 text-xs font-semibold text-teal-800">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredAlunos.map((aluno) => (
-                    <tr key={aluno.id} className="border-b border-gray-200 hover:bg-teal-50 transition">
-                      <td className="px-4 py-3 text-sm font-bold text-teal-700 border-r border-gray-200">#{aluno.numero_id || '—'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{aluno.ano_letivo}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{aluno.turmaid || '—'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">{aluno.numero_id || '—'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-800 font-semibold border-r border-gray-200">{aluno.nome}</td>
-                      <td className="px-4 py-3 border-r border-gray-200">
-                        {/* Badge status_contrato */}
-                        {(() => {
-                          const sc = aluno.status_contrato || 'NAO_GERADO';
-                          const BADGE = {
-                            NAO_GERADO:         'bg-gray-100 text-gray-500 border-gray-300',
-                            GERADO:             'bg-blue-100 text-blue-700 border-blue-300',
-                            ENVIADO_ASSINATURA: 'bg-yellow-100 text-yellow-700 border-yellow-300',
-                            ASSINADO:           'bg-green-100 text-green-700 border-green-300',
-                            RECUSADO:           'bg-red-100 text-red-700 border-red-300',
-                            EXPIRADO:           'bg-orange-100 text-orange-700 border-orange-300',
-                          };
-                          const LABEL = {
-                            NAO_GERADO:         'Não Gerado',
-                            GERADO:             'Gerado',
-                            ENVIADO_ASSINATURA: 'Enviado',
-                            ASSINADO:           'Assinado',
-                            RECUSADO:           'Recusado',
-                            EXPIRADO:           'Expirado',
-                          };
-                          return (
-                            <div className="flex flex-col gap-1.5">
-                              <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold border ${BADGE[sc] || 'bg-gray-100 text-gray-500 border-gray-200'}`}>
-                                {LABEL[sc] || sc}
-                              </span>
-                              <div className="flex gap-1 flex-wrap">
-                                <button
-                                  onClick={() => { abrirContratoAluno(aluno); marcarContratoGerado(aluno.id); }}
-                                  className="px-1.5 py-0.5 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
-                                  title="Gerar contrato"
-                                >Gerar</button>
-                                <button
-                                  onClick={() => iniciarAssinaturaDigital(aluno.id)}
-                                  className="px-1.5 py-0.5 text-xs rounded border border-blue-300 text-blue-600 hover:bg-blue-50 transition-colors"
-                                  title="Enviar para Assinafy"
-                                >Assinafy</button>
-                                <button
-                                  onClick={() => consultarAssinaturaDigital(aluno.id)}
-                                  className="px-1.5 py-0.5 text-xs rounded border border-teal-300 text-teal-600 hover:bg-teal-50 transition-colors"
-                                  title="Ver status da assinatura"
-                                >Status</button>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex items-center justify-center gap-1 flex-wrap">
-                          <Link href={`/admin/alunos/${aluno.id}`}>
-                            <button
-                              className="p-2 text-blue-600 hover:text-blue-800 transition"
-                              title="Editar"
-                            >
-                              ✏️
-                            </button>
-                          </Link>
-                          <Link href={`/admin/alunos/ficha?id=${aluno.id}`} target="_blank" rel="noopener noreferrer">
-                            <button
-                              className="p-2 text-gray-600 hover:text-gray-800 transition"
-                              title="Gerar PDF da Ficha do Aluno"
-                            >
-                              🖨️
-                            </button>
-                          </Link>
-                          <button
-                            className="p-2 text-gray-600 hover:text-gray-800 transition"
-                            title="Resetar Senha"
-                          >
-                            🔑
-                          </button>
-                          <button
-                            className="p-2 text-gray-600 hover:text-gray-800 transition"
-                            title="Armazenamento"
-                          >
-                            ☁️
-                          </button>
-                          <button
-                            onClick={() => abrirContratoAluno(aluno)}
-                            className="p-2 text-gray-600 hover:text-gray-800 transition"
-                            title="Contrato para impressão"
-                          >
-                            📄
-                          </button>
-                          <Link href={`/admin/alunos/historico?id=${aluno.id}`}>
-                            <button
-                              className="p-2 text-gray-600 hover:text-gray-800 transition text-base"
-                              title="Histórico Escolar"
-                            >
-                              📜
-                            </button>
-                          </Link>
-                          <Link href={`/admin/alunos/declaracao?id=${aluno.id}&tipo=matricula`}>
-                            <button
-                              className="p-2 text-gray-600 hover:text-gray-800 transition text-base"
-                              title="Declaração de Matrícula"
-                            >
-                              📝
-                            </button>
-                          </Link>
-                          <Link href={`/admin/alunos/declaracao?id=${aluno.id}&tipo=frequencia`}>
-                            <button
-                              className="p-2 text-gray-600 hover:text-gray-800 transition text-base"
-                              title="Declaração de Frequência"
-                            >
-                              📅
-                            </button>
-                          </Link>
-                          <Link href={`/admin/alunos/declaracao?id=${aluno.id}&tipo=conclusao`}>
-                            <button
-                              className="p-2 text-gray-600 hover:text-gray-800 transition text-base"
-                              title="Declaração de Conclusão"
-                            >
-                              🎓
-                            </button>
-                          </Link>
-                          <button
-                            onClick={() => iniciarAssinaturaDigital(aluno.id)}
-                            className="p-2 text-gray-600 hover:text-gray-800 transition"
-                            title="Iniciar assinatura digital"
-                          >
-                            🔒
-                          </button>
-                          <button
-                            onClick={() => setModalRematricula(aluno)}
-                            className="p-2 text-teal-600 hover:text-teal-800 hover:bg-teal-50 rounded-lg transition"
-                            title="Rematricular Aluno (Novo Ano Letivo)"
-                          >
-                            🔄
-                          </button>
-                          <button
-                            onClick={() => solicitarDeletar(aluno)}
-                            className="p-2 text-red-600 hover:text-red-800 transition cursor-pointer"
-                            title="Deletar"
-                          >
-                            ❌
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-            </div>
-          </>
         )}
 
         {/* ABA IMPORTAÇÃO */}
         {abaAtiva === 'importacao' && (
           <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
-            {/* Cabeçalho */}
             <div className="mb-6">
               <h2 className="text-xl font-bold text-teal-600 mb-2 flex items-center gap-2">
                 📥 Envio de Arquivo para Importação de Alunos
@@ -649,7 +600,6 @@ export default function ListagemAlunos() {
               <p className="text-sm text-gray-600">Selecione a turma e o arquivo de alunos para importar</p>
             </div>
 
-            {/* Seção de Configuração */}
             <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6">
               <h3 className="text-lg font-bold text-teal-600 mb-4">Configuração</h3>
               
@@ -658,11 +608,9 @@ export default function ListagemAlunos() {
                   <label className="text-xs font-medium text-teal-600 mb-1 block">TURMA</label>
                   <select className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50">
                     <option value="">Selecione a turma</option>
-                    <option value="1A">1A</option>
-                    <option value="1B">1B</option>
-                    <option value="2A">2A</option>
-                    <option value="2B">2B</option>
-                    <option value="3A">3A</option>
+                    {turmas.map(t => (
+                      <option key={t.id} value={t.id}>{t.nome}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -670,14 +618,13 @@ export default function ListagemAlunos() {
                   <label className="text-xs font-medium text-teal-600 mb-1 block">ANO LETIVO</label>
                   <select className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50">
                     <option value="">Escolha o ano letivo</option>
-                    <option value="2024">2024</option>
-                    <option value="2025">2025</option>
-                    <option value="2026">2026</option>
+                    {anosLetivos.map(ano => (
+                      <option key={ano} value={ano}>{ano}</option>
+                    ))}
                   </select>
                 </div>
               </div>
 
-              {/* Área de Upload */}
               <div>
                 <label className="text-xs font-medium text-teal-600 mb-1 block">ARQUIVO EXCEL</label>
                 <div className="border-2 border-dashed border-teal-300 rounded-lg p-6 text-center cursor-pointer hover:bg-teal-50 transition">
@@ -690,35 +637,10 @@ export default function ListagemAlunos() {
               </div>
             </div>
 
-            {/* DICAS */}
-            <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-6">
-              <h4 className="font-semibold text-yellow-800 mb-2 flex items-center gap-2">
-                ⚠️ DICAS
-              </h4>
-              <ul className="text-sm text-yellow-900 space-y-1">
-                <li>• Verifique as <strong>Regras de Importação</strong> antes de enviar o arquivo</li>
-                <li>• Use o <strong>Arquivo Modelo (Vazio)</strong> como base para estruturar seu arquivo</li>
-                <li>• Certifique-se de selecionar a turma e o ano letivo corretos</li>
-                <li>• Apenas arquivos Excel (.xlsx, .xls) ou CSV são aceitos</li>
-              </ul>
-            </div>
-
-            {/* Botões de Ação */}
             <div className="flex gap-4 mb-6">
-              <button className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition text-sm">
+              <button className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition text-sm cursor-pointer">
                 IMPORTAR ALUNOS
               </button>
-              <button className="px-6 py-2 bg-gray-400 hover:bg-gray-500 text-white rounded-lg font-semibold transition text-sm">
-                ATUALIZAR LISTA DE ARQUIVOS
-              </button>
-            </div>
-
-            {/* Resultados */}
-            <div className="bg-white rounded-lg shadow-md p-4 md:p-6 border border-gray-200">
-              <h3 className="text-lg font-bold text-teal-600 mb-4">Resultado da Importação</h3>
-              <div className="text-center text-gray-500 py-6">
-                <p>Nenhuma informação foi localizada em nossa Base de Dados</p>
-              </div>
             </div>
           </div>
         )}
@@ -754,3 +676,4 @@ export default function ListagemAlunos() {
     </DashboardLayout>
   );
 }
+
