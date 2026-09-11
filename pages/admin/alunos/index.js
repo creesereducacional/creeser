@@ -32,6 +32,8 @@ export default function ListagemAlunos() {
   const [turmaVal, setTurmaVal] = useState('');
   const [anoLetivoVal, setAnoLetivoVal] = useState('');
 
+  const [errorMsg, setErrorMsg] = useState(null);
+
   useEffect(() => {
     carregarAlunos();
     carregarOpcoesFiltros();
@@ -40,13 +42,22 @@ export default function ListagemAlunos() {
   const carregarAlunos = async () => {
     try {
       setLoading(true);
+      setErrorMsg(null);
       const response = await fetch('/api/alunos');
+      const data = await response.json().catch(() => null);
+
       if (response.ok) {
-        const data = await response.json();
         setAlunos(Array.isArray(data) ? data : []);
+      } else {
+        const msg = data?.message || data?.error || `Erro ${response.status} ao carregar alunos.`;
+        setErrorMsg(msg);
+        console.error('❌ Falha ao carregar alunos:', msg);
+        setAlunos([]);
       }
     } catch (error) {
-      console.error('Erro ao carregar alunos:', error);
+      console.error('❌ Erro de conexão ao carregar alunos:', error);
+      setErrorMsg(error.message || 'Falha de comunicação com o servidor.');
+      setAlunos([]);
     } finally {
       setLoading(false);
     }
@@ -416,6 +427,17 @@ export default function ListagemAlunos() {
 
               {loading ? (
                 <div className="p-12 text-center text-gray-500 font-medium">Carregando alunos e matrículas...</div>
+              ) : errorMsg ? (
+                <div className="p-12 text-center space-y-3">
+                  <div className="text-red-500 text-3xl">⚠️</div>
+                  <div className="text-gray-800 font-bold">{errorMsg}</div>
+                  <button
+                    onClick={carregarAlunos}
+                    className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-semibold transition"
+                  >
+                    Tentar Novamente
+                  </button>
+                </div>
               ) : filteredAlunos.length === 0 ? (
                 <div className="p-12 text-center text-gray-500">Nenhum aluno ou matrícula encontrado com os filtros selecionados.</div>
               ) : (

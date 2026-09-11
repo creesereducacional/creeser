@@ -130,8 +130,19 @@ export default async function handler(req, res) {
   const authUser = requireAuth(req, res);
   if (!authUser) return;
 
-  // Removido financeiro e comercial para alinhamento com privilégio acadêmico estrito
-  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria', 'admin', 'professor'])) {
+  // Garantir paridade com todos os perfis administrativos/pedagógicos/financeiros autorizados
+  if (!requirePerfil(authUser, res, [
+    'grupo_admin',
+    'instituicao_admin',
+    'admin',
+    'coordenador',
+    'secretaria',
+    'professor',
+    'financeiro',
+    'comercial',
+    'comercial_master',
+    'recepcao'
+  ])) {
     return;
   }
 
