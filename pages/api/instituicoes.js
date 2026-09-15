@@ -4,7 +4,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { requireAuth, requirePerfil } from '../../lib/auth-server';
+import { requireAuth, requirePerfil, hasPerfil } from '../../lib/auth-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -17,20 +17,39 @@ export default async function handler(req, res) {
   try {
     const authUser = requireAuth(req, res);
     if (!authUser) return;
-    if (!requirePerfil(authUser, res, ['grupo_admin'])) {
-      return;
-    }
 
-    // GET - Listar todas as instituições
+    // GET - Listar instituições autorizadas para o usuário logado
     if (method === 'GET') {
+      const isGrupoAdmin = hasPerfil(authUser, ['grupo_admin']);
+
+      if (isGrupoAdmin) {
+        const { data, error } = await supabase
+          .from('instituicoes')
+          .select('*')
+          .order('ordem', { ascending: true })
+          .order('nome', { ascending: true });
+
+        if (error) throw error;
+        return res.status(200).json(data || []);
+      }
+
+      // Usuário comum: retorna apenas sua própria instituição
+      if (!authUser.instituicao_id) {
+        return res.status(200).json([]);
+      }
+
       const { data, error } = await supabase
         .from('instituicoes')
         .select('*')
-        .order('ordem', { ascending: true })
-        .order('nome', { ascending: true });
+        .eq('id', authUser.instituicao_id)
+        .maybeSingle();
 
       if (error) throw error;
-      return res.status(200).json(data || []);
+      return res.status(200).json(data ? [data] : []);
+    }
+
+    if (!requirePerfil(authUser, res, ['grupo_admin'])) {
+      return;
     }
 
     // POST - Criar nova instituição

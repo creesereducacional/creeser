@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import DashboardLayout from '../../../components/DashboardLayout';
 import PageHeader from '@/components/ui/PageHeader';
@@ -8,11 +8,18 @@ import ConfirmModal from '@/components/ConfirmModal';
 
 export default function ListagemTurmas() {
   const [turmas, setTurmas] = useState([]);
-  const [filtradas, setFiltradas] = useState([]);
-  const [opcoes, setOpcoes] = useState({ unidades: [] });
+  const [instituicoes, setInstituicoes] = useState([]);
+  const [todasUnidades, setTodasUnidades] = useState([]);
+  const [todosCursos, setTodosCursos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchUnidade, setSearchUnidade] = useState('');
-  const [searchSituacao, setSearchSituacao] = useState('');
+
+  // Filtros
+  const [filtroInstituicao, setFiltroInstituicao] = useState('');
+  const [filtroUnidade, setFiltroUnidade] = useState('');
+  const [filtroCurso, setFiltroCurso] = useState('');
+  const [filtroStatus, setFiltroStatus] = useState('');
+  const [filtroNome, setFiltroNome] = useState('');
+
   const [modalConfirm, setModalConfirm] = useState({
     isOpen: false,
     idTurma: null,
@@ -20,60 +27,151 @@ export default function ListagemTurmas() {
   });
 
   useEffect(() => {
-    carregarTurmas();
-    carregarOpcoes();
+    inicializar();
   }, []);
 
-  useEffect(() => {
-    aplicarFiltros();
-  }, [turmas, searchUnidade, searchSituacao]);
-
-  const carregarTurmas = async () => {
+  const inicializar = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/turmas');
-      if (res.ok) {
-        const data = await res.json();
+      const [resInst, resOpcoes, resCursos, resTurmas] = await Promise.all([
+        fetch('/api/instituicoes'),
+        fetch('/api/turmas/opcoes'),
+        fetch('/api/cursos'),
+        fetch('/api/turmas'),
+      ]);
+
+      let instList = [];
+      if (resInst.ok) {
+        const data = await resInst.json();
+        instList = Array.isArray(data) ? data : [];
+        setInstituicoes(instList);
+      }
+
+      if (resOpcoes.ok) {
+        const data = await resOpcoes.json();
+        if (Array.isArray(data.unidades)) setTodasUnidades(data.unidades);
+      }
+
+      if (resCursos.ok) {
+        const data = await resCursos.json();
+        setTodosCursos(Array.isArray(data) ? data : []);
+      }
+
+      if (resTurmas.ok) {
+        const data = await resTurmas.json();
         setTurmas(Array.isArray(data) ? data : []);
       }
+
+      // Se o usuário possuir exatamente 1 instituição, auto-seleciona
+      if (instList.length === 1) {
+        setFiltroInstituicao(String(instList[0].id));
+      }
     } catch (error) {
-      console.error('Erro ao carregar turmas:', error);
+      console.error('Erro ao inicializar dados de turmas:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const carregarOpcoes = async () => {
-    try {
-      const res = await fetch('/api/turmas/opcoes');
-      if (!res.ok) return;
+  const handleInstituicaoChange = (novaInstituicaoId) => {
+    setFiltroInstituicao(novaInstituicaoId);
+    setFiltroUnidade('');
+    setFiltroCurso('');
+  };
 
-      const data = await res.json();
-      setOpcoes({
-        unidades: Array.isArray(data.unidades) ? data.unidades : [],
+  const handleUnidadeChange = (novaUnidadeId) => {
+    setFiltroUnidade(novaUnidadeId);
+    setFiltroCurso('');
+  };
+
+  // Unidades disponíveis baseadas na Instituição selecionada
+  const unidadesDisponiveis = useMemo(() => {
+    if (!filtroInstituicao) return todasUnidades;
+    return todasUnidades.filter(
+      (u) => String(u.instituicao_id || u.instituicaoid || '') === String(filtroInstituicao)
+    );
+  }, [todasUnidades, filtroInstituicao]);
+
+  // Cursos disponíveis baseados na Instituição e Unidade selecionadas
+  const cursosDisponiveis = useMemo(() => {
+    let lista = todosCursos;
+
+    if (filtroInstituicao) {
+      lista = lista.filter(
+        (c) => String(c.instituicaoId || c.instituicaoid || c.instituicao_id || '') === String(filtroInstituicao)
+      );
+    }
+
+    if (filtroUnidade) {
+      lista = lista.filter((c) => {
+        if (Array.isArray(c.unidadeIds) && c.unidadeIds.length > 0) {
+          return c.unidadeIds.some((uid) => String(uid) === String(filtroUnidade));
+        }
+        return true;
       });
-    } catch (error) {
-      console.error('Erro ao carregar opções de turmas:', error);
-    }
-  };
-
-  const aplicarFiltros = () => {
-    let resultado = turmas;
-
-    if (searchUnidade) {
-      resultado = resultado.filter((turma) => turma.unidadeId?.toString() === searchUnidade.toString());
     }
 
-    if (searchSituacao) {
-      resultado = resultado.filter(turma => turma.situacao === searchSituacao);
-    }
+    return lista;
+  }, [todosCursos, filtroInstituicao, filtroUnidade]);
 
-    setFiltradas(resultado);
-  };
+  // Filtragem das turmas
+  const filtradas = useMemo(() => {
+    return turmas.filter((turma) => {
+      // Filtro Instituição
+      if (filtroInstituicao) {
+        const turmaInstId = String(turma.instituicaoId || turma.instituicaoid || turma.instituicao_id || '');
+        if (turmaInstId && turmaInstId !== String(filtroInstituicao)) {
+          return false;
+        }
+      }
+
+      // Filtro Unidade
+      if (filtroUnidade) {
+        const turmaUnidadeId = String(turma.unidadeId || turma.unidadeid || turma.unidade_id || '');
+        if (turmaUnidadeId !== String(filtroUnidade)) {
+          return false;
+        }
+      }
+
+      // Filtro Curso
+      if (filtroCurso) {
+        const turmaCursoId = String(turma.cursoId || turma.cursoid || turma.curso_id || '');
+        if (turmaCursoId !== String(filtroCurso)) {
+          return false;
+        }
+      }
+
+      // Filtro Status
+      if (filtroStatus) {
+        const statusTurma = String(turma.situacao || 'ATIVO').toUpperCase();
+        if (statusTurma !== filtroStatus.toUpperCase()) {
+          return false;
+        }
+      }
+
+      // Filtro Busca por Nome
+      if (filtroNome.trim()) {
+        const termo = filtroNome.toLowerCase().trim();
+        const nomeTurma = (turma.nome || '').toLowerCase();
+        if (!nomeTurma.includes(termo)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [turmas, filtroInstituicao, filtroUnidade, filtroCurso, filtroStatus, filtroNome]);
 
   const limparFiltros = () => {
-    setSearchUnidade('');
-    setSearchSituacao('');
+    if (instituicoes.length === 1) {
+      setFiltroInstituicao(String(instituicoes[0].id));
+    } else {
+      setFiltroInstituicao('');
+    }
+    setFiltroUnidade('');
+    setFiltroCurso('');
+    setFiltroStatus('');
+    setFiltroNome('');
   };
 
   const solicitarDeletar = (turma) => {
@@ -130,53 +228,95 @@ export default function ListagemTurmas() {
           </Link>
         </div>
 
-        {/* Filtro de Busca */}
-        <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 md:p-6 mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-teal-600 text-xl">🔍</span>
-            <h2 className="text-lg font-semibold text-gray-700">Filtro de Busca</h2>
+        {/* Barra de Filtros Avançados */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+            {/* 1. Instituição */}
+            <div className="flex flex-col">
+              <label className="text-xs font-medium text-gray-600 mb-1">Instituição</label>
+              <select
+                value={filtroInstituicao}
+                onChange={(e) => handleInstituicaoChange(e.target.value)}
+                disabled={instituicoes.length === 1}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm bg-white disabled:bg-gray-100 disabled:text-gray-500"
+              >
+                {instituicoes.length > 1 && <option value="">Todas as Instituições</option>}
+                {instituicoes.map((inst) => (
+                  <option key={inst.id} value={inst.id}>
+                    {inst.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 2. Unidade */}
+            <div className="flex flex-col">
+              <label className="text-xs font-medium text-gray-600 mb-1">Unidade</label>
+              <select
+                value={filtroUnidade}
+                onChange={(e) => handleUnidadeChange(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm bg-white"
+              >
+                <option value="">Todas as Unidades</option>
+                {unidadesDisponiveis.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 3. Curso */}
+            <div className="flex flex-col">
+              <label className="text-xs font-medium text-gray-600 mb-1">Curso</label>
+              <select
+                value={filtroCurso}
+                onChange={(e) => setFiltroCurso(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm bg-white"
+              >
+                <option value="">Todos os Cursos</option>
+                {cursosDisponiveis.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 4. Status */}
+            <div className="flex flex-col">
+              <label className="text-xs font-medium text-gray-600 mb-1">Status</label>
+              <select
+                value={filtroStatus}
+                onChange={(e) => setFiltroStatus(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm bg-white"
+              >
+                <option value="">Todos os Status</option>
+                <option value="ATIVO">ATIVO</option>
+                <option value="INATIVO">INATIVO</option>
+              </select>
+            </div>
+
+            {/* 5. Busca por nome da turma */}
+            <div className="flex flex-col">
+              <label className="text-xs font-medium text-gray-600 mb-1">Busca por nome</label>
+              <input
+                type="text"
+                placeholder="🔍 Nome da turma..."
+                value={filtroNome}
+                onChange={(e) => setFiltroNome(e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm"
+              />
+            </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-medium text-teal-600 mb-1 block">UNIDADE</label>
-                <select
-                  value={searchUnidade}
-                  onChange={(e) => setSearchUnidade(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
-                >
-                  <option value="">- Selecione uma Unidade -</option>
-                  {opcoes.unidades.map((unidade) => (
-                    <option key={unidade.id} value={unidade.id}>
-                      {unidade.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-teal-600 mb-1 block">SITUAÇÃO</label>
-                <select
-                  value={searchSituacao}
-                  onChange={(e) => setSearchSituacao(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
-                >
-                  <option value="">- Selecione -</option>
-                  <option value="ATIVO">ATIVO</option>
-                  <option value="INATIVO">INATIVO</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <button
-                onClick={limparFiltros}
-                className="px-6 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold transition text-sm"
-              >
-                LIMPAR
-              </button>
-            </div>
+          <div className="flex justify-end pt-2 border-t border-gray-100">
+            <button
+              onClick={limparFiltros}
+              className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-teal-600 border border-gray-300 rounded-lg hover:border-teal-500 transition-colors bg-white cursor-pointer flex items-center gap-1.5"
+            >
+              🧹 Limpar Filtros
+            </button>
           </div>
         </div>
 

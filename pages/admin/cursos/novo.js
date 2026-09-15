@@ -3,6 +3,32 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import DashboardLayout from '../../../components/DashboardLayout';
 
+const formatarMilhar = (val) => {
+  if (val === null || val === undefined || val === '') return '';
+  const digits = String(val).replace(/\D/g, '').slice(0, 5);
+  if (!digits) return '';
+  return Number(digits).toLocaleString('pt-BR');
+};
+
+const parseMoedaParaNumero = (val) => {
+  if (val === null || val === undefined || val === '') return null;
+  if (typeof val === 'number') return Number.isNaN(val) ? null : val;
+  const cleaned = String(val)
+    .trim()
+    .replace(/[R$\s]/g, '')
+    .replace(/\.(?=\d{3}(\D|$))/g, '')
+    .replace(',', '.');
+  const num = Number.parseFloat(cleaned);
+  return Number.isNaN(num) ? null : num;
+};
+
+const formatarMoedaBRL = (val) => {
+  if (val === null || val === undefined || val === '') return '';
+  const num = typeof val === 'number' ? val : parseMoedaParaNumero(val);
+  if (num === null || Number.isNaN(num)) return '';
+  return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+};
+
 export default function CadastroCurso() {
   const router = useRouter();
   const { id } = router.query;
@@ -57,11 +83,21 @@ export default function CadastroCurso() {
       const res = await fetch('/api/instituicoes');
       if (res.ok) {
         const data = await res.json();
-        setInstituicoes(Array.isArray(data) ? data : []);
+        const lista = Array.isArray(data) ? data : [];
+        setInstituicoes(lista);
+        if (lista.length === 1 && !isEditando) {
+          setFormData((prev) => ({
+            ...prev,
+            instituicaoId: String(lista[0].id),
+          }));
+        }
+        return lista;
       }
     } catch (error) {
       console.error('Erro ao carregar instituições:', error);
     }
+
+    return [];
   };
 
   const carregarUnidades = async () => {
@@ -96,9 +132,28 @@ export default function CadastroCurso() {
           instituicaoId = String(unidadeCurso?.instituicaoId || unidadeCurso?.instituicao_id || '');
         }
 
+        const duracaoStr = curso.duracao !== null && curso.duracao !== undefined ? String(curso.duracao) : '';
+        const medReq = curso.mediaRequerida !== null && curso.mediaRequerida !== undefined ? String(Number(curso.mediaRequerida)) : '';
+        const freqReq = curso.frequenciaRequerida !== null && curso.frequenciaRequerida !== undefined ? String(curso.frequenciaRequerida) : '';
+        const cgHoraria = curso.cargaHoraria !== null && curso.cargaHoraria !== undefined ? String(curso.cargaHoraria).replace(/\D/g, '').slice(0, 5) : '';
+        const cgEstagio = curso.cargaHorariaEstagio !== null && curso.cargaHorariaEstagio !== undefined ? String(curso.cargaHorariaEstagio).replace(/\D/g, '').slice(0, 5) : '';
+        const cgAtiv = curso.cargaHorariaAtividadesComplementares !== null && curso.cargaHorariaAtividadesComplementares !== undefined ? String(curso.cargaHorariaAtividadesComplementares).replace(/\D/g, '').slice(0, 5) : '';
+        const valInsc = curso.valorInscricao ? formatarMoedaBRL(curso.valorInscricao) : '';
+        const valMens = curso.valorMensalidade ? formatarMoedaBRL(curso.valorMensalidade) : '';
+
         setFormData((prev) => ({
           ...prev,
           ...curso,
+          nome: String(curso.nome || '').toUpperCase(),
+          descricaoGeral: curso.descricaoGeral || curso.descricaogeral || '',
+          duracao: duracaoStr,
+          mediaRequerida: medReq,
+          frequenciaRequerida: freqReq,
+          cargaHoraria: cgHoraria,
+          cargaHorariaEstagio: cgEstagio,
+          cargaHorariaAtividadesComplementares: cgAtiv,
+          valorInscricao: valInsc,
+          valorMensalidade: valMens,
           instituicaoId,
         }));
         setSituacao(curso.situacao || 'ATIVO');
@@ -146,6 +201,48 @@ export default function CadastroCurso() {
         const unidadeInstituicaoId = String(unidade?.instituicaoId || unidade?.instituicao_id || '');
         return unidadeInstituicaoId === String(value);
       }));
+      return;
+    }
+
+    // 1. NOME: máx 100 caracteres, somente alfanuméricos e espaços, CAIXA ALTA
+    if (name === 'nome') {
+      const upper = value.toUpperCase();
+      const filtered = upper.replace(/[^A-Z0-9À-ÿ\s]/g, '').slice(0, 100);
+      setFormData(prev => ({ ...prev, nome: filtered }));
+      return;
+    }
+
+    // 2. DESCRIÇÃO GERAL: máx 500 caracteres, alfanumérico e pontuação normal
+    if (name === 'descricaoGeral') {
+      const filtered = value.replace(/[^a-zA-Z0-9À-ÿ\s.,;:!?()[\]'"/\-–—\n\r%ºª$]/g, '').slice(0, 500);
+      setFormData(prev => ({ ...prev, descricaoGeral: filtered }));
+      return;
+    }
+
+    // 4, 7, 8: CARGAS HORÁRIAS: inteiros, máximo 5 dígitos
+    if (
+      name === 'cargaHoraria' ||
+      name === 'cargaHorariaEstagio' ||
+      name === 'cargaHorariaAtividadesComplementares'
+    ) {
+      const digits = value.replace(/\D/g, '').slice(0, 5);
+      setFormData(prev => ({ ...prev, [name]: digits }));
+      return;
+    }
+
+    // 9, 10: VALORES MONETÁRIOS: formato R$ 5.000,55 com centavos
+    if (name === 'valorInscricao' || name === 'valorMensalidade') {
+      const digits = value.replace(/\D/g, '');
+      if (!digits) {
+        setFormData(prev => ({ ...prev, [name]: '' }));
+        return;
+      }
+      const valorDecimal = Number.parseInt(digits, 10) / 100;
+      const formatado = valorDecimal.toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+      });
+      setFormData(prev => ({ ...prev, [name]: formatado }));
       return;
     }
 
@@ -222,8 +319,20 @@ export default function CadastroCurso() {
     setLoading(true);
     setMessage({ type: '', text: '' });
 
-    if (!formData.nome) {
+    if (!formData.nome || !formData.nome.trim()) {
       setMessage({ type: 'error', text: 'O nome do curso é obrigatório' });
+      setLoading(false);
+      return;
+    }
+
+    if (formData.nome.length > 100) {
+      setMessage({ type: 'error', text: 'O nome do curso não pode ter mais de 100 caracteres' });
+      setLoading(false);
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9À-ÿ\s]+$/.test(formData.nome)) {
+      setMessage({ type: 'error', text: 'O nome do curso deve conter apenas caracteres alfanuméricos e espaços' });
       setLoading(false);
       return;
     }
@@ -234,12 +343,29 @@ export default function CadastroCurso() {
       return;
     }
 
+    if (formData.descricaoGeral && formData.descricaoGeral.length > 500) {
+      setMessage({ type: 'error', text: 'A descrição geral não pode ter mais de 500 caracteres' });
+      setLoading(false);
+      return;
+    }
+
     try {
       const method = isEditando ? 'PUT' : 'POST';
       const url = isEditando ? `/api/cursos/${id}` : '/api/cursos';
-      
+
       const payload = {
         ...formData,
+        nome: formData.nome.trim().toUpperCase(),
+        duracao: formData.duracao ? Number.parseInt(formData.duracao, 10) : null,
+        cargaHoraria: formData.cargaHoraria ? Number.parseInt(String(formData.cargaHoraria).replace(/\D/g, ''), 10) : null,
+        cargaHorariaEstagio: formData.cargaHorariaEstagio ? Number.parseInt(String(formData.cargaHorariaEstagio).replace(/\D/g, ''), 10) : null,
+        cargaHorariaAtividadesComplementares: formData.cargaHorariaAtividadesComplementares
+          ? Number.parseInt(String(formData.cargaHorariaAtividadesComplementares).replace(/\D/g, ''), 10)
+          : null,
+        mediaRequerida: formData.mediaRequerida !== '' ? Number.parseFloat(formData.mediaRequerida) : null,
+        frequenciaRequerida: formData.frequenciaRequerida !== '' ? Number.parseInt(formData.frequenciaRequerida, 10) : null,
+        valorInscricao: parseMoedaParaNumero(formData.valorInscricao),
+        valorMensalidade: parseMoedaParaNumero(formData.valorMensalidade),
         situacao,
         unidadeIds: unidadesSelecionadas,
         unidades: unidadesSelecionadas
@@ -269,7 +395,7 @@ export default function CadastroCurso() {
         }, 1500);
       } else {
         const error = await res.json();
-        setMessage({ type: 'error', text: error.message || 'Erro ao salvar curso' });
+        setMessage({ type: 'error', text: error.message || error.error || 'Erro ao salvar curso' });
       }
     } catch (error) {
       setMessage({ type: 'error', text: 'Erro: ' + error.message });
@@ -333,11 +459,12 @@ export default function CadastroCurso() {
                   value={formData.instituicaoId}
                   onChange={handleInputChange}
                   required
-                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                  disabled={instituicoes.length <= 1 || (isEditando && instituicoes.length <= 1)}
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50 disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
                 >
                   <option value="">Selecione a instituição</option>
                   {instituicoes.map((instituicao) => (
-                    <option key={instituicao.id} value={instituicao.id}>{instituicao.nome}</option>
+                    <option key={instituicao.id} value={String(instituicao.id)}>{instituicao.nome}</option>
                   ))}
                 </select>
               </div>
@@ -347,19 +474,24 @@ export default function CadastroCurso() {
                 <input
                   type="text"
                   name="nome"
-                  placeholder="Nome do curso"
+                  placeholder="NOME DO CURSO"
+                  maxLength={100}
                   value={formData.nome}
                   onChange={handleInputChange}
                   required
-                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50 uppercase"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-medium text-teal-600 mb-1 block">DESCRIÇÃO GERAL</label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-xs font-medium text-teal-600 block">DESCRIÇÃO GERAL</label>
+                  <span className="text-xs text-gray-500">{(formData.descricaoGeral || '').length}/500</span>
+                </div>
                 <textarea
                   name="descricaoGeral"
                   placeholder="Descrição do curso"
+                  maxLength={500}
                   value={formData.descricaoGeral}
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50 h-20"
@@ -369,14 +501,19 @@ export default function CadastroCurso() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="text-xs font-medium text-teal-600 mb-1 block">DURAÇÃO *</label>
-                  <input
-                    type="text"
+                  <select
                     name="duracao"
-                    placeholder="Ex: 4"
                     value={formData.duracao}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                  />
+                  >
+                    <option value="">Selecione a duração</option>
+                    {Array.from({ length: 20 }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={String(n)}>
+                        {n} {n === 1 ? 'Período' : 'Períodos'}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -384,8 +521,8 @@ export default function CadastroCurso() {
                   <input
                     type="text"
                     name="cargaHoraria"
-                    placeholder="Ex: 3200"
-                    value={formData.cargaHoraria}
+                    placeholder="Ex: 3.200"
+                    value={formatarMilhar(formData.cargaHoraria)}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                   />
@@ -410,26 +547,42 @@ export default function CadastroCurso() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="text-xs font-medium text-teal-600 mb-1 block">MÉDIA REQUERIDA *</label>
-                  <input
-                    type="text"
+                  <select
                     name="mediaRequerida"
-                    placeholder="Ex: 6"
                     value={formData.mediaRequerida}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                  />
+                  >
+                    <option value="">Selecione a média</option>
+                    {Array.from({ length: 11 }, (_, i) => i).map((n) => (
+                      <option key={n} value={String(n)}>
+                        {n}
+                      </option>
+                    ))}
+                    {formData.mediaRequerida !== '' &&
+                      !Array.from({ length: 11 }, (_, i) => String(i)).includes(String(formData.mediaRequerida)) && (
+                        <option value={String(formData.mediaRequerida)}>
+                          {formData.mediaRequerida}
+                        </option>
+                      )}
+                  </select>
                 </div>
 
                 <div>
                   <label className="text-xs font-medium text-teal-600 mb-1 block">FREQUÊNCIA REQUERIDA</label>
-                  <input
-                    type="text"
+                  <select
                     name="frequenciaRequerida"
-                    placeholder="Ex: 75"
                     value={formData.frequenciaRequerida}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                  />
+                  >
+                    <option value="">Selecione a frequência</option>
+                    {Array.from({ length: 101 }, (_, i) => i).map((n) => (
+                      <option key={n} value={String(n)}>
+                        {n}%
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -461,7 +614,7 @@ export default function CadastroCurso() {
                   type="text"
                   name="cargaHorariaEstagio"
                   placeholder="Ex: 400"
-                  value={formData.cargaHorariaEstagio}
+                  value={formatarMilhar(formData.cargaHorariaEstagio)}
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 />
@@ -473,7 +626,7 @@ export default function CadastroCurso() {
                   type="text"
                   name="cargaHorariaAtividadesComplementares"
                   placeholder="Ex: 200"
-                  value={formData.cargaHorariaAtividadesComplementares}
+                  value={formatarMilhar(formData.cargaHorariaAtividadesComplementares)}
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 />
@@ -506,7 +659,7 @@ export default function CadastroCurso() {
                 <input
                   type="text"
                   name="valorInscricao"
-                  placeholder="Ex: 500"
+                  placeholder="R$ 0,00"
                   value={formData.valorInscricao}
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
@@ -518,7 +671,7 @@ export default function CadastroCurso() {
                 <input
                   type="text"
                   name="valorMensalidade"
-                  placeholder="Ex: 1200"
+                  placeholder="R$ 0,00"
                   value={formData.valorMensalidade}
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"

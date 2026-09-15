@@ -88,6 +88,54 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Instituição não definida para este usuário.' });
     }
 
+    // Se cursoid for informado, validar se o curso pertence à instituição / unidade do operador
+    if (cursoid) {
+      const { data: cursoValido } = await supabase
+        .from('cursos')
+        .select('id, instituicao_id')
+        .eq('id', Number(cursoid))
+        .maybeSingle();
+
+      if (!cursoValido || (cursoValido.instituicao_id && String(cursoValido.instituicao_id) !== String(efetivInstituicaoId))) {
+        return res.status(400).json({ error: 'O curso selecionado não está disponível para sua unidade.' });
+      }
+
+      // Validar vínculo em curso_unidade se a tabela/relacionamento existir
+      try {
+        const { data: unidadesInst } = await supabase
+          .from('unidades')
+          .select('id')
+          .eq('instituicao_id', efetivInstituicaoId);
+
+        const uIds = (unidadesInst || []).map((u) => u.id);
+        if (uIds.length > 0) {
+          let temVinculo = false;
+          for (const colPair of [
+            { c: 'cursoid', u: 'unidadeid' },
+            { c: 'curso_id', u: 'unidade_id' },
+            { c: 'cursoId', u: 'unidadeId' },
+          ]) {
+            const { data: l, error: errL } = await supabase
+              .from('curso_unidade')
+              .select(`${colPair.c}`)
+              .eq(colPair.c, Number(cursoid))
+              .in(colPair.u, uIds);
+            if (!errL && l && l.length > 0) {
+              temVinculo = true;
+              break;
+            }
+          }
+          // Se existirem vínculos cadastrados na instituição e o curso não estiver vinculado a nenhuma unidade da instituição
+          const { data: qdtVinculos } = await supabase.from('curso_unidade').select('id').limit(1);
+          if (qdtVinculos && qdtVinculos.length > 0 && !temVinculo) {
+            return res.status(400).json({ error: 'O curso selecionado não está disponível para esta unidade.' });
+          }
+        }
+      } catch (e) {
+        console.error('Erro ao validar curso_unidade no backend:', e);
+      }
+    }
+
     // Pré-cadastro sempre inicia como PRE_CADASTRO
     // O financeiro gerará a cobrança e avançará o status manualmente
     const statusmatricula = 'PRE_CADASTRO';

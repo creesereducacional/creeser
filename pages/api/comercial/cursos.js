@@ -20,7 +20,8 @@ export default async function handler(req, res) {
   if (!authUser) return;
   if (!requirePerfil(authUser, res, PERFIS_PERMITIDOS)) return;
 
-  const instituicaoId = resolveInstituicaoId(req, authUser);
+  const perfil = String(authUser.perfil || authUser.tipo || '').toLowerCase();
+  const isRecepcao = perfil === 'recepcao';
 
   let query = supabase
     .from('cursos')
@@ -30,8 +31,49 @@ export default async function handler(req, res) {
 
   if (instituicaoId) query = applyInstituicaoFilter(query, instituicaoId);
 
-  const { data, error } = await query;
+  const { data: cursos, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
 
-  return res.status(200).json(data || []);
+  let resultado = cursos || [];
+
+  // Se o usuário for recepção ou tiver instituicao_id resolvido, filtrar pelos cursos vinculados na tabela curso_unidade se ela existir
+  if (instituicaoId && resultado.length > 0) {
+    try {
+      // Buscar unidades da instituição
+      const { data: unidades } = await supabase
+        .from('unidades')
+        .select('id')
+        .eq('instituicao_id', instituicaoId);
+
+      const unidadeIds = (unidades || []).map((u) => u.id);
+
+      if (unidadeIds.length > 0) {
+        // Buscar vínculos em curso_unidade (tentando schema candidatos)
+        let links = null;
+        for (const colPair of [
+          { c: 'cursoid', u: 'unidadeid' },
+          { c: 'curso_id', u: 'unidade_id' },
+          { c: 'cursoId', u: 'unidadeId' },
+        ]) {
+          const { data: l, error: errL } = await supabase
+            .from('curso_unidade')
+            .select(`${colPair.c},${colPair.u}`)
+            .in(colPair.u, unidadeIds);
+          if (!errL && l) {
+            links = l.map((item) => Number(item[colPair.c]));
+            break;
+          }
+        }
+
+        if (links && Array.isArray(links)) {
+          const cursoIdsPermitidos = new Set(links);
+          resultado = resultado.filter((c) => cursoIdsPermitidos.has(Number(c.id)));
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao filtrar cursos por unidade:', e);
+    }
+  }
+
+  return res.status(200).json(resultado);
 }

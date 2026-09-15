@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import {
   applyInstituicaoFilter,
   hasPerfil,
+  readInstituicaoId,
   requireAuth,
   requirePerfil,
   resolveInstituicaoId,
@@ -19,7 +20,10 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 let cursoUnidadeSchemaCache = null;
 
 const parseInteger = (value) => {
-  const parsed = Number.parseInt(String(value ?? '').trim(), 10);
+  if (value === undefined || value === null || value === '') return null;
+  const digitsOnly = String(value).trim().replace(/\D/g, '');
+  if (!digitsOnly) return null;
+  const parsed = Number.parseInt(digitsOnly, 10);
   return Number.isNaN(parsed) ? null : parsed;
 };
 
@@ -32,12 +36,13 @@ const parseDecimal = (value) => {
     return Number.isNaN(value) ? null : value;
   }
 
-  const normalized = String(value)
+  const cleaned = String(value)
     .trim()
+    .replace(/[R$\s]/g, '')
     .replace(/\.(?=\d{3}(\D|$))/g, '')
     .replace(',', '.');
 
-  const parsed = Number.parseFloat(normalized);
+  const parsed = Number.parseFloat(cleaned);
   return Number.isNaN(parsed) ? null : parsed;
 };
 
@@ -258,14 +263,75 @@ const mapRowToResponse = (row, unidadesDoCurso = []) => {
   };
 };
 
+const validarDadosCurso = (payload) => {
+  if (!payload.nome || payload.nome.trim() === '') {
+    return 'O nome do curso é obrigatório';
+  }
+  if (payload.nome.length > 100) {
+    return 'O nome do curso não pode ter mais de 100 caracteres';
+  }
+  const regexNome = /^[a-zA-Z0-9À-ÿ\s]+$/;
+  if (!regexNome.test(payload.nome)) {
+    return 'O nome do curso deve conter apenas caracteres alfanuméricos e espaços';
+  }
+
+  if (payload.descricaogeral) {
+    if (payload.descricaogeral.length > 500) {
+      return 'A descrição geral não pode ter mais de 500 caracteres';
+    }
+    const regexDescricao = /^[a-zA-Z0-9À-ÿ\s.,;:!?()[\]'"/\-–—\n\r%ºª$]*$/;
+    if (!regexDescricao.test(payload.descricaogeral)) {
+      return 'A descrição geral contém caracteres inválidos';
+    }
+  }
+
+  if (payload.duracao !== null && (payload.duracao < 1 || payload.duracao > 20)) {
+    return 'A duração deve ser entre 1 e 20 períodos';
+  }
+
+  if (payload.cargahoraria !== null && (payload.cargahoraria < 0 || payload.cargahoraria > 99999)) {
+    return 'A carga horária deve ser entre 0 e 99.999 horas';
+  }
+
+  if (payload.mediarequerida !== null && (payload.mediarequerida < 0 || payload.mediarequerida > 10)) {
+    return 'A média requerida deve ser entre 0 e 10';
+  }
+
+  if (payload.frequenciarequerida !== null && (payload.frequenciarequerida < 0 || payload.frequenciarequerida > 100)) {
+    return 'A frequência requerida deve ser entre 0% e 100%';
+  }
+
+  if (payload.cargahorariaestagio !== null && (payload.cargahorariaestagio < 0 || payload.cargahorariaestagio > 99999)) {
+    return 'A carga horária de estágio deve ser entre 0 e 99.999 horas';
+  }
+
+  if (
+    payload.cargahorariaatividadescomplementares !== null &&
+    (payload.cargahorariaatividadescomplementares < 0 || payload.cargahorariaatividadescomplementares > 99999)
+  ) {
+    return 'A carga horária de atividades complementares deve ser entre 0 e 99.999 horas';
+  }
+
+  if (payload.valorinscricao !== null && (payload.valorinscricao < 0 || Number.isNaN(payload.valorinscricao))) {
+    return 'O valor de inscrição não pode ser negativo';
+  }
+
+  if (payload.valormensalidade !== null && (payload.valormensalidade < 0 || Number.isNaN(payload.valormensalidade))) {
+    return 'O valor da mensalidade não pode ser negativo';
+  }
+
+  return null;
+};
+
 const mapBodyToPayload = (body = {}) => {
-  const nome = String(body.nome || body.titulo || '').trim();
+  const nomeRaw = String(body.nome || body.titulo || '').trim();
+  const nome = nomeRaw.toUpperCase();
   const situacao = body.situacao || (parseBoolean(body.ativo) ? 'ATIVO' : 'INATIVO') || 'ATIVO';
 
   return {
     nome,
     instituicao_id: normalizeText(body.instituicaoId ?? body.instituicao_id ?? body.instituicaoid),
-    descricaogeral: body.descricaoGeral ?? body.descricaogeral ?? body.descricao ?? null,
+    descricaogeral: normalizeText(body.descricaoGeral ?? body.descricaogeral ?? body.descricao),
     duracao: parseInteger(body.duracao),
     cargahoraria: parseInteger(body.cargaHoraria ?? body.cargahoraria),
     cargahorariaestagio: parseInteger(body.cargaHorariaEstagio ?? body.cargahorariaestagio),
@@ -346,15 +412,25 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
+      const requestedInstituicaoId = readInstituicaoId(req);
+      const userInstituicaoId = normalizeText(authUser.instituicao_id ?? authUser.instituicaoId);
+
+      if (!isGroupAdmin) {
+        if (requestedInstituicaoId && requestedInstituicaoId !== userInstituicaoId) {
+          return res.status(403).json({ error: 'Acesso não autorizado para esta instituição', message: 'Acesso não autorizado para esta instituição' });
+        }
+        if (!userInstituicaoId) {
+          return res.status(403).json({ error: 'Instituição não definida para o usuário atual', message: 'Instituição não definida para o usuário atual' });
+        }
+      }
+
+      const instituicaoId = isGroupAdmin ? (requestedInstituicaoId || null) : userInstituicaoId;
+
       let query = supabase
         .from('cursos')
         .select('*')
         .eq('id', id);
 
-      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
-      if (!isGroupAdmin && !instituicaoId) {
-        return res.status(403).json({ error: 'Instituicao nao definida para o usuario atual', message: 'Instituicao nao definida para o usuario atual' });
-      }
       query = applyInstituicaoFilter(query, instituicaoId);
 
       const { data, error } = await query.maybeSingle();
@@ -375,20 +451,39 @@ export default async function handler(req, res) {
     if (req.method === 'PUT') {
       const body = req.body || {};
       const payload = mapBodyToPayload(body);
-      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
+      const requestedInstituicaoId = normalizeText(body.instituicaoId ?? body.instituicao_id ?? req.headers?.['x-instituicao-id']);
+      const userInstituicaoId = normalizeText(authUser.instituicao_id ?? authUser.instituicaoId);
 
-      if (!instituicaoId) {
-        return res.status(400).json({ error: 'Instituicao e obrigatoria', message: 'Instituicao e obrigatoria' });
+      // Buscar curso atual para checar escopo
+      const { data: cursoAtual, error: cursoError } = await supabase
+        .from('cursos')
+        .select('id, instituicao_id')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (cursoError || !cursoAtual) {
+        return res.status(404).json({ error: 'Curso não encontrado', message: 'Curso não encontrado' });
       }
 
-      payload.instituicao_id = instituicaoId;
-
-      if (!payload.nome) {
-        return res.status(400).json({ error: 'Nome é obrigatório', message: 'Nome é obrigatório' });
+      if (!isGroupAdmin) {
+        if (cursoAtual.instituicao_id && cursoAtual.instituicao_id !== userInstituicaoId) {
+          return res.status(403).json({ error: 'Acesso não autorizado a este curso', message: 'Acesso não autorizado a este curso' });
+        }
+        if (requestedInstituicaoId && requestedInstituicaoId !== userInstituicaoId) {
+          return res.status(403).json({ error: 'Não é permitido alterar o curso para outra instituição', message: 'Não é permitido alterar o curso para outra instituição' });
+        }
+        payload.instituicao_id = userInstituicaoId;
+      } else {
+        payload.instituicao_id = requestedInstituicaoId || cursoAtual.instituicao_id || userInstituicaoId;
       }
 
       if (!payload.instituicao_id) {
         return res.status(400).json({ error: 'Instituição é obrigatória', message: 'Instituição é obrigatória' });
+      }
+
+      const erroValidacao = validarDadosCurso(payload);
+      if (erroValidacao) {
+        return res.status(400).json({ error: erroValidacao, message: erroValidacao });
       }
 
       const unidadeIds = await resolveUnidadeIdsFromBody(body);
@@ -398,7 +493,9 @@ export default async function handler(req, res) {
         .update(payload)
         .eq('id', id);
 
-      updateQuery = applyInstituicaoFilter(updateQuery, instituicaoId);
+      if (!isGroupAdmin) {
+        updateQuery = applyInstituicaoFilter(updateQuery, userInstituicaoId);
+      }
 
       const { data, error } = await updateQuery
         .select('*')
@@ -425,9 +522,20 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'DELETE') {
-      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
-      if (!instituicaoId) {
-        return res.status(400).json({ error: 'Instituicao e obrigatoria', message: 'Instituicao e obrigatoria' });
+      const userInstituicaoId = normalizeText(authUser.instituicao_id ?? authUser.instituicaoId);
+
+      const { data: cursoAtual } = await supabase
+        .from('cursos')
+        .select('id, instituicao_id')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (!cursoAtual) {
+        return res.status(404).json({ error: 'Curso não encontrado', message: 'Curso não encontrado' });
+      }
+
+      if (!isGroupAdmin && cursoAtual.instituicao_id && cursoAtual.instituicao_id !== userInstituicaoId) {
+        return res.status(403).json({ error: 'Acesso não autorizado para excluir este curso', message: 'Acesso não autorizado para excluir este curso' });
       }
 
       try {
@@ -441,7 +549,9 @@ export default async function handler(req, res) {
         .delete()
         .eq('id', id);
 
-      deleteQuery = applyInstituicaoFilter(deleteQuery, instituicaoId);
+      if (!isGroupAdmin) {
+        deleteQuery = applyInstituicaoFilter(deleteQuery, userInstituicaoId);
+      }
 
       const { data, error } = await deleteQuery
         .select('id')

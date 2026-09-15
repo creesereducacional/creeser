@@ -6,27 +6,65 @@ export default function ListagemCursos() {
   const [cursos, setCursos] = useState([]);
   const [filtrados, setFiltrados] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [instituicoes, setInstituicoes] = useState([]);
+  const [instituicaoPadraoId, setInstituicaoPadraoId] = useState('');
+  const [selectedInstituicaoId, setSelectedInstituicaoId] = useState('');
   const [searchNome, setSearchNome] = useState('');
   const [searchSituacao, setSearchSituacao] = useState('');
 
   useEffect(() => {
-    carregarCursos();
+    carregarInstituicoes();
   }, []);
 
   useEffect(() => {
     aplicarFiltros();
   }, [cursos, searchNome, searchSituacao]);
 
-  const carregarCursos = async () => {
+  const carregarInstituicoes = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/cursos');
+      const res = await fetch('/api/instituicoes');
       if (res.ok) {
         const data = await res.json();
-        setCursos(data);
+        const lista = Array.isArray(data) ? data : [];
+        setInstituicoes(lista);
+
+        if (lista.length > 0) {
+          const padrao = String(lista[0].id);
+          setInstituicaoPadraoId(padrao);
+          setSelectedInstituicaoId(padrao);
+          await carregarCursos(padrao);
+        } else {
+          setLoading(false);
+        }
+      } else {
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar instituições:', error);
+      setLoading(false);
+    }
+  };
+
+  const carregarCursos = async (instId = selectedInstituicaoId) => {
+    if (!instId) {
+      setCursos([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/cursos?instituicao_id=${encodeURIComponent(instId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setCursos(Array.isArray(data) ? data : []);
+      } else {
+        setCursos([]);
       }
     } catch (error) {
       console.error('Erro ao carregar cursos:', error);
+      setCursos([]);
     } finally {
       setLoading(false);
     }
@@ -37,7 +75,7 @@ export default function ListagemCursos() {
 
     if (searchNome) {
       resultado = resultado.filter(curso =>
-        curso.nome.toLowerCase().includes(searchNome.toLowerCase())
+        (curso.nome || '').toLowerCase().includes(searchNome.toLowerCase())
       );
     }
 
@@ -51,6 +89,10 @@ export default function ListagemCursos() {
   const limparFiltros = () => {
     setSearchNome('');
     setSearchSituacao('');
+    if (instituicaoPadraoId) {
+      setSelectedInstituicaoId(instituicaoPadraoId);
+      carregarCursos(instituicaoPadraoId);
+    }
   };
 
   const deletarCurso = async (id) => {
@@ -58,7 +100,7 @@ export default function ListagemCursos() {
       try {
         const res = await fetch(`/api/cursos/${id}`, { method: 'DELETE' });
         if (res.ok) {
-          carregarCursos();
+          carregarCursos(selectedInstituicaoId);
         }
       } catch (error) {
         console.error('Erro ao deletar:', error);
@@ -105,6 +147,29 @@ export default function ListagemCursos() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            {/* 1. Instituição */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Instituição *</label>
+              <select
+                value={selectedInstituicaoId}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSelectedInstituicaoId(val);
+                  carregarCursos(val);
+                }}
+                disabled={instituicoes.length <= 1}
+                className="w-full px-4 py-2 border border-teal-200 rounded bg-white focus:outline-none focus:ring-2 focus:ring-teal-600 disabled:bg-gray-100 disabled:text-gray-600 disabled:cursor-not-allowed"
+              >
+                {instituicoes.length === 0 && <option value="">Nenhuma instituição autorizada</option>}
+                {instituicoes.map((inst) => (
+                  <option key={inst.id} value={String(inst.id)}>
+                    {inst.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 2. Nome do Curso */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Nome do Curso</label>
               <input
@@ -116,6 +181,7 @@ export default function ListagemCursos() {
               />
             </div>
 
+            {/* 3. Situação */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Situação</label>
               <select
@@ -132,9 +198,9 @@ export default function ListagemCursos() {
 
           <button
             onClick={limparFiltros}
-            className="px-6 py-2 bg-gray-400 text-white rounded font-semibold hover:bg-gray-500 transition"
+            className="px-6 py-2 bg-gray-400 text-white rounded font-semibold hover:bg-gray-500 transition flex items-center gap-1"
           >
-            Limpar Filtros
+            🧹 Limpar Filtros
           </button>
         </div>
 

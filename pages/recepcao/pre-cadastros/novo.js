@@ -463,7 +463,7 @@ export default function NovoPrecadastro() {
             <div className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
               <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wide pb-2 border-b">📚 Curso de Interesse</h2>
 
-              {instituicoes.length > 1 && (
+              {instituicoes.length > 1 ? (
                 <div>
                   <label className={labelCls}>Unidade</label>
                   <select
@@ -471,24 +471,30 @@ export default function NovoPrecadastro() {
                     onChange={e => { setInstSel(e.target.value); set('cursoid', ''); set('turmaid', ''); }}
                     className={`${inputCls} ${inputOk}`}
                   >
-                    <option value="">— Selecione a instituição —</option>
+                    <option value="">— Selecione a instituição / unidade —</option>
                     {instituicoes.map(i => <option key={i.id} value={i.id}>{i.nome}</option>)}
                   </select>
                 </div>
-              )}
+              ) : null}
 
               <div>
                 <label className={labelCls}>Curso {carregandoCursos && '(carregando…)'}</label>
-                <select
-                  value={form.cursoid}
-                  onChange={e => { set('cursoid', e.target.value); set('turmaid', ''); }}
-                  disabled={!instSel || carregandoCursos}
-                  className={`${inputCls} ${inputOk} ${!instSel ? 'opacity-50' : ''}`}
-                >
-                  <option value="">— Selecione o curso —</option>
-                  {cursos.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-                </select>
-                {!instSel && <p className="text-xs text-gray-400 mt-1">Selecione a instituição primeiro.</p>}
+                {instSel && !carregandoCursos && cursos.length === 0 ? (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-xs font-medium">
+                    ⚠️ Nenhum curso disponível para esta unidade.
+                  </div>
+                ) : (
+                  <select
+                    value={form.cursoid}
+                    onChange={e => { set('cursoid', e.target.value); set('turmaid', ''); }}
+                    disabled={!instSel || carregandoCursos || cursos.length === 0}
+                    className={`${inputCls} ${inputOk} ${!instSel || cursos.length === 0 ? 'opacity-50' : ''}`}
+                  >
+                    <option value="">— Selecione o curso —</option>
+                    {cursos.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                  </select>
+                )}
+                {!instSel && <p className="text-xs text-gray-400 mt-1">Selecione a unidade primeiro.</p>}
               </div>
 
               {form.cursoid && (
