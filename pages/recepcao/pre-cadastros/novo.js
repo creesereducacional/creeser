@@ -55,23 +55,35 @@ export default function NovoPrecadastro() {
   const [salvando, setSalvando]                   = useState(false);
   const [erro, setErro]                           = useState(null);
 
-  // Carregar instituições (lógica original inalterada)
+  // Carregar instituição do usuário logado diretamente via token,
+  // sem depender do endpoint /api/comercial/instituicoes que pode retornar []
   useEffect(() => {
-    fetch('/api/comercial/instituicoes', { credentials: 'include' })
+    fetch('/api/auth/me', { credentials: 'include' })
       .then(r => r.json())
       .then(data => {
-        const list = Array.isArray(data) ? data : [];
-        setInstituicoes(list);
-        if (list.length === 1) setInstSel(list[0].id);
+        const userInstId = data?.usuario?.instituicao_id;
+        if (userInstId) {
+          setInstSel(String(userInstId));
+          setInstituicoes([{ id: userInstId, nome: '' }]);
+        } else {
+          // fallback: tentar buscar via endpoint de instituições
+          return fetch('/api/comercial/instituicoes', { credentials: 'include' })
+            .then(r => r.json())
+            .then(lista => {
+              const list = Array.isArray(lista) ? lista : [];
+              setInstituicoes(list);
+              if (list.length === 1) setInstSel(String(list[0].id));
+            });
+        }
       })
       .catch(() => {});
   }, []);
 
-  // Carregar cursos (lógica ajustada para sempre buscar se instSel não estiver explicitamente selecionado)
+  // Carregar cursos sempre que instSel mudar
   useEffect(() => {
+    if (!instSel) return; // aguarda ter a instituição definida
     setCarregandoCursos(true);
-    const url = instSel ? `/api/comercial/cursos?instituicao_id=${instSel}` : '/api/comercial/cursos';
-    fetch(url, { credentials: 'include' })
+    fetch(`/api/comercial/cursos?instituicao_id=${instSel}`, { credentials: 'include' })
       .then(r => r.json())
       .then(data => setCursos(Array.isArray(data) ? data : []))
       .catch(() => {})

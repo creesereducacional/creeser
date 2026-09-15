@@ -22,7 +22,12 @@ export default async function handler(req, res) {
   if (!requirePerfil(authUser, res, PERFIS_PERMITIDOS)) return;
 
   const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
-  const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+  // Para grupo_admin: aceita query param; para outros: usa query param ou token
+  const queryInstId = req.query?.instituicao_id || req.query?.instituicaoId || null;
+  const tokenInstId = authUser.instituicao_id || authUser.instituicaoId || null;
+  const instituicaoId = isGroupAdmin
+    ? (queryInstId || resolveInstituicaoId(req, authUser, { allowAll: true }))
+    : (queryInstId || tokenInstId);
 
   let query = supabase
     .from('cursos')
