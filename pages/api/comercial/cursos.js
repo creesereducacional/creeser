@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import {
   requireAuth,
   requirePerfil,
+  hasPerfil,
   applyInstituicaoFilter,
   resolveInstituicaoId,
 } from '../../../lib/auth-server';
