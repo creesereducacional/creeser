@@ -39,9 +39,9 @@ export default function GerenciarGrades() {
       setLoadingOpcoes(true);
 
       const [instituicoesRes, cursosRes, unidadesRes] = await Promise.all([
-        fetch('/api/instituicoes'),
-        fetch('/api/cursos'),
-        fetch('/api/unidades')
+        fetch('/api/instituicoes', { credentials: 'include' }),
+        fetch('/api/cursos', { credentials: 'include' }),
+        fetch('/api/unidades', { credentials: 'include' })
       ]);
 
       if (instituicoesRes.ok) {

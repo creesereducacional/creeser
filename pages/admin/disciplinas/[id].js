@@ -35,11 +35,11 @@ export default function EditarDisciplina() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/cursos'),
-      fetch('/api/grades')
-    ]).then(async ([resCursos, resGrades]) => {
-      if (resCursos.ok) setCursos(await resCursos.json());
-      if (resGrades.ok) setGrades(await resGrades.json());
+      fetch('/api/cursos', { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+      fetch('/api/grades', { credentials: 'include' }).then(r => r.ok ? r.json() : [])
+    ]).then(([dataCursos, dataGrades]) => {
+      setCursos(Array.isArray(dataCursos) ? dataCursos : []);
+      setGrades(Array.isArray(dataGrades) ? dataGrades : []);
     }).catch(console.error);
   }, []);
 
