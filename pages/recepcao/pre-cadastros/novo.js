@@ -67,11 +67,11 @@ export default function NovoPrecadastro() {
       .catch(() => {});
   }, []);
 
-  // Carregar cursos (lógica original inalterada)
+  // Carregar cursos (lógica ajustada para sempre buscar se instSel não estiver explicitamente selecionado)
   useEffect(() => {
-    if (!instSel) { setCursos([]); return; }
     setCarregandoCursos(true);
-    fetch(`/api/comercial/cursos?instituicao_id=${instSel}`, { credentials: 'include' })
+    const url = instSel ? `/api/comercial/cursos?instituicao_id=${instSel}` : '/api/comercial/cursos';
+    fetch(url, { credentials: 'include' })
       .then(r => r.json())
       .then(data => setCursos(Array.isArray(data) ? data : []))
       .catch(() => {})
@@ -536,9 +536,9 @@ export default function NovoPrecadastro() {
 
               <div>
                 <label className={labelCls}>Curso {carregandoCursos && '(carregando…)'}</label>
-                {instSel && !carregandoCursos && cursos.length === 0 ? (
+                {!carregandoCursos && cursos.length === 0 ? (
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-xs font-medium">
-                    ⚠️ Nenhum curso disponível para esta unidade.
+                    ⚠️ Nenhum curso disponível.
                   </div>
                 ) : (
                   <select
