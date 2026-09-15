@@ -585,14 +585,19 @@ export default function EditarTurma() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               <div>
                 <label className="text-xs font-medium text-teal-600 mb-1 block">QTD. MESES CONTRATO</label>
-                <input
-                  type="text"
+                <select
                   name="mesesContrato"
                   value={formData.mesesContrato}
                   onChange={handleChange}
-                  placeholder="Ex. 12"
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
-                />
+                >
+                  <option value="">Selecione a quantidade de meses</option>
+                  {Array.from({ length: 60 }, (_, i) => i + 1).map((m) => (
+                    <option key={m} value={m}>
+                      {m} {m === 1 ? 'Mês' : 'Meses'}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
