@@ -20,8 +20,8 @@ export default async function handler(req, res) {
   if (!authUser) return;
   if (!requirePerfil(authUser, res, PERFIS_PERMITIDOS)) return;
 
-  const perfil = String(authUser.perfil || authUser.tipo || '').toLowerCase();
-  const isRecepcao = perfil === 'recepcao';
+  const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+  const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
 
   let query = supabase
     .from('cursos')
@@ -36,10 +36,9 @@ export default async function handler(req, res) {
 
   let resultado = cursos || [];
 
-  // Se o usuário for recepção ou tiver instituicao_id resolvido, filtrar pelos cursos vinculados na tabela curso_unidade se ela existir
+  // Se a instituição estiver definida, checar se a instituição possui vínculos cadastrados na tabela curso_unidade
   if (instituicaoId && resultado.length > 0) {
     try {
-      // Buscar unidades da instituição
       const { data: unidades } = await supabase
         .from('unidades')
         .select('id')
@@ -48,7 +47,6 @@ export default async function handler(req, res) {
       const unidadeIds = (unidades || []).map((u) => u.id);
 
       if (unidadeIds.length > 0) {
-        // Buscar vínculos em curso_unidade (tentando schema candidatos)
         let links = null;
         for (const colPair of [
           { c: 'cursoid', u: 'unidadeid' },
@@ -59,13 +57,15 @@ export default async function handler(req, res) {
             .from('curso_unidade')
             .select(`${colPair.c},${colPair.u}`)
             .in(colPair.u, unidadeIds);
-          if (!errL && l) {
+
+          if (!errL && l && l.length > 0) {
             links = l.map((item) => Number(item[colPair.c]));
             break;
           }
         }
 
-        if (links && Array.isArray(links)) {
+        // Somente aplicar o filtro restritivo se existirem vínculos explícitos na tabela curso_unidade para a instituição
+        if (links && Array.isArray(links) && links.length > 0) {
           const cursoIdsPermitidos = new Set(links);
           resultado = resultado.filter((c) => cursoIdsPermitidos.has(Number(c.id)));
         }
