@@ -219,11 +219,14 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
   if (vencimentoPadrao < hoje) vencimentoPadrao.setMonth(vencimentoPadrao.getMonth() + 1);
   const vencimentoStr = vencimentoPadrao.toISOString().split('T')[0];
 
+  const descontoTurma = aluno.desconto_turma || aluno.turmas?.desconto;
+  const descontoInicial = aluno.percentual_desconto || descontoTurma || '';
+
   const [form, setForm] = useState({
     descricao: '',
     categoria: '',
     valor: aluno.valor_mensalidade || '',
-    percentual_desconto: '',
+    percentual_desconto: descontoInicial,
     vencimento_desconto: '',
     data_vencimento: vencimentoStr,
     quantidade_parcelas: 1,
@@ -646,10 +649,13 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
   const qtdParcelasTurma = aluno.mesescontrato_turma || aluno.turmas?.mesescontrato;
   const qtdParcelasInicial = aluno.qtd_parcelas || qtdParcelasTurma || 12;
 
+  const descontoTurma = aluno.desconto_turma || aluno.turmas?.desconto;
+  const descontoInicial = aluno.percentual_desconto || descontoTurma || '';
+
   const [form, setForm] = useState({
     descricao: '',
     valor: aluno.valor_mensalidade || '',
-    percentual_desconto: '',
+    percentual_desconto: descontoInicial,
     vencimento_desconto: '',
     quantidade_parcelas: qtdParcelasInicial,
     periodo: 'Período Único',
