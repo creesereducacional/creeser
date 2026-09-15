@@ -65,6 +65,8 @@ export default function AdminUsuarios() {
   const [perfisFiltrados, setPerfisFiltrados] = useState([]);
   const [tiposFiltrados, setTiposFiltrados] = useState([]);
 
+  const [operadorInstituicaoId, setOperadorInstituicaoId] = useState(null);
+
   const buscarOperador = async () => {
     try {
       setCarregandoOperador(true);
@@ -79,6 +81,7 @@ export default function AdminUsuarios() {
           return p;
         };
         const opPerfil = mapP(rawP);
+        setOperadorInstituicaoId(data?.usuario?.instituicao_id || null);
         
         let pFiltrados = [];
         if (opPerfil === 'grupo_admin') {
@@ -223,6 +226,8 @@ export default function AdminUsuarios() {
         whatsapp:     (form.whatsapp || '').replace(/\D/g, ''),
       };
       if (form.senha.trim()) payload.senha = form.senha.trim();
+      // Incluir instituicao_id no payload ao criar novo usuário
+      if (!editandoId && operadorInstituicaoId) payload.instituicao_id = operadorInstituicaoId;
 
       const url    = editandoId ? `/api/usuarios?id=${editandoId}` : '/api/usuarios';
       const method = editandoId ? 'PUT' : 'POST';

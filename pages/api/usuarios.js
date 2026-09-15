@@ -101,7 +101,7 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     const body = req.body || {};
     const instId = resolveInstituicaoId(req, authUser);
-    const { nomeCompleto, email, senha, cpf, dataNascimento, whatsapp, tipo, perfil, status } = body;
+    const { nomeCompleto, email, senha, cpf, dataNascimento, whatsapp, tipo, perfil, status, instituicao_id: bodyInstId } = body;
     if (!nomeCompleto || !email || !senha || !tipo) {
       return res.status(400).json({ error: 'Nome, email, senha e tipo são obrigatórios' });
     }
@@ -123,6 +123,9 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Acesso negado: Perfil de acesso não permitido para o seu cargo.' });
     }
 
+    // Prioriza instituicao_id enviado pelo frontend; fallback para o do operador
+    const finalInstId = bodyInstId || instId || null;
+
     let insertData = {
       email,
       senha,
@@ -131,7 +134,7 @@ export default async function handler(req, res) {
       whatsapp:        whatsapp || null,
       tipo,
       perfil:          perfilResolvido,
-      instituicao_id:  instId || null,
+      instituicao_id:  finalInstId,
       status:          status || 'ativo',
     };
 
