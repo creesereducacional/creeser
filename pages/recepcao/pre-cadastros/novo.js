@@ -79,11 +79,13 @@ export default function NovoPrecadastro() {
       .catch(() => {});
   }, []);
 
-  // Carregar cursos sempre que instSel mudar
+  // Carregar cursos: usa instSel se disponível, senão busca todos via token do servidor
   useEffect(() => {
-    if (!instSel) return; // aguarda ter a instituição definida
     setCarregandoCursos(true);
-    fetch(`/api/comercial/cursos?instituicao_id=${instSel}`, { credentials: 'include' })
+    const url = instSel
+      ? `/api/comercial/cursos?instituicao_id=${instSel}`
+      : '/api/comercial/cursos';
+    fetch(url, { credentials: 'include' })
       .then(r => r.json())
       .then(data => setCursos(Array.isArray(data) ? data : []))
       .catch(() => {})
