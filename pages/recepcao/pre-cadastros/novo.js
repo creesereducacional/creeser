@@ -105,6 +105,60 @@ export default function NovoPrecadastro() {
     return id;
   }
 
+  const [verificandoCpf, setVerificandoCpf]       = useState(false);
+
+  const initialFormState = {
+    nome: '', cpf: '', email: '', telefone_celular: '',
+    data_nascimento: '',
+    responsavel_nome: '', responsavel_cpf: '', responsavel_rg: '', responsavel_telefone: '', responsavel_parentesco: '',
+    responsavel_financeiro_mesmo: true,
+    financeiro_nome: '', financeiro_cpf: '', financeiro_rg: '', financeiro_telefone: '', financeiro_parentesco: '',
+    cursoid: '', turmaid: '', observacoes_adicionais: '',
+  };
+
+  const resetForm = () => {
+    setForm(initialFormState);
+    setErros({});
+    setIdade(null);
+  };
+
+  const checarCpfDuplicado = async (cpfVal) => {
+    const rawCpf = (cpfVal || '').replace(/\D/g, '');
+    if (rawCpf.length !== 11) return;
+
+    setVerificandoCpf(true);
+    try {
+      const res = await fetch(`/api/recepcao/pre-cadastros/verificar-cpf?cpf=${encodeURIComponent(cpfVal.trim())}`, {
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (res.ok && data.exists) {
+        setErro(`Este CPF (${cpfVal}) já possui um cadastro no sistema (Aluno: ${data.aluno?.nome || 'Já existente'}). Os campos foram resetados.`);
+        if (data.aluno?.id) setDuplicateId(data.aluno.id);
+        resetForm();
+      }
+    } catch (e) {
+      console.error('Erro ao verificar CPF:', e);
+    } finally {
+      setVerificandoCpf(false);
+    }
+  };
+
+  const handleCpfChange = (val) => {
+    const masked = maskCPF(val);
+    set('cpf', masked);
+    const raw = masked.replace(/\D/g, '');
+    if (raw.length === 11) {
+      checarCpfDuplicado(masked);
+    }
+  };
+
+  const handleCpfBlur = () => {
+    if (form.cpf && form.cpf.replace(/\D/g, '').length === 11) {
+      checarCpfDuplicado(form.cpf);
+    }
+  };
+
   function handleDataNascimento(val) {
     set('data_nascimento', val);
     const id = calcularIdade(val);
@@ -254,11 +308,13 @@ export default function NovoPrecadastro() {
                 <input
                   className={`${inputCls} ${erros.cpf ? inputErr : inputOk}`}
                   value={form.cpf}
-                  onChange={e => set('cpf', maskCPF(e.target.value))}
+                  onChange={e => handleCpfChange(e.target.value)}
+                  onBlur={handleCpfBlur}
                   placeholder="000.000.000-00"
                   maxLength={14}
                 />
                 {erros.cpf && <p className="text-xs text-red-600 mt-1">{erros.cpf}</p>}
+                {verificandoCpf && <p className="text-xs text-gray-500 mt-1">Verificando CPF no sistema...</p>}
               </div>
 
               <div>
