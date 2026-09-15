@@ -81,6 +81,7 @@ export default async function handler(req, res) {
         turmas (
           id,
           nome,
+          mesescontrato,
           unidades (
             id,
             nome
@@ -229,6 +230,7 @@ export default async function handler(req, res) {
         curso: cursoObj.nome || '',
         turma: turmaObj.nome || '',
         ano_letivo_turma: a.ano_letivo || '',
+        mesescontrato_turma: turmaObj.mesescontrato || null,
         responsavel: responsavelObj,
       };
     });

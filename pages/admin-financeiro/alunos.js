@@ -643,12 +643,15 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
   if (vencimentoPadrao < hoje) vencimentoPadrao.setMonth(vencimentoPadrao.getMonth() + 1);
   const vencimentoStr = vencimentoPadrao.toISOString().split('T')[0];
 
+  const qtdParcelasTurma = aluno.mesescontrato_turma || aluno.turmas?.mesescontrato;
+  const qtdParcelasInicial = aluno.qtd_parcelas || qtdParcelasTurma || 12;
+
   const [form, setForm] = useState({
     descricao: '',
     valor: aluno.valor_mensalidade || '',
     percentual_desconto: '',
     vencimento_desconto: '',
-    quantidade_parcelas: aluno.qtd_parcelas || 12,
+    quantidade_parcelas: qtdParcelasInicial,
     periodo: 'Período Único',
     data_vencimento: vencimentoStr,
   });
