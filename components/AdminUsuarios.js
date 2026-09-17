@@ -40,6 +40,8 @@ const FORM_INICIAL = {
   perfil: 'secretaria',
   status: 'ativo',
   whatsapp: '',
+  instituicao_id: '',
+  unidade_id: '',
 };
 
 function labelPerfil(perfil) {
@@ -65,7 +67,11 @@ export default function AdminUsuarios() {
   const [perfisFiltrados, setPerfisFiltrados] = useState([]);
   const [tiposFiltrados, setTiposFiltrados] = useState([]);
 
+  const [operadorPerfil, setOperadorPerfil] = useState('');
   const [operadorInstituicaoId, setOperadorInstituicaoId] = useState(null);
+  const [listaInstituicoes, setListaInstituicoes] = useState([]);
+  const [listaUnidades, setListaUnidades] = useState([]);
+  const [carregandoUnidades, setCarregandoUnidades] = useState(false);
 
   const buscarOperador = async () => {
     try {
@@ -81,6 +87,7 @@ export default function AdminUsuarios() {
           return p;
         };
         const opPerfil = mapP(rawP);
+        setOperadorPerfil(opPerfil);
         setOperadorInstituicaoId(data?.usuario?.instituicao_id || null);
         
         let pFiltrados = [];
@@ -96,12 +103,9 @@ export default function AdminUsuarios() {
         
         setPerfisFiltrados(pFiltrados);
 
-        // O tipo de usuário é fixo conforme as novas regras: funcionario, professor, aluno.
-        // Mas filtramos as opções de Tipo baseados no perfil que o operador logado tem autoridade para criar:
         const perfisPermitidosVal = pFiltrados.map(p => p.value);
         const tFiltrados = [];
         
-        // Se puder gerenciar algum perfil administrativo (não-professor e não-aluno)
         if (perfisPermitidosVal.some(p => p !== 'professor' && p !== 'aluno')) {
           tFiltrados.push({ value: 'funcionario', label: 'Funcionário' });
         }
@@ -121,9 +125,53 @@ export default function AdminUsuarios() {
     }
   };
 
+  const carregarInstituicoes = async () => {
+    try {
+      const res = await fetch('/api/instituicoes', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setListaInstituicoes(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar instituições:', err);
+    }
+  };
+
+  const carregarUnidadesDaInstituicao = async (instId) => {
+    if (!instId) {
+      setListaUnidades([]);
+      return;
+    }
+    try {
+      setCarregandoUnidades(true);
+      const res = await fetch('/api/unidades', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        const unidadesFiltradas = (Array.isArray(data) ? data : []).filter(
+          u => String(u.instituicaoId) === String(instId) || String(u.instituicao_id) === String(instId)
+        );
+        setListaUnidades(unidadesFiltradas);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar unidades:', err);
+    } finally {
+      setCarregandoUnidades(false);
+    }
+  };
+
   useEffect(() => {
     buscarOperador();
+    carregarInstituicoes();
   }, []);
+
+  // Recarrega as unidades sempre que a instituição selecionada no form muda
+  useEffect(() => {
+    if (form.instituicao_id) {
+      carregarUnidadesDaInstituicao(form.instituicao_id);
+    } else {
+      setListaUnidades([]);
+    }
+  }, [form.instituicao_id]);
 
 
 
@@ -148,7 +196,10 @@ export default function AdminUsuarios() {
   useEffect(() => { buscarUsuarios(); }, [buscarUsuarios]);
 
   const abrirNovo = () => {
-    setForm(FORM_INICIAL);
+    setForm({
+      ...FORM_INICIAL,
+      instituicao_id: operadorInstituicaoId || '',
+    });
     setEditandoId(null);
     setErroForm('');
     setMostrarForm(true);
@@ -161,14 +212,21 @@ export default function AdminUsuarios() {
       tipoResolvido = 'funcionario';
     }
 
+    // Identificar vínculo primário em usuario_instituicoes
+    const primeiroVinculo = Array.isArray(u.vinculos) && u.vinculos.length > 0 ? u.vinculos[0] : null;
+    const instIdResolvida = primeiroVinculo?.instituicao_id || u.instituicao_id || operadorInstituicaoId || '';
+    const unidadeIdResolvida = primeiroVinculo?.unidade_id != null ? String(primeiroVinculo.unidade_id) : '';
+
     setForm({
-      nomeCompleto: u.nomecompleto || u.nomeCompleto || '',
-      email:        u.email || '',
-      senha:        '',
-      tipo:         tipoResolvido,
-      perfil:       u.perfil || 'secretaria',
-      status:       u.status || 'ativo',
-      whatsapp:     formatarWhatsapp(u.whatsapp || ''),
+      nomeCompleto:   u.nomecompleto || u.nomeCompleto || '',
+      email:          u.email || '',
+      senha:          '',
+      tipo:           tipoResolvido,
+      perfil:         u.perfil || 'secretaria',
+      status:         u.status || 'ativo',
+      whatsapp:       formatarWhatsapp(u.whatsapp || ''),
+      instituicao_id: instIdResolvida,
+      unidade_id:     unidadeIdResolvida,
     });
     setEditandoId(u.id);
     setErroForm('');
@@ -190,6 +248,11 @@ export default function AdminUsuarios() {
     setForm(f => {
       const novoForm = { ...f, [name]: value };
       
+      // Se alterar a instituição, reseta a unidade selecionada
+      if (name === 'instituicao_id') {
+        novoForm.unidade_id = '';
+      }
+
       // Regra condicional: se alterar o Tipo, definir o perfil automaticamente
       if (name === 'tipo') {
         if (value === 'professor') {
@@ -197,7 +260,6 @@ export default function AdminUsuarios() {
         } else if (value === 'aluno') {
           novoForm.perfil = 'aluno';
         } else if (value === 'funcionario') {
-          // Se for funcionário, e o perfil anterior era professor/aluno, define um administrativo padrão permitido
           if (f.perfil === 'professor' || f.perfil === 'aluno') {
             const primeiroAdmin = perfisFiltrados.find(p => p.value !== 'professor' && p.value !== 'aluno');
             novoForm.perfil = primeiroAdmin ? primeiroAdmin.value : 'secretaria';
@@ -218,16 +280,16 @@ export default function AdminUsuarios() {
     setSalvando(true);
     try {
       const payload = {
-        nomeCompleto: form.nomeCompleto.trim(),
-        email:        form.email.trim(),
-        tipo:         form.tipo,
-        perfil:       form.perfil,
-        status:       form.status,
-        whatsapp:     (form.whatsapp || '').replace(/\D/g, ''),
+        nomeCompleto:   form.nomeCompleto.trim(),
+        email:          form.email.trim(),
+        tipo:           form.tipo,
+        perfil:         form.perfil,
+        status:         form.status,
+        whatsapp:       (form.whatsapp || '').replace(/\D/g, ''),
+        instituicao_id: form.instituicao_id || operadorInstituicaoId || null,
+        unidade_id:     form.unidade_id !== '' && form.unidade_id != null ? Number(form.unidade_id) : null,
       };
       if (form.senha.trim()) payload.senha = form.senha.trim();
-      // Incluir instituicao_id no payload ao criar novo usuário
-      if (!editandoId && operadorInstituicaoId) payload.instituicao_id = operadorInstituicaoId;
 
       const url    = editandoId ? `/api/usuarios?id=${editandoId}` : '/api/usuarios';
       const method = editandoId ? 'PUT' : 'POST';
@@ -426,6 +488,59 @@ export default function AdminUsuarios() {
               </select>
             </div>
 
+            {/* SELEÇÃO DE INSTITUIÇÃO */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Instituição
+              </label>
+              {operadorPerfil === 'grupo_admin' ? (
+                <select
+                  name="instituicao_id"
+                  value={form.instituicao_id}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                >
+                  <option value="">Selecione uma instituição...</option>
+                  {listaInstituicoes.map(inst => (
+                    <option key={inst.id} value={inst.id}>
+                      {inst.nome}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  disabled
+                  value={listaInstituicoes.find(i => String(i.id) === String(form.instituicao_id || operadorInstituicaoId))?.nome || 'Instituição Atual'}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-100 text-gray-700 text-sm"
+                />
+              )}
+            </div>
+
+            {/* SELEÇÃO DE UNIDADE VINCULADA */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Unidade Vinculada (Escopo)
+              </label>
+              <select
+                name="unidade_id"
+                value={form.unidade_id}
+                onChange={handleChange}
+                disabled={carregandoUnidades || (!form.instituicao_id && !operadorInstituicaoId)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-gray-100"
+              >
+                <option value="">-- Sem unidade (Pendente / Acesso Geral) --</option>
+                {listaUnidades.map(unid => (
+                  <option key={unid.id} value={unid.id}>
+                    {unid.isMatriz || unid.is_matriz ? `⭐ ${unid.nome} (MATRIZ - Acesso Total)` : `${unid.nome} (Filial)`}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Matriz concede acesso a todas as unidades da instituição. Filial restringe aos dados locais.
+              </p>
+            </div>
+
             <div className="md:col-span-2 flex gap-3 pt-2">
               <button
                 type="submit"
@@ -464,51 +579,68 @@ export default function AdminUsuarios() {
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">Email</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700 hidden md:table-cell">Perfil</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700 hidden sm:table-cell">Tipo</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-700 hidden lg:table-cell">Unidade (Escopo)</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-700">Status</th>
                   <th className="px-4 py-3 text-center font-semibold text-gray-700">Acoes</th>
                 </tr>
               </thead>
               <tbody>
-                {usuarios.map((u, i) => (
-                  <tr
-                    key={u.id}
-                    className={`border-b border-gray-100 hover:bg-blue-50 transition-colors ${i % 2 === 1 ? 'bg-gray-50' : 'bg-white'}`}
-                  >
-                    <td className="px-4 py-3 font-medium text-gray-800">
-                      {u.nomecompleto || u.nomeCompleto || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">{u.email}</td>
-                    <td className="px-4 py-3 text-gray-600 hidden md:table-cell">{labelPerfil(u.perfil)}</td>
-                    <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">{labelTipo(u.tipo)}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${u.status === 'ativo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                        {u.status === 'ativo' ? 'Ativo' : 'Inativo'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-center gap-2 flex-wrap">
-                        <button
-                          onClick={() => abrirEditar(u)}
-                          className="px-3 py-1 bg-teal-600 text-white rounded text-xs font-semibold hover:bg-teal-700 transition-colors"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => alternarStatus(u)}
-                          className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${u.status === 'ativo' ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' : 'bg-green-100 text-green-800 hover:bg-green-200'}`}
-                        >
-                          {u.status === 'ativo' ? 'Inativar' : 'Ativar'}
-                        </button>
-                        <button
-                          onClick={() => excluirUsuario(u)}
-                          className="px-3 py-1 bg-red-600 text-white rounded text-xs font-semibold hover:bg-red-700 transition-colors"
-                        >
-                          Excluir
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {usuarios.map((u, i) => {
+                  const primVinc = Array.isArray(u.vinculos) && u.vinculos.length > 0 ? u.vinculos[0] : null;
+                  return (
+                    <tr
+                      key={u.id}
+                      className={`border-b border-gray-100 hover:bg-blue-50 transition-colors ${i % 2 === 1 ? 'bg-gray-50' : 'bg-white'}`}
+                    >
+                      <td className="px-4 py-3 font-medium text-gray-800">
+                        {u.nomecompleto || u.nomeCompleto || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">{u.email}</td>
+                      <td className="px-4 py-3 text-gray-600 hidden md:table-cell">{labelPerfil(u.perfil)}</td>
+                      <td className="px-4 py-3 text-gray-600 hidden sm:table-cell">{labelTipo(u.tipo)}</td>
+                      <td className="px-4 py-3 text-gray-600 hidden lg:table-cell text-xs">
+                        {primVinc ? (
+                          primVinc.unidade_nome ? (
+                            <span className={primVinc.is_matriz ? 'font-bold text-teal-700' : 'text-gray-700'}>
+                              {primVinc.is_matriz ? `⭐ ${primVinc.unidade_nome} (Matriz)` : primVinc.unidade_nome}
+                            </span>
+                          ) : (
+                            <span className="text-yellow-600 font-medium">⏳ Pendente</span>
+                          )
+                        ) : (
+                          <span className="text-gray-400">Legado</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${u.status === 'ativo' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          {u.status === 'ativo' ? 'Ativo' : 'Inativo'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-center gap-2 flex-wrap">
+                          <button
+                            onClick={() => abrirEditar(u)}
+                            className="px-3 py-1 bg-teal-600 text-white rounded text-xs font-semibold hover:bg-teal-700 transition-colors"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => alternarStatus(u)}
+                            className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${u.status === 'ativo' ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' : 'bg-green-100 text-green-800 hover:bg-green-200'}`}
+                          >
+                            {u.status === 'ativo' ? 'Inativar' : 'Ativar'}
+                          </button>
+                          <button
+                            onClick={() => excluirUsuario(u)}
+                            className="px-3 py-1 bg-red-600 text-white rounded text-xs font-semibold hover:bg-red-700 transition-colors"
+                          >
+                            Excluir
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

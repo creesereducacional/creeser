@@ -77,16 +77,49 @@ export default async function handler(req, res) {
     const { data, error } = await query;
     if (error) {
       console.error('[RC40.2][GET /api/usuarios] ERRO COMPLETO:', error);
-      console.error('error.code:', error.code);
-      console.error('error.message:', error.message);
-      console.error('error.details:', error.details);
-      console.error('error.hint:', error.hint);
-      console.error('status HTTP:', error.status || 500);
-      console.error('response body:', JSON.stringify(error));
       return res.status(500).json({ error: error.message || 'Erro ao buscar usuarios no banco' });
     }
 
     const lista = Array.isArray(data) ? data : [];
+    
+    // Buscar vínculos em usuario_instituicoes para os usuários retornados
+    const userIds = lista.map(u => u.id);
+    let vinculosMap = {};
+
+    if (userIds.length > 0) {
+      try {
+        const { data: vinculosData, error: errVinc } = await supabase
+          .from('usuario_instituicoes')
+          .select(`
+            id,
+            usuario_id,
+            instituicao_id,
+            unidade_id,
+            unidades (
+              id,
+              nome,
+              is_matriz
+            )
+          `)
+          .in('usuario_id', userIds);
+
+        if (!errVinc && Array.isArray(vinculosData)) {
+          vinculosData.forEach(v => {
+            if (!vinculosMap[v.usuario_id]) vinculosMap[v.usuario_id] = [];
+            vinculosMap[v.usuario_id].push({
+              id: v.id,
+              instituicao_id: v.instituicao_id,
+              unidade_id: v.unidade_id,
+              unidade_nome: v.unidades?.nome || null,
+              is_matriz: Boolean(v.unidades?.is_matriz),
+            });
+          });
+        }
+      } catch (eVinc) {
+        console.warn('Aviso ao carregar usuario_instituicoes:', eVinc.message);
+      }
+    }
+
     // Ordenar em memória para garantir compatibilidade com nome / nomecompleto
     lista.sort((a, b) => {
       const nA = String(a.nomecompleto || a.nome || a.email || '').toLowerCase();
@@ -94,14 +127,34 @@ export default async function handler(req, res) {
       return nA.localeCompare(nB);
     });
 
-    // Omitir campo senha da resposta
-    return res.status(200).json(lista.map(u => { const { senha, ...rest } = u; return rest; }));
+    // Omitir campo senha da resposta e anexar vínculos
+    return res.status(200).json(lista.map(u => {
+      const { senha, ...rest } = u;
+      return {
+        ...rest,
+        vinculos: vinculosMap[u.id] || [],
+      };
+    }));
   }
 
   if (req.method === 'POST') {
     const body = req.body || {};
     const instId = resolveInstituicaoId(req, authUser);
-    const { nomeCompleto, email, senha, cpf, dataNascimento, whatsapp, tipo, perfil, status, instituicao_id: bodyInstId } = body;
+    const {
+      nomeCompleto,
+      email,
+      senha,
+      cpf,
+      dataNascimento,
+      whatsapp,
+      tipo,
+      perfil,
+      status,
+      instituicao_id: bodyInstId,
+      unidade_id: bodyUnidadeId,
+      vinculos: bodyVinculos,
+    } = body;
+
     if (!nomeCompleto || !email || !senha || !tipo) {
       return res.status(400).json({ error: 'Nome, email, senha e tipo são obrigatórios' });
     }
@@ -123,8 +176,36 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Acesso negado: Perfil de acesso não permitido para o seu cargo.' });
     }
 
-    // Prioriza instituicao_id enviado pelo frontend; fallback para o do operador
-    const finalInstId = bodyInstId || instId || null;
+    // Validação de Instituição:
+    // grupo_admin pode escolher qualquer instituição.
+    // instituicao_admin está ESTRITAMENTE restrito à sua própria instituição.
+    let finalInstId = instId || null;
+    if (isGroupAdmin && bodyInstId) {
+      finalInstId = bodyInstId;
+    } else if (!isGroupAdmin) {
+      finalInstId = authUser.instituicao_id || authUser.instituicaoId || instId;
+    }
+
+    if (!finalInstId) {
+      return res.status(400).json({ error: 'Instituição é obrigatória para criar usuário.' });
+    }
+
+    // Validação da Unidade (se informada)
+    const unidadeIdNum = bodyUnidadeId != null && bodyUnidadeId !== '' ? Number(bodyUnidadeId) : null;
+    if (unidadeIdNum !== null) {
+      const { data: unidadeCheck, error: errUnidadeCheck } = await supabase
+        .from('unidades')
+        .select('id, instituicao_id')
+        .eq('id', unidadeIdNum)
+        .maybeSingle();
+
+      if (errUnidadeCheck || !unidadeCheck) {
+        return res.status(400).json({ error: 'A unidade selecionada não existe.' });
+      }
+      if (String(unidadeCheck.instituicao_id) !== String(finalInstId)) {
+        return res.status(400).json({ error: 'A unidade selecionada não pertence à instituição informada.' });
+      }
+    }
 
     let insertData = {
       email,
@@ -152,14 +233,30 @@ export default async function handler(req, res) {
       }).select('*').single();
     }
 
-    const { data, error } = resInsert;
+    const { data: novoUser, error: errUser } = resInsert;
 
-    if (error) {
-      console.error('[POST /api/usuarios] Erro na inserção:', error);
-      if (error.code === '23505') return res.status(409).json({ error: 'CPF ou email já cadastrado' });
-      return res.status(500).json({ error: error.message || 'Erro ao criar usuário' });
+    if (errUser) {
+      console.error('[POST /api/usuarios] Erro na inserção:', errUser);
+      if (errUser.code === '23505') return res.status(409).json({ error: 'CPF ou email já cadastrado' });
+      return res.status(500).json({ error: errUser.message || 'Erro ao criar usuário' });
     }
-    const { senha: _, ...userNoSenha } = data || {};
+
+    // Sincronizar usuario_instituicoes (Fase 5.3)
+    if (novoUser && novoUser.id && finalInstId) {
+      try {
+        await supabase
+          .from('usuario_instituicoes')
+          .insert({
+            usuario_id: novoUser.id,
+            instituicao_id: finalInstId,
+            unidade_id: unidadeIdNum,
+          });
+      } catch (errVincInsert) {
+        console.error('Aviso: Erro ao registrar usuario_instituicoes na criação:', errVincInsert);
+      }
+    }
+
+    const { senha: _, ...userNoSenha } = novoUser || {};
     return res.status(201).json({ message: 'Usuário criado com sucesso', usuario: userNoSenha });
   }
 
@@ -235,6 +332,49 @@ export default async function handler(req, res) {
     }
     const { data, error } = resUpdate;
     if (error) return res.status(500).json({ error: error.message || 'Erro ao atualizar usuário' });
+
+    // Sincronizar vínculo em usuario_instituicoes no PUT (Fase 5.3)
+    // Determinar a instituição do vínculo:
+    // grupo_admin pode informar instituicao_id; para outros perfis, restringe-se estritamente à sua instituição
+    const targetInstId = isGroupAdmin && body.instituicao_id
+      ? body.instituicao_id
+      : (authUser.instituicao_id || authUser.instituicaoId || originalUser.instituicao_id);
+
+    if (targetInstId && (body.unidade_id !== undefined || body.instituicao_id !== undefined)) {
+      const unidadeIdNum = body.unidade_id != null && body.unidade_id !== '' ? Number(body.unidade_id) : null;
+
+      // Se unidade informada, validar se pertence à instituição alvo
+      if (unidadeIdNum !== null) {
+        const { data: unidCheck } = await supabase
+          .from('unidades')
+          .select('id, instituicao_id')
+          .eq('id', unidadeIdNum)
+          .maybeSingle();
+
+        if (unidCheck && String(unidCheck.instituicao_id) === String(targetInstId)) {
+          // Upsert com base na constraint UNIQUE(usuario_id, instituicao_id)
+          await supabase
+            .from('usuario_instituicoes')
+            .upsert({
+              usuario_id: Number(id),
+              instituicao_id: targetInstId,
+              unidade_id: unidadeIdNum,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'usuario_id,instituicao_id' });
+        }
+      } else if (body.unidade_id === null || body.unidade_id === '') {
+        // Permitir unidade pendente (null)
+        await supabase
+          .from('usuario_instituicoes')
+          .upsert({
+            usuario_id: Number(id),
+            instituicao_id: targetInstId,
+            unidade_id: null,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'usuario_id,instituicao_id' });
+      }
+    }
+
     const { senha: _, ...userNoSenha } = data || {};
     return res.status(200).json({ message: 'Usuário atualizado com sucesso', usuario: userNoSenha });
   }
