@@ -4,6 +4,7 @@ import {
   hasPerfil,
   requireAuth,
   requirePerfil,
+  resolveContextoUsuario,
   resolveInstituicaoId,
 } from '../../../lib/auth-server';
 
@@ -153,9 +154,27 @@ export default async function handler(req, res) {
 
   const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
 
+  // ── FASE 4.2: resolver contexto de escopo (instituição + unidade) ──────────
+  // resolveContextoUsuario consulta usuario_instituicoes para determinar:
+  //   • instituicaoId       — instituição validada pelo servidor
+  //   • unidadesPermitidas  — null (irrestrito) ou [unidade_id] (apenas filial)
+  //   • legacyFallback      — true se sem vínculo novo (usa campo legado)
+  //   • queryError          — string se houve falha de banco
+  const ctx = await resolveContextoUsuario(req, authUser);
+
+  if (ctx.queryError) {
+    console.error('[alunos] Falha ao resolver contexto:', ctx.queryError);
+    return res.status(503).json({ error: 'Serviço temporariamente indisponível. Tente novamente.' });
+  }
+  // ────────────────────────────────────────────────────────────────────────────
+
   try {
     if (req.method === 'GET') {
-      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+      // Instituição: contexto validado pelo servidor
+      const instituicaoId = ctx.legacyFallback
+        ? resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin })
+        : ctx.instituicaoId;
+
       if (!isGroupAdmin && !instituicaoId) {
         return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
       }
@@ -315,6 +334,15 @@ export default async function handler(req, res) {
       // 3. Desdobrar em 1 registro por Matrícula (ALUNO + MATRÍCULA + CURSO + TURMA) com fallback total para legado
       const listaAlunosFinal = [];
 
+      // Helper: verifica se uma unidade_id está dentro do escopo permitido.
+      // null → sem restrição (matriz, legado, grupo_admin).
+      // [id] → somente aquela unidade (filial).
+      const unidadePermitida = (unidadeIdVal) => {
+        if (!ctx.unidadesPermitidas) return true; // irrestrito
+        if (unidadeIdVal == null) return true;     // sem unidade definida → exibir (não punir dado incompleto)
+        return ctx.unidadesPermitidas.includes(Number(unidadeIdVal));
+      };
+
       alunos.forEach((aluno) => {
         const matriculasDoAluno = matriculasPorAluno[aluno.id] || [];
 
@@ -323,6 +351,12 @@ export default async function handler(req, res) {
             const turmaObj = mat.turmas || aluno.turmas || {};
             const cursoObj = mat.cursos || aluno.cursos || (turmaObj.cursos ? turmaObj.cursos : null);
             const unidadeObj = turmaObj.unidades || (aluno.turmas?.unidades ? aluno.turmas.unidades : null);
+
+            // FILTRO DE UNIDADE (Fase 4.2):
+            // A unidade da matrícula vem de turmaObj.unidadeid (coluna legada da tabela turmas).
+            // Cada matrícula é avaliada individualmente — cursos simultâneos preservados.
+            const unidadeIdMatricula = turmaObj?.unidadeid ?? aluno.turmas?.unidadeid ?? null;
+            if (!unidadePermitida(unidadeIdMatricula)) return; // pula esta matrícula
 
             listaAlunosFinal.push({
               ...aluno,
@@ -362,6 +396,10 @@ export default async function handler(req, res) {
           const turmaObj = aluno.turmas || {};
           const cursoObj = aluno.cursos || (turmaObj.cursos ? turmaObj.cursos : null);
           const unidadeObj = turmaObj.unidades || null;
+
+          // FILTRO DE UNIDADE para registros legados
+          const unidadeIdLegado = turmaObj?.unidadeid ?? null;
+          if (!unidadePermitida(unidadeIdLegado)) return; // pula este aluno legado
 
           listaAlunosFinal.push({
             ...aluno,
@@ -445,7 +483,9 @@ export default async function handler(req, res) {
         return null;
       };
       
-      let instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
+      let instituicaoId = ctx.legacyFallback
+        ? resolveInstituicaoId(req, authUser, { allowAll: false })
+        : ctx.instituicaoId;
       
       // Se for administrador do grupo e tiver selecionado/enviado uma instituição no formulário, resolver essa instituição
       if (isGroupAdmin && (formData.instituicaoId || formData.instituicao_id || formData.instituicaoid)) {
