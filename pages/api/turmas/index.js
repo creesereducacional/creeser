@@ -1,9 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 import {
   applyInstituicaoFilter,
+  applyUnidadeFilter,
   hasPerfil,
   requireAuth,
   requirePerfil,
+  resolveContextoUsuario,
   resolveInstituicaoId,
 } from '../../../lib/auth-server';
 
@@ -184,14 +186,33 @@ export default async function handler(req, res) {
 
   const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
 
+  // ── FASE 4.1: resolver contexto de escopo (instituição + unidade) ──────────
+  // resolveContextoUsuario consulta usuario_instituicoes para determinar:
+  //   • instituicaoId       — instituição de contexto validada pelo servidor
+  //   • unidadesPermitidas  — null (irrestrito) ou [unidade_id] (somente filial)
+  //   • legacyFallback      — true se usuário não tem vínculo novo (usa campo legado)
+  //   • queryError          — string se houve falha de banco (nunca ampliar escopo)
+  const ctx = await resolveContextoUsuario(req, authUser);
+
+  if (ctx.queryError) {
+    console.error('[turmas] Falha ao resolver contexto:', ctx.queryError);
+    return res.status(503).json({ error: 'Serviço temporariamente indisponível. Tente novamente.' });
+  }
+  // ────────────────────────────────────────────────────────────────────────────
+
   try {
     if (req.method === 'GET') {
-      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+      // Instituição: vem do contexto validado pelo servidor
+      // Legado: resolveInstituicaoId continua funcionando para grupo_admin e legacyFallback
+      const instituicaoId = ctx.legacyFallback
+        ? resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin })
+        : ctx.instituicaoId;
+
       if (!isGroupAdmin && !instituicaoId) {
         return res.status(403).json({ error: 'Instituicao nao definida para o usuario atual' });
       }
 
-      // Se for perfil professor, aplicar restrição por vínculos
+      // Se for perfil professor, aplicar restrição por vínculos de disciplina
       if (hasPerfil(authUser, ['professor'])) {
         const emailLogado = authUser.email;
         if (!emailLogado) return res.status(200).json([]);
@@ -224,6 +245,8 @@ export default async function handler(req, res) {
           .order('id', { ascending: false });
 
         query = applyInstituicaoFilter(query, instituicaoId);
+        // Filtro de unidade: coluna legada é 'unidadeid' (sem underscore)
+        query = applyUnidadeFilter(query, ctx.unidadesPermitidas, 'unidadeid');
         const { data, error } = await query;
         if (error) {
           console.error('Supabase GET turmas error:', error);
@@ -238,6 +261,10 @@ export default async function handler(req, res) {
         .order('id', { ascending: false });
 
       query = applyInstituicaoFilter(query, instituicaoId);
+      // Filtro de unidade: coluna legada é 'unidadeid' (sem underscore)
+      // null → sem restrição (matriz, legado, grupo_admin)
+      // [id] → apenas turmas daquela unidade (filial)
+      query = applyUnidadeFilter(query, ctx.unidadesPermitidas, 'unidadeid');
 
       const { data, error } = await query;
 
@@ -252,7 +279,11 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const body = req.body || {};
       const { payloadNormalizado } = mapBodyToPayload(body);
-      let instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
+
+      // Instituição: validada pelo contexto; grupo_admin pode informar qualquer uma
+      let instituicaoId = ctx.legacyFallback
+        ? resolveInstituicaoId(req, authUser, { allowAll: false })
+        : ctx.instituicaoId;
 
       if (isGroupAdmin && (body.instituicaoId || body.instituicao_id || body.instituicaoid)) {
         instituicaoId = normalizeText(body.instituicaoId || body.instituicao_id || body.instituicaoid);
@@ -263,6 +294,16 @@ export default async function handler(req, res) {
       }
 
       payloadNormalizado.instituicao_id = instituicaoId;
+
+      // Validar unidade informada pelo frontend contra o escopo do usuário
+      // unidadesPermitidas === null → acesso irrestrito (matriz, legado, grupo_admin)
+      // unidadesPermitidas === [id] → apenas aquela unidade é permitida
+      if (ctx.unidadesPermitidas !== null && payloadNormalizado.unidadeid != null) {
+        const unidadeInformada = Number(payloadNormalizado.unidadeid);
+        if (!ctx.unidadesPermitidas.includes(unidadeInformada)) {
+          return res.status(403).json({ error: 'Unidade informada fora do escopo permitido para este usuário.' });
+        }
+      }
 
       if (!payloadNormalizado.nome) {
         return res.status(400).json({ error: 'Nome é obrigatório' });
