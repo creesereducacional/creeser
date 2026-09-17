@@ -133,6 +133,8 @@ const mapRowToResponse = (row) => ({
   dataCadastroRenovacao: row.data_cadastro_renovacao || '',
   dataProtocoloRenovacao: row.data_protocolo_renovacao || '',
   cursos: Array.isArray(row.cursos) ? row.cursos : [],
+  isMatriz: Boolean(row.is_matriz),
+  is_matriz: Boolean(row.is_matriz),
   dataCriacao: row.datacriacao || null,
   dataAtualizacao: row.dataatualizacao || null,
 });
@@ -236,6 +238,7 @@ const mapBodyToPayload = (body) => {
     data_cadastro_renovacao: body.dataCadastroRenovacao || null,
     data_protocolo_renovacao: body.dataProtocoloRenovacao || null,
     cursos: Array.isArray(body.cursos) ? body.cursos : [],
+    is_matriz: Boolean(body.isMatriz !== undefined ? body.isMatriz : body.is_matriz),
   };
 };
 
@@ -272,6 +275,27 @@ export default async function handler(req, res) {
       }
 
       const payload = mapBodyToPayload(body);
+
+      // Validação de unicidade de Matriz por Instituição (Fase 5.2)
+      if (payload.is_matriz && payload.instituicao_id) {
+        const { data: matrizExistente, error: errMatrizCheck } = await supabase
+          .from('unidades')
+          .select('id, nome')
+          .eq('instituicao_id', payload.instituicao_id)
+          .eq('is_matriz', true)
+          .maybeSingle();
+
+        if (errMatrizCheck) {
+          console.error('Erro ao verificar matriz existente:', errMatrizCheck);
+          return res.status(500).json({ error: 'Erro ao verificar unicidade da matriz', detail: errMatrizCheck.message });
+        }
+
+        if (matrizExistente) {
+          return res.status(409).json({
+            error: `Conflito: A instituição selecionada já possui uma Unidade Matriz cadastrada ("${matrizExistente.nome}"). Não é permitido cadastrar mais de uma matriz para a mesma instituição.`,
+          });
+        }
+      }
 
       const { data, error } = await supabase
         .from('unidades')

@@ -29,6 +29,7 @@ export default function NovaUnidade() {
     telefone: '',
     codigoPoloRecenseamento: '',
     instituicaoEnsinoSuperior: false,
+    isMatriz: false,
     situacao: 'ATIVO',
 
     // Seção Mantenedora
@@ -503,10 +504,10 @@ export default function NovaUnidade() {
                 </div>
               </div>
 
-              {/* Linha 7: Instituição e Status */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Linha 7: Instituição, Matriz e Status */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="flex items-center gap-2 text-xs md:text-sm font-medium text-teal-600 mt-4">
+                  <label className="flex items-center gap-2 text-xs md:text-sm font-medium text-teal-600 mt-4 cursor-pointer">
                     <input
                       type="checkbox"
                       name="instituicaoEnsinoSuperior"
@@ -516,6 +517,20 @@ export default function NovaUnidade() {
                     />
                     Instituição de Ensino Superior?
                   </label>
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-2 text-xs md:text-sm font-bold text-teal-700 mt-4 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="isMatriz"
+                      checked={formData.isMatriz}
+                      onChange={handleChange}
+                      className="w-4 h-4 rounded border-teal-400 text-teal-700"
+                    />
+                    ⭐ Unidade Matriz (Principal)
+                  </label>
+                  <p className="text-[11px] text-gray-500 mt-1">Concede aos usuários vinculados acesso a todas as unidades da instituição.</p>
                 </div>
 
                 <div>

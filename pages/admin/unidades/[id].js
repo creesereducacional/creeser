@@ -17,7 +17,7 @@ export default function EditarUnidade() {
 
   const [formData, setFormData] = useState({
     instituicaoId: '', instituicaoNome: '',
-    nome: '', cnpj: '', cep: '', cidade: '', endereco: '', numero: '', bairro: '', local: '', email: '', telefone: '', codigoPoloRecenseamento: '', instituicaoEnsinoSuperior: false, situacao: 'ATIVO',
+    nome: '', cnpj: '', cep: '', cidade: '', endereco: '', numero: '', bairro: '', local: '', email: '', telefone: '', codigoPoloRecenseamento: '', instituicaoEnsinoSuperior: false, isMatriz: false, situacao: 'ATIVO',
     codMecMantenedora: '', cnpjMantenedora: '', razaoSocial: '', cepMantenedora: '', logradouroMantenedora: '', numeroMantenedora: '', complementoMantenedora: '', bairroMantenedora: '', ufMantenedora: '',
     tipoCredenciamento: '', numeroCredenciamento: '', dataCredenciamento: '', veiculoPublicacao: '', dataPublicacao: '', secaoPublicacao: '', paginaPublicacao: '', numeroDOU: '',
     temRecredenciamento: false, tipoRecredenciamento: '', numeroRecredenciamento: '', dataRecredenciamento: '', veiculoRecredenciamento: '', dataPublicacaoRecredenciamento: '', secaoRecredenciamento: '', paginaRecredenciamento: '', numeroDOURecredenciamento: '', numeroProcessoRecredenciamento: '', tipoProcessoRecredenciamento: '', dataCadastroRecredenciamento: '', dataProtocoloRecredenciamento: '',
@@ -382,12 +382,19 @@ export default function EditarUnidade() {
                   <input type="text" name="codigoPoloRecenseamento" value={formData.codigoPoloRecenseamento} onChange={handleChange} placeholder="Código" className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50" />
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="flex items-center gap-2 text-xs md:text-sm font-medium text-teal-600 mt-4">
+                  <label className="flex items-center gap-2 text-xs md:text-sm font-medium text-teal-600 mt-4 cursor-pointer">
                     <input type="checkbox" name="instituicaoEnsinoSuperior" checked={formData.instituicaoEnsinoSuperior} onChange={handleChange} className="w-4 h-4 rounded border-teal-300 text-teal-600" />
                     Instituição de Ensino Superior?
                   </label>
+                </div>
+                <div>
+                  <label className="flex items-center gap-2 text-xs md:text-sm font-bold text-teal-700 mt-4 cursor-pointer">
+                    <input type="checkbox" name="isMatriz" checked={Boolean(formData.isMatriz)} onChange={handleChange} className="w-4 h-4 rounded border-teal-400 text-teal-700" />
+                    ⭐ Unidade Matriz (Principal)
+                  </label>
+                  <p className="text-[11px] text-gray-500 mt-1">Concede aos usuários vinculados acesso a todas as unidades da instituição.</p>
                 </div>
                 <div>
                   <label className="block text-xs md:text-sm font-medium text-teal-600 mb-2">STATUS <span className="text-red-500">*</span></label>
