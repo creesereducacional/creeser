@@ -22,6 +22,7 @@ import {
   requirePerfil,
   hasPerfil,
   resolveInstituicaoId,
+  resolveContextoUsuario,
 } from '../../../../lib/auth-server';
 
 const supabase = createClient(
@@ -41,7 +42,19 @@ export default async function handler(req, res) {
   if (!requirePerfil(authUser, res, PERFIS_PERMITIDOS)) return;
 
   const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
-  const userInstituicaoId = resolveInstituicaoId(req, authUser);
+
+  // ── FASE 4.3: Resolver contexto de escopo (Instituição × Unidade) ──────────
+  const ctx = await resolveContextoUsuario(req, authUser);
+
+  if (ctx.queryError) {
+    console.error('[rematricula] Falha ao resolver contexto:', ctx.queryError);
+    return res.status(503).json({ message: 'Serviço temporariamente indisponível. Tente novamente.' });
+  }
+
+  const userInstituicaoId = ctx.legacyFallback
+    ? resolveInstituicaoId(req, authUser)
+    : ctx.instituicaoId;
+  // ──────────────────────────────────────────────────────────────────────────
 
   const { id } = req.query;
   const alunoIdNum = Number(id);
@@ -69,7 +82,7 @@ export default async function handler(req, res) {
     // 1. Validar existência do aluno e isolamento multi-tenant
     const { data: aluno, error: errAluno } = await supabase
       .from('alunos')
-      .select('id, nome, instituicao_id')
+      .select('id, nome, instituicao_id, turmaid')
       .eq('id', alunoIdNum)
       .maybeSingle();
 
@@ -83,6 +96,55 @@ export default async function handler(req, res) {
 
     if (!isGroupAdmin && aluno.instituicao_id && aluno.instituicao_id !== userInstituicaoId) {
       return res.status(403).json({ message: 'Acesso negado: aluno pertence a outra instituição.' });
+    }
+
+    // 1.1 Validar escopo de unidade da matrícula/turma de origem (se usuário filial)
+    if (ctx.unidadesPermitidas !== null) {
+      // Buscar matrícula principal para identificar turma de origem
+      const { data: matOrigem } = await supabase
+        .from('matriculas')
+        .select('id, instituicao_id, turma_id')
+        .eq('aluno_id', alunoIdNum)
+        .eq('is_principal', true)
+        .maybeSingle();
+
+      const turmaOrigemId = matOrigem?.turma_id || aluno.turmaid;
+
+      if (turmaOrigemId) {
+        const { data: turmaOrigemData } = await supabase
+          .from('turmas')
+          .select('id, unidadeid, instituicao_id')
+          .eq('id', turmaOrigemId)
+          .maybeSingle();
+
+        const unidadeOrigem = turmaOrigemData?.unidadeid != null ? Number(turmaOrigemData.unidadeid) : null;
+        if (unidadeOrigem !== null && !ctx.unidadesPermitidas.includes(unidadeOrigem)) {
+          return res.status(403).json({
+            message: 'Acesso negado: a matrícula atual do aluno pertence a uma unidade fora do seu escopo.',
+          });
+        }
+      }
+
+      // Validar turma de destino se informada
+      if (nova_turma_id) {
+        const { data: turmaDestinoData } = await supabase
+          .from('turmas')
+          .select('id, unidadeid, instituicao_id')
+          .eq('id', Number(nova_turma_id))
+          .maybeSingle();
+
+        if (turmaDestinoData) {
+          if (!isGroupAdmin && turmaDestinoData.instituicao_id && turmaDestinoData.instituicao_id !== userInstituicaoId) {
+            return res.status(403).json({ message: 'Acesso negado: nova turma pertence a outra instituição.' });
+          }
+          const unidadeDestino = turmaDestinoData.unidadeid != null ? Number(turmaDestinoData.unidadeid) : null;
+          if (unidadeDestino !== null && !ctx.unidadesPermitidas.includes(unidadeDestino)) {
+            return res.status(403).json({
+              message: 'Acesso negado: a nova turma selecionada pertence a uma unidade fora do seu escopo.',
+            });
+          }
+        }
+      }
     }
 
     // 2. PRÉ-VERIFICAÇÃO DE DÉBITOS FINANCEIROS OPERACIONAIS ('pendente', 'vencido')

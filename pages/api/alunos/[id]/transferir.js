@@ -17,6 +17,7 @@ import {
   requirePerfil,
   hasPerfil,
   resolveInstituicaoId,
+  resolveContextoUsuario,
 } from '../../../../lib/auth-server';
 
 const supabase = createClient(
@@ -36,7 +37,19 @@ export default async function handler(req, res) {
   if (!requirePerfil(authUser, res, PERFIS_PERMITIDOS)) return;
 
   const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
-  const userInstituicaoId = resolveInstituicaoId(req, authUser);
+
+  // ── FASE 4.3: Resolver contexto de escopo (Instituição × Unidade) ──────────
+  const ctx = await resolveContextoUsuario(req, authUser);
+
+  if (ctx.queryError) {
+    console.error('[transferir] Falha ao resolver contexto:', ctx.queryError);
+    return res.status(503).json({ message: 'Serviço temporariamente indisponível. Tente novamente.' });
+  }
+
+  const userInstituicaoId = ctx.legacyFallback
+    ? resolveInstituicaoId(req, authUser)
+    : ctx.instituicaoId;
+  // ──────────────────────────────────────────────────────────────────────────
 
   const { id } = req.query;
   const alunoIdNum = Number(id);
@@ -90,19 +103,54 @@ export default async function handler(req, res) {
       });
     }
 
+    // Validação de escopo de instituição na matrícula
+    if (!isGroupAdmin && matriculaAlvo.instituicao_id && matriculaAlvo.instituicao_id !== userInstituicaoId) {
+      return res.status(403).json({ message: 'Acesso negado: matrícula pertence a outra instituição.' });
+    }
+
     if (Number(matriculaAlvo.turma_id) === novaTurmaIdNum) {
       return res.status(400).json({ message: 'Esta matrícula já está vinculada à turma selecionada.' });
+    }
+
+    // Validação de escopo de unidade na TURMA DE ORIGEM (se o usuário for filial)
+    if (ctx.unidadesPermitidas !== null && matriculaAlvo.turma_id) {
+      const { data: turmaOrigemCheck } = await supabase
+        .from('turmas')
+        .select('id, unidadeid')
+        .eq('id', matriculaAlvo.turma_id)
+        .maybeSingle();
+
+      const unidadeOrigem = turmaOrigemCheck?.unidadeid != null ? Number(turmaOrigemCheck.unidadeid) : null;
+      if (unidadeOrigem !== null && !ctx.unidadesPermitidas.includes(unidadeOrigem)) {
+        return res.status(403).json({
+          message: 'Acesso negado: a turma de origem da matrícula não pertence à unidade permitida para seu usuário.',
+        });
+      }
     }
 
     // 3. Inspecionar e validar a nova turma de destino
     const { data: novaTurma, error: errTurma } = await supabase
       .from('turmas')
-      .select('id, nome, cursoid, gradeid, situacao, instituicao_id')
+      .select('id, nome, cursoid, gradeid, situacao, instituicao_id, unidadeid')
       .eq('id', novaTurmaIdNum)
       .maybeSingle();
 
     if (errTurma || !novaTurma) {
       return res.status(404).json({ message: 'Turma de destino não encontrada.' });
+    }
+
+    if (!isGroupAdmin && novaTurma.instituicao_id && novaTurma.instituicao_id !== userInstituicaoId) {
+      return res.status(403).json({ message: 'Acesso negado: turma de destino pertence a outra instituição.' });
+    }
+
+    // Validação de escopo de unidade na TURMA DE DESTINO (se o usuário for filial)
+    if (ctx.unidadesPermitidas !== null) {
+      const unidadeDestino = novaTurma.unidadeid != null ? Number(novaTurma.unidadeid) : null;
+      if (unidadeDestino !== null && !ctx.unidadesPermitidas.includes(unidadeDestino)) {
+        return res.status(403).json({
+          message: 'Acesso negado: a turma de destino não pertence à unidade permitida para seu usuário.',
+        });
+      }
     }
 
     if (novaTurma.situacao && novaTurma.situacao !== 'ATIVO') {

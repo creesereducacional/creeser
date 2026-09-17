@@ -23,6 +23,7 @@ import {
   requirePerfil,
   hasPerfil,
   resolveInstituicaoId,
+  resolveContextoUsuario,
 } from '../../../../lib/auth-server';
 
 const supabase = createClient(
@@ -42,7 +43,19 @@ export default async function handler(req, res) {
   if (!requirePerfil(authUser, res, PERFIS_PERMITIDOS)) return;
 
   const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
-  const userInstituicaoId = resolveInstituicaoId(req, authUser);
+
+  // ── FASE 4.3: Resolver contexto de escopo (Instituição × Unidade) ──────────
+  const ctx = await resolveContextoUsuario(req, authUser);
+
+  if (ctx.queryError) {
+    console.error('[nova-matricula] Falha ao resolver contexto:', ctx.queryError);
+    return res.status(503).json({ message: 'Serviço temporariamente indisponível. Tente novamente.' });
+  }
+
+  const userInstituicaoId = ctx.legacyFallback
+    ? resolveInstituicaoId(req, authUser)
+    : ctx.instituicaoId;
+  // ──────────────────────────────────────────────────────────────────────────
 
   const { id } = req.query;
   const alunoIdNum = Number(id);
@@ -89,6 +102,30 @@ export default async function handler(req, res) {
 
     if (!isGroupAdmin && aluno.instituicao_id && aluno.instituicao_id !== userInstituicaoId) {
       return res.status(403).json({ message: 'Acesso negado: aluno pertence a outra instituição.' });
+    }
+
+    // 1.1 Validar turma do novo curso (multi-tenant e escopo de unidade)
+    const { data: turmaNova, error: errTurmaNova } = await supabase
+      .from('turmas')
+      .select('id, nome, unidadeid, instituicao_id, situacao')
+      .eq('id', turmaIdNum)
+      .maybeSingle();
+
+    if (errTurmaNova || !turmaNova) {
+      return res.status(404).json({ message: 'Turma selecionada não encontrada.' });
+    }
+
+    if (!isGroupAdmin && turmaNova.instituicao_id && turmaNova.instituicao_id !== userInstituicaoId) {
+      return res.status(403).json({ message: 'Acesso negado: turma selecionada pertence a outra instituição.' });
+    }
+
+    if (ctx.unidadesPermitidas !== null) {
+      const unidadeNova = turmaNova.unidadeid != null ? Number(turmaNova.unidadeid) : null;
+      if (unidadeNova !== null && !ctx.unidadesPermitidas.includes(unidadeNova)) {
+        return res.status(403).json({
+          message: 'Acesso negado: a turma selecionada para o novo curso pertence a uma unidade fora do seu escopo.',
+        });
+      }
     }
 
     // 2. PRÉ-VERIFICAÇÃO DE DÉBITOS FINANCEIROS OPERACIONAIS ('pendente', 'vencido')
