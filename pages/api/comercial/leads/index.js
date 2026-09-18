@@ -4,7 +4,7 @@ import {
   requirePerfil,
   hasPerfil,
   applyInstituicaoFilter,
-  resolveInstituicaoId,
+  resolveContextoUsuario,
 } from '../../../../lib/auth-server';
 import { rateLimit, getClientIp } from '../../../../lib/rate-limit';
 
@@ -54,8 +54,19 @@ export default async function handler(req, res) {
   if (!authUser) return;
   if (!requirePerfil(authUser, res, PERFIS_PERMITIDOS)) return;
 
-  const instituicaoId = resolveInstituicaoId(req, authUser);
-  if (!instituicaoId) {
+  // ── 1. Resolução do Contexto Instituição × Unidade ───────────────────────────
+  const ctx = await resolveContextoUsuario(req, authUser);
+  if (ctx.queryError) {
+    return res.status(503).json({
+      error: 'Serviço temporariamente indisponível ao verificar permissões de acesso',
+      code: 'AUTH_CONTEXT_UNAVAILABLE',
+    });
+  }
+
+  const isGroupAdmin = authUser.perfil === 'grupo_admin' || authUser.is_superadmin;
+  const userInstituicaoId = ctx.instituicaoId;
+
+  if (!isGroupAdmin && !userInstituicaoId) {
     return res.status(403).json({ error: 'Instituição não definida para o usuário atual' });
   }
 
@@ -66,7 +77,9 @@ export default async function handler(req, res) {
       .select('*')
       .order('created_at', { ascending: false });
 
-    query = applyInstituicaoFilter(query, instituicaoId);
+    if (!isGroupAdmin) {
+      query = applyInstituicaoFilter(query, userInstituicaoId);
+    }
 
     if (isOperador(authUser)) {
       // Operador: apenas seus próprios leads
@@ -84,14 +97,93 @@ export default async function handler(req, res) {
       query = query.eq('status', status);
     }
 
-    const { data, error } = await query;
+    const { data: rawLeads, error } = await query;
     if (error) {
       console.error('[leads/GET]', error.message);
       return res.status(500).json({ error: 'Erro interno ao carregar leads' });
     }
 
-    // Buscar followups pendentes dos leads da lista
-    const leadIds = (data || []).map(l => l.id);
+    const leadsCarregados = rawLeads || [];
+
+    // ── Resolução de Unidade em Lote para Filial ─────────────────────────────
+    let leadsFiltrados = leadsCarregados;
+
+    if (ctx.unidadesPermitidas !== null && leadsCarregados.length > 0) {
+      const alunoConvertidoIds = Array.from(
+        new Set(leadsCarregados.map(l => l.aluno_convertido_id).filter(Boolean))
+      );
+
+      const alunoUnidadeMap = new Map();
+
+      if (alunoConvertidoIds.length > 0) {
+        // 1. Matrículas com turmas(unidadeid)
+        const { data: matriculasData } = await supabase
+          .from('matriculas')
+          .select(`
+            id,
+            aluno_id,
+            turma_id,
+            is_principal,
+            turmas(id, unidadeid)
+          `)
+          .in('aluno_id', alunoConvertidoIds);
+
+        if (matriculasData) {
+          const matriculasOrdenadas = [...matriculasData].sort((a, b) => {
+            if (a.is_principal && !b.is_principal) return -1;
+            if (!a.is_principal && b.is_principal) return 1;
+            return 0;
+          });
+
+          for (const m of matriculasOrdenadas) {
+            if (!alunoUnidadeMap.has(m.aluno_id)) {
+              const uid = m.turmas?.unidadeid != null ? Number(m.turmas.unidadeid) : null;
+              if (uid !== null) {
+                alunoUnidadeMap.set(m.aluno_id, uid);
+              }
+            }
+          }
+        }
+
+        // 2. Fallback legado em alunos(turmaid, turmas(unidadeid))
+        const pendentesAlunoIds = alunoConvertidoIds.filter(id => !alunoUnidadeMap.has(id));
+        if (pendentesAlunoIds.length > 0) {
+          const { data: alunosData } = await supabase
+            .from('alunos')
+            .select('id, turmaid, turmas(id, unidadeid)')
+            .in('id', pendentesAlunoIds);
+
+          if (alunosData) {
+            for (const a of alunosData) {
+              const uid = a.turmas?.unidadeid != null ? Number(a.turmas.unidadeid) : null;
+              if (uid !== null) {
+                alunoUnidadeMap.set(a.id, uid);
+              }
+            }
+          }
+        }
+      }
+
+      leadsFiltrados = leadsCarregados.filter(l => {
+        // Lead não convertido: permanece na regra de carteira/institucional
+        if (!l.aluno_convertido_id) {
+          return true;
+        }
+
+        // Lead convertido: verificar unidade do aluno
+        const unidadeId = alunoUnidadeMap.get(l.aluno_convertido_id) ?? null;
+
+        // Se a unidade for indeterminável, preservar no escopo institucional legado
+        if (unidadeId === null) {
+          return true;
+        }
+
+        return ctx.unidadesPermitidas.includes(unidadeId);
+      });
+    }
+
+    // Buscar followups pendentes dos leads da lista filtrada
+    const leadIds = leadsFiltrados.map(l => l.id);
     let followupsMap = {};
     if (leadIds.length > 0) {
       try {
@@ -113,7 +205,7 @@ export default async function handler(req, res) {
     }
 
     // Enriquecer dados dos leads
-    const enrichedData = (data || []).map(l => {
+    const enrichedData = leadsFiltrados.map(l => {
       let nextF = followupsMap[l.id];
       if (!nextF) {
         // Tentar parsear das observações (fallback)
@@ -164,7 +256,8 @@ export default async function handler(req, res) {
   }
 
   // ── POST: criar lead ──────────────────────────────────────────────────────
-  if (req.method === 'POST') {    // Rate limit: 30 leads por IP a cada hora
+  if (req.method === 'POST') {
+    // Rate limit: 30 leads por IP a cada hora
     const ip = getClientIp(req);
     const rl = rateLimit({ key: `lead_criar:${ip}`, limit: 30, windowMs: 60 * 60 * 1000 });
     if (!rl.allowed) {
@@ -179,7 +272,7 @@ export default async function handler(req, res) {
     const statusFinal = status && STATUS_VALIDOS.includes(status) ? status : 'novo';
 
     const novoLead = {
-      instituicao_id: instituicaoId,
+      instituicao_id: userInstituicaoId,
       nome: String(nome).trim(),
       telefone: telefone ? String(telefone).trim() : null,
       whatsapp: whatsapp ? String(whatsapp).trim() : null,
@@ -200,7 +293,7 @@ export default async function handler(req, res) {
     try {
       const { registrarInteracao } = require('../../../../lib/comercial/interacao-service');
       await registrarInteracao(supabase, data.id, {
-        instituicao_id: instituicaoId,
+        instituicao_id: userInstituicaoId,
         usuario_id: authUser.id,
         tipo: 'criacao',
         descricao: 'Ficha de Matrícula Comercial cadastrada no sistema'
