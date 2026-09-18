@@ -2,7 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 import {
   requireAuth,
   requirePerfil,
-  resolveInstituicaoId,
+  applyInstituicaoFilter,
+  resolveContextoUsuario,
 } from '../../../lib/auth-server';
 
 const supabase = createClient(
@@ -10,7 +11,15 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const PERFIS_PERMITIDOS = ['grupo_admin', 'instituicao_admin', 'admin', 'financeiro', 'comercial', 'comercial_master', 'comercial_operador'];
+const PERFIS_PERMITIDOS = [
+  'grupo_admin',
+  'instituicao_admin',
+  'admin',
+  'financeiro',
+  'comercial',
+  'comercial_master',
+  'comercial_operador',
+];
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -21,22 +30,37 @@ export default async function handler(req, res) {
   if (!authUser) return;
   if (!requirePerfil(authUser, res, PERFIS_PERMITIDOS)) return;
 
-  const resolvedInstituicaoId = resolveInstituicaoId(req, authUser);
+  // ── 1. Resolução do Contexto Instituição × Unidade ───────────────────────────
+  const ctx = await resolveContextoUsuario(req, authUser);
+  if (ctx.queryError) {
+    return res.status(503).json({
+      error: 'Serviço temporariamente indisponível ao verificar permissões de acesso',
+      code: 'AUTH_CONTEXT_UNAVAILABLE',
+    });
+  }
+
+  const isGroupAdmin = authUser.perfil === 'grupo_admin' || authUser.is_superadmin;
+  const userInstituicaoId = ctx.instituicaoId;
+
+  if (!isGroupAdmin && !userInstituicaoId) {
+    return res.status(403).json({ error: 'Instituição não definida para o usuário atual' });
+  }
 
   // Filtros da URL
-  const { instituicao_id, captador_id, curso_id, data_inicio, data_fim } = req.query;
+  const { captador_id, curso_id, data_inicio, data_fim } = req.query;
 
   try {
-    // ── 1. BUSCA DE LEADS COM FILTROS ────────────────────────────────────────
+    // ── 2. BUSCA DE LEADS COM FILTROS ────────────────────────────────────────
     let queryLeads = supabase
       .from('leads')
-      .select('id, nome, status, created_at, instituicao_id, captado_por_id, cursoid, observacoes, instituicoes(nome), usuarios:captado_por_id(nomecompleto), cursos:cursoid(nome)');
+      .select(`
+        id, nome, status, created_at, instituicao_id, captado_por_id, cursoid, observacoes,
+        aluno_convertido_id,
+        instituicoes(nome), usuarios:captado_por_id(nomecompleto), cursos:cursoid(nome)
+      `);
 
-    // Filtros de Contexto & Rota
-    if (resolvedInstituicaoId) {
-      queryLeads = queryLeads.eq('instituicao_id', resolvedInstituicaoId);
-    } else if (instituicao_id) {
-      queryLeads = queryLeads.eq('instituicao_id', instituicao_id);
+    if (!isGroupAdmin) {
+      queryLeads = applyInstituicaoFilter(queryLeads, userInstituicaoId);
     }
 
     if (captador_id) {
@@ -52,18 +76,16 @@ export default async function handler(req, res) {
       queryLeads = queryLeads.lte('created_at', data_fim);
     }
 
-    const { data: leads = [], error: errorLeads } = await queryLeads;
+    const { data: rawLeads = [], error: errorLeads } = await queryLeads;
     if (errorLeads) throw errorLeads;
 
-    // ── 2. BUSCA DE VENDAS COM FILTROS ───────────────────────────────────────
+    // ── 3. BUSCA DE VENDAS COM FILTROS ───────────────────────────────────────
     let queryVendas = supabase
       .from('vendas_comerciais')
       .select('id, lead_id, instituicao_id, captador_id, curso_id, valor, status, created_at');
 
-    if (resolvedInstituicaoId) {
-      queryVendas = queryVendas.eq('instituicao_id', resolvedInstituicaoId);
-    } else if (instituicao_id) {
-      queryVendas = queryVendas.eq('instituicao_id', instituicao_id);
+    if (!isGroupAdmin) {
+      queryVendas = applyInstituicaoFilter(queryVendas, userInstituicaoId);
     }
     if (captador_id) {
       queryVendas = queryVendas.eq('captador_id', captador_id);
@@ -78,13 +100,13 @@ export default async function handler(req, res) {
       queryVendas = queryVendas.lte('created_at', data_fim);
     }
 
-    let { data: vendas = [], error: errorVendas } = await queryVendas;
-    
+    let { data: rawVendas = [], error: errorVendas } = await queryVendas;
+
     // Fallback: se a tabela de vendas ainda não estiver pronta
     if (errorVendas) {
       console.warn('[API Dashboard] Tabela de vendas não disponível, parseando observações...');
-      vendas = [];
-      leads.forEach(l => {
+      rawVendas = [];
+      rawLeads.forEach(l => {
         const marker = '[VENDA COMERCIAL REGISTRADA]';
         const idx = l.observacoes?.indexOf(marker);
         if (idx !== -1 && idx !== undefined) {
@@ -92,7 +114,7 @@ export default async function handler(req, res) {
             const jsonStr = l.observacoes.substring(idx + marker.length).trim();
             const parsed = JSON.parse(jsonStr);
             if (parsed && parsed.vendas_comerciais) {
-              vendas.push({
+              rawVendas.push({
                 lead_id: l.id,
                 instituicao_id: l.instituicao_id,
                 captador_id: l.captado_por_id,
@@ -107,15 +129,13 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── 3. BUSCA DE RECEITAS COM FILTROS ─────────────────────────────────────
+    // ── 4. BUSCA DE RECEITAS COM FILTROS ─────────────────────────────────────
     let queryReceitas = supabase
       .from('financeiro_receitas_comerciais')
       .select('id, lead_id, instituicao_id, captador_id, valor_bruto, status, data_pagamento');
 
-    if (resolvedInstituicaoId) {
-      queryReceitas = queryReceitas.eq('instituicao_id', resolvedInstituicaoId);
-    } else if (instituicao_id) {
-      queryReceitas = queryReceitas.eq('instituicao_id', instituicao_id);
+    if (!isGroupAdmin) {
+      queryReceitas = applyInstituicaoFilter(queryReceitas, userInstituicaoId);
     }
     if (captador_id) {
       queryReceitas = queryReceitas.eq('captador_id', captador_id);
@@ -127,10 +147,10 @@ export default async function handler(req, res) {
       queryReceitas = queryReceitas.lte('data_pagamento', data_fim);
     }
 
-    let { data: receitas = [], error: errorReceitas } = await queryReceitas;
+    let { data: rawReceitas = [], error: errorReceitas } = await queryReceitas;
     if (errorReceitas) {
-      receitas = [];
-      leads.forEach(l => {
+      rawReceitas = [];
+      rawLeads.forEach(l => {
         const marker = '[RECEITA FINANCEIRA ASAAS]';
         const idx = l.observacoes?.indexOf(marker);
         if (idx !== -1 && idx !== undefined) {
@@ -138,7 +158,7 @@ export default async function handler(req, res) {
             const jsonStr = l.observacoes.substring(idx + marker.length).trim();
             const parsed = JSON.parse(jsonStr);
             if (parsed && parsed.financeiro_receitas_comerciais) {
-              receitas.push({
+              rawReceitas.push({
                 lead_id: l.id,
                 instituicao_id: l.instituicao_id,
                 captador_id: l.captado_por_id,
@@ -152,15 +172,13 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── 4. BUSCA DE COMISSÕES COM FILTROS ────────────────────────────────────
+    // ── 5. BUSCA DE COMISSÕES COM FILTROS ────────────────────────────────────
     let queryComissoes = supabase
       .from('financeiro_comissoes')
       .select('id, lead_id, instituicao_id, captador_id, valor_comissao, status, created_at');
 
-    if (resolvedInstituicaoId) {
-      queryComissoes = queryComissoes.eq('instituicao_id', resolvedInstituicaoId);
-    } else if (instituicao_id) {
-      queryComissoes = queryComissoes.eq('instituicao_id', instituicao_id);
+    if (!isGroupAdmin) {
+      queryComissoes = applyInstituicaoFilter(queryComissoes, userInstituicaoId);
     }
     if (captador_id) {
       queryComissoes = queryComissoes.eq('captador_id', captador_id);
@@ -172,10 +190,10 @@ export default async function handler(req, res) {
       queryComissoes = queryComissoes.lte('created_at', data_fim);
     }
 
-    let { data: comissoes = [], error: errorComissoes } = await queryComissoes;
+    let { data: rawComissoes = [], error: errorComissoes } = await queryComissoes;
     if (errorComissoes) {
-      comissoes = [];
-      leads.forEach(l => {
+      rawComissoes = [];
+      rawLeads.forEach(l => {
         const marker = '[COMISSÃO GERADA]';
         const idx = l.observacoes?.indexOf(marker);
         if (idx !== -1 && idx !== undefined) {
@@ -183,7 +201,7 @@ export default async function handler(req, res) {
             const jsonStr = l.observacoes.substring(idx + marker.length).trim();
             const parsed = JSON.parse(jsonStr);
             if (parsed && parsed.financeiro_comissoes) {
-              comissoes.push({
+              rawComissoes.push({
                 lead_id: l.id,
                 instituicao_id: l.instituicao_id,
                 captador_id: l.captado_por_id,
@@ -197,7 +215,113 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── 5. CALCULO DOS KPIS ──────────────────────────────────────────────────
+    // ── 6. RESOLUÇÃO DE ESCOPO DE UNIDADE PARA FILIAL (LOTE / SEM N+1) ────────
+    let leads = rawLeads;
+    let vendas = rawVendas;
+    let receitas = rawReceitas;
+    let comissoes = rawComissoes;
+
+    if (ctx.unidadesPermitidas !== null) {
+      // Coletar alunos convertidos vinculados aos leads carregados
+      const alunoConvertidoIds = Array.from(
+        new Set(rawLeads.map(l => l.aluno_convertido_id).filter(Boolean))
+      );
+
+      const alunoUnidadeMap = new Map();
+
+      if (alunoConvertidoIds.length > 0) {
+        // 1. Buscar matrículas com turmas(unidadeid)
+        const { data: matriculasData } = await supabase
+          .from('matriculas')
+          .select(`
+            id,
+            aluno_id,
+            turma_id,
+            is_principal,
+            turmas(id, unidadeid)
+          `)
+          .in('aluno_id', alunoConvertidoIds);
+
+        if (matriculasData) {
+          const matriculasOrdenadas = [...matriculasData].sort((a, b) => {
+            if (a.is_principal && !b.is_principal) return -1;
+            if (!a.is_principal && b.is_principal) return 1;
+            return 0;
+          });
+
+          for (const m of matriculasOrdenadas) {
+            if (!alunoUnidadeMap.has(m.aluno_id)) {
+              const uid = m.turmas?.unidadeid != null ? Number(m.turmas.unidadeid) : null;
+              if (uid !== null) {
+                alunoUnidadeMap.set(m.aluno_id, uid);
+              }
+            }
+          }
+        }
+
+        // 2. Fallback legado em alunos(turmaid, turmas(unidadeid)) para os que restaram sem unidade
+        const pendentesAlunoIds = alunoConvertidoIds.filter(id => !alunoUnidadeMap.has(id));
+        if (pendentesAlunoIds.length > 0) {
+          const { data: alunosData } = await supabase
+            .from('alunos')
+            .select('id, turmaid, turmas(id, unidadeid)')
+            .in('id', pendentesAlunoIds);
+
+          if (alunosData) {
+            for (const a of alunosData) {
+              const uid = a.turmas?.unidadeid != null ? Number(a.turmas.unidadeid) : null;
+              if (uid !== null) {
+                alunoUnidadeMap.set(a.id, uid);
+              }
+            }
+          }
+        }
+      }
+
+      // Mapear cada lead para sua unidade determinável
+      const leadUnidadeMap = new Map();
+      const leadsPermitidosSet = new Set();
+
+      for (const l of rawLeads) {
+        let uId = null;
+        if (l.aluno_convertido_id) {
+          uId = alunoUnidadeMap.get(l.aluno_convertido_id) ?? null;
+        }
+
+        if (uId !== null) {
+          leadUnidadeMap.set(l.id, uId);
+          if (ctx.unidadesPermitidas.includes(uId)) {
+            leadsPermitidosSet.add(l.id);
+          }
+        } else {
+          // Lead sem aluno/unidade determinável: permanece no escopo institucional
+          leadsPermitidosSet.add(l.id);
+        }
+      }
+
+      // Filtrar leads
+      leads = rawLeads.filter(l => leadsPermitidosSet.has(l.id));
+
+      // Filtrar vendas: se vinculada a lead, deve pertencer a lead permitido
+      vendas = rawVendas.filter(v => {
+        if (!v.lead_id) return true;
+        return leadsPermitidosSet.has(v.lead_id);
+      });
+
+      // Filtrar receitas: se vinculada a lead, deve pertencer a lead permitido
+      receitas = rawReceitas.filter(r => {
+        if (!r.lead_id) return true;
+        return leadsPermitidosSet.has(r.lead_id);
+      });
+
+      // Filtrar comissoes: se vinculada a lead, deve pertencer a lead permitido
+      comissoes = rawComissoes.filter(c => {
+        if (!c.lead_id) return true;
+        return leadsPermitidosSet.has(c.lead_id);
+      });
+    }
+
+    // ── 7. CÁLCULO DOS KPIS (SOMENTE SOBRE O CONJUNTO AUTORIZADO) ────────────
     const totalLeads = leads.length;
     const leadsNovos = leads.filter(l => l.status === 'novo').length;
     const leadsNegociacao = leads.filter(l => l.status === 'contatado' || l.status === 'interessado').length;
@@ -224,7 +348,7 @@ export default async function handler(req, res) {
       .filter(c => c.status === 'REPASSADO')
       .reduce((sum, c) => sum + parseFloat(c.valor_comissao || 0), 0);
 
-    // ── 6. DADOS DOS GRÁFICOS ────────────────────────────────────────────────
+    // ── 8. DADOS DOS GRÁFICOS (RECALCULADOS SOBRE CONJUNTO AUTORIZADO) ────────
     
     // 1. Evolução de Leads por Mês
     const leadsPorMesMap = {};
@@ -267,7 +391,7 @@ export default async function handler(req, res) {
       total
     }));
 
-    // ── 7. TABELA "ÚLTIMAS CONVERSÕES" ───────────────────────────────────────
+    // ── 9. TABELA "ÚLTIMAS CONVERSÕES" ───────────────────────────────────────
     const ultimasVendas = vendas
       .filter(v => v.status === 'MATRICULADO' || v.status === 'PAGO')
       .slice(0, 10)
