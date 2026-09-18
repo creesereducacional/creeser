@@ -1,5 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
-import { hasPerfil, requireAuth, requirePerfil, resolveInstituicaoId, resolveInstitutionContext } from '../../../../lib/auth-server';
+import {
+  hasPerfil,
+  requireAuth,
+  requirePerfil,
+  resolveInstituicaoId,
+  resolveContextoUsuario,
+} from '../../../../lib/auth-server';
 import { emitirBoletoEfi } from '../../../../lib/efi/EfiBillingService';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -19,7 +25,19 @@ export default async function handler(req, res) {
     }
 
     const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
-    const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: false });
+
+    // ── FASE 6.1.2: Resolver contexto de escopo (Instituição × Unidade) ──────────
+    const ctx = await resolveContextoUsuario(req, authUser);
+
+    if (ctx.queryError) {
+      console.error('[ordens/create] Falha ao resolver contexto de escopo:', ctx.queryError);
+      return res.status(503).json({ message: 'Serviço temporariamente indisponível. Tente novamente.' });
+    }
+
+    const userInstituicaoId = ctx.legacyFallback
+      ? resolveInstituicaoId(req, authUser, { allowAll: false })
+      : ctx.instituicaoId;
+    // ────────────────────────────────────────────────────────────────────────────
 
     const {
       aluno_id,
@@ -37,7 +55,13 @@ export default async function handler(req, res) {
       // Emissão imediata no gateway (somente para tipo === 'ordem_simples')
       emitir_imediatamente = false,
       descricao_boleto,
-    } = req.body;
+    } = req.body || {};
+
+    if (!aluno_id || !tipo || !descricao || !valor_total || valor_total <= 0) {
+      return res.status(400).json({ 
+        message: 'Dados obrigatórios faltando: aluno_id, tipo, descricao, valor_total' 
+      });
+    }
 
     const { data: aluno, error: alunoError } = await supabase
       .from('alunos')
@@ -57,31 +81,66 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'O aluno informado não possui um CPF válido com 11 dígitos cadastrado.' });
     }
 
-    // Tentar resolver a unidade/turma se o aluno não possuir instituicao_id diretamente
-    let unidadeInstituicaoId = null;
-    if (!aluno.instituicao_id && aluno.turmaid) {
+    // ── Resolução da Unidade e Turma do Aluno (Fase 6.1.2) ────────────────────
+    // Prioriza o modelo de matrículas (cursos simultâneos e matrícula principal)
+    let turmaIdResolvida = null;
+    const { data: matriculasAluno } = await supabase
+      .from('matriculas')
+      .select('turma_id, is_principal, instituicao_id')
+      .eq('aluno_id', aluno_id);
+
+    if (Array.isArray(matriculasAluno) && matriculasAluno.length > 0) {
+      const matAlvo = matriculasAluno.find(m => m.is_principal) || matriculasAluno[0];
+      turmaIdResolvida = matAlvo?.turma_id || null;
+    }
+
+    // Fallback para coluna legada alunos.turmaid
+    if (!turmaIdResolvida) {
+      turmaIdResolvida = aluno.turmaid || null;
+    }
+
+    let unidadeIdDoAluno = null;
+    let turmaInstituicaoId = null;
+
+    if (turmaIdResolvida) {
       const { data: turmaData } = await supabase
         .from('turmas')
-        .select('unidade_id, unidades(instituicao_id)')
-        .eq('id', aluno.turmaid)
+        .select('id, unidadeid, instituicao_id')
+        .eq('id', turmaIdResolvida)
         .maybeSingle();
-      if (turmaData?.unidades?.instituicao_id) {
-        unidadeInstituicaoId = turmaData.unidades.instituicao_id;
+
+      if (turmaData) {
+        unidadeIdDoAluno = turmaData.unidadeid != null ? Number(turmaData.unidadeid) : null;
+        turmaInstituicaoId = turmaData.instituicao_id || null;
       }
     }
 
-    const instituicaoFinal = resolveInstitutionContext({
-      aluno: {
-        instituicao_id: aluno.instituicao_id,
-        unidade_instituicao_id: unidadeInstituicaoId
-      },
-      user: authUser,
-      requestedId: req.body.instituicao_id || instituicaoId
-    });
+    // Determinar a instituição final da ordem a ser gravada:
+    // Nunca confiar em instituicao_id enviado pelo cliente para ampliar escopo.
+    let instituicaoFinal = userInstituicaoId || aluno.instituicao_id || turmaInstituicaoId || null;
 
-    if (!isGroupAdmin && aluno.instituicao_id && aluno.instituicao_id !== instituicaoId && instituicaoFinal !== instituicaoId) {
-      console.error('[SECURITY VIOLATION] Tentativa de acesso negado a aluno de outro tenant:', { authUser: authUser.email, aluno_id });
-      return res.status(403).json({ message: 'Acesso negado para o aluno informado' });
+    // Se for grupo_admin e tiver enviado instituicao_id no body, permitir direcionar
+    if (isGroupAdmin && req.body.instituicao_id) {
+      instituicaoFinal = req.body.instituicao_id;
+    }
+
+    // Validação de isolamento por Instituição:
+    if (!isGroupAdmin) {
+      if (aluno.instituicao_id && userInstituicaoId && aluno.instituicao_id !== userInstituicaoId) {
+        return res.status(403).json({ message: 'Acesso negado: o aluno pertence a outra instituição.' });
+      }
+      if (turmaInstituicaoId && userInstituicaoId && turmaInstituicaoId !== userInstituicaoId) {
+        return res.status(403).json({ message: 'Acesso negado: a turma do aluno pertence a outra instituição.' });
+      }
+    }
+
+    // Validação de Escopo de Unidade (para Usuário Filial):
+    if (ctx.unidadesPermitidas !== null) {
+      if (unidadeIdDoAluno !== null && !ctx.unidadesPermitidas.includes(unidadeIdDoAluno)) {
+        return res.status(403).json({
+          message: 'Acesso negado: a turma/matrícula do aluno pertence a uma unidade fora do seu escopo permitido.',
+        });
+      }
     }
 
     if (!instituicaoFinal) {
