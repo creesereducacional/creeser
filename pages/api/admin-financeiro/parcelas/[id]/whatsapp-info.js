@@ -1,13 +1,52 @@
 import { createClient } from '@supabase/supabase-js';
 import {
+  hasPerfil,
   requireAuth,
   requirePerfil,
+  resolveInstituicaoId,
+  resolveContextoUsuario,
 } from '../../../../../lib/auth-server';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
+
+// ── Função auxiliar: derivar unidade do aluno através de matrículas/turmas ──
+async function resolverUnidadeAluno(alunoId, turmaidLegado) {
+  let turmaIdResolvida = null;
+  const { data: matriculasAluno } = await supabase
+    .from('matriculas')
+    .select('turma_id, is_principal, instituicao_id')
+    .eq('aluno_id', alunoId);
+
+  if (Array.isArray(matriculasAluno) && matriculasAluno.length > 0) {
+    const matAlvo = matriculasAluno.find(m => m.is_principal) || matriculasAluno[0];
+    turmaIdResolvida = matAlvo?.turma_id || null;
+  }
+
+  if (!turmaIdResolvida) {
+    turmaIdResolvida = turmaidLegado || null;
+  }
+
+  let unidadeIdDoAluno = null;
+  let turmaInstituicaoId = null;
+
+  if (turmaIdResolvida) {
+    const { data: turmaData } = await supabase
+      .from('turmas')
+      .select('id, unidadeid, instituicao_id')
+      .eq('id', turmaIdResolvida)
+      .maybeSingle();
+
+    if (turmaData) {
+      unidadeIdDoAluno = turmaData.unidadeid != null ? Number(turmaData.unidadeid) : null;
+      turmaInstituicaoId = turmaData.instituicao_id || null;
+    }
+  }
+
+  return { turmaIdResolvida, unidadeIdDoAluno, turmaInstituicaoId };
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -26,10 +65,30 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'ID da parcela é obrigatório' });
     }
 
+    const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+
+    // ── FASE 6.2.7: Resolver contexto de escopo (Instituição × Unidade) ──────────
+    const ctx = await resolveContextoUsuario(req, authUser);
+
+    if (ctx.queryError) {
+      console.error('[admin-financeiro/parcelas/whatsapp-info] Falha ao resolver contexto de escopo:', ctx.queryError);
+      return res.status(503).json({
+        message: 'Serviço temporariamente indisponível para resolução de contexto do usuário',
+        error: ctx.queryError.message,
+      });
+    }
+
+    const instituicaoId = ctx.instituicaoId || (ctx.legacyFallback ? resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin }) : null);
+
+    if (!isGroupAdmin && !instituicaoId) {
+      return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
+    }
+    // ────────────────────────────────────────────────────────────────────────────
+
     // 1. Buscar a parcela
     const { data: parcela, error: parcelaError } = await supabase
       .from('financeiro_parcelas')
-      .select('id, numero_parcela, valor, data_vencimento, status, boleto_url, efi_charge_id, ordem_pagamento_id, instituicao_id')
+      .select('id, numero_parcela, valor, data_vencimento, status, boleto_url, boleto_barcode, efi_charge_id, ordem_pagamento_id, instituicao_id, aluno_id')
       .eq('id', id)
       .maybeSingle();
 
@@ -37,6 +96,60 @@ export default async function handler(req, res) {
       return res.status(404).json({ message: 'Parcela não encontrada' });
     }
 
+    // Validação institucional direta na parcela
+    if (!isGroupAdmin && instituicaoId && parcela.instituicao_id && parcela.instituicao_id !== instituicaoId) {
+      return res.status(403).json({ message: 'Acesso negado: a parcela pertence a outra instituição.' });
+    }
+
+    // 2. Buscar a ordem de pagamento
+    const { data: ordem, error: ordemError } = await supabase
+      .from('financeiro_ordens_pagamento')
+      .select('id, instituicao_id, aluno_id')
+      .eq('id', parcela.ordem_pagamento_id)
+      .maybeSingle();
+
+    if (ordemError || !ordem) {
+      return res.status(404).json({ message: 'Ordem de pagamento não encontrada' });
+    }
+
+    // Validação institucional na ordem vinculada
+    if (!isGroupAdmin && instituicaoId && ordem.instituicao_id && ordem.instituicao_id !== instituicaoId) {
+      return res.status(403).json({ message: 'Acesso negado: a ordem pertence a outra instituição.' });
+    }
+
+    // 3. Buscar o aluno vinculado
+    const alunoId = ordem.aluno_id || parcela.aluno_id;
+    const { data: aluno, error: alunoError } = await supabase
+      .from('alunos')
+      .select('id, nome, telefone_celular, turmaid, instituicao_id')
+      .eq('id', alunoId)
+      .maybeSingle();
+
+    if (alunoError || !aluno) {
+      return res.status(404).json({ message: 'Aluno não encontrado' });
+    }
+
+    // Validação institucional no aluno vinculado
+    if (!isGroupAdmin && instituicaoId && aluno.instituicao_id && aluno.instituicao_id !== instituicaoId) {
+      return res.status(403).json({ message: 'Acesso negado: o aluno pertence a outra instituição.' });
+    }
+
+    // 4. Validação de Escopo de Unidade (para Usuário Filial)
+    if (ctx.unidadesPermitidas !== null) {
+      const { unidadeIdDoAluno, turmaInstituicaoId } = await resolverUnidadeAluno(aluno.id, aluno.turmaid);
+
+      if (!isGroupAdmin && instituicaoId && turmaInstituicaoId && turmaInstituicaoId !== instituicaoId) {
+        return res.status(403).json({ message: 'Acesso negado: a turma do aluno pertence a outra instituição.' });
+      }
+
+      if (unidadeIdDoAluno !== null && !ctx.unidadesPermitidas.includes(unidadeIdDoAluno)) {
+        return res.status(403).json({
+          message: 'Acesso negado: a matrícula/turma do aluno pertence a uma unidade fora do seu escopo permitido.'
+        });
+      }
+    }
+
+    // ── Autorização concluída: efeitos externos e recuperação inteligente ─────
     let finalPaymentUrl = parcela.boleto_url || null;
 
     // Se a URL do boleto estiver vazia e houver um efi_charge_id, tentamos a recuperação inteligente
@@ -82,29 +195,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // 2. Buscar a ordem de pagamento
-    const { data: ordem, error: ordemError } = await supabase
-      .from('financeiro_ordens_pagamento')
-      .select('aluno_id')
-      .eq('id', parcela.ordem_pagamento_id)
-      .maybeSingle();
-
-    if (ordemError || !ordem) {
-      return res.status(404).json({ message: 'Ordem de pagamento não encontrada' });
-    }
-
-    // 3. Buscar o aluno
-    const { data: aluno, error: alunoError } = await supabase
-      .from('alunos')
-      .select('id, nome, telefone_celular')
-      .eq('id', ordem.aluno_id)
-      .maybeSingle();
-
-    if (alunoError || !aluno) {
-      return res.status(404).json({ message: 'Aluno não encontrado' });
-    }
-
-    // 4. Buscar os responsáveis vinculados
+    // 5. Buscar os responsáveis vinculados para obter contato
     const { data: relResp, error: relRespError } = await supabase
       .from('responsavel_aluno')
       .select(`
@@ -149,3 +240,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ message: 'Erro interno do servidor', error: error.message });
   }
 }
+
