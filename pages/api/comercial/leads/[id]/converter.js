@@ -5,6 +5,7 @@ import {
   hasPerfil,
   applyInstituicaoFilter,
   resolveInstituicaoId,
+  resolveContextoUsuario,
 } from '../../../../../lib/auth-server';
 
 const supabase = createClient(
@@ -26,12 +27,33 @@ export default async function handler(req, res) {
   if (!authUser) return;
   if (!requirePerfil(authUser, res, PERFIS_PERMITIDOS)) return;
 
+  const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+
+  // ── FASE 7.1.1: Resolver contexto de escopo (Instituição × Unidade) ──────────
+  const ctx = await resolveContextoUsuario(req, authUser);
+
+  if (ctx.queryError) {
+    console.error('[comercial/leads/converter] Falha ao resolver contexto de escopo:', ctx.queryError);
+    return res.status(503).json({
+      error: 'Serviço temporariamente indisponível para resolução de contexto do usuário',
+      message: ctx.queryError.message,
+    });
+  }
+
+  const userInstituicaoId = ctx.instituicaoId || (ctx.legacyFallback ? resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin }) : null);
+
+  if (!isGroupAdmin && !userInstituicaoId) {
+    return res.status(403).json({ error: 'Instituição não definida para o usuário atual' });
+  }
+  // ────────────────────────────────────────────────────────────────────────────
+
   const { id } = req.query;
-  const instituicaoId = resolveInstituicaoId(req, authUser);
 
   // Buscar o lead com filtro de isolamento
   let selectQuery = supabase.from('leads').select('*').eq('id', id);
-  selectQuery = applyInstituicaoFilter(selectQuery, instituicaoId);
+  if (!isGroupAdmin) {
+    selectQuery = applyInstituicaoFilter(selectQuery, userInstituicaoId);
+  }
   if (isComercialPuro(authUser)) {
     selectQuery = selectQuery.eq('captado_por_id', authUser.id);
   }
@@ -39,6 +61,11 @@ export default async function handler(req, res) {
   const { data: lead, error: findError } = await selectQuery.maybeSingle();
   if (findError) return res.status(500).json({ error: findError.message });
   if (!lead) return res.status(404).json({ error: 'Lead não encontrado' });
+
+  // Validação institucional direta do lead
+  if (!isGroupAdmin && lead.instituicao_id && userInstituicaoId && lead.instituicao_id !== userInstituicaoId) {
+    return res.status(403).json({ error: 'Acesso negado: o lead pertence a outra instituição.' });
+  }
 
   if (lead.status === 'pre_matricula' || lead.status === 'matriculado') {
     return res.status(400).json({ error: 'Este lead já foi convertido em pré-matrícula ou matrícula' });
@@ -52,18 +79,36 @@ export default async function handler(req, res) {
     valor_mensalidade,
     qtd_parcelas,
     dia_pagamento,
-  } = req.body;
+  } = req.body || {};
 
-  // Verificar turma somente se fornecida
+  // ── Validar turma destino por Instituição e Unidade (ANTES de qualquer escrita)
   if (turmaid) {
     const { data: turmaCheck, error: turmaErr } = await supabase
       .from('turmas')
-      .select('id, situacao')
+      .select('id, situacao, instituicao_id, unidadeid')
       .eq('id', Number(turmaid))
       .maybeSingle();
+
     if (turmaErr || !turmaCheck) {
       return res.status(400).json({ error: 'Turma não encontrada.' });
     }
+
+    // 1. Validar instituição da turma
+    if (!isGroupAdmin && turmaCheck.instituicao_id && userInstituicaoId && turmaCheck.instituicao_id !== userInstituicaoId) {
+      return res.status(403).json({ error: 'Acesso negado: a turma selecionada pertence a outra instituição.' });
+    }
+
+    // 2. Validar escopo de unidade para Filial
+    if (ctx.unidadesPermitidas !== null) {
+      const unidadeIdTurma = turmaCheck.unidadeid != null ? Number(turmaCheck.unidadeid) : null;
+      if (unidadeIdTurma !== null && !ctx.unidadesPermitidas.includes(unidadeIdTurma)) {
+        return res.status(403).json({
+          error: 'Acesso negado: a turma selecionada pertence a uma unidade fora do seu escopo permitido.'
+        });
+      }
+    }
+
+    // 3. Validar situação da turma
     const situacaoTurma = String(turmaCheck.situacao || '').toUpperCase();
     if (situacaoTurma && !['ATIVO', 'EM_ANDAMENTO', 'ABERTA'].includes(situacaoTurma)) {
       return res.status(400).json({ error: 'A turma selecionada não está ativa.' });
@@ -71,11 +116,13 @@ export default async function handler(req, res) {
   }
 
   // Criar aluno com dados mínimos do lead + dados do curso/plano escolhidos
+  const instituicaoFinal = lead.instituicao_id || userInstituicaoId;
+
   const novoAluno = {
     nome: lead.nome,
     email: lead.email || null,
     telefone_celular: lead.whatsapp || lead.telefone || null,
-    instituicao_id: lead.instituicao_id,
+    instituicao_id: instituicaoFinal,
     captado_por_id: lead.captado_por_id || authUser.id,
     statusmatricula: 'PRE_CADASTRO',
     data_captacao: new Date().toISOString().slice(0, 10),
@@ -131,3 +178,4 @@ export default async function handler(req, res) {
     mensagem: 'Pré-matrícula criada com sucesso. A matrícula será confirmada após complementação cadastral e confirmação de pagamento.',
   });
 }
+
