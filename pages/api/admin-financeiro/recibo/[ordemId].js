@@ -1,10 +1,53 @@
 import { createClient } from '@supabase/supabase-js';
-import { applyInstituicaoFilter, hasPerfil, requireAuth, requirePerfil, resolveInstituicaoId } from '../../../../lib/auth-server';
+import {
+  applyInstituicaoFilter,
+  hasPerfil,
+  requireAuth,
+  requirePerfil,
+  resolveInstituicaoId,
+  resolveContextoUsuario,
+} from '../../../../lib/auth-server';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
+
+// ── Função auxiliar: derivar unidade do aluno através de matrículas/turmas ──
+async function resolverUnidadeAluno(alunoId, turmaidLegado) {
+  let turmaIdResolvida = null;
+  const { data: matriculasAluno } = await supabase
+    .from('matriculas')
+    .select('turma_id, is_principal, instituicao_id')
+    .eq('aluno_id', alunoId);
+
+  if (Array.isArray(matriculasAluno) && matriculasAluno.length > 0) {
+    const matAlvo = matriculasAluno.find(m => m.is_principal) || matriculasAluno[0];
+    turmaIdResolvida = matAlvo?.turma_id || null;
+  }
+
+  if (!turmaIdResolvida) {
+    turmaIdResolvida = turmaidLegado || null;
+  }
+
+  let unidadeIdDoAluno = null;
+  let turmaInstituicaoId = null;
+
+  if (turmaIdResolvida) {
+    const { data: turmaData } = await supabase
+      .from('turmas')
+      .select('id, unidadeid, instituicao_id')
+      .eq('id', turmaIdResolvida)
+      .maybeSingle();
+
+    if (turmaData) {
+      unidadeIdDoAluno = turmaData.unidadeid != null ? Number(turmaData.unidadeid) : null;
+      turmaInstituicaoId = turmaData.instituicao_id || null;
+    }
+  }
+
+  return { turmaIdResolvida, unidadeIdDoAluno, turmaInstituicaoId };
+}
 
 async function getEmpresaData(instituicaoId) {
   try {
@@ -48,11 +91,24 @@ export default async function handler(req, res) {
     }
 
     const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
-    const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+
+    // ── FASE 6.2.6: Resolver contexto de escopo (Instituição × Unidade) ──────────
+    const ctx = await resolveContextoUsuario(req, authUser);
+
+    if (ctx.queryError) {
+      console.error('[admin-financeiro/recibo] Falha ao resolver contexto de escopo:', ctx.queryError);
+      return res.status(503).json({
+        message: 'Serviço temporariamente indisponível para resolução de contexto do usuário',
+        error: ctx.queryError.message,
+      });
+    }
+
+    const instituicaoId = ctx.instituicaoId || (ctx.legacyFallback ? resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin }) : null);
 
     if (!isGroupAdmin && !instituicaoId) {
       return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
     }
+    // ────────────────────────────────────────────────────────────────────────────
 
     let ordem = null;
     let parcela = null;
@@ -61,7 +117,7 @@ export default async function handler(req, res) {
       // 1. Buscar a parcela diretamente
       const { data: parcData, error: parcErr } = await supabase
         .from('financeiro_parcelas')
-        .select('id, ordem_pagamento_id, valor, valor_pago, data_vencimento, status, boleto_numero, updated_at, metodo_pagamento, detalhes_baixa_multipla, instituicao_id')
+        .select('id, ordem_pagamento_id, valor, valor_pago, data_vencimento, status, boleto_numero, updated_at, metodo_pagamento, detalhes_baixa_multipla, instituicao_id, aluno_id')
         .eq('id', parcelaId)
         .maybeSingle();
 
@@ -82,25 +138,38 @@ export default async function handler(req, res) {
         .select('id, instituicao_id, descricao, referencia, valor_total, aluno_id')
         .eq('id', parcData.ordem_pagamento_id);
 
-      queryOrdem = applyInstituicaoFilter(queryOrdem, instituicaoId);
+      if (!isGroupAdmin) {
+        queryOrdem = applyInstituicaoFilter(queryOrdem, instituicaoId);
+      }
       const { data: ordData, error: ordErr } = await queryOrdem.single();
 
       if (ordErr || !ordData) {
         return res.status(404).json({ message: 'Ordem vinculada à parcela não encontrada' });
       }
-      ordem = ordData;
 
+      if (!isGroupAdmin && instituicaoId && ordData.instituicao_id && ordData.instituicao_id !== instituicaoId) {
+        return res.status(403).json({ message: 'Acesso negado: a ordem pertence a outra instituição' });
+      }
+
+      ordem = ordData;
     } else {
-      // Fluxo antigo com ordemId
+      // Fluxo com ordemId
       let ordemQuery = supabase
         .from('financeiro_ordens_pagamento')
         .select('id, instituicao_id, descricao, referencia, valor_total, aluno_id, financeiro_parcelas!ordem_pagamento_id(id, numero_parcela, valor, valor_pago, data_vencimento, status, boleto_numero, updated_at, metodo_pagamento, detalhes_baixa_multipla)')
         .eq('id', ordemId);
 
-      ordemQuery = applyInstituicaoFilter(ordemQuery, instituicaoId);
+      if (!isGroupAdmin) {
+        ordemQuery = applyInstituicaoFilter(ordemQuery, instituicaoId);
+      }
       const { data: ordData, error: ordErr } = await ordemQuery.single();
 
       if (ordErr || !ordData) return res.status(404).json({ message: 'Ordem não encontrada' });
+
+      if (!isGroupAdmin && instituicaoId && ordData.instituicao_id && ordData.instituicao_id !== instituicaoId) {
+        return res.status(403).json({ message: 'Acesso negado: a ordem pertence a outra instituição' });
+      }
+
       ordem = ordData;
 
       const parcelas = ordem.financeiro_parcelas || [];
@@ -116,12 +185,47 @@ export default async function handler(req, res) {
       }
     }
 
-    const { data: aluno } = await supabase
-      .from('alunos')
-      .select('nome, cpf, turmaid, cursoid')
-      .eq('id', ordem.aluno_id)
-      .single();
+    // ── Buscar aluno vinculado para autorização de escopo e emissão ───────────
+    const alunoId = ordem.aluno_id || parcela?.aluno_id || null;
+    let aluno = null;
 
+    if (alunoId) {
+      const { data: alunoData, error: alunoErr } = await supabase
+        .from('alunos')
+        .select('id, nome, cpf, turmaid, cursoid, instituicao_id')
+        .eq('id', alunoId)
+        .maybeSingle();
+
+      if (alunoErr) {
+        return res.status(500).json({ message: 'Erro ao validar aluno da ordem: ' + alunoErr.message });
+      }
+
+      aluno = alunoData;
+
+      if (aluno) {
+        // Validação institucional do aluno
+        if (!isGroupAdmin && instituicaoId && aluno.instituicao_id && aluno.instituicao_id !== instituicaoId) {
+          return res.status(403).json({ message: 'Acesso negado: o aluno pertence a outra instituição.' });
+        }
+
+        // Validação de escopo de unidade para Filial
+        if (ctx.unidadesPermitidas !== null) {
+          const { unidadeIdDoAluno, turmaInstituicaoId } = await resolverUnidadeAluno(aluno.id, aluno.turmaid);
+
+          if (!isGroupAdmin && instituicaoId && turmaInstituicaoId && turmaInstituicaoId !== instituicaoId) {
+            return res.status(403).json({ message: 'Acesso negado: a turma do aluno pertence a outra instituição.' });
+          }
+
+          if (unidadeIdDoAluno !== null && !ctx.unidadesPermitidas.includes(unidadeIdDoAluno)) {
+            return res.status(403).json({
+              message: 'Acesso negado: a matrícula/turma do aluno pertence a uma unidade fora do seu escopo permitido.'
+            });
+          }
+        }
+      }
+    }
+
+    // ── Buscar turma e curso para compor recibo (após autorização prévia) ──────
     const [{ data: turma }, { data: curso }] = await Promise.all([
       aluno?.turmaid ? supabase.from('turmas').select('nome').eq('id', aluno.turmaid).single() : Promise.resolve({ data: null }),
       aluno?.cursoid ? supabase.from('cursos').select('nome').eq('id', aluno.cursoid).single() : Promise.resolve({ data: null }),
@@ -158,3 +262,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ message: error.message });
   }
 }
+
