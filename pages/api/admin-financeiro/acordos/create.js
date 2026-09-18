@@ -8,6 +8,7 @@ import {
   requireAuth,
   requirePerfil,
   resolveInstituicaoId,
+  resolveContextoUsuario,
 } from '../../../../lib/auth-server';
 
 const supabase = createClient(
@@ -27,11 +28,23 @@ export default async function handler(req, res) {
   }
 
   const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
-  const instituicaoFinal = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
 
-  if (!isGroupAdmin && !instituicaoFinal) {
+  // ── FASE 6.1.4: Resolver contexto de escopo (Instituição × Unidade) ──────────
+  const ctx = await resolveContextoUsuario(req, authUser);
+
+  if (ctx.queryError) {
+    console.error('[acordos/create] Falha ao resolver contexto de escopo:', ctx.queryError);
+    return res.status(503).json({ message: 'Serviço temporariamente indisponível. Tente novamente.' });
+  }
+
+  const userInstituicaoId = ctx.legacyFallback
+    ? resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin })
+    : ctx.instituicaoId;
+
+  if (!isGroupAdmin && !userInstituicaoId) {
     return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
   }
+  // ────────────────────────────────────────────────────────────────────────────
 
   try {
     const {
@@ -73,12 +86,70 @@ export default async function handler(req, res) {
     // ── Carregar aluno ────────────────────────────────────────────────────────
     let alunoQuery = supabase
       .from('alunos')
-      .select('id, nome, cpf, instituicao_id')
+      .select('id, nome, cpf, instituicao_id, turmaid')
       .eq('id', Number(aluno_id));
-    alunoQuery = applyInstituicaoFilter(alunoQuery, instituicaoFinal);
+    if (!isGroupAdmin) {
+      alunoQuery = applyInstituicaoFilter(alunoQuery, userInstituicaoId);
+    }
     const { data: aluno } = await alunoQuery.maybeSingle();
 
     if (!aluno) return res.status(404).json({ message: 'Aluno não encontrado.' });
+
+    // ── Resolução da Unidade e Turma do Aluno (Fase 6.1.4) ────────────────────
+    let turmaIdResolvida = null;
+    const { data: matriculasAluno } = await supabase
+      .from('matriculas')
+      .select('turma_id, is_principal, instituicao_id')
+      .eq('aluno_id', aluno.id);
+
+    if (Array.isArray(matriculasAluno) && matriculasAluno.length > 0) {
+      const matAlvo = matriculasAluno.find(m => m.is_principal) || matriculasAluno[0];
+      turmaIdResolvida = matAlvo?.turma_id || null;
+    }
+
+    // Fallback para coluna legada alunos.turmaid
+    if (!turmaIdResolvida) {
+      turmaIdResolvida = aluno.turmaid || null;
+    }
+
+    let unidadeIdDoAluno = null;
+    let turmaInstituicaoId = null;
+
+    if (turmaIdResolvida) {
+      const { data: turmaData } = await supabase
+        .from('turmas')
+        .select('id, unidadeid, instituicao_id')
+        .eq('id', turmaIdResolvida)
+        .maybeSingle();
+
+      if (turmaData) {
+        unidadeIdDoAluno = turmaData.unidadeid != null ? Number(turmaData.unidadeid) : null;
+        turmaInstituicaoId = turmaData.instituicao_id || null;
+      }
+    }
+
+    // Validação de isolamento por Instituição:
+    if (!isGroupAdmin) {
+      if (aluno.instituicao_id && userInstituicaoId && aluno.instituicao_id !== userInstituicaoId) {
+        return res.status(403).json({ message: 'Acesso negado: o aluno pertence a outra instituição.' });
+      }
+      if (turmaInstituicaoId && userInstituicaoId && turmaInstituicaoId !== userInstituicaoId) {
+        return res.status(403).json({ message: 'Acesso negado: a turma do aluno pertence a outra instituição.' });
+      }
+    }
+
+    // Validação de Escopo de Unidade (para Usuário Filial):
+    if (ctx.unidadesPermitidas !== null) {
+      if (unidadeIdDoAluno !== null && !ctx.unidadesPermitidas.includes(unidadeIdDoAluno)) {
+        return res.status(403).json({
+          message: 'Acesso negado: a turma/matrícula do aluno pertence a uma unidade fora do seu escopo permitido.'
+        });
+      }
+    }
+
+    const instituicaoFinal = isGroupAdmin
+      ? (aluno.instituicao_id || userInstituicaoId || null)
+      : userInstituicaoId;
 
     // ── Carregar e validar parcelas originais ──────────────────────────────────
     let parcelasQuery = supabase
