@@ -16,12 +16,49 @@ import {
   requireAuth,
   requirePerfil,
   resolveInstituicaoId,
+  resolveContextoUsuario,
 } from '../../../../lib/auth-server';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
+
+// ── Função auxiliar: derivar unidade do aluno através de matrículas/turmas ──
+async function resolverUnidadeAluno(alunoId, turmaidLegado) {
+  let turmaIdResolvida = null;
+  const { data: matriculasAluno } = await supabase
+    .from('matriculas')
+    .select('turma_id, is_principal, instituicao_id')
+    .eq('aluno_id', alunoId);
+
+  if (Array.isArray(matriculasAluno) && matriculasAluno.length > 0) {
+    const matAlvo = matriculasAluno.find(m => m.is_principal) || matriculasAluno[0];
+    turmaIdResolvida = matAlvo?.turma_id || null;
+  }
+
+  if (!turmaIdResolvida) {
+    turmaIdResolvida = turmaidLegado || null;
+  }
+
+  let unidadeIdDoAluno = null;
+  let turmaInstituicaoId = null;
+
+  if (turmaIdResolvida) {
+    const { data: turmaData } = await supabase
+      .from('turmas')
+      .select('id, unidadeid, instituicao_id')
+      .eq('id', turmaIdResolvida)
+      .maybeSingle();
+
+    if (turmaData) {
+      unidadeIdDoAluno = turmaData.unidadeid != null ? Number(turmaData.unidadeid) : null;
+      turmaInstituicaoId = turmaData.instituicao_id || null;
+    }
+  }
+
+  return { turmaIdResolvida, unidadeIdDoAluno, turmaInstituicaoId };
+}
 
 export default async function handler(req, res) {
   const authUser = requireAuth(req, res);
@@ -31,7 +68,20 @@ export default async function handler(req, res) {
   }
 
   const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
-  req.instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+
+  // ── FASE 6.1.5: Resolver contexto de escopo (Instituição × Unidade) ──────────
+  const ctx = await resolveContextoUsuario(req, authUser);
+
+  if (ctx.queryError) {
+    console.error('[efi/carne] Falha ao resolver contexto de escopo:', ctx.queryError);
+    return res.status(503).json({ message: 'Serviço temporariamente indisponível. Tente novamente.' });
+  }
+
+  req.ctx = ctx;
+  req.isGroupAdmin = isGroupAdmin;
+  req.instituicaoId = ctx.legacyFallback
+    ? resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin })
+    : ctx.instituicaoId;
   req.authUser = authUser;
 
   if (!isGroupAdmin && !req.instituicaoId) {
@@ -55,7 +105,7 @@ async function buscarCarne(req, res) {
 
     let ordemQuery = supabase
       .from('financeiro_ordens_pagamento')
-      .select('efi_carnet_id, instituicao_id')
+      .select('efi_carnet_id, instituicao_id, aluno_id, aluno:alunos ( id, turmaid, instituicao_id )')
       .eq('id', ordem_id);
 
     ordemQuery = applyInstituicaoFilter(ordemQuery, req.instituicaoId);
@@ -63,6 +113,14 @@ async function buscarCarne(req, res) {
 
     if (error || !ordemData?.efi_carnet_id) {
       return res.status(404).json({ message: 'Carnê EFI não encontrado para esta ordem.' });
+    }
+
+    // Validação de Escopo de Unidade para Filial
+    if (req.ctx.unidadesPermitidas !== null && ordemData.aluno) {
+      const { unidadeIdDoAluno } = await resolverUnidadeAluno(ordemData.aluno.id, ordemData.aluno.turmaid);
+      if (unidadeIdDoAluno !== null && !req.ctx.unidadesPermitidas.includes(unidadeIdDoAluno)) {
+        return res.status(403).json({ message: 'Acesso negado para esta ordem fora do seu escopo de unidade.' });
+      }
     }
 
     const data = await efi.getCarnet(Number(ordemData.efi_carnet_id));
@@ -93,7 +151,7 @@ async function criarCarne(req, res) {
       .from('financeiro_ordens_pagamento')
       .select(`
         id, instituicao_id, tipo, descricao, status, quantidade_parcelas, efi_carnet_id,
-        aluno:alunos!inner ( id, nome, cpf, email, data_nascimento, telefone_celular, turmaid, cursoid )
+        aluno:alunos!inner ( id, nome, cpf, email, data_nascimento, telefone_celular, turmaid, cursoid, instituicao_id )
       `)
       .eq('id', ordem_id);
 
@@ -105,6 +163,28 @@ async function criarCarne(req, res) {
     }
 
     const ordemSelecionada = ordemData;
+    const aluno = ordemSelecionada.aluno;
+
+    // ── Validação de Escopo de Unidade e Instituição (Fase 6.1.5) ───────────────
+    const { unidadeIdDoAluno, turmaInstituicaoId } = await resolverUnidadeAluno(aluno.id, aluno.turmaid);
+
+    if (!req.isGroupAdmin) {
+      if (aluno.instituicao_id && req.instituicaoId && aluno.instituicao_id !== req.instituicaoId) {
+        return res.status(403).json({ message: 'Acesso negado: o aluno pertence a outra instituição.' });
+      }
+      if (turmaInstituicaoId && req.instituicaoId && turmaInstituicaoId !== req.instituicaoId) {
+        return res.status(403).json({ message: 'Acesso negado: a turma do aluno pertence a outra instituição.' });
+      }
+    }
+
+    if (req.ctx.unidadesPermitidas !== null) {
+      if (unidadeIdDoAluno !== null && !req.ctx.unidadesPermitidas.includes(unidadeIdDoAluno)) {
+        return res.status(403).json({
+          message: 'Acesso negado: a matrícula/turma do aluno pertence a uma unidade fora do seu escopo permitido.'
+        });
+      }
+    }
+    // ──────────────────────────────────────────────────────────────────────────
 
     if (ordemSelecionada.tipo !== 'carne') {
       return res.status(422).json({ message: 'Use /efi/cobranca para ordens simples.' });
@@ -134,8 +214,6 @@ async function criarCarne(req, res) {
     if (parcelasErr || !parcelas?.length) {
       return res.status(422).json({ message: 'Nenhuma parcela encontrada para esta ordem.' });
     }
-
-    const aluno = ordemSelecionada.aluno;
 
     // Buscar curso e turma
     const { data: turma } = aluno.turmaid
@@ -365,11 +443,38 @@ async function cancelarParcela(req, res) {
 
     let ordemQuery = supabase
       .from('financeiro_ordens_pagamento')
-      .select('efi_carnet_id, instituicao_id')
+      .select('efi_carnet_id, instituicao_id, aluno_id, aluno:alunos ( id, turmaid, instituicao_id )')
       .eq('id', ordem_id);
 
     ordemQuery = applyInstituicaoFilter(ordemQuery, req.instituicaoId);
     const { data: ordem } = await ordemQuery.single();
+
+    if (!ordem) {
+      return res.status(404).json({ message: 'Ordem não encontrada.' });
+    }
+
+    // ── Validação de Escopo de Unidade e Instituição (Fase 6.1.5) ───────────────
+    if (ordem.aluno) {
+      const { unidadeIdDoAluno, turmaInstituicaoId } = await resolverUnidadeAluno(ordem.aluno.id, ordem.aluno.turmaid);
+
+      if (!req.isGroupAdmin) {
+        if (ordem.aluno.instituicao_id && req.instituicaoId && ordem.aluno.instituicao_id !== req.instituicaoId) {
+          return res.status(403).json({ message: 'Acesso negado: o aluno pertence a outra instituição.' });
+        }
+        if (turmaInstituicaoId && req.instituicaoId && turmaInstituicaoId !== req.instituicaoId) {
+          return res.status(403).json({ message: 'Acesso negado: a turma do aluno pertence a outra instituição.' });
+        }
+      }
+
+      if (req.ctx.unidadesPermitidas !== null) {
+        if (unidadeIdDoAluno !== null && !req.ctx.unidadesPermitidas.includes(unidadeIdDoAluno)) {
+          return res.status(403).json({
+            message: 'Acesso negado: a matrícula/turma do aluno pertence a uma unidade fora do seu escopo permitido.'
+          });
+        }
+      }
+    }
+    // ──────────────────────────────────────────────────────────────────────────
 
     let parcelaQuery = supabase
       .from('financeiro_parcelas')
@@ -443,7 +548,7 @@ async function cancelarCarne(req, res) {
     // 1. Buscar ordem
     let ordemQuery = supabase
       .from('financeiro_ordens_pagamento')
-      .select('id, tipo, status, efi_carnet_id')
+      .select('id, tipo, status, efi_carnet_id, instituicao_id, aluno_id, aluno:alunos ( id, turmaid, instituicao_id )')
       .eq('id', ordem_id);
 
     ordemQuery = applyInstituicaoFilter(ordemQuery, req.instituicaoId);
@@ -452,6 +557,29 @@ async function cancelarCarne(req, res) {
     if (ordemErr || !ordem) {
       return res.status(404).json({ message: 'Ordem não encontrada.' });
     }
+
+    // ── Validação de Escopo de Unidade e Instituição (Fase 6.1.5) ───────────────
+    if (ordem.aluno) {
+      const { unidadeIdDoAluno, turmaInstituicaoId } = await resolverUnidadeAluno(ordem.aluno.id, ordem.aluno.turmaid);
+
+      if (!req.isGroupAdmin) {
+        if (ordem.aluno.instituicao_id && req.instituicaoId && ordem.aluno.instituicao_id !== req.instituicaoId) {
+          return res.status(403).json({ message: 'Acesso negado: o aluno pertence a outra instituição.' });
+        }
+        if (turmaInstituicaoId && req.instituicaoId && turmaInstituicaoId !== req.instituicaoId) {
+          return res.status(403).json({ message: 'Acesso negado: a turma do aluno pertence a outra instituição.' });
+        }
+      }
+
+      if (req.ctx.unidadesPermitidas !== null) {
+        if (unidadeIdDoAluno !== null && !req.ctx.unidadesPermitidas.includes(unidadeIdDoAluno)) {
+          return res.status(403).json({
+            message: 'Acesso negado: a matrícula/turma do aluno pertence a uma unidade fora do seu escopo permitido.'
+          });
+        }
+      }
+    }
+    // ──────────────────────────────────────────────────────────────────────────
 
     if (ordem.status === 'cancelado') {
       return res.status(422).json({ message: 'Ordem já está cancelada.' });
