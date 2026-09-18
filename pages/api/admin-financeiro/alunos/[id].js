@@ -1,29 +1,84 @@
 import { createClient } from '@supabase/supabase-js';
-import { applyInstituicaoFilter, hasPerfil, requireAuth, requirePerfil, resolveInstituicaoId } from '../../../../lib/auth-server';
+import {
+  applyInstituicaoFilter,
+  hasPerfil,
+  requireAuth,
+  requirePerfil,
+  resolveInstituicaoId,
+  resolveContextoUsuario,
+} from '../../../../lib/auth-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// ── Função auxiliar: derivar unidade do aluno através de matrículas/turmas ──
+async function resolverUnidadeAluno(alunoId, turmaidLegado) {
+  let turmaIdResolvida = null;
+  const { data: matriculasAluno } = await supabase
+    .from('matriculas')
+    .select('turma_id, is_principal, instituicao_id')
+    .eq('aluno_id', alunoId);
+
+  if (Array.isArray(matriculasAluno) && matriculasAluno.length > 0) {
+    const matAlvo = matriculasAluno.find(m => m.is_principal) || matriculasAluno[0];
+    turmaIdResolvida = matAlvo?.turma_id || null;
+  }
+
+  if (!turmaIdResolvida) {
+    turmaIdResolvida = turmaidLegado || null;
+  }
+
+  let unidadeIdDoAluno = null;
+  let turmaInstituicaoId = null;
+
+  if (turmaIdResolvida) {
+    const { data: turmaData } = await supabase
+      .from('turmas')
+      .select('id, unidadeid, instituicao_id')
+      .eq('id', turmaIdResolvida)
+      .maybeSingle();
+
+    if (turmaData) {
+      unidadeIdDoAluno = turmaData.unidadeid != null ? Number(turmaData.unidadeid) : null;
+      turmaInstituicaoId = turmaData.instituicao_id || null;
+    }
+  }
+
+  return { turmaIdResolvida, unidadeIdDoAluno, turmaInstituicaoId };
+}
+
 export default async function handler(req, res) {
   const { id } = req.query;
+
+  const authUser = requireAuth(req, res);
+  if (!authUser) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'financeiro', 'admin'])) {
+    return;
+  }
+
+  const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+
+  // ── FASE 6.1.7: Resolver contexto de escopo (Instituição × Unidade) ──────────
+  const ctx = await resolveContextoUsuario(req, authUser);
+
+  if (ctx.queryError) {
+    console.error('[admin-financeiro/alunos/id] Falha ao resolver contexto de escopo:', ctx.queryError);
+    return res.status(503).json({ message: 'Serviço temporariamente indisponível. Tente novamente.' });
+  }
+
+  const instituicaoId = ctx.legacyFallback
+    ? resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin })
+    : ctx.instituicaoId;
+
+  if (!isGroupAdmin && !instituicaoId) {
+    return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
+  }
+  // ────────────────────────────────────────────────────────────────────────────
 
   if (req.method === 'GET') {
     // Buscar aluno específico
     try {
-      const authUser = requireAuth(req, res);
-      if (!authUser) return;
-      if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'financeiro', 'admin'])) {
-        return;
-      }
-
-      const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
-      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
-
-      if (!isGroupAdmin && !instituicaoId) {
-        return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
-      }
-
       let query = supabase
         .from('alunos')
         .select(
@@ -40,14 +95,41 @@ export default async function handler(req, res) {
           qtd_parcelas,
           dia_pagamento,
           telefone_celular,
-          endereco`
+          endereco,
+          instituicao_id`
         )
         .eq('id', Number(id));
 
-      query = applyInstituicaoFilter(query, instituicaoId);
+      if (!isGroupAdmin) {
+        query = applyInstituicaoFilter(query, instituicaoId);
+      }
       const { data, error } = query.single ? await query.single() : await query;
 
-      if (error) throw error;
+      if (error || !data) {
+        return res.status(404).json({ message: 'Aluno não encontrado' });
+      }
+
+      // ── Validação de Escopo de Unidade e Instituição (Fase 6.1.7) ───────────
+      const { unidadeIdDoAluno, turmaInstituicaoId } = await resolverUnidadeAluno(data.id, data.turmaid);
+
+      if (!isGroupAdmin) {
+        if (data.instituicao_id && instituicaoId && data.instituicao_id !== instituicaoId) {
+          return res.status(403).json({ message: 'Acesso negado: o aluno pertence a outra instituição.' });
+        }
+        if (turmaInstituicaoId && instituicaoId && turmaInstituicaoId !== instituicaoId) {
+          return res.status(403).json({ message: 'Acesso negado: a turma do aluno pertence a outra instituição.' });
+        }
+      }
+
+      if (ctx.unidadesPermitidas !== null) {
+        if (unidadeIdDoAluno !== null && !ctx.unidadesPermitidas.includes(unidadeIdDoAluno)) {
+          return res.status(403).json({
+            message: 'Acesso negado: a matrícula/turma do aluno pertence a uma unidade fora do seu escopo permitido.'
+          });
+        }
+      }
+      // ──────────────────────────────────────────────────────────────────────
+
       return res.status(200).json(data);
     } catch (error) {
       console.error('Erro ao buscar aluno:', error);
@@ -57,19 +139,6 @@ export default async function handler(req, res) {
 
   if (req.method === 'PATCH') {
     try {
-      const authUser = requireAuth(req, res);
-      if (!authUser) return;
-      if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'financeiro', 'admin'])) {
-        return;
-      }
-
-      const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
-      const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
-
-      if (!isGroupAdmin && !instituicaoId) {
-        return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
-      }
-
       const { acao, observacao_trancamento } = req.body || {};
 
       if (acao !== 'trancar') {
@@ -83,10 +152,12 @@ export default async function handler(req, res) {
       // Buscar aluno
       let alunoQuery = supabase
         .from('alunos')
-        .select('id, statusmatricula, instituicao_id')
+        .select('id, statusmatricula, instituicao_id, turmaid')
         .eq('id', Number(id));
 
-      alunoQuery = applyInstituicaoFilter(alunoQuery, instituicaoId);
+      if (!isGroupAdmin) {
+        alunoQuery = applyInstituicaoFilter(alunoQuery, instituicaoId);
+      }
 
       const { data: aluno, error: alunoError } = await alunoQuery.maybeSingle();
       if (alunoError) {
@@ -95,6 +166,27 @@ export default async function handler(req, res) {
       if (!aluno) {
         return res.status(404).json({ message: 'Aluno não encontrado' });
       }
+
+      // ── Validação de Escopo de Unidade e Instituição (Fase 6.1.7) ───────────
+      const { unidadeIdDoAluno, turmaInstituicaoId } = await resolverUnidadeAluno(aluno.id, aluno.turmaid);
+
+      if (!isGroupAdmin) {
+        if (aluno.instituicao_id && instituicaoId && aluno.instituicao_id !== instituicaoId) {
+          return res.status(403).json({ message: 'Acesso negado: o aluno pertence a outra instituição.' });
+        }
+        if (turmaInstituicaoId && instituicaoId && turmaInstituicaoId !== instituicaoId) {
+          return res.status(403).json({ message: 'Acesso negado: a turma do aluno pertence a outra instituição.' });
+        }
+      }
+
+      if (ctx.unidadesPermitidas !== null) {
+        if (unidadeIdDoAluno !== null && !ctx.unidadesPermitidas.includes(unidadeIdDoAluno)) {
+          return res.status(403).json({
+            message: 'Acesso negado: a matrícula/turma do aluno pertence a uma unidade fora do seu escopo permitido.'
+          });
+        }
+      }
+      // ──────────────────────────────────────────────────────────────────────
 
       // Bloquear trancamento de alunos cancelados/desistentes
       if (aluno.statusmatricula === 'CANCELADO' || aluno.statusmatricula === 'DESISTENTE' || aluno.statusmatricula === 'TRANCADO' || aluno.statusmatricula === 'TRANCADO_COM_DEBITO') {
