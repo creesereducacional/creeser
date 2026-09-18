@@ -5,6 +5,7 @@ import {
   requireAuth,
   requirePerfil,
   resolveInstituicaoId,
+  resolveContextoUsuario,
 } from '../../../../lib/auth-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -88,11 +89,27 @@ export default async function handler(req, res) {
   }
 
   const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
-  const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
 
-  if (!isGroupAdmin && !instituicaoId) {
+  // ── FASE 6.1.10: Resolver contexto de escopo institucional ──────────────────
+  const ctx = await resolveContextoUsuario(req, authUser);
+
+  if (ctx.queryError) {
+    console.error('[convenios/id] Falha ao resolver contexto de escopo:', ctx.queryError);
+    return res.status(503).json({ message: 'Serviço temporariamente indisponível. Tente novamente.' });
+  }
+
+  // A tabela financeiro_convenios é de escopo institucional (instituicao_id).
+  // Não possui relação direta ou coluna de unidade_id.
+  const userInstituicaoId = ctx.legacyFallback
+    ? resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin })
+    : ctx.instituicaoId;
+
+  const instituicaoId = isGroupAdmin ? null : userInstituicaoId;
+
+  if (!isGroupAdmin && !userInstituicaoId) {
     return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
   }
+  // ────────────────────────────────────────────────────────────────────────────
 
   if (req.method === 'GET') {
     try {
@@ -109,9 +126,25 @@ export default async function handler(req, res) {
 
   if (req.method === 'PUT') {
     try {
+      // 1. Validar existência e escopo do convênio atual antes de atualizar
+      const { data: convenioAtual, error: getErr } = await supabase
+        .from('financeiro_convenios')
+        .select('id, instituicao_id')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (getErr) throw getErr;
+      if (!convenioAtual) {
+        return res.status(404).json({ message: 'Convenio nao encontrado' });
+      }
+
+      // Validação de segurança multi-tenant
+      if (!isGroupAdmin && userInstituicaoId && convenioAtual.instituicao_id !== userInstituicaoId) {
+        return res.status(403).json({ message: 'Acesso negado: convenio pertence a outra instituicao' });
+      }
+
       const nome = normalizeText(req.body?.nome);
       const percentual = parsePercentual(req.body?.percentual);
-      const instituicaoIdPayload = resolveInstituicaoId(req, authUser, { allowAll: false });
       const cnpj = formatCnpj(req.body?.cnpj);
       const observacoes = normalizeText(req.body?.observacoes);
 
@@ -123,18 +156,19 @@ export default async function handler(req, res) {
         return res.status(400).json({ message: 'Percentual deve ser um valor entre 0 e 100' });
       }
 
-      if (!instituicaoIdPayload) {
-        return res.status(400).json({ message: 'Instituicao e obrigatoria' });
-      }
-
       if (req.body?.cnpj && !cnpj) {
         return res.status(400).json({ message: 'CNPJ deve conter 14 digitos' });
       }
 
+      // Manter a instituição original do convênio (ou a selecionada pelo grupo_admin)
+      const instituicaoIdFinal = isGroupAdmin
+        ? (req.body?.instituicao_id || convenioAtual.instituicao_id)
+        : userInstituicaoId;
+
       const payload = {
         nome,
         percentual,
-        instituicao_id: instituicaoIdPayload,
+        instituicao_id: instituicaoIdFinal,
         cnpj,
         observacoes,
         ativo: req.body?.ativo !== false,
@@ -147,7 +181,7 @@ export default async function handler(req, res) {
 
       if (error) throw error;
 
-      const updated = await getConvenioById(id, instituicaoIdPayload);
+      const updated = await getConvenioById(id, instituicaoId);
       return res.status(200).json(withLowercaseKeys(updated));
     } catch (error) {
       console.error('Erro ao atualizar convenio:', error);
@@ -157,6 +191,23 @@ export default async function handler(req, res) {
 
   if (req.method === 'DELETE') {
     try {
+      // 1. Validar existência e escopo do convênio antes de deletar
+      const { data: convenioAtual, error: getErr } = await supabase
+        .from('financeiro_convenios')
+        .select('id, instituicao_id')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (getErr) throw getErr;
+      if (!convenioAtual) {
+        return res.status(404).json({ message: 'Convenio nao encontrado' });
+      }
+
+      // Validação de segurança multi-tenant
+      if (!isGroupAdmin && userInstituicaoId && convenioAtual.instituicao_id !== userInstituicaoId) {
+        return res.status(403).json({ message: 'Acesso negado: convenio pertence a outra instituicao' });
+      }
+
       let query = supabase
         .from('financeiro_convenios')
         .delete()
