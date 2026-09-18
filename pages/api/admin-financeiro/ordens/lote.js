@@ -1,5 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
-import { hasPerfil, requireAuth, requirePerfil, resolveInstituicaoId } from '../../../../lib/auth-server';
+import {
+  hasPerfil,
+  requireAuth,
+  requirePerfil,
+  resolveInstituicaoId,
+  resolveContextoUsuario,
+} from '../../../../lib/auth-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -18,11 +24,23 @@ export default async function handler(req, res) {
     }
 
     const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
-    const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+
+    // ── FASE 6.1.3: Resolver contexto de escopo (Instituição × Unidade) ──────────
+    const ctx = await resolveContextoUsuario(req, authUser);
+
+    if (ctx.queryError) {
+      console.error('[ordens/lote] Falha ao resolver contexto de escopo:', ctx.queryError);
+      return res.status(503).json({ message: 'Serviço temporariamente indisponível. Tente novamente.' });
+    }
+
+    const instituicaoId = ctx.legacyFallback
+      ? resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin })
+      : ctx.instituicaoId;
 
     if (!instituicaoId && !isGroupAdmin) {
       return res.status(400).json({ message: 'Instituição obrigatória' });
     }
+    // ────────────────────────────────────────────────────────────────────────────
 
     const {
       turmaId,
@@ -39,10 +57,10 @@ export default async function handler(req, res) {
       });
     }
 
-    // 1. Validar status da turma (não iniciada/não ativa)
+    // 1. Validar turma e escopo (instituição e unidade)
     const { data: turma, error: turmaErr } = await supabase
       .from('turmas')
-      .select('id, nome, status_formacao, instituicao_id')
+      .select('id, nome, status_formacao, instituicao_id, unidadeid')
       .eq('id', Number(turmaId))
       .maybeSingle();
 
@@ -50,9 +68,21 @@ export default async function handler(req, res) {
       return res.status(404).json({ message: 'Turma não encontrada' });
     }
 
-    // Validação de segurança multi-tenant
-    if (!isGroupAdmin && turma.instituicao_id && turma.instituicao_id !== instituicaoId) {
-      return res.status(403).json({ message: 'Acesso negado para a turma informada' });
+    // Validação de segurança multi-tenant (Instituição)
+    if (!isGroupAdmin) {
+      if (instituicaoId && turma.instituicao_id && turma.instituicao_id !== instituicaoId) {
+        return res.status(403).json({ message: 'Acesso negado para a turma informada' });
+      }
+    }
+
+    // Validação de escopo de Unidade (para Usuário Filial)
+    if (ctx.unidadesPermitidas !== null) {
+      const turmaUnidadeId = turma.unidadeid != null ? Number(turma.unidadeid) : null;
+      if (turmaUnidadeId === null || !ctx.unidadesPermitidas.includes(turmaUnidadeId)) {
+        return res.status(403).json({
+          message: 'Acesso negado: a turma informada pertence a uma unidade fora do seu escopo permitido.'
+        });
+      }
     }
 
     // Turma precisa estar no status "Não Iniciada" (representado por "EM_FORMACAO" ou nulo)
