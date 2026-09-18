@@ -5,6 +5,7 @@ import {
   requireAuth,
   requirePerfil,
   resolveInstituicaoId,
+  resolveContextoUsuario,
 } from '../../../../lib/auth-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -24,11 +25,23 @@ export default async function handler(req, res) {
     }
 
     const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
-    const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+
+    // ── FASE 6.2.3: Resolver contexto de escopo (Instituição × Unidade) ──────────
+    const ctx = await resolveContextoUsuario(req, authUser);
+
+    if (ctx.queryError) {
+      console.error('[admin-financeiro/ordens] Falha ao resolver contexto de escopo:', ctx.queryError);
+      return res.status(503).json({ message: 'Serviço temporariamente indisponível. Tente novamente.' });
+    }
+
+    const instituicaoId = ctx.legacyFallback
+      ? resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin })
+      : ctx.instituicaoId;
 
     if (!isGroupAdmin && !instituicaoId) {
       return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
     }
+    // ────────────────────────────────────────────────────────────────────────────
 
     // Buscar apenas ordens simples (tipo = 'ordem_simples')
     let query = supabase
@@ -36,6 +49,7 @@ export default async function handler(req, res) {
       .select(`
         id,
         aluno_id,
+        instituicao_id,
         tipo,
         descricao,
         referencia,
@@ -48,20 +62,88 @@ export default async function handler(req, res) {
         criado_por,
         created_at,
         updated_at,
-        alunos(nome, cpf, email, turmaid, cursoid, ano_letivo),
+        alunos(id, nome, cpf, email, turmaid, cursoid, ano_letivo, turmas(id, nome, unidadeid)),
         financeiro_parcelas!ordem_pagamento_id(id, numero_parcela, valor, data_vencimento, status, boleto_numero, boleto_url, efi_charge_id)
       `)
       .eq('tipo', 'ordem_simples')
       .order('created_at', { ascending: false });
 
-    query = applyInstituicaoFilter(query, instituicaoId);
+    if (!isGroupAdmin) {
+      query = applyInstituicaoFilter(query, instituicaoId);
+    } else if (req.query.instituicao_id) {
+      query = query.eq('instituicao_id', req.query.instituicao_id);
+    }
 
-    const { data: ordens, error: ordensError } = await query;
+    const { data: ordensData, error: ordensError } = await query;
 
     if (ordensError) throw ordensError;
 
+    const ordensCarregadas = ordensData || [];
+
+    // ── Resolução de Matrículas e Unidade em Lote (evita N+1 queries) ───────────
+    const alunoIdsCarregados = Array.from(
+      new Set(ordensCarregadas.map(o => o.aluno_id).filter(Boolean))
+    );
+
+    let matriculasPorAluno = {};
+    if (alunoIdsCarregados.length > 0) {
+      const { data: matriculasData } = await supabase
+        .from('matriculas')
+        .select(`
+          id,
+          aluno_id,
+          turma_id,
+          is_principal,
+          turmas (
+            id,
+            nome,
+            unidadeid
+          )
+        `)
+        .in('aluno_id', alunoIdsCarregados);
+
+      if (Array.isArray(matriculasData)) {
+        matriculasData.forEach(mat => {
+          if (!matriculasPorAluno[mat.aluno_id]) {
+            matriculasPorAluno[mat.aluno_id] = [];
+          }
+          matriculasPorAluno[mat.aluno_id].push(mat);
+        });
+      }
+    }
+
+    // Filtrar ordens por escopo de unidade (para Usuário Filial)
+    const ordensFiltradas = ordensCarregadas.filter(o => {
+      // Se for Matriz ou Grupo Admin ou Legado irrestrito (ctx.unidadesPermitidas === null)
+      if (ctx.unidadesPermitidas === null) {
+        return true;
+      }
+
+      // Descobrir unidade pela matrícula prioritária ou primeira matrícula
+      const mats = matriculasPorAluno[o.aluno_id] || [];
+      let matAlvo = mats.find(m => m.is_principal) || mats[0] || null;
+
+      let unidadeIdDoAluno = null;
+      if (matAlvo?.turmas) {
+        unidadeIdDoAluno = matAlvo.turmas.unidadeid != null ? Number(matAlvo.turmas.unidadeid) : null;
+      }
+
+      // Fallback para alunos.turmaid (legado)
+      if (unidadeIdDoAluno === null && o.alunos?.turmas) {
+        unidadeIdDoAluno = o.alunos.turmas.unidadeid != null ? Number(o.alunos.turmas.unidadeid) : null;
+      }
+
+      // Se possui unidade resolvida, deve pertencer a unidadesPermitidas
+      if (unidadeIdDoAluno !== null) {
+        return ctx.unidadesPermitidas.includes(unidadeIdDoAluno);
+      }
+
+      // Se não possui nenhuma unidade associada, permitir (dados legados incompletos)
+      return true;
+    });
+
     // Normalizar resposta
-    const ordensNormalizadas = (ordens || []).map(o => {
+    const ordensNormalizadas = ordensFiltradas.map(o => {
       const parcela = (o.financeiro_parcelas || [])[0] || {};
       return {
         ...o,
