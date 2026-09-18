@@ -2,7 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 import {
   requireAuth,
   requirePerfil,
-  hasPerfil,
+  applyInstituicaoFilter,
+  resolveContextoUsuario,
 } from '../../../lib/auth-server';
 
 const supabase = createClient(
@@ -10,7 +11,62 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const PERFIS_PERMITIDOS = ['grupo_admin', 'instituicao_admin', 'admin', 'financeiro', 'comercial', 'comercial_master', 'comercial_operador', 'recepcao'];
+const PERFIS_PERMITIDOS = [
+  'grupo_admin',
+  'instituicao_admin',
+  'admin',
+  'financeiro',
+  'comercial',
+  'comercial_master',
+  'comercial_operador',
+  'recepcao',
+];
+
+let cursoUnidadeSchemaCache = null;
+
+const isMissingColumnError = (error) => {
+  const message = String(error?.message || '').toLowerCase();
+  return error?.code === '42703' || message.includes('does not exist') || message.includes('could not find');
+};
+
+const isMissingTableError = (error) => {
+  const message = String(error?.message || '').toLowerCase();
+  return error?.code === '42P01' || message.includes('relation') || message.includes('does not exist');
+};
+
+const getCursoUnidadeSchema = async () => {
+  if (cursoUnidadeSchemaCache) {
+    return cursoUnidadeSchemaCache;
+  }
+
+  const candidates = [
+    { cursoCol: 'cursoid', unidadeCol: 'unidadeid' },
+    { cursoCol: 'curso_id', unidadeCol: 'unidade_id' },
+    { cursoCol: 'cursoId', unidadeCol: 'unidadeId' },
+  ];
+
+  for (const schema of candidates) {
+    const { error } = await supabase
+      .from('curso_unidade')
+      .select(`${schema.cursoCol},${schema.unidadeCol}`)
+      .limit(1);
+
+    if (!error) {
+      cursoUnidadeSchemaCache = schema;
+      return schema;
+    }
+
+    if (isMissingTableError(error)) {
+      return null;
+    }
+
+    if (!isMissingColumnError(error)) {
+      throw error;
+    }
+  }
+
+  return null;
+};
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Método não permitido' });
@@ -19,77 +75,73 @@ export default async function handler(req, res) {
   if (!authUser) return;
   if (!requirePerfil(authUser, res, PERFIS_PERMITIDOS)) return;
 
-  const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+  // ── 1. Resolução do Contexto Instituição × Unidade ───────────────────────────
+  const ctx = await resolveContextoUsuario(req, authUser);
+  if (ctx.queryError) {
+    return res.status(503).json({
+      error: 'Serviço temporariamente indisponível ao verificar permissões de acesso',
+      code: 'AUTH_CONTEXT_UNAVAILABLE',
+    });
+  }
 
-  // Resolve instituicao_id: query string tem prioridade, depois token
-  const queryInstId = req.query?.instituicao_id || req.query?.instituicaoId || null;
-  const tokenInstId = authUser.instituicao_id || authUser.instituicaoId || null;
-  // grupo_admin sem parâmetro vê todos; demais usam queryParam ou token
-  const instituicaoId = isGroupAdmin
-    ? (queryInstId || null)
-    : (queryInstId || tokenInstId || null);
+  const isGroupAdmin = authUser.perfil === 'grupo_admin' || authUser.is_superadmin;
+  const userInstituicaoId = ctx.instituicaoId;
 
-  // Buscar TODOS os cursos ativos (sem filtro no banco — filtramos em memória)
-  const { data: todosOsCursos, error } = await supabase
+  if (!isGroupAdmin && !userInstituicaoId) {
+    return res.status(403).json({ error: 'Instituição não definida para o usuário atual' });
+  }
+
+  // ── 2. Consulta base de cursos da instituição ────────────────────────────────
+  let query = supabase
     .from('cursos')
     .select('id, nome, nivelensino, grauconferido, cargahoraria, instituicao_id')
     .or('situacao.eq.ATIVO,situacao.is.null')
     .order('nome');
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (!isGroupAdmin) {
+    query = applyInstituicaoFilter(query, userInstituicaoId);
+  }
+
+  const { data: todosOsCursos, error: cursosError } = await query;
+  if (cursosError) return res.status(500).json({ error: cursosError.message });
 
   let resultado = todosOsCursos || [];
 
-  // Se não tiver filtro de instituição, retorna todos
-  if (!instituicaoId) {
-    return res.status(200).json(resultado);
-  }
-
-  // Filtra em memória: cursos da instituição OU sem vínculo (null)
-  const cursosDaInst = resultado.filter(c =>
-    String(c.instituicao_id) === String(instituicaoId) ||
-    c.instituicao_id === null ||
-    c.instituicao_id === undefined
-  );
-
-  // Fallback: se filtro retornar vazio por inconsistência de dados, mostra todos
-  resultado = cursosDaInst.length > 0 ? cursosDaInst : resultado;
-
-  // Verificar vínculos na tabela curso_unidade para refinar (opcional)
-  try {
-    const { data: unidades } = await supabase
-      .from('unidades')
-      .select('id')
-      .eq('instituicao_id', instituicaoId);
-
-    const unidadeIds = (unidades || []).map((u) => u.id);
-
-    if (unidadeIds.length > 0) {
-      let links = null;
-      for (const colPair of [
-        { c: 'cursoid', u: 'unidadeid' },
-        { c: 'curso_id', u: 'unidade_id' },
-        { c: 'cursoId', u: 'unidadeId' },
-      ]) {
-        const { data: l, error: errL } = await supabase
-          .from('curso_unidade')
-          .select(`${colPair.c},${colPair.u}`)
-          .in(colPair.u, unidadeIds);
-
-        if (!errL && l && l.length > 0) {
-          links = l.map((item) => Number(item[colPair.c]));
-          break;
-        }
-      }
-
-      // Somente aplicar filtro restritivo se existirem vínculos explícitos
-      if (links && links.length > 0) {
-        const permitidos = new Set(links);
-        resultado = resultado.filter((c) => permitidos.has(Number(c.id)));
-      }
+  // ── 3. Filtragem de Unidade para Filial (ctx.unidadesPermitidas !== null) ─────
+  if (ctx.unidadesPermitidas !== null) {
+    let schema = null;
+    try {
+      schema = await getCursoUnidadeSchema();
+    } catch (schemaErr) {
+      console.error('Erro ao detectar schema de curso_unidade:', schemaErr);
+      return res.status(500).json({
+        error: 'Erro ao validar vínculos de unidade para os cursos',
+      });
     }
-  } catch (e) {
-    console.error('Erro ao filtrar cursos por unidade:', e);
+
+    // Se não há tabela ou schema identificável para curso_unidade:
+    // Não ampliar escopo como fallback. Retornar array vazio de forma segura.
+    if (!schema) {
+      return res.status(200).json([]);
+    }
+
+    const { data: links, error: linksError } = await supabase
+      .from('curso_unidade')
+      .select(`${schema.cursoCol},${schema.unidadeCol}`)
+      .in(schema.unidadeCol, ctx.unidadesPermitidas);
+
+    if (linksError) {
+      console.error('Erro ao consultar vínculos de curso_unidade:', linksError);
+      return res.status(500).json({
+        error: 'Erro ao carregar cursos da unidade autorizada',
+      });
+    }
+
+    const cursosPermitidosIds = new Set(
+      (links || []).map((item) => Number(item[schema.cursoCol])).filter(Boolean)
+    );
+
+    resultado = resultado.filter((c) => cursosPermitidosIds.has(Number(c.id)));
   }
 
   return res.status(200).json(resultado);
