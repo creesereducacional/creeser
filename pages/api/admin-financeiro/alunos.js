@@ -5,6 +5,7 @@ import {
   requireAuth,
   requirePerfil,
   resolveInstituicaoId,
+  resolveContextoUsuario,
 } from '../../../lib/auth-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -24,11 +25,23 @@ export default async function handler(req, res) {
     }
 
     const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
-    const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+
+    // ── FASE 6.2.1: Resolver contexto de escopo (Instituição × Unidade) ──────────
+    const ctx = await resolveContextoUsuario(req, authUser);
+
+    if (ctx.queryError) {
+      console.error('[admin-financeiro/alunos] Falha ao resolver contexto de escopo:', ctx.queryError);
+      return res.status(503).json({ message: 'Serviço temporariamente indisponível. Tente novamente.' });
+    }
+
+    const instituicaoId = ctx.legacyFallback
+      ? resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin })
+      : ctx.instituicaoId;
 
     if (!isGroupAdmin && !instituicaoId) {
       return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
     }
+    // ────────────────────────────────────────────────────────────────────────────
 
     const { anoLetivo, unidadeId, cursoId, turmaId, status, search } = req.query;
 
@@ -74,6 +87,7 @@ export default async function handler(req, res) {
         ano_letivo,
         matricula,
         foto,
+        instituicao_id,
         cursos (
           id,
           nome
@@ -81,6 +95,7 @@ export default async function handler(req, res) {
         turmas (
           id,
           nome,
+          unidadeid,
           mesescontrato,
           desconto,
           unidades (
@@ -91,7 +106,11 @@ export default async function handler(req, res) {
       )
       .order('nome', { ascending: true });
 
-    alunosQuery = applyInstituicaoFilter(alunosQuery, instituicaoId);
+    if (!isGroupAdmin) {
+      alunosQuery = applyInstituicaoFilter(alunosQuery, instituicaoId);
+    } else if (req.query.instituicao_id) {
+      alunosQuery = alunosQuery.eq('instituicao_id', req.query.instituicao_id);
+    }
 
     // Aplicar filtros dinâmicos
     if (status && String(status).trim()) {
@@ -128,7 +147,84 @@ export default async function handler(req, res) {
       alunosQuery = alunosQuery.or(orFilter);
     }
 
-    const { data: alunos, error: alunosError } = await alunosQuery;
+    const { data: alunosData, error: alunosError } = await alunosQuery;
+
+    if (alunosError) throw alunosError;
+
+    const alunosCarregados = alunosData || [];
+    const alunoIdsCarregados = alunosCarregados.map(a => a.id).filter(Boolean);
+
+    // ── Resolução de Matrículas e Unidade em Lote (evita N+1 queries) ───────────
+    let matriculasPorAluno = {};
+    if (alunoIdsCarregados.length > 0) {
+      const { data: matriculasData } = await supabase
+        .from('matriculas')
+        .select(`
+          id,
+          aluno_id,
+          turma_id,
+          is_principal,
+          turmas (
+            id,
+            nome,
+            unidadeid,
+            unidades (
+              id,
+              nome
+            )
+          )
+        `)
+        .in('aluno_id', alunoIdsCarregados);
+
+      if (Array.isArray(matriculasData)) {
+        matriculasData.forEach(mat => {
+          if (!matriculasPorAluno[mat.aluno_id]) {
+            matriculasPorAluno[mat.aluno_id] = [];
+          }
+          matriculasPorAluno[mat.aluno_id].push(mat);
+        });
+      }
+    }
+
+    // Filtrar alunos conforme o escopo de unidade (para filial) e derivar unidade ativa
+    const alunos = alunosCarregados.filter(aluno => {
+      // 1. Prioriza matrícula (is_principal = true ou a primeira)
+      const mats = matriculasPorAluno[aluno.id] || [];
+      let matAlvo = mats.find(m => m.is_principal) || mats[0] || null;
+
+      let unidadeIdDoAluno = null;
+      let unidadeNomeDoAluno = null;
+
+      if (matAlvo?.turmas) {
+        unidadeIdDoAluno = matAlvo.turmas.unidadeid != null ? Number(matAlvo.turmas.unidadeid) : null;
+        unidadeNomeDoAluno = matAlvo.turmas.unidades?.nome || null;
+      }
+
+      // 2. Fallback para alunos.turmaid (legado)
+      if (unidadeIdDoAluno === null && aluno.turmas) {
+        unidadeIdDoAluno = aluno.turmas.unidadeid != null
+          ? Number(aluno.turmas.unidadeid)
+          : (aluno.turmas.unidades?.id != null ? Number(aluno.turmas.unidades.id) : null);
+        unidadeNomeDoAluno = aluno.turmas.unidades?.nome || null;
+      }
+
+      // Guardar referências enriquecidas no objeto do aluno
+      aluno._resolvidaUnidadeId = unidadeIdDoAluno;
+      aluno._resolvidaUnidadeNome = unidadeNomeDoAluno;
+
+      // Se for Matriz ou Grupo Admin ou Legado irrestrito (ctx.unidadesPermitidas === null)
+      if (ctx.unidadesPermitidas === null) {
+        return true;
+      }
+
+      // Se for Filial, somente permitir se a unidade estiver em ctx.unidadesPermitidas
+      if (unidadeIdDoAluno !== null) {
+        return ctx.unidadesPermitidas.includes(unidadeIdDoAluno);
+      }
+
+      // Se não possui nenhuma unidade associada, permitir (dados legados incompletos)
+      return true;
+    });
 
     if (alunosError) throw alunosError;
 
@@ -226,8 +322,8 @@ export default async function handler(req, res) {
         financeiro_aberto: resumoFinanceiro[a.id]?.aberto || 0,
         financeiro_atraso: resumoFinanceiro[a.id]?.atraso || 0,
         financeiro_pago: resumoFinanceiro[a.id]?.pago || 0,
-        unidade: unidadeObj.nome || '',
-        unidade_id: unidadeObj.id || null,
+        unidade: a._resolvidaUnidadeNome || unidadeObj.nome || '',
+        unidade_id: a._resolvidaUnidadeId || unidadeObj.id || null,
         curso: cursoObj.nome || '',
         turma: turmaObj.nome || '',
         ano_letivo_turma: a.ano_letivo || '',
