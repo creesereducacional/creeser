@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import {
   requireAuth,
   requirePerfil,
-  hasPerfil,
+  resolveContextoUsuario,
 } from '../../../lib/auth-server';
 
 const supabase = createClient(
@@ -19,7 +19,16 @@ export default async function handler(req, res) {
   if (!authUser) return;
   if (!requirePerfil(authUser, res, PERFIS_PERMITIDOS)) return;
 
-  const isGrupoAdmin = hasPerfil(authUser, ['grupo_admin']);
+  // ── 1. Resolução do Contexto Instituição × Unidade ───────────────────────────
+  const ctx = await resolveContextoUsuario(req, authUser);
+  if (ctx.queryError) {
+    return res.status(503).json({
+      error: 'Serviço temporariamente indisponível ao verificar permissões de acesso',
+      code: 'AUTH_CONTEXT_UNAVAILABLE',
+    });
+  }
+
+  const isGrupoAdmin = authUser.perfil === 'grupo_admin' || authUser.is_superadmin;
 
   if (isGrupoAdmin) {
     const { data, error } = await supabase
@@ -33,15 +42,17 @@ export default async function handler(req, res) {
     return res.status(200).json(data || []);
   }
 
-  // Usuário comum: retorna apenas sua própria instituição
-  if (!authUser.instituicao_id) return res.status(200).json([]);
+  // Usuário comum: retorna apenas sua própria instituição resolvida pelo contexto
+  const userInstituicaoId = ctx.instituicaoId;
+  if (!userInstituicaoId) return res.status(200).json([]);
 
   const { data, error } = await supabase
     .from('instituicoes')
     .select('id, nome, tipo_instituicao')
-    .eq('id', authUser.instituicao_id)
+    .eq('id', userInstituicaoId)
     .maybeSingle();
 
   if (error) return res.status(500).json({ error: error.message });
   return res.status(200).json(data ? [data] : []);
 }
+
