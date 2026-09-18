@@ -9,7 +9,7 @@ import {
   requireAuth,
   requirePerfil,
   hasPerfil,
-  resolveInstituicaoId,
+  resolveContextoUsuario,
 } from '../../../../lib/auth-server';
 
 const supabase = createClient(
@@ -28,29 +28,36 @@ const isMaster = (user) =>
 const isAdminLevel = (user) =>
   hasPerfil(user, ['grupo_admin', 'instituicao_admin', 'admin']);
 
-async function resolveOperador(operadorId, authUser) {
-  const { data, error } = await supabase
+async function resolveOperador(operadorId, authUser, ctx) {
+  const isGroupAdmin = authUser.perfil === 'grupo_admin' || authUser.is_superadmin;
+  const userInstituicaoId = ctx.instituicaoId;
+
+  let query = supabase
     .from('usuarios')
     .select(CAMPOS_SEGUROS)
     .eq('id', operadorId)
-    .eq('perfil', 'comercial_operador')
-    .maybeSingle();
+    .eq('perfil', 'comercial_operador');
+
+  // Isolamento institucional rigoroso pelo contexto
+  if (!isGroupAdmin) {
+    if (!userInstituicaoId) {
+      return { operador: null, erro: 'Instituição não definida para o usuário atual.' };
+    }
+    query = query.eq('instituicao_id', userInstituicaoId);
+  }
+
+  const { data, error } = await query.maybeSingle();
 
   if (error) return { operador: null, erro: error.message };
   if (!data)  return { operador: null, erro: 'Operador não encontrado.' };
 
-  // Verificar ownership
+  // Verificar ownership para comercial master
   if (isMaster(authUser) && data.comercial_master_id !== Number(authUser.id)) {
     return { operador: null, erro: 'Acesso negado: este operador pertence a outro master.' };
   }
 
   if (!isAdminLevel(authUser) && !isMaster(authUser)) {
     return { operador: null, erro: 'Acesso negado.' };
-  }
-
-  // Isolamento multi-tenant para admin
-  if (!hasPerfil(authUser, ['grupo_admin']) && authUser.instituicao_id && data.instituicao_id !== authUser.instituicao_id) {
-    return { operador: null, erro: 'Acesso negado: instituição diferente.' };
   }
 
   return { operador: data, erro: null };
@@ -71,12 +78,28 @@ export default async function handler(req, res) {
   const operadorId = Number(id);
   if (isNaN(operadorId)) return res.status(400).json({ error: 'ID inválido.' });
 
+  // ── 1. Resolução do Contexto Instituição × Unidade ───────────────────────────
+  const ctx = await resolveContextoUsuario(req, authUser);
+  if (ctx.queryError) {
+    return res.status(503).json({
+      error: 'Serviço temporariamente indisponível ao verificar permissões de acesso',
+      code: 'AUTH_CONTEXT_UNAVAILABLE',
+    });
+  }
+
+  const isGroupAdmin = authUser.perfil === 'grupo_admin' || authUser.is_superadmin;
+  const userInstituicaoId = ctx.instituicaoId;
+
+  if (!isGroupAdmin && !userInstituicaoId) {
+    return res.status(403).json({ error: 'Instituição não definida para o usuário atual' });
+  }
+
   // ── PATCH: atualizar operador ─────────────────────────────────────────────
   if (req.method === 'PATCH') {
-    const { operador, erro } = await resolveOperador(operadorId, authUser);
+    const { operador, erro } = await resolveOperador(operadorId, authUser, ctx);
     if (erro) return res.status(operador === null ? 404 : 403).json({ error: erro });
 
-    const { nomeCompleto, email, whatsapp, status, nova_senha } = req.body || {};
+    const { nomeCompleto, email, whatsapp, status, nova_senha, comercial_master_id } = req.body || {};
 
     const updates = {};
     if (nomeCompleto) updates.nomecompleto = String(nomeCompleto).trim();
@@ -84,6 +107,34 @@ export default async function handler(req, res) {
     if (whatsapp !== undefined) updates.whatsapp = whatsapp ? String(whatsapp).trim() : null;
     if (status && ['ativo', 'inativo'].includes(status)) updates.status = status;
     if (nova_senha)   updates.senha = String(nova_senha);
+
+    // Validação de comercial_master_id se enviado
+    if (comercial_master_id !== undefined) {
+      if (isMaster(authUser)) {
+        // Comercial master não pode transferir operador para outro líder
+        if (Number(comercial_master_id) !== Number(authUser.id)) {
+          return res.status(403).json({ error: 'Acesso negado: você não pode transferir operadores para outro master.' });
+        }
+      } else if (isAdminLevel(authUser)) {
+        // Admin pode alterar, mas deve validar se o novo master pertence à mesma instituição
+        const novoMasterId = Number(comercial_master_id);
+        const { data: masterCheck } = await supabase
+          .from('usuarios')
+          .select('id, instituicao_id, perfil')
+          .eq('id', novoMasterId)
+          .maybeSingle();
+
+        if (!masterCheck) {
+          return res.status(400).json({ error: 'Líder comercial master informado não encontrado.' });
+        }
+
+        if (!isGroupAdmin && masterCheck.instituicao_id && String(masterCheck.instituicao_id) !== String(userInstituicaoId)) {
+          return res.status(403).json({ error: 'O líder comercial indicado pertence a outra instituição.' });
+        }
+
+        updates.comercial_master_id = novoMasterId;
+      }
+    }
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'Nenhum campo para atualizar.' });
@@ -109,8 +160,8 @@ export default async function handler(req, res) {
 
   // ── DELETE: desativar operador (soft delete) ──────────────────────────────
   if (req.method === 'DELETE') {
-    const { operador, erro } = await resolveOperador(operadorId, authUser);
-    if (erro) return res.status(404).json({ error: erro });
+    const { operador, erro } = await resolveOperador(operadorId, authUser, ctx);
+    if (erro) return res.status(operador === null ? 404 : 403).json({ error: erro });
 
     const { data, error } = await supabase
       .from('usuarios')
