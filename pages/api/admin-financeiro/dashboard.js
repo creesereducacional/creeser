@@ -5,6 +5,7 @@ import {
   requireAuth,
   requirePerfil,
   resolveInstituicaoId,
+  resolveContextoUsuario,
 } from '../../../lib/auth-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -33,142 +34,208 @@ export default async function handler(req, res) {
     }
 
     const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
-    const instituicaoId = resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin });
+
+    // ── FASE 6.2.5: Resolver contexto de escopo (Instituição × Unidade) ──────────
+    const ctx = await resolveContextoUsuario(req, authUser);
+
+    if (ctx.queryError) {
+      console.error('[admin-financeiro/dashboard] Falha ao resolver contexto de escopo:', ctx.queryError);
+      return res.status(503).json({
+        message: 'Serviço temporariamente indisponível para resolução de contexto do usuário',
+        error: ctx.queryError.message,
+      });
+    }
+
+    const instituicaoId = ctx.instituicaoId || (ctx.legacyFallback ? resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin }) : null);
 
     if (!isGroupAdmin && !instituicaoId) {
       return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
     }
+    // ────────────────────────────────────────────────────────────────────────────
 
-    // 1. Total de alunos com pendências
-    let parcelasPendentesQuery = supabase
+    // 1. Buscar todas as parcelas da instituição (tabela base de métricas de recebimento e pendência)
+    let parcelasQuery = supabase
       .from('financeiro_parcelas')
-      .select('aluno_id, valor')
-      .eq('status', 'pendente');
+      .select('id, aluno_id, ordem_pagamento_id, valor, status, data_vencimento');
 
-    parcelasPendentesQuery = applyInstituicaoFilter(parcelasPendentesQuery, instituicaoId);
-    const { data: parcelasPendentes } = await parcelasPendentesQuery;
+    if (!isGroupAdmin) {
+      parcelasQuery = applyInstituicaoFilter(parcelasQuery, instituicaoId);
+    }
+    const { data: todasParcelas, error: parcelasErr } = await parcelasQuery;
+    if (parcelasErr) throw parcelasErr;
 
-    const alunosComPendencias = new Set((parcelasPendentes || []).map(p => p.aluno_id)).size;
-    const totalReceber = (parcelasPendentes || []).reduce((acc, p) => acc + (Number(p.valor) || 0), 0);
-
-    // 2. Boletos vencidos
-    const hoje = new Date().toISOString().split('T')[0];
-    let parcelasVencidasQuery = supabase
-      .from('financeiro_parcelas')
-      .select('id, valor')
-      .eq('status', 'pendente')
-      .lt('data_vencimento', hoje);
-
-    parcelasVencidasQuery = applyInstituicaoFilter(parcelasVencidasQuery, instituicaoId);
-    const { data: parcelasVencidas } = await parcelasVencidasQuery;
-
-    const qtdBoletosVencidos = (parcelasVencidas || []).length;
-    const valorVencido = (parcelasVencidas || []).reduce((acc, p) => {
-      return acc + (Number(p.valor) || 0);
-    }, 0);
-
-    // 4. Total de ordens (ordem_simples)
+    // 2. Buscar ordens de pagamento da instituição (ordem_simples e carne)
     let ordensQuery = supabase
       .from('financeiro_ordens_pagamento')
-      .select('id, valor_total')
-      .eq('tipo', 'ordem_simples');
+      .select('id, aluno_id, tipo, status, valor_total');
 
-    ordensQuery = applyInstituicaoFilter(ordensQuery, instituicaoId);
-    const { data: ordens } = await ordensQuery;
+    if (!isGroupAdmin) {
+      ordensQuery = applyInstituicaoFilter(ordensQuery, instituicaoId);
+    }
+    const { data: todasOrdens, error: ordensErr } = await ordensQuery;
+    if (ordensErr) throw ordensErr;
 
-    // 5. Total de carnês (carne)
-    let carnesQuery = supabase
-      .from('financeiro_ordens_pagamento')
-      .select('id, valor_total')
-      .eq('tipo', 'carne');
+    // 3. Mapear unidade por aluno para usuários de Filial
+    const unidadesPermitidasSet = ctx.unidadesPermitidas
+      ? new Set(ctx.unidadesPermitidas.map(String))
+      : null;
 
-    carnesQuery = applyInstituicaoFilter(carnesQuery, instituicaoId);
-    const { data: carnes } = await carnesQuery;
+    let alunoUnidadeMap = new Map();
+    let alunoDadosMap = new Map();
 
-    // 6. Parcelas pagas (para calcular taxa de recebimento)
-    let parcelasPagasQuery = supabase
-      .from('financeiro_parcelas')
-      .select('id, valor')
-      .eq('status', 'pago');
+    // Coletar todos os aluno_ids presentes nas parcelas e ordens carregadas
+    const todosAlunoIds = Array.from(
+      new Set([
+        ...(todasParcelas || []).map(p => p.aluno_id),
+        ...(todasOrdens || []).map(o => o.aluno_id),
+      ].filter(Boolean))
+    );
 
-    parcelasPagasQuery = applyInstituicaoFilter(parcelasPagasQuery, instituicaoId);
-    const { data: parcelasPagas } = await parcelasPagasQuery;
+    if (todosAlunoIds.length > 0) {
+      // Buscar dados cadastrais dos alunos envolvidos
+      const { data: alunosData } = await supabase
+        .from('alunos')
+        .select(`
+          id,
+          nome,
+          matricula,
+          turmaid,
+          cursos(nome),
+          turmas(id, nome, unidadeid)
+        `)
+        .in('id', todosAlunoIds);
 
-    const totalRecebido = (parcelasPagas || []).reduce((acc, p) => {
-      return acc + (Number(p.valor) || 0);
-    }, 0);
+      if (alunosData) {
+        alunosData.forEach(a => alunoDadosMap.set(a.id, a));
+      }
 
-    // 7. Total de todas as parcelas (para calcular taxa)
-    let todasParcQuery = supabase
-      .from('financeiro_parcelas')
-      .select('id, valor');
+      // Se for usuário de filial, buscar matrículas para mapear unidade precisa
+      if (unidadesPermitidasSet) {
+        const { data: matriculasData } = await supabase
+          .from('matriculas')
+          .select(`
+            id,
+            aluno_id,
+            turma_id,
+            is_principal,
+            turmas(id, unidadeid)
+          `)
+          .in('aluno_id', todosAlunoIds);
 
-    todasParcQuery = applyInstituicaoFilter(todasParcQuery, instituicaoId);
-    const { data: todasParc } = await todasParcQuery;
+        if (matriculasData) {
+          const matsSorted = [...matriculasData].sort((a, b) => {
+            if (a.is_principal && !b.is_principal) return -1;
+            if (!a.is_principal && b.is_principal) return 1;
+            return 0;
+          });
 
-    const totalGerado = (todasParc || []).reduce((acc, p) => {
-      return acc + (Number(p.valor) || 0);
-    }, 0);
+          for (const m of matsSorted) {
+            if (!alunoUnidadeMap.has(m.aluno_id)) {
+              const uid = m.turmas?.unidadeid != null ? String(m.turmas.unidadeid) : null;
+              if (uid) alunoUnidadeMap.set(m.aluno_id, uid);
+            }
+          }
+        }
+      }
+    }
 
+    // Função de verificação de pertinência ao escopo de filial
+    const alunoPertenceAoEscopo = (alunoId) => {
+      if (!unidadesPermitidasSet) return true; // Matriz ou Grupo Admin
+      if (!alunoId) return true; // Preserva registros legados sem aluno
+
+      let uid = alunoUnidadeMap.get(alunoId);
+      if (!uid) {
+        const aluno = alunoDadosMap.get(alunoId);
+        if (aluno?.turmas?.unidadeid != null) {
+          uid = String(aluno.turmas.unidadeid);
+        }
+      }
+
+      if (!uid) return true; // Preserva registros legados sem unidade definida
+      return unidadesPermitidasSet.has(uid);
+    };
+
+    // 4. Filtrar parcelas pelo escopo do usuário
+    const parcelasFiltradas = (todasParcelas || []).filter(p => alunoPertenceAoEscopo(p.aluno_id));
+
+    // 5. Filtrar ordens pelo escopo do usuário
+    const ordensFiltradas = (todasOrdens || []).filter(o => alunoPertenceAoEscopo(o.aluno_id));
+
+    // ── Métricas de Parcelas e Recebimento ──────────────────────────────────────
+    const hojeStr = new Date().toISOString().split('T')[0];
+
+    // Parcelas pendentes
+    const parcelasPendentes = parcelasFiltradas.filter(p => p.status === 'pendente');
+    const alunosComPendencias = new Set(parcelasPendentes.map(p => p.aluno_id).filter(Boolean)).size;
+    const totalReceber = parcelasPendentes.reduce((acc, p) => acc + (Number(p.valor) || 0), 0);
+
+    // Boletos vencidos (pendente e vencimento < hoje)
+    const parcelasVencidas = parcelasPendentes.filter(p => p.data_vencimento && p.data_vencimento < hojeStr);
+    const qtdBoletosVencidos = parcelasVencidas.length;
+    const valorVencido = parcelasVencidas.reduce((acc, p) => acc + (Number(p.valor) || 0), 0);
+
+    // Parcelas pagas
+    const parcelasPagas = parcelasFiltradas.filter(p => p.status === 'pago');
+    const totalRecebido = parcelasPagas.reduce((acc, p) => acc + (Number(p.valor) || 0), 0);
+
+    // Total gerado (todas as parcelas no escopo)
+    const totalGerado = parcelasFiltradas.reduce((acc, p) => acc + (Number(p.valor) || 0), 0);
     const taxaRecebimento = totalGerado > 0 ? ((totalRecebido / totalGerado) * 100).toFixed(1) : 0;
 
-    // Buscar carnês ativos para calcular carnês a vencer
-    let carnesAtivosQuery = supabase
-      .from('financeiro_ordens_pagamento')
-      .select('id, aluno_id, alunos(id, nome, matricula, cursos(nome), turmas(nome))')
-      .eq('tipo', 'carne')
-      .eq('status', 'ativo');
+    // ── Métricas de Ordens e Carnês ───────────────────────────────────────────
+    const ordensSimples = ordensFiltradas.filter(o => o.tipo === 'ordem_simples');
+    const carnes = ordensFiltradas.filter(o => o.tipo === 'carne');
 
-    carnesAtivosQuery = applyInstituicaoFilter(carnesAtivosQuery, instituicaoId);
-    const { data: carnesList } = await carnesAtivosQuery;
+    const totalOrdens = ordensSimples.length;
+    const valorTotalOrdens = ordensSimples.reduce((acc, o) => acc + (Number(o.valor_total) || 0), 0);
 
-    const carneIds = (carnesList || []).map(c => c.id);
-    let parcelasCarne = [];
-    if (carneIds.length > 0) {
-      const { data: parcs } = await supabase
-        .from('financeiro_parcelas')
-        .select('id, ordem_pagamento_id, status, data_vencimento, valor')
-        .in('ordem_pagamento_id', carneIds);
-      if (parcs) parcelasCarne = parcs;
+    const totalCarnes = carnes.length;
+    const valorTotalCarnes = carnes.reduce((acc, c) => acc + (Number(c.valor_total) || 0), 0);
+
+    // ── Carnês a Vencer (carnês ativos com exatamente 1 parcela restante) ──────
+    const carnesAtivos = carnes.filter(c => c.status === 'ativo');
+    const parcelasPorOrdem = new Map();
+    for (const p of parcelasFiltradas) {
+      if (p.ordem_pagamento_id) {
+        if (!parcelasPorOrdem.has(p.ordem_pagamento_id)) {
+          parcelasPorOrdem.set(p.ordem_pagamento_id, []);
+        }
+        parcelasPorOrdem.get(p.ordem_pagamento_id).push(p);
+      }
     }
 
     const carnesAVencerList = [];
-    for (const c of (carnesList || [])) {
-      const parcs = parcelasCarne.filter(p => p.ordem_pagamento_id === c.id);
+    for (const c of carnesAtivos) {
+      const parcs = parcelasPorOrdem.get(c.id) || [];
       const restantes = parcs.filter(p => p.status !== 'pago' && p.status !== 'cancelado');
       if (restantes.length === 1) {
         const unica = restantes[0];
+        const aluno = alunoDadosMap.get(c.aluno_id);
         carnesAVencerList.push({
           carne_id: c.id,
           aluno_id: c.aluno_id,
-          aluno_nome: c.alunos?.nome || 'Sem nome',
-          aluno_matricula: c.alunos?.matricula || '',
-          curso: c.alunos?.cursos?.nome || '',
-          turma: c.alunos?.turmas?.nome || '',
+          aluno_nome: aluno?.nome || 'Sem nome',
+          aluno_matricula: aluno?.matricula || '',
+          curso: aluno?.cursos?.nome || '',
+          turma: aluno?.turmas?.nome || '',
           valor_restante: Number(unica.valor) || 0,
           data_vencimento: unica.data_vencimento,
         });
       }
     }
 
-    // Buscar detalhamento de alunos inadimplentes (valor em atraso)
-    let parcelasAtrasoQuery = supabase
-      .from('financeiro_parcelas')
-      .select('valor, status, data_vencimento, aluno_id, alunos(id, nome, matricula, cursos(nome), turmas(nome))');
-
-    parcelasAtrasoQuery = applyInstituicaoFilter(parcelasAtrasoQuery, instituicaoId);
-    const { data: todasParcelasAtraso } = await parcelasAtrasoQuery;
-
-    const hojeStr = new Date().toISOString().split('T')[0];
-    const parcelasAtrasadas = (todasParcelasAtraso || []).filter(p => {
-      const isVencido = p.status === 'vencido' || (p.status === 'pendente' && p.data_vencimento < hojeStr);
-      return isVencido;
+    // ── Alunos em Atraso (detalhamento de inadimplentes) ───────────────────────
+    const parcelasAtrasadas = parcelasFiltradas.filter(p => {
+      return p.status === 'vencido' || (p.status === 'pendente' && p.data_vencimento && p.data_vencimento < hojeStr);
     });
 
     const inadimplentesMap = {};
     for (const p of parcelasAtrasadas) {
-      const aluno = p.alunos;
+      if (!p.aluno_id) continue;
+      const aluno = alunoDadosMap.get(p.aluno_id);
       if (!aluno) continue;
+
       if (!inadimplentesMap[aluno.id]) {
         inadimplentesMap[aluno.id] = {
           aluno_id: aluno.id,
@@ -186,7 +253,7 @@ export default async function handler(req, res) {
 
     const inadimplentesList = Object.values(inadimplentesMap).sort((a, b) => b.valor_em_atraso - a.valor_em_atraso);
 
-    // Montar resposta
+    // ── Montar resposta mantendo estritamente o contrato atual ────────────────
     const dados = {
       // EDUCACIONAL
       totalAlunosComPendencias: alunosComPendencias,
@@ -198,10 +265,10 @@ export default async function handler(req, res) {
       valorVencido: valorVencido,
       
       // ORDENS E CARNÊS
-      totalOrdens: (ordens || []).length,
-      valorTotalOrdens: (ordens || []).reduce((acc, o) => acc + (Number(o.valor_total) || 0), 0),
-      totalCarnes: (carnes || []).length,
-      valorTotalCarnes: (carnes || []).reduce((acc, c) => acc + (Number(c.valor_total) || 0), 0),
+      totalOrdens: totalOrdens,
+      valorTotalOrdens: valorTotalOrdens,
+      totalCarnes: totalCarnes,
+      valorTotalCarnes: valorTotalCarnes,
       
       // RECEBIMENTO
       totalRecebido: totalRecebido,
@@ -217,15 +284,16 @@ export default async function handler(req, res) {
       faturasPendentes: alunosComPendencias,
       receita30dias: totalReceber,
       mrr: totalReceber,
-      arpu: alunosComPendencias > 0 ? (totalReceber / alunosComPendencias).toFixed(2) : 0
+      arpu: alunosComPendencias > 0 ? (totalReceber / alunosComPendencias).toFixed(2) : 0,
     };
 
-    res.status(200).json(withLowercaseKeys(dados));
+    return res.status(200).json(withLowercaseKeys(dados));
   } catch (error) {
     console.error('Erro ao calcular dashboard:', error);
-    res.status(500).json({ 
+    return res.status(500).json({ 
       message: 'Erro ao calcular dashboard',
-      error: error.message 
+      error: error.message,
     });
   }
 }
+
