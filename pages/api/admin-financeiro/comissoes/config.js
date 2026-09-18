@@ -4,6 +4,7 @@ import {
   requirePerfil,
   hasPerfil,
   resolveInstituicaoId,
+  resolveContextoUsuario,
 } from '../../../../lib/auth-server';
 
 const supabase = createClient(
@@ -18,8 +19,26 @@ export default async function handler(req, res) {
   if (!authUser) return;
   if (!requirePerfil(authUser, res, PERFIS)) return;
 
-  const isGroupAdmin  = hasPerfil(authUser, ['grupo_admin']);
-  const instituicaoId = req.query.instituicao_id || resolveInstituicaoId(req, authUser);
+  const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+
+  // ── FASE 6.1.9: Resolver contexto de escopo institucional ───────────────────
+  const ctx = await resolveContextoUsuario(req, authUser);
+
+  if (ctx.queryError) {
+    console.error('[comissoes/config] Falha ao resolver contexto de escopo:', ctx.queryError);
+    return res.status(503).json({ message: 'Serviço temporariamente indisponível. Tente novamente.' });
+  }
+
+  // A tabela comissoes_config é exclusivamente institucional (UNIQUE por instituicao_id).
+  // Não há conceito de unidade_id na tabela comissoes_config.
+  const userInstituicaoId = ctx.legacyFallback
+    ? resolveInstituicaoId(req, authUser, { allowAll: isGroupAdmin })
+    : ctx.instituicaoId;
+
+  const instituicaoId = isGroupAdmin
+    ? (req.query.instituicao_id || req.body?.instituicao_id || userInstituicaoId)
+    : userInstituicaoId;
+  // ────────────────────────────────────────────────────────────────────────────
 
   // ── GET ──────────────────────────────────────────────────────────────────
   if (req.method === 'GET') {
@@ -45,7 +64,15 @@ export default async function handler(req, res) {
   // ── PUT ──────────────────────────────────────────────────────────────────
   if (req.method === 'PUT') {
     const { modo, percentual, valor_fixo, ativo, instituicao_id: bodyInstId } = req.body || {};
-    const instId = bodyInstId || instituicaoId;
+
+    // Validar instituição do servidor: usuários que não sejam grupo_admin não podem alterar outra instituição
+    if (!isGroupAdmin) {
+      if (bodyInstId && userInstituicaoId && bodyInstId !== userInstituicaoId) {
+        return res.status(403).json({ message: 'Acesso negado: não é permitido alterar configuração de outra instituição' });
+      }
+    }
+
+    const instId = isGroupAdmin ? (bodyInstId || instituicaoId) : userInstituicaoId;
 
     if (!instId) {
       return res.status(400).json({ message: 'instituicao_id é obrigatório' });
