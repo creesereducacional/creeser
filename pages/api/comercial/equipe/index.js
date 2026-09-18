@@ -10,8 +10,8 @@ import {
   requireAuth,
   requirePerfil,
   hasPerfil,
-  resolveInstituicaoId,
   applyInstituicaoFilter,
+  resolveContextoUsuario,
 } from '../../../../lib/auth-server';
 
 const supabase = createClient(
@@ -42,7 +42,21 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Acesso negado: operadores não gerenciam equipe.' });
   }
 
-  const instituicaoId = resolveInstituicaoId(req, authUser);
+  // ── 1. Resolução do Contexto Instituição × Unidade ───────────────────────────
+  const ctx = await resolveContextoUsuario(req, authUser);
+  if (ctx.queryError) {
+    return res.status(503).json({
+      error: 'Serviço temporariamente indisponível ao verificar permissões de acesso',
+      code: 'AUTH_CONTEXT_UNAVAILABLE',
+    });
+  }
+
+  const isGroupAdmin = authUser.perfil === 'grupo_admin' || authUser.is_superadmin;
+  const userInstituicaoId = ctx.instituicaoId;
+
+  if (!isGroupAdmin && !userInstituicaoId) {
+    return res.status(403).json({ error: 'Instituição não definida para o usuário atual' });
+  }
 
   // ── GET: listar operadores ────────────────────────────────────────────────
   if (req.method === 'GET') {
@@ -52,11 +66,12 @@ export default async function handler(req, res) {
       .eq('perfil', 'comercial_operador')
       .order('nomecompleto');
 
-    if (isAdminLevel(authUser)) {
-      // Admin/grupo_admin vê todos os operadores da instituição
-      query = applyInstituicaoFilter(query, instituicaoId);
-    } else {
-      // Master vê apenas seus operadores
+    if (!isGroupAdmin) {
+      query = applyInstituicaoFilter(query, userInstituicaoId);
+    }
+
+    if (!isAdminLevel(authUser)) {
+      // Master vê apenas seus próprios operadores subordinados
       query = query.eq('comercial_master_id', Number(authUser.id));
     }
 
@@ -91,19 +106,30 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Senha inicial é obrigatória.' });
     }
 
-    // Instituição: herda do master ou da seleção do admin
-    const instId = isMaster(authUser)
-      ? authUser.instituicao_id
-      : (resolveInstituicaoId(req, authUser) || authUser.instituicao_id);
+    // Instituição: derivada estritamente do contexto autenticado
+    const instIdFinal = userInstituicaoId;
 
-    if (!instId) {
+    if (!instIdFinal) {
       return res.status(422).json({ error: 'Instituição não definida. Não é possível criar operador.' });
     }
 
-    // Master ID: o próprio master ou o que o admin especificar
-    const masterIdFinal = isMaster(authUser)
-      ? Number(authUser.id)
-      : (req.body?.comercial_master_id ? Number(req.body.comercial_master_id) : Number(authUser.id));
+    // Master ID:
+    // Se for master, o operador subordinado é obrigatoriamente atribuído a ele mesmo.
+    // Se for admin, pode especificar comercial_master_id ou associar ao próprio admin.
+    let masterIdFinal = Number(authUser.id);
+    if (!isMaster(authUser) && req.body?.comercial_master_id) {
+      const candidatoMasterId = Number(req.body.comercial_master_id);
+      // Validar se o comercial_master indicado pertence à mesma instituição
+      const { data: masterCheck } = await supabase
+        .from('usuarios')
+        .select('id, instituicao_id, perfil')
+        .eq('id', candidatoMasterId)
+        .maybeSingle();
+
+      if (masterCheck && (!masterCheck.instituicao_id || String(masterCheck.instituicao_id) === String(instIdFinal))) {
+        masterIdFinal = candidatoMasterId;
+      }
+    }
 
     const { data, error } = await supabase
       .from('usuarios')
@@ -115,7 +141,7 @@ export default async function handler(req, res) {
         tipo:                  'comercial',
         perfil:                'comercial_operador',
         status:                'ativo',
-        instituicao_id:        instId,
+        instituicao_id:        instIdFinal,
         comercial_master_id:   masterIdFinal,
         criado_por_id:         Number(authUser.id),
       })
