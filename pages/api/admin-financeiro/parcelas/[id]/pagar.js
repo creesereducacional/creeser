@@ -3,6 +3,8 @@ import {
   hasPerfil,
   requireAuth,
   requirePerfil,
+  resolveInstituicaoId,
+  resolveContextoUsuario,
 } from '../../../../../lib/auth-server';
 import { tentarCriarComissao } from '../../../../../lib/comissoes-helper';
 import { verificarEProcessarPagamentoEntrada } from '../../../../../lib/acordos-helper';
@@ -45,6 +47,20 @@ export default async function handler(req, res) {
   if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'financeiro'])) return;
 
   const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+
+  // ── FASE 6.1.1: Resolver contexto de escopo (Instituição × Unidade) ──────────
+  const ctx = await resolveContextoUsuario(req, authUser);
+
+  if (ctx.queryError) {
+    console.error('[pagar] Falha ao resolver contexto de escopo:', ctx.queryError);
+    return res.status(503).json({ message: 'Serviço temporariamente indisponível. Tente novamente.' });
+  }
+
+  const userInstituicaoId = ctx.legacyFallback
+    ? resolveInstituicaoId(req, authUser)
+    : ctx.instituicaoId;
+  // ────────────────────────────────────────────────────────────────────────────
+
   const { id } = req.query;
 
   if (!id) {
@@ -105,14 +121,61 @@ export default async function handler(req, res) {
     return res.status(404).json({ message: 'Parcela não encontrada' });
   }
 
-  // ── Isolamento multi-tenant ────────────────────────────────────────────────
+  // ── Isolamento multi-tenant (Instituição) ───────────────────────────────────
   if (!isGroupAdmin) {
-    const tokenInstituicao = authUser.instituicao_id || authUser.instituicaoId || null;
     const parcelaInstituicao = parcela.instituicao_id || null;
-    if (tokenInstituicao && parcelaInstituicao && tokenInstituicao !== parcelaInstituicao) {
+    if (userInstituicaoId && parcelaInstituicao && userInstituicaoId !== parcelaInstituicao) {
       return res.status(403).json({ message: 'Acesso negado: parcela pertence a outra instituição' });
     }
   }
+
+  // ── FASE 6.1.1: Validação de Escopo de Unidade (para Usuário Filial) ────────
+  // Se o usuário estiver restrito a uma filial (ctx.unidadesPermitidas !== null),
+  // descobre a unidade real da parcela via aluno -> matriculas / turmas.
+  if (ctx.unidadesPermitidas !== null && parcela.aluno_id) {
+    let unidadeParcelaId = null;
+
+    // 1. Tenta identificar via matrícula(s) do aluno
+    const { data: matriculasAluno } = await supabase
+      .from('matriculas')
+      .select('turma_id, is_principal')
+      .eq('aluno_id', parcela.aluno_id);
+
+    const matriculaAlvo = Array.isArray(matriculasAluno) && matriculasAluno.length > 0
+      ? (matriculasAluno.find(m => m.is_principal) || matriculasAluno[0])
+      : null;
+
+    let turmaIdResolvida = matriculaAlvo?.turma_id || null;
+
+    // 2. Fallback: se não encontrou em matriculas, busca diretamente em alunos.turmaid
+    if (!turmaIdResolvida) {
+      const { data: alunoDado } = await supabase
+        .from('alunos')
+        .select('turmaid')
+        .eq('id', parcela.aluno_id)
+        .maybeSingle();
+      turmaIdResolvida = alunoDado?.turmaid || null;
+    }
+
+    // 3. Obter a unidade da turma identificada
+    if (turmaIdResolvida) {
+      const { data: turmaDado } = await supabase
+        .from('turmas')
+        .select('id, unidadeid')
+        .eq('id', turmaIdResolvida)
+        .maybeSingle();
+
+      unidadeParcelaId = turmaDado?.unidadeid != null ? Number(turmaDado.unidadeid) : null;
+    }
+
+    // Se a unidade for identificada e não estiver nas unidades permitidas para o usuário filial:
+    if (unidadeParcelaId !== null && !ctx.unidadesPermitidas.includes(unidadeParcelaId)) {
+      return res.status(403).json({
+        message: 'Acesso negado: esta parcela pertence a uma unidade fora do escopo permitido para o seu usuário.',
+      });
+    }
+  }
+  // ────────────────────────────────────────────────────────────────────────────
 
   // ── Validação de estado ────────────────────────────────────────────────────
   if (parcela.status === 'pago') {
