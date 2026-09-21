@@ -176,36 +176,82 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Acesso negado: Perfil de acesso não permitido para o seu cargo.' });
     }
 
-    // Validação de Instituição:
-    // grupo_admin pode escolher qualquer instituição.
-    // instituicao_admin está ESTRITAMENTE restrito à sua própria instituição.
-    let finalInstId = instId || null;
-    if (isGroupAdmin && bodyInstId) {
-      finalInstId = bodyInstId;
-    } else if (!isGroupAdmin) {
-      finalInstId = authUser.instituicao_id || authUser.instituicaoId || instId;
+    // Resolução dos vínculos institucionais (suporta múltiplos vínculos via bodyVinculos ou fallback único)
+    let vinculosParaProcessar = [];
+    if (Array.isArray(bodyVinculos) && bodyVinculos.length > 0) {
+      vinculosParaProcessar = bodyVinculos;
+    } else if (bodyInstId || instId || (!isGroupAdmin && (authUser.instituicao_id || authUser.instituicaoId))) {
+      vinculosParaProcessar = [{
+        instituicao_id: bodyInstId || instId || authUser.instituicao_id || authUser.instituicaoId,
+        unidade_id: bodyUnidadeId != null && bodyUnidadeId !== '' ? Number(bodyUnidadeId) : null,
+      }];
     }
 
-    if (!finalInstId) {
-      return res.status(400).json({ error: 'Instituição é obrigatória para criar usuário.' });
+    if (vinculosParaProcessar.length === 0) {
+      return res.status(400).json({ error: 'Instituição é obrigatória para criar usuário. Adicione ao menos um vínculo.' });
     }
 
-    // Validação da Unidade (se informada)
-    const unidadeIdNum = bodyUnidadeId != null && bodyUnidadeId !== '' ? Number(bodyUnidadeId) : null;
-    if (unidadeIdNum !== null) {
-      const { data: unidadeCheck, error: errUnidadeCheck } = await supabase
-        .from('unidades')
-        .select('id, instituicao_id')
-        .eq('id', unidadeIdNum)
+    // Validar cada vínculo
+    const vinculosValidados = [];
+    const instituicoesVistas = new Set();
+
+    for (const v of vinculosParaProcessar) {
+      const vInstId = v.instituicao_id != null && v.instituicao_id !== '' ? Number(v.instituicao_id) : null;
+      if (!vInstId) {
+        return res.status(400).json({ error: 'ID da instituição não informado em um dos vínculos.' });
+      }
+
+      // Restrição de perfil: usuários que não são grupo_admin só podem vincular à sua própria instituição
+      if (!isGroupAdmin) {
+        const opInstId = Number(authUser.instituicao_id || authUser.instituicaoId || instId);
+        if (vInstId !== opInstId) {
+          return res.status(403).json({ error: 'Acesso negado: Você não tem permissão para vincular usuários a outras instituições.' });
+        }
+      }
+
+      // Unicidade de instituição por usuário
+      if (instituicoesVistas.has(vInstId)) {
+        return res.status(400).json({ error: `A instituição #${vInstId} foi informada mais de uma vez nos vínculos.` });
+      }
+      instituicoesVistas.add(vInstId);
+
+      // Validação de existência da instituição
+      const { data: instCheck, error: errInstCheck } = await supabase
+        .from('instituicoes')
+        .select('id')
+        .eq('id', vInstId)
         .maybeSingle();
 
-      if (errUnidadeCheck || !unidadeCheck) {
-        return res.status(400).json({ error: 'A unidade selecionada não existe.' });
+      if (errInstCheck || !instCheck) {
+        return res.status(400).json({ error: `A instituição #${vInstId} informada no vínculo não existe.` });
       }
-      if (String(unidadeCheck.instituicao_id) !== String(finalInstId)) {
-        return res.status(400).json({ error: 'A unidade selecionada não pertence à instituição informada.' });
+
+      // Validação da Unidade (se informada)
+      const vUnidadeIdNum = v.unidade_id != null && v.unidade_id !== '' ? Number(v.unidade_id) : null;
+      if (vUnidadeIdNum !== null) {
+        const { data: unidadeCheck, error: errUnidadeCheck } = await supabase
+          .from('unidades')
+          .select('id, instituicao_id')
+          .eq('id', vUnidadeIdNum)
+          .maybeSingle();
+
+        if (errUnidadeCheck || !unidadeCheck) {
+          return res.status(400).json({ error: `A unidade #${vUnidadeIdNum} selecionada não existe.` });
+        }
+        if (String(unidadeCheck.instituicao_id) !== String(vInstId)) {
+          return res.status(400).json({ error: `A unidade #${vUnidadeIdNum} não pertence à instituição #${vInstId}.` });
+        }
       }
+
+      vinculosValidados.push({
+        instituicao_id: vInstId,
+        unidade_id: vUnidadeIdNum,
+      });
     }
+
+    const vinculoPrincipal = vinculosValidados[0];
+    const finalInstId = vinculoPrincipal.instituicao_id;
+    const finalUnidadeId = vinculoPrincipal.unidade_id;
 
     let insertData = {
       email,
@@ -216,6 +262,7 @@ export default async function handler(req, res) {
       tipo,
       perfil:          perfilResolvido,
       instituicao_id:  finalInstId,
+      unidade_id:      finalUnidadeId,
       status:          status || 'ativo',
     };
 
@@ -241,18 +288,23 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: errUser.message || 'Erro ao criar usuário' });
     }
 
-    // Sincronizar usuario_instituicoes (Fase 5.3)
-    if (novoUser && novoUser.id && finalInstId) {
-      try {
-        await supabase
-          .from('usuario_instituicoes')
-          .insert({
-            usuario_id: novoUser.id,
-            instituicao_id: finalInstId,
-            unidade_id: unidadeIdNum,
-          });
-      } catch (errVincInsert) {
-        console.error('Aviso: Erro ao registrar usuario_instituicoes na criação:', errVincInsert);
+    // Persistir todos os vínculos em usuario_instituicoes
+    if (novoUser && novoUser.id && vinculosValidados.length > 0) {
+      const insertsVinc = vinculosValidados.map(v => ({
+        usuario_id: novoUser.id,
+        instituicao_id: v.instituicao_id,
+        unidade_id: v.unidade_id,
+      }));
+
+      const { error: errVincInsert } = await supabase
+        .from('usuario_instituicoes')
+        .insert(insertsVinc);
+
+      if (errVincInsert) {
+        console.error('[POST /api/usuarios] Erro ao registrar usuario_instituicoes:', errVincInsert);
+        // Rollback da criação do usuário para evitar inconsistência/órfão
+        await supabase.from('usuarios').delete().eq('id', novoUser.id);
+        return res.status(500).json({ error: `Erro ao associar vínculos institucionais: ${errVincInsert.message || 'Falha no banco'}` });
       }
     }
 
@@ -280,7 +332,7 @@ export default async function handler(req, res) {
     // Carregar o registro existente para validar que o operador não está alterando um usuário de perfil superior
     const { data: originalUser, error: checkError } = await supabase
       .from('usuarios')
-      .select('perfil, tipo')
+      .select('id, perfil, tipo, instituicao_id, unidade_id')
       .eq('id', id)
       .maybeSingle();
 
@@ -312,71 +364,139 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Acesso negado: Perfil de acesso não permitido para o seu cargo.' });
     }
 
-    const updates = {};
-    if (body.nomeCompleto)   updates.nomecompleto    = body.nomeCompleto;
-    if (body.email)          updates.email           = body.email;
-    if (body.cpf)            updates.cpf             = body.cpf;
-    if (body.dataNascimento) updates.datanascimento  = body.dataNascimento;
-    if (body.whatsapp)       updates.whatsapp        = body.whatsapp;
-    if (body.tipo)           updates.tipo            = body.tipo;
-    if (body.perfil)         updates.perfil          = body.perfil;
-    if (body.status)         updates.status          = body.status;
-
-    let resUpdate = await supabase.from('usuarios').update(updates).eq('id', id).select('*').single();
-    if (resUpdate.error && resUpdate.error.message && resUpdate.error.message.includes('nomecompleto')) {
-      if (updates.nomecompleto) {
-        delete updates.nomecompleto;
-        updates.nome = body.nomeCompleto;
-      }
-      resUpdate = await supabase.from('usuarios').update(updates).eq('id', id).select('*').single();
+    // ── FASE 7.2.3: Campos cadastrais enviados para a RPC ────────────────────
+    // A coluna pode se chamar "nomecompleto" ou "nome" conforme a migration.
+    // Enviamos ambas as variantes ao JSONB; a RPC aplica apenas a que existir.
+    const camposCadastrais = {};
+    if (body.nomeCompleto) {
+      camposCadastrais.nomecompleto = body.nomeCompleto;
+      camposCadastrais.nome         = body.nomeCompleto; // fallback caso coluna seja "nome"
     }
-    const { data, error } = resUpdate;
-    if (error) return res.status(500).json({ error: error.message || 'Erro ao atualizar usuário' });
+    if (body.email)          camposCadastrais.email          = body.email;
+    if (body.cpf)            camposCadastrais.cpf            = body.cpf;
+    if (body.dataNascimento) camposCadastrais.datanascimento = body.dataNascimento;
+    if (body.whatsapp)       camposCadastrais.whatsapp       = body.whatsapp;
+    if (body.tipo)           camposCadastrais.tipo           = body.tipo;
+    if (body.perfil)         camposCadastrais.perfil         = body.perfil;
+    if (body.status)         camposCadastrais.status         = body.status;
 
-    // Sincronizar vínculo em usuario_instituicoes no PUT (Fase 5.3)
-    // Determinar a instituição do vínculo:
-    // grupo_admin pode informar instituicao_id; para outros perfis, restringe-se estritamente à sua instituição
-    const targetInstId = isGroupAdmin && body.instituicao_id
-      ? body.instituicao_id
-      : (authUser.instituicao_id || authUser.instituicaoId || originalUser.instituicao_id);
+    const { vinculos: bodyVinculos } = body;
+    const usarRpc = bodyVinculos !== undefined;
 
-    if (targetInstId && (body.unidade_id !== undefined || body.instituicao_id !== undefined)) {
-      const unidadeIdNum = body.unidade_id != null && body.unidade_id !== '' ? Number(body.unidade_id) : null;
+    if (usarRpc) {
+      // ── Caminho transacional via RPC ────────────────────────────────────────
+      if (!Array.isArray(bodyVinculos)) {
+        return res.status(400).json({ error: 'Formato inválido para vinculos: esperava-se um array.' });
+      }
 
-      // Se unidade informada, validar se pertence à instituição alvo
-      if (unidadeIdNum !== null) {
-        const { data: unidCheck } = await supabase
-          .from('unidades')
-          .select('id, instituicao_id')
-          .eq('id', unidadeIdNum)
-          .maybeSingle();
+      const opInstId = isGroupAdmin
+        ? null
+        : (authUser.instituicao_id || authUser.instituicaoId || null);
 
-        if (unidCheck && String(unidCheck.instituicao_id) === String(targetInstId)) {
-          // Upsert com base na constraint UNIQUE(usuario_id, instituicao_id)
-          await supabase
-            .from('usuario_instituicoes')
-            .upsert({
-              usuario_id: Number(id),
-              instituicao_id: targetInstId,
-              unidade_id: unidadeIdNum,
-              updated_at: new Date().toISOString(),
-            }, { onConflict: 'usuario_id,instituicao_id' });
+      const { data: rpcData, error: rpcError } = await supabase.rpc(
+        'fn_sincronizar_vinculos_usuario',
+        {
+          p_usuario_id:              Number(id),
+          p_is_grupo_admin:          isGroupAdmin,
+          p_operador_instituicao_id: opInstId,
+          p_campos_cadastrais:       camposCadastrais,
+          p_vinculos:                bodyVinculos,
         }
-      } else if (body.unidade_id === null || body.unidade_id === '') {
-        // Permitir unidade pendente (null)
-        await supabase
-          .from('usuario_instituicoes')
-          .upsert({
-            usuario_id: Number(id),
-            instituicao_id: targetInstId,
-            unidade_id: null,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'usuario_id,instituicao_id' });
-      }
-    }
+      );
 
-    const { senha: _, ...userNoSenha } = data || {};
-    return res.status(200).json({ message: 'Usuário atualizado com sucesso', usuario: userNoSenha });
+      if (rpcError) {
+        console.error('[PUT /api/usuarios] Erro na RPC fn_sincronizar_vinculos_usuario:', rpcError);
+        // Mapear prefixos semânticos da RPC para respostas HTTP adequadas
+        const msg = rpcError.message || '';
+        if (msg.includes('USUARIO_NAO_ENCONTRADO')) {
+          return res.status(404).json({ error: 'Usuário não encontrado.' });
+        }
+        if (
+          msg.includes('VINCULO_SEM_INSTITUICAO') ||
+          msg.includes('INSTITUICAO_DUPLICADA') ||
+          msg.includes('INSTITUICAO_NAO_ENCONTRADA') ||
+          msg.includes('UNIDADE_NAO_ENCONTRADA') ||
+          msg.includes('UNIDADE_INSTITUICAO_INVALIDA')
+        ) {
+          return res.status(400).json({ error: msg });
+        }
+        if (msg.includes('USUARIO_SEM_VINCULO')) {
+          return res.status(400).json({ error: 'O usuário deve possuir ao menos um vínculo institucional.' });
+        }
+        if (msg.includes('OPERADOR_SEM_INSTITUICAO')) {
+          return res.status(403).json({ error: 'Instituição do operador não definida para sincronizar vínculos.' });
+        }
+        return res.status(500).json({ error: `Erro ao sincronizar vínculos: ${msg}` });
+      }
+
+      // Buscar o usuário atualizado para retornar ao cliente
+      const { data: usuarioAtualizado } = await supabase
+        .from('usuarios')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      const { senha: _s, ...userNoSenha } = usuarioAtualizado || {};
+      return res.status(200).json({ message: 'Usuário atualizado com sucesso', usuario: userNoSenha });
+
+    } else {
+      // ── Caminho legado: sem body.vinculos ────────────────────────────────────
+      // Mantém o fluxo REST separado para requisições que não enviam vínculos.
+      const updates = { ...camposCadastrais };
+
+      let resUpdate = await supabase.from('usuarios').update(updates).eq('id', id).select('*').single();
+      if (resUpdate.error && resUpdate.error.message && resUpdate.error.message.includes('nomecompleto')) {
+        // Tentar com coluna "nome" caso "nomecompleto" não exista
+        const updatesAlt = { ...updates };
+        if (updatesAlt.nomecompleto) {
+          delete updatesAlt.nomecompleto;
+        }
+        resUpdate = await supabase.from('usuarios').update(updatesAlt).eq('id', id).select('*').single();
+      }
+      const { data, error } = resUpdate;
+      if (error) return res.status(500).json({ error: error.message || 'Erro ao atualizar usuário' });
+
+      // Fallback legado: body.instituicao_id / body.unidade_id avulsos
+      if (body.instituicao_id !== undefined || body.unidade_id !== undefined) {
+        const targetInstId = isGroupAdmin && body.instituicao_id
+          ? Number(body.instituicao_id)
+          : Number(authUser.instituicao_id || authUser.instituicaoId || originalUser.instituicao_id);
+
+        if (targetInstId) {
+          const unidadeIdNum = body.unidade_id != null && body.unidade_id !== '' ? Number(body.unidade_id) : null;
+          if (unidadeIdNum !== null) {
+            const { data: unidCheck } = await supabase
+              .from('unidades')
+              .select('id, instituicao_id')
+              .eq('id', unidadeIdNum)
+              .maybeSingle();
+
+            if (unidCheck && String(unidCheck.instituicao_id) === String(targetInstId)) {
+              await supabase
+                .from('usuario_instituicoes')
+                .upsert({
+                  usuario_id:     Number(id),
+                  instituicao_id: targetInstId,
+                  unidade_id:     unidadeIdNum,
+                  updated_at:     new Date().toISOString(),
+                }, { onConflict: 'usuario_id,instituicao_id' });
+            }
+          } else {
+            await supabase
+              .from('usuario_instituicoes')
+              .upsert({
+                usuario_id:     Number(id),
+                instituicao_id: targetInstId,
+                unidade_id:     null,
+                updated_at:     new Date().toISOString(),
+              }, { onConflict: 'usuario_id,instituicao_id' });
+          }
+        }
+      }
+
+      const { senha: _, ...userNoSenha } = data || {};
+      return res.status(200).json({ message: 'Usuário atualizado com sucesso', usuario: userNoSenha });
+    }
   }
 
   if (req.method === 'DELETE') {
