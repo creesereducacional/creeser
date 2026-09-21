@@ -185,25 +185,13 @@ export default function AdminUsuarios() {
   useEffect(() => { buscarUsuarios(); }, [buscarUsuarios]);
 
   const abrirNovo = () => {
-    let initialVinculos = [];
-    if (operadorInstituicaoId) {
-      const instNome = listaInstituicoes.find(i => String(i.id) === String(operadorInstituicaoId))?.nome || 'Instituição Atual';
-      initialVinculos = [{
-        instituicao_id: operadorInstituicaoId,
-        instituicao_nome: instNome,
-        unidade_id: null,
-        unidade_nome: null,
-        is_matriz: false,
-      }];
-    }
-
     setForm({
       ...FORM_INICIAL,
-      instituicao_id: operadorInstituicaoId || '',
+      instituicao_id: '',
       unidade_id: '',
-      vinculos: initialVinculos,
+      vinculos: [],
     });
-    setNovoVincInstId(operadorInstituicaoId ? '' : '');
+    setNovoVincInstId(operadorPerfil === 'grupo_admin' ? '' : (operadorInstituicaoId ? String(operadorInstituicaoId) : ''));
     setNovoVincUnidadeId('');
     setErroVinculo('');
     setEditandoId(null);
@@ -379,10 +367,10 @@ export default function AdminUsuarios() {
     if (!form.email.trim()) return setErroForm('Email é obrigatório');
     if (!editandoId && !form.senha.trim()) return setErroForm('Senha é obrigatória para novo usuário');
 
-    // Validação de Vínculos
+    // Validação de Vínculos: obrigatório ter pelo menos 1 vínculo na lista
     const vinculosList = form.vinculos || [];
-    if (vinculosList.length === 0 && !form.instituicao_id && !operadorInstituicaoId) {
-      return setErroForm('É obrigatório adicionar ao menos um vínculo institucional.');
+    if (vinculosList.length === 0) {
+      return setErroForm('É obrigatório adicionar ao menos um vínculo institucional antes de salvar.');
     }
 
     setSalvando(true);
@@ -407,14 +395,30 @@ export default function AdminUsuarios() {
       const url    = editandoId ? `/api/usuarios?id=${editandoId}` : '/api/usuarios';
       const method = editandoId ? 'PUT' : 'POST';
 
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || `Erro ${res.status}`);
+      let res;
+      try {
+        res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        });
+      } catch (netErr) {
+        throw new Error(`Falha de conexão com o servidor ao salvar usuário (${netErr.message || 'Erro de rede'}). Verifique se o servidor está ativo.`);
+      }
+
+      const contentType = res.headers.get('content-type') || '';
+      let body = {};
+      if (contentType.includes('application/json')) {
+        body = await res.json().catch(() => ({}));
+      } else {
+        const textBody = await res.text().catch(() => '');
+        body = { error: textBody || `Erro HTTP ${res.status} (${res.statusText})` };
+      }
+
+      if (!res.ok) {
+        throw new Error(body.error || `Erro ${res.status}: ${res.statusText || 'Falha na requisição'}`);
+      }
 
       fecharForm();
       buscarUsuarios();

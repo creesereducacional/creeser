@@ -196,14 +196,14 @@ export default async function handler(req, res) {
     const instituicoesVistas = new Set();
 
     for (const v of vinculosParaProcessar) {
-      const vInstId = v.instituicao_id != null && v.instituicao_id !== '' ? Number(v.instituicao_id) : null;
+      const vInstId = v.instituicao_id != null && String(v.instituicao_id).trim() !== '' ? String(v.instituicao_id).trim() : null;
       if (!vInstId) {
         return res.status(400).json({ error: 'ID da instituição não informado em um dos vínculos.' });
       }
 
       // Restrição de perfil: usuários que não são grupo_admin só podem vincular à sua própria instituição
       if (!isGroupAdmin) {
-        const opInstId = Number(authUser.instituicao_id || authUser.instituicaoId || instId);
+        const opInstId = String(authUser.instituicao_id || authUser.instituicaoId || instId || '').trim();
         if (vInstId !== opInstId) {
           return res.status(403).json({ error: 'Acesso negado: Você não tem permissão para vincular usuários a outras instituições.' });
         }
@@ -458,9 +458,10 @@ export default async function handler(req, res) {
 
       // Fallback legado: body.instituicao_id / body.unidade_id avulsos
       if (body.instituicao_id !== undefined || body.unidade_id !== undefined) {
-        const targetInstId = isGroupAdmin && body.instituicao_id
-          ? Number(body.instituicao_id)
-          : Number(authUser.instituicao_id || authUser.instituicaoId || originalUser.instituicao_id);
+        const rawTarget = isGroupAdmin && body.instituicao_id
+          ? body.instituicao_id
+          : (authUser.instituicao_id || authUser.instituicaoId || originalUser.instituicao_id);
+        const targetInstId = rawTarget != null && String(rawTarget).trim() !== '' ? String(rawTarget).trim() : null;
 
         if (targetInstId) {
           const unidadeIdNum = body.unidade_id != null && body.unidade_id !== '' ? Number(body.unidade_id) : null;
