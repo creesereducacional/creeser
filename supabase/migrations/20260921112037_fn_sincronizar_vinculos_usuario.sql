@@ -1,4 +1,4 @@
-﻿-- ============================================================
+-- ============================================================
 -- FASE 7.2.3 — RPC Transacional: fn_sincronizar_vinculos_usuario
 -- ============================================================
 -- Atualiza atomicamente os campos cadastrais do usuário e
@@ -249,16 +249,11 @@ BEGIN
       END;
     END LOOP;
 
-    -- 4. Atualizar campos legados (instituicao_id / unidade_id em usuarios)
-    v_legado_inst_id    := NULL;
-    v_legado_unidade_id := NULL;
+    -- 4. Atualizar campo legado (instituicao_id em usuarios)
+    v_legado_inst_id := NULL;
 
     IF p_is_grupo_admin THEN
       v_legado_inst_id := (v_novos_vinculos[1]->>'instituicao_id')::UUID;
-      IF v_novos_vinculos[1]->>'unidade_id' IS NOT NULL
-         AND v_novos_vinculos[1]->>'unidade_id' <> 'null' THEN
-        v_legado_unidade_id := (v_novos_vinculos[1]->>'unidade_id')::INTEGER;
-      END IF;
     ELSE
       v_vinc_original_inst := FALSE;
       FOR i IN 1 .. COALESCE(array_length(v_novos_vinculos, 1), 0) LOOP
@@ -271,12 +266,6 @@ BEGIN
 
       IF v_vinc_original_inst AND v_prim_vinculo IS NOT NULL THEN
         v_legado_inst_id := v_original.instituicao_id;
-        IF v_prim_vinculo->>'unidade_id' IS NOT NULL
-           AND v_prim_vinculo->>'unidade_id' <> 'null' THEN
-          v_legado_unidade_id := (v_prim_vinculo->>'unidade_id')::INTEGER;
-        ELSE
-          v_legado_unidade_id := v_original.unidade_id;
-        END IF;
       ELSE
         v_vinc_op := NULL;
         FOR i IN 1 .. COALESCE(array_length(v_novos_vinculos, 1), 0) LOOP
@@ -288,16 +277,11 @@ BEGIN
 
         v_prim_vinculo := COALESCE(v_vinc_op, v_novos_vinculos[1]);
         v_legado_inst_id := (v_prim_vinculo->>'instituicao_id')::UUID;
-        IF v_prim_vinculo->>'unidade_id' IS NOT NULL
-           AND v_prim_vinculo->>'unidade_id' <> 'null' THEN
-          v_legado_unidade_id := (v_prim_vinculo->>'unidade_id')::INTEGER;
-        END IF;
       END IF;
     END IF;
 
     UPDATE usuarios
-    SET instituicao_id = v_legado_inst_id,
-        unidade_id     = v_legado_unidade_id
+    SET instituicao_id = v_legado_inst_id
     WHERE id = p_usuario_id;
 
   END IF; -- fim do bloco de vínculos
@@ -305,8 +289,7 @@ BEGIN
   -- 5. Retornar confirmação
   RETURN jsonb_build_object(
     'ok',                    true,
-    'legado_instituicao_id', v_legado_inst_id,
-    'legado_unidade_id',     v_legado_unidade_id
+    'legado_instituicao_id', v_legado_inst_id
   );
 
 EXCEPTION

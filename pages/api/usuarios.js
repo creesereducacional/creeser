@@ -251,7 +251,6 @@ export default async function handler(req, res) {
 
     const vinculoPrincipal = vinculosValidados[0];
     const finalInstId = vinculoPrincipal.instituicao_id;
-    const finalUnidadeId = vinculoPrincipal.unidade_id;
 
     let insertData = {
       email,
@@ -262,7 +261,6 @@ export default async function handler(req, res) {
       tipo,
       perfil:          perfilResolvido,
       instituicao_id:  finalInstId,
-      unidade_id:      finalUnidadeId,
       status:          status || 'ativo',
     };
 
@@ -332,7 +330,7 @@ export default async function handler(req, res) {
     // Carregar o registro existente para validar que o operador não está alterando um usuário de perfil superior
     const { data: originalUser, error: checkError } = await supabase
       .from('usuarios')
-      .select('id, perfil, tipo, instituicao_id, unidade_id')
+      .select('id, perfil, tipo, instituicao_id')
       .eq('id', id)
       .maybeSingle();
 
