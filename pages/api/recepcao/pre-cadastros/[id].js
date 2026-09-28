@@ -51,10 +51,29 @@ export default async function handler(req, res) {
 
   // ── PUT ─ editar campos basicos (recepcao nao altera status) ─────────────
   if (req.method === 'PUT') {
-    const { nome, cpf, email, telefone_celular, observacoes_adicionais } = req.body || {};
+    const {
+      nome, cpf, email, telefone_celular, observacoes_adicionais,
+      data_nascimento, cursoid, turmaid,
+    } = req.body || {};
 
     if (nome !== undefined && !String(nome || '').trim()) {
       return res.status(400).json({ error: 'Nome nao pode ser vazio' });
+    }
+
+    // Validar data_nascimento quando informada
+    if (data_nascimento !== undefined && data_nascimento !== null && data_nascimento !== '') {
+      const d = new Date(data_nascimento);
+      if (isNaN(d.getTime()) || d > new Date()) {
+        return res.status(400).json({ error: 'Data de nascimento inválida' });
+      }
+    }
+
+    // Validar cursoid quando informado
+    if (cursoid !== undefined && cursoid !== null && cursoid !== '') {
+      const cid = Number(cursoid);
+      if (!Number.isInteger(cid) || cid <= 0) {
+        return res.status(400).json({ error: 'Curso inválido' });
+      }
     }
 
     const updates = {};
@@ -63,6 +82,11 @@ export default async function handler(req, res) {
     if (email              !== undefined) updates.email               = email              ? String(email).trim().toLowerCase() : null;
     if (telefone_celular   !== undefined) updates.telefone_celular    = telefone_celular   ? String(telefone_celular).trim() : null;
     if (observacoes_adicionais !== undefined) updates.observacoes_adicionais = observacoes_adicionais || null;
+    if (data_nascimento    !== undefined) updates.data_nascimento     = data_nascimento    || null;
+    if (cursoid            !== undefined) updates.cursoid             = cursoid            ? Number(cursoid) : null;
+    // Ao limpar o curso, limpar a turma também
+    if (turmaid            !== undefined) updates.turmaid             = turmaid            ? Number(turmaid) : null;
+    if (cursoid !== undefined && !cursoid && turmaid === undefined) updates.turmaid = null;
 
     if (!Object.keys(updates).length) {
       return res.status(400).json({ error: 'Nenhum campo para atualizar' });
@@ -78,12 +102,18 @@ export default async function handler(req, res) {
     if (updateError) return res.status(500).json({ error: updateError.message });
 
     await registrarAuditoria(id, authUser.id, 'EDITAR_PRE_CADASTRO', {
-      antes: { nome: aluno.nome, cpf: aluno.cpf, email: aluno.email, telefone_celular: aluno.telefone_celular },
+      antes: {
+        nome: aluno.nome, cpf: aluno.cpf, email: aluno.email,
+        telefone_celular: aluno.telefone_celular,
+        data_nascimento: aluno.data_nascimento,
+        cursoid: aluno.cursoid, turmaid: aluno.turmaid,
+      },
       depois: updates,
     });
 
     return res.status(200).json(updated);
   }
+
 
   return res.status(405).json({ error: 'Metodo nao permitido' });
 }
