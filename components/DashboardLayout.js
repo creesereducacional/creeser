@@ -441,6 +441,7 @@ export default function DashboardLayout({ children }) {
                         <div className="relative group">
                           <button
                             onClick={() => setExpandedSubmenus(prev => ({
+                              ...prev,
                               [item.id]: !prev[item.id]
                             }))}
                             className={`w-full flex items-center justify-between gap-3 px-3 py-1 rounded-lg transition text-sm cursor-pointer text-white ${
