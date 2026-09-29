@@ -7,6 +7,9 @@ const MENU_ITEMS = [
   { href: '/recepcao/dashboard',          icon: '📊', label: 'Dashboard' },
   { href: '/recepcao/pre-cadastros',      icon: '📋', label: 'Pré-Cadastros' },
   { href: '/recepcao/pre-cadastros/novo', icon: '➕', label: 'Novo Pré-Cadastro' },
+  { href: '/recepcao/alunos',             icon: '👥', label: 'Alunos' },
+  { href: '/recepcao/cursos',             icon: '📖', label: 'Cursos' },
+  { href: '/recepcao/turmas',             icon: '🏫', label: 'Turmas' },
 ];
 
 const PERFIS_RECEPCAO = ['recepcao', 'grupo_admin', 'instituicao_admin', 'admin'];
@@ -82,7 +85,12 @@ export default function RecepcaoLayout({ children, titulo }) {
             const ativo =
               item.href === '/recepcao/pre-cadastros/novo'
                 ? router.pathname === item.href
-                : router.pathname.startsWith(item.href) && item.href !== '/recepcao/pre-cadastros/novo';
+                : item.href === '/recepcao/dashboard'
+                ? router.pathname === item.href
+                : router.pathname === item.href || (
+                    router.pathname.startsWith(item.href) &&
+                    !(item.href === '/recepcao/pre-cadastros' && router.pathname === '/recepcao/pre-cadastros/novo')
+                  );
             return (
               <Link key={item.href} href={item.href}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
