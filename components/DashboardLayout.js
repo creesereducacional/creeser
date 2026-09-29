@@ -252,6 +252,7 @@ export default function DashboardLayout({ children }) {
 
     // Estágio
     { 
+      id: 'estagio',
       em_breve: true, 
       perfis: ['grupo_admin', 'instituicao_admin'],
       tiposInstituicao: ['faculdade'],
@@ -266,6 +267,7 @@ export default function DashboardLayout({ children }) {
 
     // Contábil
     { 
+      id: 'contabil',
       em_breve: true, 
       perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
       tiposInstituicao: ['faculdade'],
@@ -286,6 +288,7 @@ export default function DashboardLayout({ children }) {
 
     // Documentos
     { 
+      id: 'documentos',
       em_breve: true, 
       perfis: ['grupo_admin', 'instituicao_admin', 'financeiro'],
       nome: 'Documentos', 
@@ -301,6 +304,7 @@ export default function DashboardLayout({ children }) {
 
     // Relatórios
     { 
+      id: 'relatorios',
       em_breve: true, 
       perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
       nome: 'Relatórios', 
@@ -316,6 +320,7 @@ export default function DashboardLayout({ children }) {
 
     // Gráficos
     { 
+      id: 'graficos',
       em_breve: true, 
       perfis: ['grupo_admin', 'instituicao_admin', 'financeiro', 'coordenador'],
       nome: 'Gráficos', 
@@ -328,6 +333,7 @@ export default function DashboardLayout({ children }) {
 
     // Eventos
     { 
+      id: 'eventos',
       em_breve: true, 
       perfis: ['grupo_admin', 'instituicao_admin', 'financeiro', 'coordenador'],
       nome: 'Eventos', 
