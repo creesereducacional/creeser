@@ -26,6 +26,38 @@ async function registrarAuditoria(alunoId, usuarioId, acao, dados) {
   } catch (_) { /* auditoria nao deve bloquear a operacao */ }
 }
 
+async function enriquecerDadosCursoTurma(dadosAluno) {
+  if (!dadosAluno) return dadosAluno;
+  let curso_nome = null;
+  let turma_nome = null;
+
+  if (dadosAluno.cursoid) {
+    const { data: curso } = await supabase
+      .from('cursos')
+      .select('nome')
+      .eq('id', dadosAluno.cursoid)
+      .maybeSingle();
+    if (curso?.nome) curso_nome = curso.nome;
+  }
+
+  if (dadosAluno.turmaid) {
+    const { data: turma } = await supabase
+      .from('turmas')
+      .select('nome, turno')
+      .eq('id', dadosAluno.turmaid)
+      .maybeSingle();
+    if (turma?.nome) {
+      turma_nome = turma.nome + (turma.turno ? ` — ${turma.turno}` : '');
+    }
+  }
+
+  return {
+    ...dadosAluno,
+    curso_nome,
+    turma_nome,
+  };
+}
+
 export default async function handler(req, res) {
   const authUser = requireAuth(req, res);
   if (!authUser) return;
@@ -46,7 +78,8 @@ export default async function handler(req, res) {
 
   // ── GET ─────────────────────────────────────────────────────────────────
   if (req.method === 'GET') {
-    return res.status(200).json(aluno);
+    const alunoEnriquecido = await enriquecerDadosCursoTurma(aluno);
+    return res.status(200).json(alunoEnriquecido);
   }
 
   // ── PUT ─ editar campos basicos (recepcao nao altera status) ─────────────
@@ -111,7 +144,8 @@ export default async function handler(req, res) {
       depois: updates,
     });
 
-    return res.status(200).json(updated);
+    const updatedEnriquecido = await enriquecerDadosCursoTurma(updated);
+    return res.status(200).json(updatedEnriquecido);
   }
 
 

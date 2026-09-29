@@ -170,8 +170,8 @@ export default function PreCadastroDetalhe() {
   const isMenor = typeof idade === 'number' && idade < 18;
 
   // Nome do curso/turma para exibição no modo leitura
-  const cursoNome = cursos.find(c => String(c.id) === String(aluno?.cursoid))?.nome || null;
-  const turmaNome = turmas.find(t => String(t.id) === String(aluno?.turmaid))?.nome || null;
+  const cursoNome = aluno?.curso_nome || cursos.find(c => String(c.id) === String(aluno?.cursoid))?.nome || null;
+  const turmaNome = aluno?.turma_nome || turmas.find(t => String(t.id) === String(aluno?.turmaid))?.nome || null;
 
   return (
     <RecepcaoLayout titulo="Ficha do Aluno">
@@ -350,9 +350,8 @@ export default function PreCadastroDetalhe() {
                       </select>
                     )
                   ) : (
-                    <p className="text-sm text-gray-800 py-1">
-                      {/* Tenta exibir nome; se ainda não carregou, mostra ID */}
-                      {cursoNome || (aluno.cursoid ? `ID ${aluno.cursoid}` : '—')}
+                    <p className="text-sm text-gray-800 py-1 font-medium">
+                      {cursoNome || '—'}
                     </p>
                   )}
                 </div>
@@ -381,8 +380,8 @@ export default function PreCadastroDetalhe() {
                       </select>
                     )
                   ) : (
-                    <p className="text-sm text-gray-800 py-1">
-                      {turmaNome || (aluno.turmaid ? `ID ${aluno.turmaid}` : '—')}
+                    <p className="text-sm text-gray-800 py-1 font-medium">
+                      {turmaNome || '—'}
                     </p>
                   )}
                 </div>
