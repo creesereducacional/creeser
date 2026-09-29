@@ -133,7 +133,7 @@ export default function DashboardLayout({ children }) {
 
   const menuItems = [
     // Menu Principal
-    { id: 'dashboard', nome: 'Início', icon: '🏠', url: '/admin/dashboard', em_breve: false, secao: 'Menu Principal' },
+    { id: 'dashboard', nome: 'Início', icon: '🏠', url: '/admin/dashboard', em_breve: false, completed: true, secao: 'Menu Principal' },
 
     // Coordenação (restaurado)
     {
@@ -215,6 +215,7 @@ export default function DashboardLayout({ children }) {
       icon: '💵',
       url: '/admin-financeiro',
       em_breve: false,
+      completed: true,
       perfis: ['grupo_admin', 'instituicao_admin', 'financeiro'],
       secao: 'Administração'
     },
@@ -450,16 +451,20 @@ export default function DashboardLayout({ children }) {
                               ...prev,
                               [item.id]: !prev[item.id]
                             }))}
-                            className={`w-full flex items-center justify-between gap-3 px-3 py-1 rounded-lg transition text-sm cursor-pointer text-white ${
-                              expandedSubmenus[item.id] ? 'bg-teal-600' : 'hover:bg-teal-600'
+                            className={`w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg transition text-sm cursor-pointer ${
+                              expandedSubmenus[item.id]
+                                ? 'bg-teal-600 text-white font-semibold shadow-sm'
+                                : item.em_breve
+                                ? 'text-teal-200/70 hover:bg-teal-700/40 hover:text-white'
+                                : 'text-white hover:bg-teal-700/50'
                             }`}
                           >
                             <div className="flex items-center gap-3 min-w-0">
-                              <span className="text-lg flex-shrink-0">{item.icon}</span>
+                              <span className={`text-lg flex-shrink-0 ${item.em_breve ? 'opacity-60' : ''}`}>{item.icon}</span>
                               {sidebarOpen && <span className="truncate">{item.nome}</span>}
                             </div>
                             {sidebarOpen && (
-                              <span className={`transition-transform flex-shrink-0 ${expandedSubmenus[item.id] ? 'rotate-180' : ''}`}>
+                              <span className={`transition-transform flex-shrink-0 text-xs ${expandedSubmenus[item.id] ? 'rotate-180 text-white' : 'text-teal-200/70'}`}>
                                 ▼
                               </span>
                             )}
@@ -474,47 +479,59 @@ export default function DashboardLayout({ children }) {
 
                           {/* Submenu */}
                           {sidebarOpen && expandedSubmenus[item.id] && (
-                            <div className="bg-teal-800/50 rounded-lg mt-1 space-y-1 py-2 px-2 ml-2 border-l-2 border-teal-500">
-                              {item.submenu.map((subitem) => (
-                                <Link key={subitem.id} href={subitem.url}>
-                                  <div className={`flex items-center gap-3 px-3 py-1 rounded-lg transition text-xs cursor-pointer ${
-                                    subitem.completed
-                                      ? 'bg-orange-500/20 text-orange-600 font-semibold'
-                                      : router.pathname === subitem.url
-                                      ? 'bg-teal-500 text-white font-semibold'
-                                      : 'text-gray-200 hover:bg-teal-700'
-                                  }`}>
-                                    <span className="text-base flex-shrink-0">{subitem.icon}</span>
-                                    <span className="truncate">{subitem.nome}</span>
-                                  </div>
-                                </Link>
-                              ))}
+                            <div className="bg-teal-800/50 rounded-lg mt-1 space-y-1 py-1.5 px-2 ml-2 border-l-2 border-teal-500">
+                              {item.submenu.map((subitem) => {
+                                const isSubActive = router.pathname === subitem.url;
+                                const isSubEmBreve = subitem.em_breve;
+
+                                return (
+                                  <Link key={subitem.id} href={subitem.url}>
+                                    <div className={`flex items-center gap-3 px-3 py-1.5 rounded-lg transition text-xs cursor-pointer ${
+                                      isSubActive
+                                        ? 'bg-teal-500 text-white font-bold shadow-sm'
+                                        : isSubEmBreve
+                                        ? 'text-teal-200/50 hover:bg-teal-700/30 hover:text-teal-100'
+                                        : 'text-white font-medium hover:bg-teal-700/60'
+                                    }`}>
+                                      <span className={`text-base flex-shrink-0 ${isSubEmBreve ? 'opacity-50' : ''}`}>{subitem.icon}</span>
+                                      <span className="truncate">{subitem.nome}</span>
+                                    </div>
+                                  </Link>
+                                );
+                              })}
                             </div>
                           )}
                         </div>
                       ) : (
                         /* Item sem Submenu */
-                        <div className="relative group">
-                          <Link href={item.url}>
-                            <div className={`flex items-center gap-3 px-3 py-1 rounded-lg transition text-sm cursor-pointer ${
-                              item.completed
-                                ? 'bg-orange-500/20 text-orange-600 font-semibold'
-                                : router.pathname === item.url
-                                ? 'bg-teal-600 text-white font-semibold'
-                                : 'hover:bg-teal-600 text-white'
-                            }`}>
-                              <span className="text-lg flex-shrink-0">{item.icon}</span>
-                              {sidebarOpen && <span className="truncate">{item.nome}</span>}
-                            </div>
-                          </Link>
+                        (() => {
+                          const isActive = router.pathname === item.url;
+                          const isEmBreve = item.em_breve;
 
-                          {/* Tooltip when collapsed */}
-                          {!sidebarOpen && (
-                            <div className="hidden group-hover:block absolute left-20 top-0 bg-gray-800 text-white px-3 py-2 rounded-lg text-sm whitespace-nowrap z-50">
-                              {item.nome}
+                          return (
+                            <div className="relative group">
+                              <Link href={item.url}>
+                                <div className={`flex items-center gap-3 px-3 py-2 rounded-lg transition text-sm cursor-pointer ${
+                                  isActive
+                                    ? 'bg-teal-500 text-white font-bold shadow-sm'
+                                    : isEmBreve
+                                    ? 'text-teal-200/50 hover:bg-teal-700/30 hover:text-teal-100'
+                                    : 'text-white font-medium hover:bg-teal-700/60'
+                                }`}>
+                                  <span className={`text-lg flex-shrink-0 ${isEmBreve ? 'opacity-50' : ''}`}>{item.icon}</span>
+                                  {sidebarOpen && <span className="truncate">{item.nome}</span>}
+                                </div>
+                              </Link>
+
+                              {/* Tooltip when collapsed */}
+                              {!sidebarOpen && (
+                                <div className="hidden group-hover:block absolute left-20 top-0 bg-gray-800 text-white px-3 py-2 rounded-lg text-sm whitespace-nowrap z-50">
+                                  {item.nome}
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
+                          );
+                        })()
                       )}
                     </div>
                   ))}
