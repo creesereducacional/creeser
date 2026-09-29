@@ -3,6 +3,7 @@ import Link from 'next/link';
 import RecepcaoLayout from '@/components/RecepcaoLayout';
 import EmptyState from '@/components/recepcao/EmptyState';
 import StatusBadge from '@/components/recepcao/StatusBadge';
+import ModalMatricularOutroCurso from '@/components/recepcao/ModalMatricularOutroCurso';
 
 function iniciais(nome) {
   if (!nome) return '?';
@@ -20,6 +21,9 @@ export default function RecepcaoAlunos() {
   const [alunos, setAlunos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState(null);
+
+  // Modal de Matrícula em Outro Curso
+  const [alunoParaNovoCurso, setAlunoParaNovoCurso] = useState(null);
 
   // Filtros
   const [busca, setBusca] = useState('');
@@ -254,12 +258,21 @@ export default function RecepcaoAlunos() {
                         </td>
 
                         <td className="py-3.5 px-4 text-right">
-                          <Link
-                            href={`/recepcao/pre-cadastros/${aluno.id}`}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-blue-50 hover:text-blue-700 text-gray-700 rounded-xl text-xs font-semibold transition"
-                          >
-                            👁️ Ficha
-                          </Link>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => setAlunoParaNovoCurso(aluno)}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-semibold transition shadow-sm"
+                              title="Matricular este aluno em outro curso simultâneo"
+                            >
+                              ➕ Novo Curso
+                            </button>
+                            <Link
+                              href={`/recepcao/pre-cadastros/${aluno.id}`}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-blue-50 hover:text-blue-700 text-gray-700 rounded-xl text-xs font-semibold transition"
+                            >
+                              👁️ Ficha
+                            </Link>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -269,6 +282,14 @@ export default function RecepcaoAlunos() {
             </div>
           )}
         </div>
+
+        {/* ── Modal de Matrícula em Outro Curso ─────────────────────── */}
+        <ModalMatricularOutroCurso
+          isOpen={!!alunoParaNovoCurso}
+          onClose={() => setAlunoParaNovoCurso(null)}
+          aluno={alunoParaNovoCurso}
+          onSuccess={carregarAlunos}
+        />
 
       </div>
     </RecepcaoLayout>
