@@ -7,6 +7,12 @@ import {
   resolveInstituicaoId,
   resolveContextoUsuario,
 } from '../../../../../lib/auth-server';
+import {
+  validarEmailUnico,
+  isDuplicateEmailError,
+  MSG_EMAIL_DUPLICADO,
+  normalizeEmail,
+} from '../../../../../lib/api-helpers';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -117,10 +123,22 @@ export default async function handler(req, res) {
 
   // Criar aluno com dados mínimos do lead + dados do curso/plano escolhidos
   const instituicaoFinal = lead.instituicao_id || userInstituicaoId;
+  const cleanEmail = normalizeEmail(lead.email);
+
+  if (cleanEmail) {
+    const emailCheck = await validarEmailUnico({
+      email: cleanEmail,
+      supabaseClient: supabase,
+    });
+
+    if (!emailCheck.valid) {
+      return res.status(409).json({ error: emailCheck.error || MSG_EMAIL_DUPLICADO });
+    }
+  }
 
   const novoAluno = {
     nome: lead.nome,
-    email: lead.email || null,
+    email: cleanEmail,
     telefone_celular: lead.whatsapp || lead.telefone || null,
     instituicao_id: instituicaoFinal,
     captado_por_id: lead.captado_por_id || authUser.id,
@@ -142,6 +160,9 @@ export default async function handler(req, res) {
     .single();
 
   if (alunoError) {
+    if (isDuplicateEmailError(alunoError)) {
+      return res.status(409).json({ error: MSG_EMAIL_DUPLICADO });
+    }
     return res.status(500).json({ error: `Erro ao criar aluno: ${alunoError.message}` });
   }
 

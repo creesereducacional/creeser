@@ -50,10 +50,10 @@ export default function RecepcaoLayout({ children, titulo }) {
   }
 
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
+    <div className="flex h-screen bg-gray-100 overflow-hidden print:h-auto print:overflow-visible print:bg-white">
       {/* ── Sidebar ────────────────────────────────────────────────── */}
       <aside
-        className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gradient-to-b from-blue-700 to-blue-900 shadow-2xl text-white flex flex-col transition-all duration-300 flex-shrink-0`}
+        className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gradient-to-b from-blue-700 to-blue-900 shadow-2xl text-white flex flex-col transition-all duration-300 flex-shrink-0 print:hidden`}
       >
         <div className="p-6 border-b border-blue-600 flex items-center justify-between">
           {sidebarOpen ? (
@@ -120,8 +120,8 @@ export default function RecepcaoLayout({ children, titulo }) {
       </aside>
 
       {/* ── Conteúdo ──────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="bg-white shadow-sm px-6 py-4 flex items-center justify-between flex-shrink-0">
+      <div className="flex-1 flex flex-col overflow-hidden print:overflow-visible print:h-auto">
+        <header className="bg-white shadow-sm px-6 py-4 flex items-center justify-between flex-shrink-0 print:hidden">
           <h1 className="text-lg font-bold text-gray-800">{titulo || 'Recepção'}</h1>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-500">
@@ -133,7 +133,7 @@ export default function RecepcaoLayout({ children, titulo }) {
             </button>
           </div>
         </header>
-        <main className="flex-1 overflow-auto p-6">{children}</main>
+        <main className="flex-1 overflow-auto p-6 print:p-0 print:overflow-visible">{children}</main>
       </div>
     </div>
   );

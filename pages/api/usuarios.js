@@ -1,5 +1,10 @@
-import { createClient } from '@supabase/supabase-js';
 import { hasPerfil, requireAuth, requirePerfil, resolveInstituicaoId, applyInstituicaoFilter } from '../../lib/auth-server';
+import {
+  validarEmailUnico,
+  isDuplicateEmailError,
+  MSG_EMAIL_DUPLICADO,
+  normalizeEmail,
+} from '../../lib/api-helpers';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -251,9 +256,21 @@ export default async function handler(req, res) {
 
     const vinculoPrincipal = vinculosValidados[0];
     const finalInstId = vinculoPrincipal.instituicao_id;
+    const cleanEmail = normalizeEmail(email);
+
+    if (cleanEmail) {
+      const emailCheck = await validarEmailUnico({
+        email: cleanEmail,
+        supabaseClient: supabase,
+      });
+
+      if (!emailCheck.valid) {
+        return res.status(409).json({ error: emailCheck.error || MSG_EMAIL_DUPLICADO });
+      }
+    }
 
     let insertData = {
-      email,
+      email:           cleanEmail,
       senha,
       cpf:             cpf || null,
       datanascimento:  dataNascimento || null,
@@ -282,6 +299,7 @@ export default async function handler(req, res) {
 
     if (errUser) {
       console.error('[POST /api/usuarios] Erro na inserção:', errUser);
+      if (isDuplicateEmailError(errUser)) return res.status(409).json({ error: MSG_EMAIL_DUPLICADO });
       if (errUser.code === '23505') return res.status(409).json({ error: 'CPF ou email já cadastrado' });
       return res.status(500).json({ error: errUser.message || 'Erro ao criar usuário' });
     }
@@ -370,7 +388,21 @@ export default async function handler(req, res) {
       camposCadastrais.nomecompleto = body.nomeCompleto;
       camposCadastrais.nome         = body.nomeCompleto; // fallback caso coluna seja "nome"
     }
-    if (body.email)          camposCadastrais.email          = body.email;
+    if (body.email !== undefined) {
+      const cleanEmail = normalizeEmail(body.email);
+      if (cleanEmail) {
+        const emailCheck = await validarEmailUnico({
+          email: cleanEmail,
+          currentUsuarioId: id,
+          supabaseClient: supabase,
+        });
+
+        if (!emailCheck.valid) {
+          return res.status(409).json({ error: emailCheck.error || MSG_EMAIL_DUPLICADO });
+        }
+      }
+      camposCadastrais.email = cleanEmail;
+    }
     if (body.cpf)            camposCadastrais.cpf            = body.cpf;
     if (body.dataNascimento) camposCadastrais.datanascimento = body.dataNascimento;
     if (body.whatsapp)       camposCadastrais.whatsapp       = body.whatsapp;
@@ -404,6 +436,9 @@ export default async function handler(req, res) {
 
       if (rpcError) {
         console.error('[PUT /api/usuarios] Erro na RPC fn_sincronizar_vinculos_usuario:', rpcError);
+        if (isDuplicateEmailError(rpcError)) {
+          return res.status(409).json({ error: MSG_EMAIL_DUPLICADO });
+        }
         // Mapear prefixos semânticos da RPC para respostas HTTP adequadas
         const msg = rpcError.message || '';
         if (msg.includes('USUARIO_NAO_ENCONTRADO')) {
@@ -452,7 +487,12 @@ export default async function handler(req, res) {
         resUpdate = await supabase.from('usuarios').update(updatesAlt).eq('id', id).select('*').single();
       }
       const { data, error } = resUpdate;
-      if (error) return res.status(500).json({ error: error.message || 'Erro ao atualizar usuário' });
+      if (error) {
+        if (isDuplicateEmailError(error)) {
+          return res.status(409).json({ error: MSG_EMAIL_DUPLICADO });
+        }
+        return res.status(500).json({ error: error.message || 'Erro ao atualizar usuário' });
+      }
 
       // Fallback legado: body.instituicao_id / body.unidade_id avulsos
       if (body.instituicao_id !== undefined || body.unidade_id !== undefined) {

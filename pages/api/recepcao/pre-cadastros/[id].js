@@ -6,6 +6,12 @@ import {
   applyInstituicaoFilter,
   resolveInstituicaoId,
 } from '../../../../lib/auth-server';
+import {
+  validarEmailUnico,
+  isDuplicateEmailError,
+  MSG_EMAIL_DUPLICADO,
+  normalizeEmail,
+} from '../../../../lib/api-helpers';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -112,7 +118,7 @@ export default async function handler(req, res) {
     const updates = {};
     if (nome               !== undefined) updates.nome                = String(nome).trim();
     if (cpf                !== undefined) updates.cpf                 = cpf                ? String(cpf).trim() : null;
-    if (email              !== undefined) updates.email               = email              ? String(email).trim().toLowerCase() : null;
+    if (email              !== undefined) updates.email               = normalizeEmail(email);
     if (telefone_celular   !== undefined) updates.telefone_celular    = telefone_celular   ? String(telefone_celular).trim() : null;
     if (observacoes_adicionais !== undefined) updates.observacoes_adicionais = observacoes_adicionais || null;
     if (data_nascimento    !== undefined) updates.data_nascimento     = data_nascimento    || null;
@@ -125,6 +131,18 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Nenhum campo para atualizar' });
     }
 
+    if (updates.email) {
+      const emailCheck = await validarEmailUnico({
+        email: updates.email,
+        currentAlunoId: id,
+        supabaseClient: supabase,
+      });
+
+      if (!emailCheck.valid) {
+        return res.status(409).json({ error: emailCheck.error || MSG_EMAIL_DUPLICADO });
+      }
+    }
+
     const { data: updated, error: updateError } = await supabase
       .from('alunos')
       .update(updates)
@@ -132,7 +150,12 @@ export default async function handler(req, res) {
       .select()
       .single();
 
-    if (updateError) return res.status(500).json({ error: updateError.message });
+    if (updateError) {
+      if (isDuplicateEmailError(updateError)) {
+        return res.status(409).json({ error: MSG_EMAIL_DUPLICADO });
+      }
+      return res.status(500).json({ error: updateError.message });
+    }
 
     await registrarAuditoria(id, authUser.id, 'EDITAR_PRE_CADASTRO', {
       antes: {

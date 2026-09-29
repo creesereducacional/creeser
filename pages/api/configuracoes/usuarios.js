@@ -24,9 +24,10 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     const body = req.body || {};
     const instId = resolveInstituicaoId(req, authUser);
+    const cleanEmail = body.email ? String(body.email).trim().toLowerCase() : null;
     const { data, error } = await supabase.from('usuarios_sistema').insert({
       nome:           body.nome           || '',
-      email:          body.email          || null,
+      email:          cleanEmail,
       tipo:           body.tipo           || 'OPERADOR',
       ativo:          body.ativo          !== false,
       instituicao_id: instId              || null,

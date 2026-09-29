@@ -7,6 +7,12 @@ import {
   resolveInstituicaoId,
 } from '../../../../lib/auth-server';
 import { rateLimit, getClientIp } from '../../../../lib/rate-limit';
+import {
+  validarEmailUnico,
+  isDuplicateEmailError,
+  MSG_EMAIL_DUPLICADO,
+  normalizeEmail,
+} from '../../../../lib/api-helpers';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -34,12 +40,101 @@ export default async function handler(req, res) {
       .order('datacriacao', { ascending: false });
 
     query = applyInstituicaoFilter(query, instituicaoId);
-    const { data, error } = await query;
-    if (error) {
-      console.error('[pre-cadastros/GET]', error.message);
+
+    // Buscar também dados auxiliares para resolver nomes e opções de filtros
+    let cursosQuery = supabase.from('cursos').select('id, nome, instituicao_id');
+    let turmasQuery = supabase.from('turmas').select('id, nome, cursoid, unidadeid, turno, situacao, instituicao_id');
+    let unidadesQuery = supabase.from('unidades').select('id, nome, instituicao_id');
+    let cursoUnidadeQuery = supabase.from('curso_unidade').select('id, cursoid, unidadeid');
+
+    cursosQuery = applyInstituicaoFilter(cursosQuery, instituicaoId);
+    turmasQuery = applyInstituicaoFilter(turmasQuery, instituicaoId);
+    unidadesQuery = applyInstituicaoFilter(unidadesQuery, instituicaoId);
+
+    const [
+      { data: alunos, error: errAlunos },
+      { data: cursos },
+      { data: turmas },
+      { data: unidades },
+      { data: cursoUnidade },
+    ] = await Promise.all([
+      query,
+      cursosQuery,
+      turmasQuery,
+      unidadesQuery,
+      cursoUnidadeQuery,
+    ]);
+
+    if (errAlunos) {
+      console.error('[pre-cadastros/GET]', errAlunos.message);
       return res.status(500).json({ error: 'Erro interno ao carregar pré-cadastros' });
     }
-    return res.status(200).json(data || []);
+
+    const cursosMap = Object.fromEntries((cursos || []).map(c => [c.id, c]));
+    const turmasMap = Object.fromEntries((turmas || []).map(t => [t.id, t]));
+    const unidadesMap = Object.fromEntries((unidades || []).map(u => [u.id, u]));
+
+    // Mapear curso -> unidades vinculadas
+    const cursoUnidadesMap = {};
+    (cursoUnidade || []).forEach(cu => {
+      if (!cursoUnidadesMap[cu.cursoid]) cursoUnidadesMap[cu.cursoid] = new Set();
+      cursoUnidadesMap[cu.cursoid].add(cu.unidadeid);
+    });
+    (turmas || []).forEach(t => {
+      if (t.cursoid && t.unidadeid) {
+        if (!cursoUnidadesMap[t.cursoid]) cursoUnidadesMap[t.cursoid] = new Set();
+        cursoUnidadesMap[t.cursoid].add(t.unidadeid);
+      }
+    });
+
+    const enrichedAlunos = (alunos || []).map(a => {
+      const turma = turmasMap[a.turmaid];
+      const curso = cursosMap[a.cursoid];
+      let unidadeId = turma?.unidadeid || null;
+      if (!unidadeId && a.cursoid && cursoUnidadesMap[a.cursoid]?.size === 1) {
+        unidadeId = Array.from(cursoUnidadesMap[a.cursoid])[0];
+      }
+      const unidade = unidadesMap[unidadeId];
+
+      return {
+        ...a,
+        curso_nome: curso?.nome || null,
+        turma_nome: turma?.nome ? `${turma.nome}${turma.turno ? ' — ' + turma.turno : ''}` : null,
+        unidade_id: unidadeId,
+        unidade_nome: unidade?.nome || null,
+      };
+    });
+
+    if (req.query.include_options === 'true' || req.query.include_options === '1') {
+      const opcoesCursos = (cursos || []).map(c => ({
+        id: c.id,
+        nome: c.nome,
+        unidade_ids: Array.from(cursoUnidadesMap[c.id] || []),
+      }));
+
+      const opcoesTurmas = (turmas || []).map(t => ({
+        id: t.id,
+        nome: t.nome,
+        cursoid: t.cursoid,
+        unidadeid: t.unidadeid,
+        turno: t.turno,
+        situacao: t.situacao,
+      }));
+
+      const opcoesUnidades = (unidades || []).map(u => ({
+        id: u.id,
+        nome: u.nome,
+      }));
+
+      return res.status(200).json({
+        alunos: enrichedAlunos,
+        unidades: opcoesUnidades,
+        cursos: opcoesCursos,
+        turmas: opcoesTurmas,
+      });
+    }
+
+    return res.status(200).json(enrichedAlunos);
   }
 
   // ── POST ─ criar pré-cadastro ───────────────────────────────────
@@ -147,10 +242,24 @@ export default async function handler(req, res) {
     const finTel  = responsavel_financeiro_mesmo ? responsavel_telefone : financeiro_telefone;
     const finPar  = responsavel_financeiro_mesmo ? responsavel_parentesco : financeiro_parentesco;
 
+    const cleanEmail = normalizeEmail(email);
+
+    // Validação de unicidade de e-mail (alunos e usuários)
+    if (cleanEmail) {
+      const emailCheck = await validarEmailUnico({
+        email: cleanEmail,
+        supabaseClient: supabase,
+      });
+
+      if (!emailCheck.valid) {
+        return res.status(409).json({ error: emailCheck.error || MSG_EMAIL_DUPLICADO });
+      }
+    }
+
     const novoAluno = {
       nome: nome.trim(),
       cpf:              cpf?.trim()             || null,
-      email:            email?.trim()            || null,
+      email:            cleanEmail,
       telefone_celular: telefone_celular?.trim() || null,
       data_nascimento:  data_nascimento         || null,
       responsavel_nome:       responsavel_nome?.trim()       || null,
@@ -211,7 +320,12 @@ export default async function handler(req, res) {
       .select('id, nome, statusmatricula')
       .single();
 
-    if (alunoError) return res.status(500).json({ error: alunoError.message });
+    if (alunoError) {
+      if (isDuplicateEmailError(alunoError)) {
+        return res.status(409).json({ error: MSG_EMAIL_DUPLICADO });
+      }
+      return res.status(500).json({ error: alunoError.message });
+    }
 
     // Auditoria
     try {

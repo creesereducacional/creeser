@@ -7,6 +7,12 @@ import {
   resolveContextoUsuario,
   resolveInstituicaoId,
 } from '../../../lib/auth-server';
+import {
+  validarEmailUnico,
+  isDuplicateEmailError,
+  MSG_EMAIL_DUPLICADO,
+  normalizeEmail,
+} from '../../../lib/api-helpers';
 
 export const config = {
   api: {
@@ -551,6 +557,22 @@ export default async function handler(req, res) {
         }
       }
 
+      // Validação de unicidade de e-mail (alunos e usuários)
+      const cleanEmail = normalizeEmail(formData.email);
+      if (cleanEmail) {
+        const emailCheck = await validarEmailUnico({
+          email: cleanEmail,
+          supabaseClient: supabase,
+        });
+
+        if (!emailCheck.valid) {
+          return res.status(409).json({
+            error: emailCheck.error || MSG_EMAIL_DUPLICADO,
+            message: emailCheck.error || MSG_EMAIL_DUPLICADO,
+          });
+        }
+      }
+
       const alunoData = {
         // ===== IDENTIFICAÇÃO =====
         nome: toUppercase(formData.nome) || '',
@@ -574,7 +596,7 @@ export default async function handler(req, res) {
         orgao_expedidor_rg: toUppercase(formData.orgaoExpedidorRG) || null,
         uf_rg: toUppercase(formData.ufRG) || null,
         telefone_celular: formData.telefoneCelular || null,
-        email: formData.email ? formData.email.toLowerCase() : null,  // Email sempre lowercase
+        email: cleanEmail,
 
         // ===== FILIAÇÃO =====
         pai: toUppercase(formData.pai) || null,
@@ -709,6 +731,13 @@ export default async function handler(req, res) {
         if (error) {
           console.error('❌ ERRO SUPABASE:', error.message);
           console.error('   Detalhes:', error);
+
+          if (isDuplicateEmailError(error)) {
+            return res.status(409).json({
+              message: MSG_EMAIL_DUPLICADO,
+              error: MSG_EMAIL_DUPLICADO,
+            });
+          }
 
           if (error.code === '23505' || String(error.message || '').includes('alunos_cpf_key') || String(error.message || '').includes('duplicate key')) {
             return res.status(409).json({
