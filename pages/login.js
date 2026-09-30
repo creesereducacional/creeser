@@ -117,7 +117,7 @@ export default function Login() {
                   impulsiona<br />
                   <span className="text-[#00d09c]">a educação</span>
                 </h1>
-                <p className="mt-4 sm:mt-5 text-xs sm:text-sm lg:text-[15px] xl:text-base text-white/85 font-medium leading-relaxed max-w-[380px] xl:max-w-[460px]">
+                <p className="mt-4 sm:mt-5 text-xs sm:text-sm lg:text-[15px] xl:text-base text-white font-medium leading-relaxed max-w-[380px] xl:max-w-[460px]">
                   Acesso seguro e centralizado para a gestão acadêmica, financeira e administrativa do Grupo Creeser.
                 </p>
               </div>
@@ -134,7 +134,7 @@ export default function Login() {
                   </div>
                   <div>
                     <p className="text-xs sm:text-sm xl:text-base font-bold text-white leading-snug">Gestão Integrada</p>
-                    <p className="text-[11px] sm:text-xs xl:text-[13px] text-white/70 font-medium">Acadêmico, financeiro e administrativo em um só lugar.</p>
+                    <p className="text-[11px] sm:text-xs xl:text-[13px] text-white/90 font-medium">Acadêmico, financeiro e administrativo em um só lugar.</p>
                   </div>
                 </div>
 
@@ -147,7 +147,7 @@ export default function Login() {
                   </div>
                   <div>
                     <p className="text-xs sm:text-sm xl:text-base font-bold text-white leading-snug">Controle e Segurança</p>
-                    <p className="text-[11px] sm:text-xs xl:text-[13px] text-white/70 font-medium">Acesso por perfis e permissões.</p>
+                    <p className="text-[11px] sm:text-xs xl:text-[13px] text-white/90 font-medium">Acesso por perfis e permissões.</p>
                   </div>
                 </div>
 
@@ -161,7 +161,7 @@ export default function Login() {
                   </div>
                   <div>
                     <p className="text-xs sm:text-sm xl:text-base font-bold text-white leading-snug">Processos Mais Ágeis</p>
-                    <p className="text-[11px] sm:text-xs xl:text-[13px] text-white/70 font-medium">Organize, acompanhe e tome decisões com mais eficiência.</p>
+                    <p className="text-[11px] sm:text-xs xl:text-[13px] text-white/90 font-medium">Organize, acompanhe e tome decisões com mais eficiência.</p>
                   </div>
                 </div>
 
@@ -174,7 +174,7 @@ export default function Login() {
                   </div>
                   <div>
                     <p className="text-xs sm:text-sm xl:text-base font-bold text-white leading-snug">Informações Confiáveis</p>
-                    <p className="text-[11px] sm:text-xs xl:text-[13px] text-white/70 font-medium">Dados atualizados para uma gestão mais estratégica.</p>
+                    <p className="text-[11px] sm:text-xs xl:text-[13px] text-white/90 font-medium">Dados atualizados para uma gestão mais estratégica.</p>
                   </div>
                 </div>
 

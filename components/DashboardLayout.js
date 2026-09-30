@@ -409,15 +409,7 @@ export default function DashboardLayout({ children }) {
   const menuFiltrado = filtrarMenuPorContexto(menuItems, user);
 
   return (
-    <div
-      className="min-h-screen bg-cover bg-fixed bg-center flex relative"
-      style={{
-        backgroundImage: "url('/images/bg_app.png')",
-      }}
-    >
-      {/* Camada sutil de fundo para contraste de alto padrão SaaS */}
-      <div className="absolute inset-0 bg-slate-100/92 backdrop-blur-[1px] pointer-events-none z-0"></div>
-
+    <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
       <aside className={`${
         sidebarOpen ? 'w-64' : 'w-20'
