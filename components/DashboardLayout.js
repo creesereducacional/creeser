@@ -409,20 +409,28 @@ export default function DashboardLayout({ children }) {
   const menuFiltrado = filtrarMenuPorContexto(menuItems, user);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div
+      className="min-h-screen bg-cover bg-fixed bg-center flex relative"
+      style={{
+        backgroundImage: "url('/images/bg_app.png')",
+      }}
+    >
+      {/* Camada sutil de fundo para contraste de alto padrão SaaS */}
+      <div className="absolute inset-0 bg-slate-100/92 backdrop-blur-[1px] pointer-events-none z-0"></div>
+
       {/* Sidebar */}
       <aside className={`${
         sidebarOpen ? 'w-64' : 'w-20'
-      } bg-gradient-to-b from-teal-700 to-teal-800 text-white shadow-lg transition-all duration-300 fixed h-full left-0 top-0 overflow-hidden z-50 flex flex-col`}>
+      } bg-gradient-to-b from-[#0a2342] via-[#0b2b52] to-[#081a32] text-white shadow-xl transition-all duration-300 fixed h-full left-0 top-0 overflow-hidden z-50 flex flex-col border-r border-slate-800/40`}>
         
         {/* Logo */}
-        <div className="p-4 border-b border-teal-600 flex items-center justify-center min-h-20">
+        <div className="p-4 border-b border-slate-700/50 flex items-center justify-center min-h-20 bg-slate-950/20">
           {sidebarOpen ? (
             <div className="flex items-center justify-center">
-              <img src="/images/logo02.fw.png" alt="CREESER" className="h-10 object-contain" />
+              <img src="/images/logo_creeser.png" alt="CREESER" className="h-9 object-contain brightness-110" />
             </div>
           ) : (
-            <div className="text-xl font-bold text-white">C</div>
+            <div className="text-xl font-black text-teal-400">C</div>
           )}
         </div>
 
@@ -553,7 +561,7 @@ export default function DashboardLayout({ children }) {
       </aside>
 
       {/* Main Content */}
-      <div className={`${sidebarOpen ? 'ml-64' : 'ml-20'} flex-1 transition-all duration-300 flex flex-col`}>
+      <div className={`${sidebarOpen ? 'ml-64' : 'ml-20'} flex-1 transition-all duration-300 flex flex-col relative z-10`}>
         
         {/* Top Header */}
         <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">

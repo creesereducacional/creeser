@@ -83,10 +83,16 @@ export default function ComercialLayout({ children, titulo }) {
   }[perfilAtual] || perfilAtual;
 
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
+    <div
+      className="flex h-screen bg-cover bg-fixed bg-center overflow-hidden relative"
+      style={{ backgroundImage: "url('/images/bg_app.png')" }}
+    >
+      {/* Overlay de contraste para garantir leitura impecável */}
+      <div className="absolute inset-0 bg-slate-100/92 backdrop-blur-[1px] pointer-events-none z-0"></div>
+
       {/* ── Sidebar ────────────────────────────────────────────────── */}
       <aside
-        className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gradient-to-b from-teal-700 to-teal-900 shadow-2xl text-white flex flex-col transition-all duration-300 flex-shrink-0`}
+        className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gradient-to-b from-[#0a2342] via-[#0b2b52] to-[#081a32] shadow-2xl text-white flex flex-col transition-all duration-300 flex-shrink-0 z-10`}
       >
         {/* Logo */}
         <div className="px-4 py-5 border-b border-teal-600 flex items-center justify-between">
@@ -190,7 +196,7 @@ export default function ComercialLayout({ children, titulo }) {
       </aside>
 
       {/* ── Conteúdo principal ─────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden z-10">
         {/* Header */}
         <header className="bg-white shadow-sm px-6 py-4 flex items-center justify-between flex-shrink-0">
           <h1 className="text-lg font-bold text-gray-800">
