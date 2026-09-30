@@ -93,13 +93,13 @@ export default function Login() {
         <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-[1px] lg:hidden z-0"></div>
 
         {/* Container Principal */}
-        <div className="w-full min-h-screen flex flex-col lg:flex-row items-center justify-between px-6 sm:px-10 lg:px-12 xl:px-16 2xl:px-24 py-8 lg:py-10 relative z-10">
+        <div className="w-full min-h-screen flex flex-col lg:flex-row items-center justify-between px-6 sm:px-10 lg:px-14 xl:px-20 2xl:px-28 py-8 lg:py-12 relative z-10">
           
           {/* Coluna Esquerda: Conteúdo Institucional Administrativo */}
-          <div className="w-full lg:w-[400px] xl:w-[460px] 2xl:w-[500px] flex-shrink-0 flex flex-col justify-between self-stretch py-2 lg:py-4 z-10">
+          <div className="w-full lg:w-[430px] xl:w-[490px] 2xl:w-[530px] flex-shrink-0 flex flex-col justify-center py-4 lg:py-6 z-10">
             <div>
               {/* Logo Creeser */}
-              <div className="mb-5 lg:mb-7">
+              <div className="mb-6 lg:mb-8">
                 <img
                   src="/images/logo_creeser.png"
                   alt="Creeser Grupo Educacional"
@@ -108,22 +108,22 @@ export default function Login() {
               </div>
 
               {/* Tag e Headline Principal */}
-              <div className="mb-5 lg:mb-7">
-                <p className="text-xs uppercase tracking-widest font-extrabold text-teal-300 mb-2">
+              <div className="mb-6 lg:mb-8">
+                <p className="text-xs uppercase tracking-widest font-extrabold text-teal-300 mb-2.5">
                   PORTAL ADMINISTRATIVO
                 </p>
-                <h1 className="text-3xl sm:text-4xl lg:text-[40px] xl:text-[46px] 2xl:text-[52px] font-black text-white leading-[1.08] tracking-tight">
+                <h1 className="text-3xl sm:text-4xl lg:text-[42px] xl:text-[48px] 2xl:text-[54px] font-black text-white leading-[1.28] sm:leading-[1.25] xl:leading-[1.22] tracking-tight">
                   Gestão que<br />
                   impulsiona<br />
                   <span className="text-[#00d09c]">a educação</span>
                 </h1>
-                <p className="mt-3.5 sm:mt-4 text-xs sm:text-sm lg:text-[15px] xl:text-base text-white/80 font-medium leading-relaxed max-w-[380px] xl:max-w-[440px]">
+                <p className="mt-4 sm:mt-5 text-xs sm:text-sm lg:text-[15px] xl:text-base text-white/85 font-medium leading-relaxed max-w-[380px] xl:max-w-[460px]">
                   Acesso seguro e centralizado para a gestão acadêmica, financeira e administrativa do Grupo Creeser.
                 </p>
               </div>
 
               {/* Lista de Recursos Administrativos */}
-              <div className="space-y-3.5 xl:space-y-4">
+              <div className="space-y-4 xl:space-y-4.5">
                 
                 {/* Item 1: Gestão Integrada */}
                 <div className="flex items-center gap-3.5">
@@ -186,7 +186,21 @@ export default function Login() {
           <div className="hidden lg:block flex-1 pointer-events-none"></div>
 
           {/* Coluna Direita: Card de Login Administrativo */}
-          <div className="w-full lg:w-[380px] xl:w-[410px] 2xl:w-[430px] flex-shrink-0 flex justify-center lg:justify-end my-6 lg:my-0 z-20">
+          <div className="w-full lg:w-[380px] xl:w-[410px] 2xl:w-[430px] flex-shrink-0 flex flex-col items-center lg:items-end my-4 lg:my-0 z-20">
+            
+            {/* Link Superior: Voltar para o site */}
+            <div className="w-full flex justify-end mb-3 sm:mb-4">
+              <a
+                href="https://creeser.com.br"
+                className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800 hover:text-[#007A78] bg-white/95 hover:bg-white backdrop-blur-md px-4 py-2 sm:py-2.5 rounded-2xl shadow-md hover:shadow-lg border border-slate-200/90 transition-all duration-200 group"
+              >
+                <svg className="w-4 h-4 text-slate-600 group-hover:text-[#007A78] group-hover:-translate-x-1 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                </svg>
+                <span>Voltar para o site</span>
+              </a>
+            </div>
+
             <div className="bg-white rounded-[28px] xl:rounded-[32px] shadow-2xl p-6 sm:p-8 xl:p-9 w-full border border-slate-100/90 relative">
               
               {/* Logo dentro do Card */}
@@ -337,6 +351,23 @@ export default function Login() {
               </div>
 
             </div>
+
+            {/* Link Discreto para Portal Acadêmico */}
+            <div className="mt-3.5 text-center w-full">
+              <a
+                href="https://portal.creeser.com.br/login"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-[#007A78] bg-white/80 hover:bg-white backdrop-blur-md px-4 py-2 rounded-full shadow-sm hover:shadow border border-slate-200/80 transition-all duration-200"
+              >
+                <svg className="w-3.5 h-3.5 text-[#007A78]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+                </svg>
+                <span>Portal Acadêmico (Alunos e Professores)</span>
+                <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </a>
+            </div>
           </div>
 
         </div>
@@ -401,7 +432,7 @@ export default function Login() {
 
             {/* Headline Principal de Grande Impacto */}
             <div className="mb-5 lg:mb-7">
-              <h1 className="text-3xl sm:text-4xl lg:text-[40px] xl:text-[46px] 2xl:text-[52px] font-black text-[#0a2342] leading-[1.08] tracking-tight">
+              <h1 className="text-3xl sm:text-4xl lg:text-[40px] xl:text-[46px] 2xl:text-[52px] font-black text-[#0a2342] leading-[1.22] sm:leading-[1.2] xl:leading-[1.18] tracking-tight">
                 Conhecimento<br />
                 que transforma<br />
                 futuros
@@ -474,7 +505,21 @@ export default function Login() {
         <div className="hidden lg:block flex-1 pointer-events-none"></div>
 
         {/* Coluna Direita: Card de Login Flutuante */}
-        <div className="w-full lg:w-[380px] xl:w-[410px] 2xl:w-[430px] flex-shrink-0 flex justify-center lg:justify-end my-6 lg:my-0 z-20">
+        <div className="w-full lg:w-[380px] xl:w-[410px] 2xl:w-[430px] flex-shrink-0 flex flex-col items-center lg:items-end my-4 lg:my-0 z-20">
+          
+          {/* Link Superior: Voltar para o site */}
+          <div className="w-full flex justify-end mb-3 sm:mb-4">
+            <a
+              href="https://creeser.com.br"
+              className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800 hover:text-[#0070f3] bg-white/95 hover:bg-white backdrop-blur-md px-4 py-2 sm:py-2.5 rounded-2xl shadow-md hover:shadow-lg border border-slate-200/90 transition-all duration-200 group"
+            >
+              <svg className="w-4 h-4 text-slate-600 group-hover:text-[#0070f3] group-hover:-translate-x-1 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+              </svg>
+              <span>Voltar para o site</span>
+            </a>
+          </div>
+
           <div className="bg-white rounded-[28px] xl:rounded-[32px] shadow-2xl p-6 sm:p-8 xl:p-9 w-full border border-slate-100/90 relative">
             
             {/* Logo dentro do Card */}
@@ -653,6 +698,23 @@ export default function Login() {
               </div>
             </div>
 
+          </div>
+
+          {/* Link Discreto para Área Administrativa */}
+          <div className="mt-3.5 text-center w-full">
+            <a
+              href="https://app.creeser.com.br/login"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-[#0070f3] bg-white/80 hover:bg-white backdrop-blur-md px-4 py-2 rounded-full shadow-sm hover:shadow border border-slate-200/80 transition-all duration-200"
+            >
+              <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span>Área Administrativa</span>
+              <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </a>
           </div>
         </div>
 
