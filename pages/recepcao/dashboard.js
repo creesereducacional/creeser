@@ -64,6 +64,13 @@ function formatarDataHora(dataStr) {
   return { data, hora };
 }
 
+function getSaudacao() {
+  const hora = new Date().getHours();
+  if (hora >= 5 && hora < 12) return 'Bom dia';
+  if (hora >= 12 && hora < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
+
 export default function RecepcaoDashboard() {
   const router = useRouter();
   const [lista, setLista] = useState([]);
@@ -106,6 +113,12 @@ export default function RecepcaoDashboard() {
   const indiceInicio = totalRegistros === 0 ? 0 : (paginaAtual - 1) * itensPorPagina + 1;
   const indiceFim = Math.min(paginaAtual * itensPorPagina, totalRegistros);
 
+  // Saudação dinâmica com base no horário
+  const [saudacao, setSaudacao] = useState('Bom dia');
+  useEffect(() => {
+    setSaudacao(getSaudacao());
+  }, []);
+
   return (
     <RecepcaoLayout titulo="Dashboard — Recepção" badgeCount={lista.length}>
       <div className="space-y-6 max-w-7xl mx-auto">
@@ -117,7 +130,7 @@ export default function RecepcaoDashboard() {
           {/* Lado Esquerdo: Textos Institucionais */}
           <div className="z-10 max-w-md sm:max-w-lg md:max-w-xl text-left">
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-[#0f2b5c] tracking-tight flex items-center gap-2">
-              Bom dia, Recepção! <span className="inline-block animate-bounce">👋</span>
+              {saudacao}, Recepção! <span className="inline-block animate-bounce">👋</span>
             </h2>
             <p className="text-xs sm:text-sm md:text-base text-gray-600 font-medium mt-2.5 leading-relaxed">
               Aqui está o resumo das atividades de hoje. Mantenha os atendimentos em dia e ajude novos alunos a iniciarem sua jornada no CREESER.

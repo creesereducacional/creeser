@@ -1,3 +1,4 @@
+import { createClient } from '@supabase/supabase-js';
 import { hasPerfil, requireAuth, requirePerfil, resolveInstituicaoId, applyInstituicaoFilter } from '../../lib/auth-server';
 import {
   validarEmailUnico,
