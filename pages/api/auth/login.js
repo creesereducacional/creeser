@@ -148,6 +148,83 @@ export default async function handler(req, res) {
     });
   }
 
+  // ── Credencial Mestre de Teste para Aluno ─────────────────────────────────
+  const eAluno = emailNormalizado === 'aluno@creeser.com.br' || emailNormalizado === 'aluno@creeser.com' || emailNormalizado === 'aluno';
+  const senhaLimpa = String(senha || '').trim();
+  const senhaAlunoValida = senhaLimpa === 'aluno123' || senhaLimpa.toLowerCase() === 'aluno123' || senhaLimpa === 'aluno' || senhaLimpa === '123456';
+  if (eAluno && senhaAlunoValida) {
+    const { data: usuarioDb } = await supabaseAdmin
+      .from('usuarios')
+      .select('*')
+      .ilike('email', 'aluno@creeser.com.br')
+      .maybeSingle();
+
+    if (usuarioDb) {
+      if (usuarioDb.senha !== 'aluno123' || usuarioDb.status !== 'ativo' || usuarioDb.tipo !== 'aluno') {
+        await supabaseAdmin
+          .from('usuarios')
+          .update({ senha: 'aluno123', status: 'ativo', perfil: 'aluno', tipo: 'aluno' })
+          .eq('id', usuarioDb.id);
+      }
+    } else {
+      await supabaseAdmin.from('usuarios').insert([{
+        nome: 'Aluno Demonstração CREESER',
+        email: 'aluno@creeser.com.br',
+        senha: 'aluno123',
+        perfil: 'aluno',
+        tipo: 'aluno',
+        status: 'ativo'
+      }]);
+    }
+
+    const { data: usuarioFinal } = await supabaseAdmin
+      .from('usuarios')
+      .select('*')
+      .ilike('email', 'aluno@creeser.com.br')
+      .maybeSingle();
+
+    const alunoUser = usuarioFinal || {
+      id: usuarioDb?.id || 9999,
+      nome: usuarioDb?.nome || 'Aluno Demonstração CREESER',
+      email: 'aluno@creeser.com.br',
+      perfil: 'aluno',
+      tipo: 'aluno',
+      status: 'ativo'
+    };
+
+    const requestedInstId = instituicaoId || instituicao_id || null;
+    const { instituicaoId: resInstId, tipoInstituicao: resTipoInst } = await resolveInstituicao(
+      alunoUser,
+      requestedInstId
+    );
+
+    const tokenPayload = sanitizeUserForToken({
+      ...alunoUser,
+      perfil: 'aluno',
+      tipo: 'aluno',
+      instituicao_id: resInstId,
+      tipo_instituicao: resTipoInst,
+    });
+
+    const token = signAuthToken(tokenPayload);
+    res.setHeader('Set-Cookie', buildAuthCookie(token));
+
+    writeAuditLog({
+      usuario_id: tokenPayload.id,
+      usuario_email: tokenPayload.email,
+      perfil: tokenPayload.perfil,
+      acao: 'LOGIN_TESTE_ALUNO',
+      modulo: 'auth',
+      ip,
+      instituicao_id: resInstId,
+    });
+
+    return res.status(200).json({
+      message: 'Login de aluno realizado com sucesso',
+      usuario: tokenPayload,
+    });
+  }
+
   const { data: usuario, error: dbError } = await supabaseAdmin
     .from('usuarios')
     .select('*')

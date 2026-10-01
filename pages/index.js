@@ -58,23 +58,17 @@ export default function LandingPage() {
               <a href="#seguranca" className="hover:text-[#0070f3] transition-colors">Segurança</a>
             </nav>
 
-            {/* Botões de Ação */}
+            {/* Botão de Ação */}
             <div className="hidden sm:flex items-center gap-3">
               <Link
                 href="/login"
-                className="px-4 py-2 text-sm font-semibold text-slate-700 hover:text-[#0070f3] border border-slate-200 hover:border-slate-300 rounded-xl transition shadow-xs"
-              >
-                Entrar
-              </Link>
-              <button
-                onClick={() => setModalDemoAberto(true)}
                 className="px-5 py-2.5 text-sm font-bold text-white bg-[#0070f3] hover:bg-[#005ecf] active:bg-[#004fad] rounded-xl transition shadow-md shadow-blue-500/20 flex items-center gap-1.5"
               >
-                <span>Solicitar demonstração</span>
+                <span>Acesso ao sistema</span>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                 </svg>
-              </button>
+              </Link>
             </div>
 
             {/* Menu Hambúrguer Mobile */}
@@ -148,19 +142,14 @@ export default function LandingPage() {
                 <div className="pt-4 border-t border-slate-100 flex flex-col gap-2.5">
                   <Link
                     href="/login"
-                    className="w-full text-center py-2.5 text-sm font-semibold text-slate-700 border border-slate-200 rounded-xl"
+                    onClick={() => setMenuMobileAberto(false)}
+                    className="w-full text-center py-2.5 text-sm font-bold text-white bg-[#0070f3] hover:bg-[#005ecf] rounded-xl flex items-center justify-center gap-1.5"
                   >
-                    Entrar
+                    <span>Acesso ao sistema</span>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
                   </Link>
-                  <button
-                    onClick={() => {
-                      setMenuMobileAberto(false);
-                      setModalDemoAberto(true);
-                    }}
-                    className="w-full py-2.5 text-sm font-bold text-white bg-[#0070f3] rounded-xl"
-                  >
-                    Solicitar demonstração
-                  </button>
                 </div>
               </motion.div>
             )}
@@ -304,39 +293,7 @@ export default function LandingPage() {
         </section>
 
         {/* ─────────────────────────────────────────────────────────────────────
-            4. FAIXA DE PROVA REAL (FAETE)
-        ───────────────────────────────────────────────────────────────────── */}
-        <section className="py-10 lg:py-14 bg-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="bg-gradient-to-r from-slate-900 via-[#0d2a4a] to-[#0a1e36] rounded-3xl p-6 sm:p-10 text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 border border-slate-800">
-              
-              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left">
-                <div className="px-4 py-3 bg-white rounded-2xl shadow-md flex items-center justify-center flex-shrink-0">
-                  <span className="text-2xl font-black tracking-tight text-[#0c2340]">FAETE</span>
-                </div>
-                <div>
-                  <span className="inline-block px-3 py-1 bg-teal-500/20 text-teal-300 border border-teal-500/30 rounded-full text-xs font-bold uppercase tracking-wider mb-2">
-                    Já em operação em uma instituição real
-                  </span>
-                  <p className="text-sm sm:text-base text-slate-200 font-medium leading-relaxed max-w-2xl">
-                    O <strong>CREESER</strong> já está sendo utilizado na <strong>FAETE</strong>, validado na prática com processos acadêmicos reais, controle financeiro seguro e resultados concretos.
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setModalDemoAberto(true)}
-                className="px-5 py-3 text-xs sm:text-sm font-bold text-slate-900 bg-white hover:bg-slate-100 rounded-xl transition whitespace-nowrap shadow-md"
-              >
-                Conheça na prática →
-              </button>
-
-            </div>
-          </div>
-        </section>
-
-        {/* ─────────────────────────────────────────────────────────────────────
-            5. SEÇÃO: UMA PLATAFORMA PARA TODA A GESTÃO
+            4. SEÇÃO: UMA PLATAFORMA PARA TODA A GESTÃO
         ───────────────────────────────────────────────────────────────────── */}
         <section id="solucoes" className="py-16 lg:py-24 bg-slate-50 border-t border-slate-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

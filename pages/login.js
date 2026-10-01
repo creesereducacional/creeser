@@ -19,13 +19,22 @@ export default function Login() {
   const [contexto, setContexto] = useState(DOMAIN_CONTEXTS.DEFAULT);
   const [modalEsqueciSenha, setModalEsqueciSenha] = useState(false);
 
-  // Detecta o domínio atual no cliente
+  // Detecta o domínio atual no cliente ou override via query param (?tipo=admin / ?tipo=portal)
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const ctx = resolveDomainContext(window.location.hostname);
-      setContexto(ctx);
+      const urlParams = new URLSearchParams(window.location.search);
+      const queryTipo = (urlParams.get("tipo") || urlParams.get("env") || urlParams.get("modo") || urlParams.get("contexto") || "").toLowerCase();
+      
+      if (queryTipo === "admin" || queryTipo === "app") {
+        setContexto(DOMAIN_CONTEXTS.ADMIN);
+      } else if (queryTipo === "portal" || queryTipo === "academico") {
+        setContexto(DOMAIN_CONTEXTS.PORTAL);
+      } else {
+        const ctx = resolveDomainContext(window.location.hostname);
+        setContexto(ctx);
+      }
     }
-  }, []);
+  }, [router.query]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -101,7 +110,7 @@ export default function Login() {
               {/* Logo Creeser */}
               <div className="mb-6 lg:mb-8">
                 <img
-                  src="/images/logo_creeser.png"
+                  src="/images/logo_creeser2.fw.png"
                   alt="Creeser Grupo Educacional"
                   className="h-10 sm:h-12 xl:h-14 w-auto object-contain drop-shadow-sm brightness-110"
                 />
@@ -206,7 +215,7 @@ export default function Login() {
               {/* Logo dentro do Card */}
               <div className="flex justify-center mb-4">
                 <img
-                  src="/images/logo_creeser.png"
+                  src="/images/logo_creeser2.fw.png"
                   alt="Creeser"
                   className="h-9 sm:h-11 w-auto object-contain"
                 />

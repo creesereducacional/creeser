@@ -132,16 +132,16 @@ export default function DashboardLayout({ children }) {
   };
 
   const menuItems = [
-    // Menu Principal
+    // Menu Principal (Início)
     { id: 'dashboard', nome: 'Início', icon: '🏠', url: '/admin/dashboard', em_breve: false, completed: true, secao: 'Menu Principal' },
 
-    // Coordenação (restaurado)
+    // Gestão Acadêmica
     {
       id: 'coordenacao',
       nome: 'Coordenação',
       icon: '👔',
       em_breve: false,
-      secao: 'Menu Principal',
+      secao: 'Gestão Acadêmica',
       perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
       submenu: [
         { id: 'solicitacoes', nome: 'Solicitações', icon: '▪', url: '/admin/configuracoes/solicitacoes', em_breve: false, completed: true },
@@ -152,15 +152,15 @@ export default function DashboardLayout({ children }) {
       ]
     },
 
-    { id: 'comunicados', nome: 'Comunicados', icon: '✉️', url: '#', em_breve: true, secao: 'Administrativo' },
+    { id: 'comunicados', nome: 'Comunicados', icon: '✉️', url: '#', em_breve: true, secao: 'Gestão Acadêmica' },
     
-    // NPJ (com submenu)
+    // NPJ
     {
       id: 'npj',
       nome: 'NPJ',
       icon: '⚖️',
       em_breve: true,
-      secao: 'Administrativo',
+      secao: 'Gestão Acadêmica',
       perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
       tiposInstituicao: ['faculdade'],
       submenu: [
@@ -169,13 +169,13 @@ export default function DashboardLayout({ children }) {
       ]
     },
 
-    // Pedagógico (com submenu)
+    // Pedagógico
     {
       id: 'pedagogico',
       nome: 'Pedagógico',
       icon: '📚',
       em_breve: false,
-      secao: 'Pedagógico',
+      secao: 'Gestão Acadêmica',
       perfis: ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria'],
       submenu: [
         { id: 'ped-cursos', nome: 'Cursos', icon: '▪', url: '/admin/cursos', em_breve: false, completed: true },
@@ -196,9 +196,9 @@ export default function DashboardLayout({ children }) {
     {
       id: 'modulo-ead',
       nome: 'Módulo EAD',
-      icon: '📚',
+      icon: '💻',
       em_breve: false,
-      secao: 'Módulo EAD',
+      secao: 'Gestão Acadêmica',
       perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
       submenu: [
         { id: 'ead-forum', nome: 'Fórum', icon: '▪', url: '/admin/forum', em_breve: false, completed: true },
@@ -208,7 +208,7 @@ export default function DashboardLayout({ children }) {
       ]
     },
 
-    // Financeiro
+    // Gestão Administrativa
     {
       id: 'financeiro',
       nome: 'Financeiro',
@@ -217,7 +217,7 @@ export default function DashboardLayout({ children }) {
       em_breve: false,
       completed: true,
       perfis: ['grupo_admin', 'instituicao_admin', 'financeiro'],
-      secao: 'Administração'
+      secao: 'Gestão Administrativa'
     },
 
     // Processo Seletivo
@@ -228,7 +228,7 @@ export default function DashboardLayout({ children }) {
       em_breve: true, 
       perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
       tiposInstituicao: ['faculdade', 'tecnico'],
-      secao: 'Administração',
+      secao: 'Gestão Administrativa',
       submenu: [
         { id: 'locais-prova', nome: 'Locais de Prova', icon: '▪', url: '#', em_breve: true },
         { id: 'formas-ingresso', nome: 'Formas de Ingresso', icon: '▪', url: '#', em_breve: true },
@@ -242,9 +242,9 @@ export default function DashboardLayout({ children }) {
       nome: 'CPA', 
       perfis: ['grupo_admin', 'instituicao_admin'],
       tiposInstituicao: ['faculdade'],
-      icon: '🏠', 
+      icon: '📊', 
       em_breve: true, 
-      secao: 'Administração',
+      secao: 'Gestão Administrativa',
       submenu: [
         { id: 'gerenciar-cpa', nome: 'Gerenciar CPAs', icon: '▪', url: '#', em_breve: true },
         { id: 'responder-cpa', nome: 'Responder CPAs', icon: '▪', url: '#', em_breve: true },
@@ -258,8 +258,8 @@ export default function DashboardLayout({ children }) {
       perfis: ['grupo_admin', 'instituicao_admin'],
       tiposInstituicao: ['faculdade'],
       nome: 'Estágio', 
-      icon: '📊', 
-      secao: 'Administração',
+      icon: '🎓', 
+      secao: 'Gestão Administrativa',
       submenu: [
         { id: 'gerenciar-empresas', nome: 'Gerenciar empresas', icon: '▪', url: '#', em_breve: true },
         { id: 'gerenciar-estagio', nome: 'Gerenciar Estágio', icon: '▪', url: '#', em_breve: true },
@@ -274,7 +274,7 @@ export default function DashboardLayout({ children }) {
       tiposInstituicao: ['faculdade'],
       nome: 'Contábil', 
       icon: '📈', 
-      secao: 'Administração',
+      secao: 'Gestão Administrativa',
       submenu: [
         { id: 'fornecedores', nome: 'Fornecedores', icon: '▪', url: '#', em_breve: true },
         { id: 'movimentacoes', nome: 'Movimentações', icon: '▪', url: '#', em_breve: true },
@@ -287,14 +287,14 @@ export default function DashboardLayout({ children }) {
       ]
     },
 
-    // Documentos
+    // Documentação
     { 
       id: 'documentos',
       em_breve: true, 
       perfis: ['grupo_admin', 'instituicao_admin', 'financeiro'],
       nome: 'Documentos', 
       icon: '📁', 
-      secao: 'Relatórios',
+      secao: 'Documentação',
       submenu: [
         { id: 'atas', nome: 'Atas', icon: '▪', url: '#', em_breve: true },
         { id: 'certificados', nome: 'Certificados', icon: '▪', url: '#', em_breve: true },
@@ -310,7 +310,7 @@ export default function DashboardLayout({ children }) {
       perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
       nome: 'Relatórios', 
       icon: '📄', 
-      secao: 'Relatórios',
+      secao: 'Documentação',
       submenu: [
         { id: 'rel-pedagogicos', nome: 'Pedagógicos', icon: '▪', url: '#', em_breve: true },
         { id: 'rel-financeiros', nome: 'Financeiros', icon: '▪', url: '#', em_breve: true },
@@ -326,20 +326,20 @@ export default function DashboardLayout({ children }) {
       perfis: ['grupo_admin', 'instituicao_admin', 'financeiro', 'coordenador'],
       nome: 'Gráficos', 
       icon: '📊', 
-      secao: 'Relatórios',
+      secao: 'Documentação',
       submenu: [
         { id: 'graf-pedagogicos', nome: 'Pedagógicos', icon: '▪', url: '#', em_breve: true },
       ]
     },
 
-    // Eventos
+    // Outros Módulos
     { 
       id: 'eventos',
       em_breve: true, 
       perfis: ['grupo_admin', 'instituicao_admin', 'financeiro', 'coordenador'],
       nome: 'Eventos', 
-      icon: '💎', 
-      secao: 'Outras Funcionalidades',
+      icon: '📅', 
+      secao: 'Outros Módulos',
       submenu: [
         { id: 'gerenciar-eventos', nome: 'Gerenciar', icon: '▪', url: '#', em_breve: true },
         { id: 'credenciais', nome: 'Credenciais', icon: '▪', url: '#', em_breve: true },
@@ -355,7 +355,7 @@ export default function DashboardLayout({ children }) {
       em_breve: true, 
       perfis: ['grupo_admin', 'instituicao_admin'],
       tiposInstituicao: ['faculdade'],
-      secao: 'Outras Funcionalidades',
+      secao: 'Outros Módulos',
       submenu: [
         { id: 'diploma-lote', nome: 'Lote', icon: '▪', url: '#', em_breve: true },
         { id: 'diploma-assinar', nome: 'Assinar', icon: '▪', url: '#', em_breve: true },
@@ -364,28 +364,28 @@ export default function DashboardLayout({ children }) {
     },
 
     // Solicitações
-    { id: 'solicitacoes-geral', nome: 'Solicitações', icon: '✋', url: '#', em_breve: true, secao: 'Outras Funcionalidades' },
+    { id: 'solicitacoes-geral', nome: 'Solicitações', icon: '✋', url: '#', em_breve: true, secao: 'Outros Módulos' },
 
     // Ocorrências
-    { id: 'ocorrencias', nome: 'Ocorrências', icon: '⚠️', url: '#', em_breve: true, secao: 'Outras Funcionalidades' },
+    { id: 'ocorrencias', nome: 'Ocorrências', icon: '⚠️', url: '#', em_breve: true, secao: 'Outros Módulos' },
 
-    // Biblioteca
+    // Sistema
     { 
       id: 'biblioteca', 
       nome: 'Biblioteca', 
       icon: '📚', 
       em_breve: true, 
-      secao: 'Outras Funcionalidades',
+      secao: 'Sistema',
       submenu: [
         { id: 'biblioteca-virtual', nome: 'Biblioteca Virtual', icon: '▪', url: '#', em_breve: true },
       ]
     },
 
     // Integrações
-    { id: 'integracao', nome: 'Integrações', icon: '🔗', url: '#', em_breve: true, secao: 'Outras Funcionalidades' },
+    { id: 'integracao', nome: 'Integrações', icon: '🔗', url: '#', em_breve: true, secao: 'Sistema' },
 
     // Usuários
-    { id: 'usuarios', nome: 'Usuários', icon: '👥', url: '/admin/usuarios', em_breve: false, secao: 'Outras Funcionalidades', completed: true, perfis: ['grupo_admin', 'instituicao_admin'] },
+    { id: 'usuarios', nome: 'Usuários', icon: '👥', url: '/admin/usuarios', em_breve: false, secao: 'Sistema', completed: true, perfis: ['grupo_admin', 'instituicao_admin'] },
 
     // Configurações
     {
@@ -393,7 +393,7 @@ export default function DashboardLayout({ children }) {
       nome: 'Configurações',
       icon: '⚙️',
       em_breve: false,
-      secao: 'Outras Funcionalidades',
+      secao: 'Sistema',
       perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
       submenu: [
         { id: 'config-operacionais', nome: 'Configurações Operacionais', icon: '▪', url: '/admin/configuracoes', em_breve: false, completed: true },
@@ -402,198 +402,320 @@ export default function DashboardLayout({ children }) {
     },
 
     // Funcionários
-    { id: 'funcionarios', nome: 'Funcionários', icon: '👤', url: '/admin/funcionarios', em_breve: false, secao: 'Outras Funcionalidades', completed: true, perfis: ['grupo_admin', 'instituicao_admin'] },
-
+    { id: 'funcionarios', nome: 'Funcionários', icon: '👤', url: '/admin/funcionarios', em_breve: false, secao: 'Sistema', completed: true, perfis: ['grupo_admin', 'instituicao_admin'] },
   ];
 
   const menuFiltrado = filtrarMenuPorContexto(menuItems, user);
 
+  // Separa o item Início dos grupos por seção
+  const inicioItem = menuFiltrado.find(i => i.id === 'dashboard');
+  const outrosItens = menuFiltrado.filter(i => i.id !== 'dashboard');
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar */}
-      <aside className={`${
-        sidebarOpen ? 'w-64' : 'w-20'
-      } bg-gradient-to-b from-[#0a2342] via-[#0b2b52] to-[#081a32] text-white shadow-xl transition-all duration-300 fixed h-full left-0 top-0 overflow-hidden z-50 flex flex-col border-r border-slate-800/40`}>
+      
+      {/* Backdrop para Gaveta Mobile */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 lg:hidden transition-opacity"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* ── Sidebar ──────────────────────────────────────────────────────── */}
+      <aside
+        className={`${
+          sidebarOpen ? 'w-64' : 'w-20'
+        } bg-[#0B2545] text-[#E2E8F0] shadow-2xl transition-all duration-300 fixed h-full left-0 top-0 z-50 flex flex-col border-r border-[#153a66] select-none`}
+      >
         
-        {/* Logo */}
-        <div className="p-4 border-b border-slate-700/50 flex items-center justify-center min-h-20 bg-slate-950/20">
+        {/* 1. Topo / Logo */}
+        <div className="p-4 pt-5 pb-4 flex items-center justify-between min-h-[72px] border-b border-[#153a66]/70 bg-[#081d38]/40">
           {sidebarOpen ? (
-            <div className="flex items-center justify-center">
-              <img src="/images/logo_creeser.png" alt="CREESER" className="h-9 object-contain brightness-110" />
+            <div className="flex items-center justify-center w-full px-2">
+              <img
+                src="/images/logo_creeser.png"
+                alt="CREESER"
+                className="h-8 xl:h-9 w-auto object-contain brightness-110 drop-shadow-sm"
+              />
             </div>
           ) : (
-            <div className="text-xl font-black text-teal-400">C</div>
+            <div className="w-10 h-10 rounded-xl bg-[#1E3A5F] text-teal-300 font-black text-lg flex items-center justify-center mx-auto shadow-inner">
+              C
+            </div>
           )}
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition"
+          >
+            ✕
+          </button>
         </div>
 
-        {/* Menu Items */}
-        <nav className="py-0 px-3 space-y-0 flex-1 overflow-y-auto">
+        {/* 2. Card de Contexto Institucional */}
+        {sidebarOpen ? (
+          <div className="mx-3 mt-3.5 mb-2 p-2.5 rounded-2xl bg-[#0f2d52]/70 border border-[#1E3A5F] flex items-center gap-3 shadow-inner">
+            <div className="w-8 h-8 rounded-xl bg-[#1E3A5F] text-teal-300 font-black text-sm flex items-center justify-center flex-shrink-0 shadow-sm">
+              C
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-[#E2E8F0] truncate leading-tight">Creeser Educacional</p>
+              <p className="text-[10px] text-[#94A3B8] font-medium truncate mt-0.5">Sistema de Gestão</p>
+            </div>
+          </div>
+        ) : (
+          <div className="my-2 flex justify-center">
+            <div className="w-7 h-7 rounded-lg bg-[#0f2d52] text-teal-300 text-[11px] font-black flex items-center justify-center">
+              ▼
+            </div>
+          </div>
+        )}
+
+        {/* 3. Navegação de Menus */}
+        <nav className="py-2 px-3 space-y-1 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+          
+          {/* Item Início em Destaque */}
+          {inicioItem && (
+            <div className="mb-2">
+              {(() => {
+                const isActive = router.pathname === inicioItem.url;
+                return (
+                  <Link href={inicioItem.url}>
+                    <div
+                      className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 text-xs sm:text-sm cursor-pointer ${
+                        isActive
+                          ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-teal-500 text-white font-bold shadow-md shadow-teal-950/40'
+                          : 'text-[#E2E8F0] hover:bg-[#1E3A5F]/70 hover:text-white font-medium'
+                      } ${!sidebarOpen ? 'justify-center px-0' : ''}`}
+                    >
+                      <span className="text-base flex-shrink-0">{inicioItem.icon}</span>
+                      {sidebarOpen && <span className="truncate">{inicioItem.nome}</span>}
+                    </div>
+                  </Link>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* Seções de Módulos */}
           {(() => {
             const secoes = {};
-            menuFiltrado.forEach(item => {
+            outrosItens.forEach(item => {
               const secao = item.secao || 'Outros';
               if (!secoes[secao]) secoes[secao] = [];
               secoes[secao].push(item);
             });
 
             return Object.entries(secoes).map(([secao, items]) => (
-              <div key={secao} className={secao === 'Menu Principal' ? 'mt-4' : ''}>
-                {/* Separador sutil entre seções */}
-                {secao !== 'Menu Principal' && <div className="h-px bg-teal-600/20 my-2 mx-3"></div>}
+              <div key={secao} className="pt-2">
+                
+                {/* Título da Seção */}
+                {sidebarOpen ? (
+                  <div className="px-3 pt-2 pb-1.5 text-[10.5px] font-extrabold uppercase tracking-wider text-[#94A3B8]">
+                    {secao}
+                  </div>
+                ) : (
+                  <div className="h-px bg-slate-700/40 my-2 mx-2" />
+                )}
+
+                {/* Itens da Seção */}
                 <div className="space-y-1">
-                  {items.map((item) => (
-                    <div key={item.id}>
-                      {/* Item com Submenu */}
-                      {item.submenu ? (
-                        <div className="relative group">
-                          <button
-                            onClick={() => setExpandedSubmenus(prev => ({
-                              ...prev,
-                              [item.id]: !prev[item.id]
-                            }))}
-                            className={`w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg transition text-sm cursor-pointer ${
-                              expandedSubmenus[item.id]
-                                ? 'bg-teal-600 text-white font-semibold shadow-sm'
-                                : item.em_breve
-                                ? 'text-teal-200/70 hover:bg-teal-700/40 hover:text-white'
-                                : 'text-white hover:bg-teal-700/50'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <span className={`text-lg flex-shrink-0 ${item.em_breve ? 'opacity-60' : ''}`}>{item.icon}</span>
-                              {sidebarOpen && <span className="truncate">{item.nome}</span>}
-                            </div>
-                            {sidebarOpen && (
-                              <span className={`transition-transform flex-shrink-0 text-xs ${expandedSubmenus[item.id] ? 'rotate-180 text-white' : 'text-teal-200/70'}`}>
-                                ▼
-                              </span>
-                            )}
-                          </button>
+                  {items.map((item) => {
+                    const isAnySubActive = item.submenu?.some(sub => router.pathname === sub.url);
+                    const isActive = router.pathname === item.url || isAnySubActive;
 
-                          {/* Tooltip quando colapsado */}
-                          {!sidebarOpen && (
-                            <div className="hidden group-hover:block absolute left-20 top-0 bg-gray-800 text-white px-3 py-2 rounded-lg text-sm whitespace-nowrap z-50">
-                              {item.nome}
-                            </div>
-                          )}
-
-                          {/* Submenu */}
-                          {sidebarOpen && expandedSubmenus[item.id] && (
-                            <div className="bg-teal-800/50 rounded-lg mt-1 space-y-1 py-1.5 px-2 ml-2 border-l-2 border-teal-500">
-                              {item.submenu.map((subitem) => {
-                                const isSubActive = router.pathname === subitem.url;
-                                const isSubEmBreve = subitem.em_breve;
-
-                                return (
-                                  <Link key={subitem.id} href={subitem.url}>
-                                    <div className={`flex items-center gap-3 px-3 py-1.5 rounded-lg transition text-xs cursor-pointer ${
-                                      isSubActive
-                                        ? 'bg-teal-500 text-white font-bold shadow-sm'
-                                        : isSubEmBreve
-                                        ? 'text-teal-200/50 hover:bg-teal-700/30 hover:text-teal-100'
-                                        : 'text-white font-medium hover:bg-teal-700/60'
-                                    }`}>
-                                      <span className={`text-base flex-shrink-0 ${isSubEmBreve ? 'opacity-50' : ''}`}>{subitem.icon}</span>
-                                      <span className="truncate">{subitem.nome}</span>
-                                    </div>
-                                  </Link>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        /* Item sem Submenu */
-                        (() => {
-                          const isActive = router.pathname === item.url;
-                          const isEmBreve = item.em_breve;
-
-                          return (
-                            <div className="relative group">
-                              <Link href={item.url}>
-                                <div className={`flex items-center gap-3 px-3 py-2 rounded-lg transition text-sm cursor-pointer ${
-                                  isActive
-                                    ? 'bg-teal-500 text-white font-bold shadow-sm'
-                                    : isEmBreve
-                                    ? 'text-teal-200/50 hover:bg-teal-700/30 hover:text-teal-100'
-                                    : 'text-white font-medium hover:bg-teal-700/60'
-                                }`}>
-                                  <span className={`text-lg flex-shrink-0 ${isEmBreve ? 'opacity-50' : ''}`}>{item.icon}</span>
-                                  {sidebarOpen && <span className="truncate">{item.nome}</span>}
-                                </div>
-                              </Link>
-
-                              {/* Tooltip when collapsed */}
-                              {!sidebarOpen && (
-                                <div className="hidden group-hover:block absolute left-20 top-0 bg-gray-800 text-white px-3 py-2 rounded-lg text-sm whitespace-nowrap z-50">
-                                  {item.nome}
-                                </div>
+                    return (
+                      <div key={item.id}>
+                        {/* Item com Submenu */}
+                        {item.submenu ? (
+                          <div className="relative group">
+                            <button
+                              onClick={() => setExpandedSubmenus(prev => ({
+                                ...prev,
+                                [item.id]: !prev[item.id]
+                              }))}
+                              className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 text-xs sm:text-sm cursor-pointer ${
+                                isAnySubActive || expandedSubmenus[item.id]
+                                  ? 'bg-[#1E3A5F] text-white font-semibold shadow-xs'
+                                  : item.em_breve
+                                  ? 'text-[#94A3B8]/70 hover:bg-[#1E3A5F]/40 hover:text-slate-200'
+                                  : 'text-[#E2E8F0] hover:bg-[#1E3A5F]/70 hover:text-white font-medium'
+                              } ${!sidebarOpen ? 'justify-center px-0' : ''}`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <span className={`text-base flex-shrink-0 ${item.em_breve ? 'opacity-60' : ''}`}>
+                                  {item.icon}
+                                </span>
+                                {sidebarOpen && <span className="truncate">{item.nome}</span>}
+                              </div>
+                              {sidebarOpen && (
+                                <svg
+                                  className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ${
+                                    expandedSubmenus[item.id] ? 'rotate-90 text-teal-300' : 'text-[#94A3B8]'
+                                  }`}
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+                                </svg>
                               )}
-                            </div>
-                          );
-                        })()
-                      )}
-                    </div>
-                  ))}
+                            </button>
+
+                            {/* Tooltip quando colapsado */}
+                            {!sidebarOpen && (
+                              <div className="hidden group-hover:block absolute left-20 top-0 bg-[#0B2545] text-white px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap z-50 border border-slate-700 shadow-xl">
+                                {item.nome}
+                              </div>
+                            )}
+
+                            {/* Submenu Aberto */}
+                            {sidebarOpen && expandedSubmenus[item.id] && (
+                              <div className="bg-[#081d38]/85 rounded-xl my-1 py-1.5 px-2 ml-3 border-l-2 border-[#10B981] space-y-0.5 animate-fade-in">
+                                {item.submenu.map((subitem) => {
+                                  const isSubActive = router.pathname === subitem.url;
+                                  const isSubEmBreve = subitem.em_breve;
+
+                                  return (
+                                    <Link key={subitem.id} href={subitem.url}>
+                                      <div
+                                        className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-all text-xs cursor-pointer ${
+                                          isSubActive
+                                            ? 'bg-teal-500 text-white font-bold shadow-xs'
+                                            : isSubEmBreve
+                                            ? 'text-[#94A3B8]/60 hover:bg-slate-800/40 hover:text-slate-200'
+                                            : 'text-[#E2E8F0]/90 hover:bg-[#1E3A5F] hover:text-white font-medium'
+                                        }`}
+                                      >
+                                        <span className={`text-[10px] flex-shrink-0 ${isSubActive ? 'text-white' : 'text-teal-400'}`}>
+                                          ▪
+                                        </span>
+                                        <span className="truncate">{subitem.nome}</span>
+                                      </div>
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          /* Item sem Submenu */
+                          (() => {
+                            const isEmBreve = item.em_breve;
+
+                            return (
+                              <div className="relative group">
+                                <Link href={item.url}>
+                                  <div
+                                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 text-xs sm:text-sm cursor-pointer ${
+                                      isActive
+                                        ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-teal-500 text-white font-bold shadow-md shadow-teal-950/40'
+                                        : isEmBreve
+                                        ? 'text-[#94A3B8]/70 hover:bg-[#1E3A5F]/40 hover:text-slate-200'
+                                        : 'text-[#E2E8F0] hover:bg-[#1E3A5F]/70 hover:text-white font-medium'
+                                    } ${!sidebarOpen ? 'justify-center px-0' : ''}`}
+                                  >
+                                    <span className={`text-base flex-shrink-0 ${isEmBreve ? 'opacity-60' : ''}`}>
+                                      {item.icon}
+                                    </span>
+                                    {sidebarOpen && <span className="truncate">{item.nome}</span>}
+                                  </div>
+                                </Link>
+
+                                {/* Tooltip quando colapsado */}
+                                {!sidebarOpen && (
+                                  <div className="hidden group-hover:block absolute left-20 top-0 bg-[#0B2545] text-white px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap z-50 border border-slate-700 shadow-xl">
+                                    {item.nome}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ));
           })()}
         </nav>
 
-        {/* Toggle Button - Fixed to the right bottom */}
-        <div className="sticky bottom-0 px-3 py-4 bg-gradient-to-t from-teal-900 to-transparent">
+        {/* 4. Botão Recolher menu fixado no rodapé */}
+        <div className="p-3 bg-[#081d38]/90 border-t border-[#153a66] flex-shrink-0">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="w-full py-2 px-3 bg-teal-600 hover:bg-teal-500 rounded-lg transition text-sm text-center text-white font-medium"
+            className="w-full py-2.5 px-3 bg-[#0f325d] hover:bg-[#164177] active:bg-[#0c2748] border border-slate-700/50 rounded-xl transition-all text-xs text-[#E2E8F0] hover:text-white font-bold flex items-center justify-center gap-2 shadow-xs"
           >
-            {sidebarOpen ? '◀ Recolher' : '▶'}
+            <svg
+              className={`w-4 h-4 transition-transform duration-200 ${!sidebarOpen ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            </svg>
+            {sidebarOpen && <span>Recolher menu</span>}
           </button>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <div className={`${sidebarOpen ? 'ml-64' : 'ml-20'} flex-1 transition-all duration-300 flex flex-col relative z-10`}>
+      {/* ── Main Content ─────────────────────────────────────────────────── */}
+      <div className={`${sidebarOpen ? 'lg:ml-64' : 'lg:ml-20'} flex-1 transition-all duration-300 flex flex-col relative z-10 min-w-0`}>
         
         {/* Top Header */}
-        <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
+        <header className="bg-white shadow-xs border-b border-gray-200 sticky top-0 z-40">
           <div className="px-4 md:px-8 py-3 md:py-4 flex flex-col md:flex-row md:justify-between md:items-center gap-3 md:gap-0">
-            <div className="hidden md:block">
-              <h2 className="text-2xl font-bold text-gray-800">Bem-vindo ao Grupo Educacional CREESER</h2>
-              <p className="text-sm text-gray-500 mt-1">Gerencie sua instituição educacional</p>
+            <div className="flex items-center gap-3">
+              {/* Botão Hambúrguer Mobile */}
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden p-2 rounded-xl text-slate-700 hover:bg-slate-100 transition border border-slate-200"
+                aria-label="Abrir menu lateral"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              
+              <div className="hidden md:block">
+                <h2 className="text-xl lg:text-2xl font-bold text-gray-800">Bem-vindo ao Grupo Educacional CREESER</h2>
+                <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Gerencie sua instituição educacional</p>
+              </div>
+              <h2 className="md:hidden text-lg font-bold text-gray-800">CREESER Gestão</h2>
             </div>
-            <h2 className="md:hidden text-xl font-bold text-gray-800">CREESER</h2>
+
             <div className="flex items-center gap-3 md:gap-6">
               <div className="text-right hidden sm:block flex-1 md:flex-none">
-                <p className="text-sm text-gray-600">Conectado como</p>
-                <p className="font-semibold text-gray-800 truncate">{user?.nome}</p>
-                <p className="text-xs text-gray-500 uppercase tracking-wide">
+                <p className="text-xs text-gray-500">Conectado como</p>
+                <p className="font-semibold text-gray-800 truncate text-sm">{user?.nome}</p>
+                <p className="text-[10.5px] text-gray-500 uppercase tracking-wide font-medium">
                   {user?.tipo === 'admin' ? 'Admin' : 'Usuário'}
                 </p>
               </div>
               <Link href="/admin/editar-perfil">
-                <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-white font-bold cursor-pointer hover:shadow-lg transition overflow-hidden border-2 border-white shadow-md flex-shrink-0">
+                <div className="w-10 h-10 md:w-11 md:h-11 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-white font-bold cursor-pointer hover:shadow-md transition overflow-hidden border-2 border-white shadow-xs flex-shrink-0">
                   {user?.foto ? (
                     <img src={user.foto} alt={user?.nome} className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-base md:text-lg">{user?.nome?.charAt(0).toUpperCase()}</span>
+                    <span className="text-sm md:text-base">{user?.nome?.charAt(0).toUpperCase()}</span>
                   )}
                 </div>
               </Link>
               <Link href="/admin/editar-perfil">
-                <button className="hidden md:block px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg transition text-sm font-medium">
+                <button className="hidden md:block px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl transition text-xs font-semibold shadow-xs">
                   Editar Perfil
                 </button>
               </Link>
               <button
                 onClick={handleLogout}
-                className="hidden md:block px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition text-sm font-medium"
+                className="hidden md:block px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl transition text-xs font-semibold shadow-xs"
               >
                 Sair
               </button>
               <button
                 onClick={handleLogout}
-                className="md:hidden px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition text-xs font-medium"
+                className="md:hidden px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition text-xs font-medium"
               >
                 Sair
               </button>
