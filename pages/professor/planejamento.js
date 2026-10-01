@@ -58,7 +58,9 @@ export default function ProfessorPlanejamento() {
         setFormData({
           ...data,
           data: data.data || "",
-          dataFim: data.dataFim || data.data_fim || ""
+          dataFim: data.dataFim || "",
+          turma: data.turma_id || data.turma || "",
+          disciplina: data.disciplina_id || data.disciplina || "",
         });
       }
     } catch (e) {
@@ -106,128 +108,183 @@ export default function ProfessorPlanejamento() {
     }
   };
 
-  // Filtrar disciplinas com base na turma selecionada (Matriz Curricular)
+  // Filtrar disciplinas com base na turma selecionada
   const disciplinasFiltradas = opcoes.disciplinas.filter(d => {
     if (!formData.turma) return true;
     const vin = opcoes.vinculos.find(v => String(v.turma_id) === String(formData.turma) && String(v.disciplina_id) === String(d.numero_id || d.id));
-    return !!vin;
+    return !opcoes.vinculos?.length || !!vin;
   });
 
   return (
-    <ProfessorLayout title={editId ? "Editar Planejamento" : "Novo Planejamento"}>
-      <form onSubmit={handleSubmit} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <ProfessorLayout title={editId ? "Editar Planejamento de Aula" : "Novo Planejamento de Aula"}>
+      <div className="max-w-4xl mx-auto pb-10 font-sans space-y-6">
+        
+        {/* Header da Página */}
+        <div className="bg-white p-6 rounded-[24px] border border-slate-200/80 shadow-xs flex items-center justify-between">
           <div>
-            <label className="text-xs font-medium text-teal-600 block mb-1">TURMA *</label>
-            <select
-              name="turma"
-              value={formData.turma}
-              onChange={handleChange}
-              required
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:border-teal-500"
-            >
-              <option value="">- Selecione uma Turma -</option>
-              {opcoes.turmas.map(t => (
-                <option key={t.id} value={t.id}>{t.nome}</option>
-              ))}
-            </select>
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+              {editId ? "✏️ Editar Planejamento Pedagógico" : "➕ Novo Planejamento de Aula"}
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              Registre os objetivos, metodologia e conteúdos programáticos da sua aula.
+            </p>
           </div>
-
-          <div>
-            <label className="text-xs font-medium text-teal-600 block mb-1">DISCIPLINA *</label>
-            <select
-              name="disciplina"
-              value={formData.disciplina}
-              onChange={handleChange}
-              required
-              disabled={!formData.turma}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:border-teal-500 disabled:opacity-50"
-            >
-              <option value="">- Selecione a Disciplina -</option>
-              {disciplinasFiltradas.map(d => (
-                <option key={d.id} value={d.numero_id || d.id}>{d.nome}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div>
-            <label className="text-xs font-medium text-teal-600 block mb-1">DATA DA AULA *</label>
-            <input
-              type="date"
-              name="data"
-              value={formData.data}
-              onChange={handleChange}
-              required
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:border-teal-500"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-teal-600 block mb-1">SALAS/LOCAL</label>
-            <input
-              type="text"
-              name="local"
-              value={formData.local}
-              onChange={handleChange}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:border-teal-500"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-teal-600 block mb-1">QTD. AULAS *</label>
-            <input
-              type="number"
-              name="quantidadeAulas"
-              value={formData.quantidadeAulas}
-              onChange={handleChange}
-              required
-              min="1"
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:border-teal-500"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="text-xs font-medium text-teal-600 block mb-1">CONTEÚDO PROGRAMÁTICO VIVENCIADO</label>
-          <textarea
-            name="conteudoVivenciado"
-            value={formData.conteudoVivenciado}
-            onChange={handleChange}
-            rows="3"
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:border-teal-500"
-          />
-        </div>
-
-        <div>
-          <label className="text-xs font-medium text-teal-600 block mb-1">OBJETIVO DA AULA</label>
-          <textarea
-            name="objetivoAula"
-            value={formData.objetivoAula}
-            onChange={handleChange}
-            rows="3"
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:border-teal-500"
-          />
-        </div>
-
-        <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
           <button
             type="button"
             onClick={() => router.push("/professor/diario")}
-            className="px-4 py-2 border border-gray-300 text-gray-600 hover:bg-gray-50 font-semibold rounded-lg text-sm transition cursor-pointer"
+            className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold rounded-xl text-xs sm:text-sm transition cursor-pointer"
           >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-lg text-sm transition disabled:opacity-50 cursor-pointer"
-          >
-            {saving ? "Salvando..." : "Salvar Planejamento"}
+            ← Voltar ao Diário
           </button>
         </div>
-      </form>
+
+        {/* Formulário */}
+        <form onSubmit={handleSubmit} className="bg-white p-6 sm:p-8 rounded-[24px] border border-slate-200/80 shadow-xs space-y-6">
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">TURMA *</label>
+              <select
+                name="turma"
+                value={formData.turma}
+                onChange={handleChange}
+                required
+                className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:border-teal-500 focus:bg-white"
+              >
+                <option value="">- Selecione uma Turma -</option>
+                {opcoes.turmas.map(t => (
+                  <option key={t.id} value={t.id}>{t.nome}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">DISCIPLINA *</label>
+              <select
+                name="disciplina"
+                value={formData.disciplina}
+                onChange={handleChange}
+                required
+                disabled={!formData.turma}
+                className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:border-teal-500 focus:bg-white disabled:opacity-50"
+              >
+                <option value="">- Selecione a Disciplina -</option>
+                {disciplinasFiltradas.map(d => (
+                  <option key={d.id} value={d.numero_id || d.id}>{d.nome}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            <div>
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">DATA DA AULA *</label>
+              <input
+                type="date"
+                name="data"
+                value={formData.data}
+                onChange={handleChange}
+                required
+                className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:border-teal-500 focus:bg-white"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">LOCAL / SALA</label>
+              <input
+                type="text"
+                name="local"
+                value={formData.local}
+                onChange={handleChange}
+                placeholder="Ex: Sala 102, Lab, etc."
+                className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:border-teal-500 focus:bg-white"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">QTD. AULAS *</label>
+              <input
+                type="number"
+                name="quantidadeAulas"
+                value={formData.quantidadeAulas}
+                onChange={handleChange}
+                required
+                min="1"
+                className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:border-teal-500 focus:bg-white"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">CONTEÚDO PROGRAMÁTICO VIVENCIADO *</label>
+            <textarea
+              name="conteudoVivenciado"
+              value={formData.conteudoVivenciado}
+              onChange={handleChange}
+              required
+              rows="3"
+              placeholder="Descreva o conteúdo abordado na aula..."
+              className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:border-teal-500 focus:bg-white"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">OBJETIVO DA AULA</label>
+            <textarea
+              name="objetivoAula"
+              value={formData.objetivoAula}
+              onChange={handleChange}
+              rows="2"
+              placeholder="Objetivos de aprendizagem dos estudantes..."
+              className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:border-teal-500 focus:bg-white"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div>
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">METODOLOGIA UTILIZADA</label>
+              <textarea
+                name="metodologias"
+                value={formData.metodologias}
+                onChange={handleChange}
+                rows="2"
+                placeholder="Ex: Aula expositiva dialogada, estudo de casos..."
+                className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:border-teal-500 focus:bg-white"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block mb-1.5">RECURSOS DIDÁTICOS</label>
+              <textarea
+                name="recursos"
+                value={formData.recursos}
+                onChange={handleChange}
+                rows="2"
+                placeholder="Ex: Projetor, apostilas, slides..."
+                className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:outline-none focus:border-teal-500 focus:bg-white"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
+            <button
+              type="button"
+              onClick={() => router.push("/professor/diario")}
+              className="px-5 py-2.5 border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold rounded-xl text-xs sm:text-sm transition cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-6 py-2.5 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-500 hover:to-teal-600 text-white font-bold rounded-xl text-xs sm:text-sm transition shadow-sm disabled:opacity-50 cursor-pointer"
+            >
+              {saving ? "Salvando..." : (editId ? "Salvar Alterações" : "Criar Planejamento")}
+            </button>
+          </div>
+        </form>
+
+      </div>
     </ProfessorLayout>
   );
 }

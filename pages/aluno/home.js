@@ -195,18 +195,18 @@ export default function AlunoHome() {
           )}
         </div>
 
-        {/* Atalhos Rápidos */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-2">
+        {/* ── 5. ATALHOS RÁPIDOS & SUPORTE ACADÊMICO ──────────────────── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
           <Link
             href="/aluno/boletim"
             className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition flex items-center gap-4 group"
           >
-            <div className="w-12 h-12 rounded-xl bg-teal-50 text-teal-700 group-hover:bg-teal-600 group-hover:text-white transition flex items-center justify-center text-2xl flex-shrink-0">
+            <div className="w-11 h-11 rounded-xl bg-teal-50 text-teal-700 group-hover:bg-teal-600 group-hover:text-white transition flex items-center justify-center text-xl flex-shrink-0">
               📄
             </div>
             <div>
-              <h4 className="text-sm font-bold text-slate-900 group-hover:text-teal-700 transition">Meu Boletim e Notas</h4>
-              <p className="text-xs text-slate-500 mt-0.5">Consulte suas notas e faltas</p>
+              <h4 className="text-xs font-bold text-slate-900 group-hover:text-teal-700 transition">Boletim e Notas</h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">Histórico escolar</p>
             </div>
           </Link>
 
@@ -214,12 +214,12 @@ export default function AlunoHome() {
             href="/aluno/forum"
             className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition flex items-center gap-4 group"
           >
-            <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-700 group-hover:bg-blue-600 group-hover:text-white transition flex items-center justify-center text-2xl flex-shrink-0">
+            <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-700 group-hover:bg-blue-600 group-hover:text-white transition flex items-center justify-center text-xl flex-shrink-0">
               💬
             </div>
             <div>
-              <h4 className="text-sm font-bold text-slate-900 group-hover:text-blue-700 transition">Fórum de Dúvidas</h4>
-              <p className="text-xs text-slate-500 mt-0.5">Interaja com professores e colegas</p>
+              <h4 className="text-xs font-bold text-slate-900 group-hover:text-blue-700 transition">Fórum de Dúvidas</h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">Tutores e colegas</p>
             </div>
           </Link>
 
@@ -227,12 +227,25 @@ export default function AlunoHome() {
             href="/enviar-documentos"
             className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition flex items-center gap-4 group"
           >
-            <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-700 group-hover:bg-purple-600 group-hover:text-white transition flex items-center justify-center text-2xl flex-shrink-0">
+            <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-700 group-hover:bg-purple-600 group-hover:text-white transition flex items-center justify-center text-xl flex-shrink-0">
               📁
             </div>
             <div>
-              <h4 className="text-sm font-bold text-slate-900 group-hover:text-purple-700 transition">Envio de Documentos</h4>
-              <p className="text-xs text-slate-500 mt-0.5">Envie seus comprovantes e atividades</p>
+              <h4 className="text-xs font-bold text-slate-900 group-hover:text-purple-700 transition">Documentos</h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">Envio de arquivos</p>
+            </div>
+          </Link>
+
+          <Link
+            href="/validar-certificado"
+            className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition flex items-center gap-4 group"
+          >
+            <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-700 group-hover:bg-amber-600 group-hover:text-white transition flex items-center justify-center text-xl flex-shrink-0">
+              🏆
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-900 group-hover:text-amber-700 transition">Certificados</h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">Validação pública</p>
             </div>
           </Link>
         </div>

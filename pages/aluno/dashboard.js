@@ -410,18 +410,41 @@ export default function AlunoDashboard() {
                       </div>
 
                       {/* Botão de Acesso */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/assistir/${curso.id}`);
-                        }}
-                        className="w-full bg-slate-900 group-hover:bg-teal-700 text-white py-2.5 rounded-xl font-bold text-xs transition shadow-xs flex items-center justify-center gap-1.5"
-                      >
-                        <span>Acessar Sala Virtual</span>
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                        </svg>
-                      </button>
+                      {curso.progresso >= 100 ? (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/assistir/${curso.id}`);
+                            }}
+                            className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-xl font-bold text-xs transition flex items-center justify-center gap-1"
+                          >
+                            <span>Aulas</span>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/avaliacao/${curso.id}`);
+                            }}
+                            className="flex-1 bg-gradient-to-r from-teal-500 to-[#00d09c] hover:opacity-95 text-slate-950 py-2.5 rounded-xl font-black text-xs transition shadow-xs flex items-center justify-center gap-1"
+                          >
+                            <span>🏆 Certificado</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/assistir/${curso.id}`);
+                          }}
+                          className="w-full bg-slate-900 group-hover:bg-teal-700 text-white py-2.5 rounded-xl font-bold text-xs transition shadow-xs flex items-center justify-center gap-1.5"
+                        >
+                          <span>Acessar Sala Virtual</span>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -431,17 +454,17 @@ export default function AlunoDashboard() {
         </div>
 
         {/* ── 5. ATALHOS RÁPIDOS & SUPORTE ACADÊMICO ──────────────────── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
           <Link
             href="/aluno/boletim"
             className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition flex items-center gap-4 group"
           >
-            <div className="w-12 h-12 rounded-xl bg-teal-50 text-teal-700 group-hover:bg-teal-600 group-hover:text-white transition flex items-center justify-center text-2xl flex-shrink-0">
+            <div className="w-11 h-11 rounded-xl bg-teal-50 text-teal-700 group-hover:bg-teal-600 group-hover:text-white transition flex items-center justify-center text-xl flex-shrink-0">
               📄
             </div>
             <div>
-              <h4 className="text-sm font-bold text-slate-900 group-hover:text-teal-700 transition">Meu Boletim e Notas</h4>
-              <p className="text-xs text-slate-500 mt-0.5">Consulte suas avaliações e histórico</p>
+              <h4 className="text-xs font-bold text-slate-900 group-hover:text-teal-700 transition">Boletim e Notas</h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">Histórico escolar</p>
             </div>
           </Link>
 
@@ -449,12 +472,12 @@ export default function AlunoDashboard() {
             href="/aluno/forum"
             className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition flex items-center gap-4 group"
           >
-            <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-700 group-hover:bg-blue-600 group-hover:text-white transition flex items-center justify-center text-2xl flex-shrink-0">
+            <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-700 group-hover:bg-blue-600 group-hover:text-white transition flex items-center justify-center text-xl flex-shrink-0">
               💬
             </div>
             <div>
-              <h4 className="text-sm font-bold text-slate-900 group-hover:text-blue-700 transition">Fórum de Dúvidas</h4>
-              <p className="text-xs text-slate-500 mt-0.5">Tire dúvidas com tutores e colegas</p>
+              <h4 className="text-xs font-bold text-slate-900 group-hover:text-blue-700 transition">Fórum de Dúvidas</h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">Tutores e colegas</p>
             </div>
           </Link>
 
@@ -462,12 +485,25 @@ export default function AlunoDashboard() {
             href="/enviar-documentos"
             className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition flex items-center gap-4 group"
           >
-            <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-700 group-hover:bg-purple-600 group-hover:text-white transition flex items-center justify-center text-2xl flex-shrink-0">
+            <div className="w-11 h-11 rounded-xl bg-purple-50 text-purple-700 group-hover:bg-purple-600 group-hover:text-white transition flex items-center justify-center text-xl flex-shrink-0">
               📁
             </div>
             <div>
-              <h4 className="text-sm font-bold text-slate-900 group-hover:text-purple-700 transition">Envio de Documentos</h4>
-              <p className="text-xs text-slate-500 mt-0.5">Envie documentos e atividades</p>
+              <h4 className="text-xs font-bold text-slate-900 group-hover:text-purple-700 transition">Documentos</h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">Envio de arquivos</p>
+            </div>
+          </Link>
+
+          <Link
+            href="/validar-certificado"
+            className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition flex items-center gap-4 group"
+          >
+            <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-700 group-hover:bg-amber-600 group-hover:text-white transition flex items-center justify-center text-xl flex-shrink-0">
+              🏆
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-900 group-hover:text-amber-700 transition">Certificados</h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">Validação pública</p>
             </div>
           </Link>
         </div>
