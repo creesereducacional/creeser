@@ -42,9 +42,9 @@ export default function LandingPage() {
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2 group">
               <img
-                src="/images/logo_creeser.png"
+                src="/images/logo_gestao.png"
                 alt="CREESER Gestão Educacional"
-                className="h-9 sm:h-11 w-auto object-contain"
+                className="h-10 sm:h-12 w-auto object-contain"
               />
             </Link>
 
@@ -856,9 +856,9 @@ export default function LandingPage() {
               {/* Logo Footer */}
               <div className="flex items-center gap-3">
                 <img
-                  src="/images/logo_creeser.png"
-                  alt="CREESER"
-                  className="h-8 w-auto object-contain brightness-110"
+                  src="/images/logo_gestao2.png"
+                  alt="CREESER Gestão Educacional"
+                  className="h-14 sm:h-16 lg:h-20 w-auto object-contain brightness-110"
                 />
               </div>
 
