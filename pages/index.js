@@ -52,10 +52,8 @@ export default function LandingPage() {
             <nav className="hidden lg:flex items-center gap-8 text-sm font-semibold text-slate-600">
               <a href="#inicio" className="hover:text-[#0070f3] transition-colors">Início</a>
               <a href="#solucoes" className="hover:text-[#0070f3] transition-colors">Soluções</a>
-              <a href="#recursos" className="hover:text-[#0070f3] transition-colors">Recursos</a>
+              <a href="#pais" className="hover:text-[#0070f3] transition-colors">Portal dos Pais</a>
               <a href="#comunidade" className="hover:text-[#0070f3] transition-colors">Comunidade</a>
-              <a href="#diferenciais" className="hover:text-[#0070f3] transition-colors">Diferenciais</a>
-              <a href="#seguranca" className="hover:text-[#0070f3] transition-colors">Segurança</a>
             </nav>
 
             {/* Botão de Ação */}
@@ -111,11 +109,11 @@ export default function LandingPage() {
                   Soluções
                 </a>
                 <a
-                  href="#recursos"
+                  href="#pais"
                   onClick={() => setMenuMobileAberto(false)}
                   className="block text-sm font-semibold text-slate-700"
                 >
-                  Recursos
+                  Portal dos Pais
                 </a>
                 <a
                   href="#comunidade"
@@ -123,20 +121,6 @@ export default function LandingPage() {
                   className="block text-sm font-semibold text-slate-700"
                 >
                   Comunidade
-                </a>
-                <a
-                  href="#diferenciais"
-                  onClick={() => setMenuMobileAberto(false)}
-                  className="block text-sm font-semibold text-slate-700"
-                >
-                  Diferenciais
-                </a>
-                <a
-                  href="#seguranca"
-                  onClick={() => setMenuMobileAberto(false)}
-                  className="block text-sm font-semibold text-slate-700"
-                >
-                  Segurança
                 </a>
 
                 <div className="pt-4 border-t border-slate-100 flex flex-col gap-2.5">
@@ -234,61 +218,187 @@ export default function LandingPage() {
         </section>
 
         {/* ─────────────────────────────────────────────────────────────────────
-            3. FAIXA DE BENEFÍCIOS (Trust Bar)
+            3. FAIXA DE BENEFÍCIOS (Trust Bar) - 100% Largura Horizontal
         ───────────────────────────────────────────────────────────────────── */}
-        <section className="bg-slate-50 border-y border-slate-100 py-6">
+        <section className="w-full bg-gradient-to-r from-[#0c2340] via-[#004b87] to-[#0070f3] py-7 sm:py-8 border-y border-blue-400/20 shadow-inner">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
               
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              {/* 1 - Desenvolvida na prática */}
+              <div className="flex items-center gap-4 group">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-400/25 to-teal-500/10 border border-teal-300/40 text-teal-300 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-110 group-hover:border-teal-300 transition-all duration-200">
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    <path d="m9 12 2 2 4-4" />
                   </svg>
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-slate-900 leading-tight">Desenvolvida na prática</p>
-                  <p className="text-[11px] text-slate-500 font-medium">Validada em uma instituição real.</p>
+                  <p className="text-sm sm:text-base font-bold text-white leading-tight">Desenvolvida na prática</p>
+                  <p className="text-xs text-teal-100/80 font-normal mt-0.5">Validada em instituição real.</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-100 text-[#0070f3] flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              {/* 2 - Tecnologia & Educação */}
+              <div className="flex items-center gap-4 group">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400/25 to-blue-500/10 border border-cyan-300/40 text-cyan-300 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-110 group-hover:border-cyan-300 transition-all duration-200">
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
                   </svg>
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-slate-900 leading-tight">Tecnologia a serviço da educação</p>
-                  <p className="text-[11px] text-slate-500 font-medium">Inovação com foco acadêmico.</p>
+                  <p className="text-sm sm:text-base font-bold text-white leading-tight">Tecnologia & Educação</p>
+                  <p className="text-xs text-blue-100/80 font-normal mt-0.5">Inovação com foco acadêmico.</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              {/* 3 - Mais eficiência na equipe */}
+              <div className="flex items-center gap-4 group">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400/25 to-emerald-500/10 border border-emerald-300/40 text-emerald-300 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-110 group-hover:border-emerald-300 transition-all duration-200">
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
                   </svg>
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-slate-900 leading-tight">Mais eficiência para sua equipe</p>
-                  <p className="text-[11px] text-slate-500 font-medium">Processos ágeis e automatizados.</p>
+                  <p className="text-sm sm:text-base font-bold text-white leading-tight">Mais eficiência na equipe</p>
+                  <p className="text-xs text-emerald-100/80 font-normal mt-0.5">Processos automatizados.</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+              {/* 4 - Foco nas pessoas */}
+              <div className="flex items-center gap-4 group">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400/25 to-amber-500/10 border border-amber-300/40 text-amber-300 flex items-center justify-center flex-shrink-0 shadow-sm group-hover:scale-110 group-hover:border-amber-300 transition-all duration-200">
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                   </svg>
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-slate-900 leading-tight">Foco nas pessoas</p>
-                  <p className="text-[11px] text-slate-500 font-medium">Alunos, professores e gestores.</p>
+                  <p className="text-sm sm:text-base font-bold text-white leading-tight">Foco nas pessoas</p>
+                  <p className="text-xs text-amber-100/80 font-normal mt-0.5">Alunos, professores e gestores.</p>
                 </div>
               </div>
 
             </div>
+          </div>
+        </section>
+
+        {/* ─────────────────────────────────────────────────────────────────────
+            NOVA SEÇÃO: CARD INSTITUCIONAL TECNOLOGIA & PROPÓSITO
+        ───────────────────────────────────────────────────────────────────── */}
+        <section className="py-12 lg:py-16 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="bg-[#ebf4fc] rounded-[24px] sm:rounded-[32px] overflow-hidden grid grid-cols-1 lg:grid-cols-12 items-stretch shadow-[0_4px_25px_rgba(0,0,0,0.04)] border border-slate-200/60"
+            >
+              {/* Lado Esquerdo: Imagem Institucional com Texto Sobreposto */}
+              <div className="lg:col-span-6 relative min-h-[300px] sm:min-h-[360px] lg:min-h-[390px] w-full overflow-hidden flex items-center">
+                <img
+                  src="/images/campos.png"
+                  alt="Instituições que investem em educação constroem um futuro melhor"
+                  className="w-full h-full object-cover object-center absolute inset-0"
+                />
+                
+                {/* Overlay sutil escuro para legibilidade máxima do texto */}
+                <div className="absolute inset-0 bg-gradient-to-r from-slate-950/70 via-slate-900/40 to-transparent pointer-events-none" />
+
+                {/* Texto Sobreposto à Esquerda */}
+                <div className="relative z-10 p-6 sm:p-10 lg:p-12 max-w-md">
+                  {/* Traço superior característico */}
+                  <div className="w-12 h-1 bg-[#00d09c] mb-4 rounded-full" />
+                  
+                  <h3 className="text-xl sm:text-2xl lg:text-3xl font-serif font-bold text-white leading-tight drop-shadow-md">
+                    Instituições que investem em educação constroem um futuro melhor.
+                  </h3>
+
+                  {/* Traço inferior característico */}
+                  <div className="w-12 h-1 bg-[#00d09c] mt-4 rounded-full" />
+                </div>
+              </div>
+
+              {/* Lado Direito: Bloco de Conteúdo Informativo */}
+              <div className="lg:col-span-6 p-6 sm:p-8 lg:p-10 xl:p-12 flex flex-col justify-center bg-[#eef6fd]">
+                
+                {/* Título com Tipografia Serifada / Elegante */}
+                <h2 className="text-2xl sm:text-3xl lg:text-[34px] font-serif font-bold text-[#0c2340] tracking-tight leading-[1.25] mb-3">
+                  Tecnologia que fortalece<br className="hidden sm:inline" /> o propósito da sua instituição.
+                </h2>
+
+                {/* Texto Descritivo */}
+                <p className="text-slate-600 text-xs sm:text-sm lg:text-[15px] leading-relaxed font-sans mb-8 max-w-lg">
+                  O CREESER combina inovação, segurança e simplicidade para apoiar o crescimento da sua instituição de ensino.
+                </p>
+
+                {/* Quatro Benefícios com Ícones em Linha Horizontal */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-3 text-center">
+                  
+                  {/* Item 1 */}
+                  <div className="flex flex-col items-center group">
+                    <div className="w-12 h-12 rounded-2xl bg-white text-[#00609C] border border-blue-100 shadow-sm flex items-center justify-center mb-2.5 group-hover:scale-110 group-hover:border-blue-300 transition-all duration-200">
+                      <svg className="w-6 h-6 text-[#00609C]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect width="18" height="18" x="3" y="3" rx="4" />
+                        <path d="M3 9h18" />
+                        <path d="M9 21V9" />
+                      </svg>
+                    </div>
+                    <span className="text-[11px] sm:text-xs font-bold text-slate-800 leading-tight">
+                      Plataforma integrada
+                    </span>
+                  </div>
+
+                  {/* Item 2 */}
+                  <div className="flex flex-col items-center group">
+                    <div className="w-12 h-12 rounded-2xl bg-white text-[#00897b] border border-teal-100 shadow-sm flex items-center justify-center mb-2.5 group-hover:scale-110 group-hover:border-teal-300 transition-all duration-200">
+                      <svg className="w-6 h-6 text-[#00897b]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                        <path d="m9 12 2 2 4-4" />
+                      </svg>
+                    </div>
+                    <span className="text-[11px] sm:text-xs font-bold text-slate-800 leading-tight">
+                      Segura e confiável
+                    </span>
+                  </div>
+
+                  {/* Item 3 */}
+                  <div className="flex flex-col items-center group">
+                    <div className="w-12 h-12 rounded-2xl bg-white text-[#00609C] border border-blue-100 shadow-sm flex items-center justify-center mb-2.5 group-hover:scale-110 group-hover:border-blue-300 transition-all duration-200">
+                      <svg className="w-6 h-6 text-[#00609C]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="m7.5 4.27 9 5.15" />
+                        <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                        <path d="m3.3 7 8.7 5 8.7-5" />
+                        <path d="M12 22V12" />
+                      </svg>
+                    </div>
+                    <span className="text-[11px] sm:text-xs font-bold text-slate-800 leading-tight">
+                      Em constante evolução
+                    </span>
+                  </div>
+
+                  {/* Item 4 */}
+                  <div className="flex flex-col items-center group">
+                    <div className="w-12 h-12 rounded-2xl bg-white text-[#00609C] border border-blue-100 shadow-sm flex items-center justify-center mb-2.5 group-hover:scale-110 group-hover:border-blue-300 transition-all duration-200">
+                      <svg className="w-6 h-6 text-[#00609C]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                      </svg>
+                    </div>
+                    <span className="text-[11px] sm:text-xs font-bold text-slate-800 leading-tight">
+                      Suporte especializado
+                    </span>
+                  </div>
+
+                </div>
+
+              </div>
+            </motion.div>
           </div>
         </section>
 
@@ -451,67 +561,229 @@ export default function LandingPage() {
         </section>
 
         {/* ─────────────────────────────────────────────────────────────────────
-            6. SEÇÃO: TODA A COMUNIDADE ACADÊMICA CONECTADA
+            6. SEÇÃO: CONTROLE DOS PAIS - 100% LARGURA HORIZONTAL
         ───────────────────────────────────────────────────────────────────── */}
-        <section id="comunidade" className="py-16 lg:py-24 bg-white">
+        <section
+          id="pais"
+          className="w-full relative py-12 sm:py-16 lg:py-24 text-white overflow-hidden bg-[#00609c] border-y border-blue-400/20 shadow-xl"
+          style={{
+            backgroundImage: "url('/images/bg_app2.png')",
+            backgroundSize: 'cover',
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'center right',
+          }}
+        >
+          {/* Overlay suave para mobile mantendo total legibilidade sem cobrir a foto em desktop */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#004f82]/95 via-[#00609c]/85 to-[#00609c]/40 lg:bg-gradient-to-r lg:from-[#00609c]/95 lg:via-[#00609c]/60 lg:to-transparent pointer-events-none" />
+
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <motion.div
+              initial={{ opacity: 0, y: 25 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="grid grid-cols-1 lg:grid-cols-12 min-h-[440px] sm:min-h-[480px] lg:min-h-[520px] items-center"
+            >
+              <div className="lg:col-span-6 py-6 sm:py-8 lg:py-10 text-white max-w-xl">
+                
+                {/* Eyebrow / Tag */}
+                <span className="inline-block px-3.5 py-1 rounded-full bg-cyan-400/20 text-cyan-200 border border-cyan-300/30 text-[11px] sm:text-xs font-extrabold uppercase tracking-widest mb-3 sm:mb-4 drop-shadow-sm">
+                  APP & PORTAL DA FAMÍLIA
+                </span>
+
+                {/* Título */}
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-serif font-bold text-white tracking-tight leading-tight drop-shadow-md mb-3">
+                  Controle dos Pais
+                </h2>
+
+                {/* Texto */}
+                <p className="text-xs sm:text-sm lg:text-[15px] text-blue-50/95 leading-relaxed font-sans mb-6 sm:mb-8 max-w-md drop-shadow-sm">
+                  Acompanhe a vida acadêmica do seu filho de forma simples, prática e segura.
+                </p>
+
+                {/* 4 Recursos com Ícones */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5 mb-8">
+                  
+                  {/* Recurso 1 */}
+                  <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-xs px-3.5 py-2.5 rounded-xl border border-white/15 shadow-sm">
+                    <div className="w-6 h-6 rounded-lg bg-teal-400/25 text-teal-300 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </div>
+                    <span className="text-xs sm:text-[13px] font-semibold text-white">Frequência em tempo real</span>
+                  </div>
+
+                  {/* Recurso 2 */}
+                  <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-xs px-3.5 py-2.5 rounded-xl border border-white/15 shadow-sm">
+                    <div className="w-6 h-6 rounded-lg bg-teal-400/25 text-teal-300 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </div>
+                    <span className="text-xs sm:text-[13px] font-semibold text-white">Acompanhamento de notas</span>
+                  </div>
+
+                  {/* Recurso 3 */}
+                  <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-xs px-3.5 py-2.5 rounded-xl border border-white/15 shadow-sm">
+                    <div className="w-6 h-6 rounded-lg bg-teal-400/25 text-teal-300 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </div>
+                    <span className="text-xs sm:text-[13px] font-semibold text-white">Comunicados da instituição</span>
+                  </div>
+
+                  {/* Recurso 4 */}
+                  <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-xs px-3.5 py-2.5 rounded-xl border border-white/15 shadow-sm">
+                    <div className="w-6 h-6 rounded-lg bg-teal-400/25 text-teal-300 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </div>
+                    <span className="text-xs sm:text-[13px] font-semibold text-white">Boletim e documentos digitais</span>
+                  </div>
+
+                </div>
+
+                {/* Botão CTA */}
+                <div>
+                  <button
+                    onClick={() => setModalDemoAberto(true)}
+                    className="inline-flex items-center gap-2 px-6 py-3.5 bg-white text-[#00609c] hover:bg-slate-100 active:scale-95 font-bold text-xs sm:text-sm rounded-xl shadow-lg transition-all duration-200 group cursor-pointer"
+                  >
+                    <span>Conheça o Portal dos Pais</span>
+                    <span className="group-hover:translate-x-1 transition-transform">→</span>
+                  </button>
+                </div>
+
+              </div>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* ─────────────────────────────────────────────────────────────────────
+            7. SEÇÃO: TODA A COMUNIDADE ACADÊMICA CONECTADA
+        ───────────────────────────────────────────────────────────────────── */}
+        <section id="comunidade" className="py-16 lg:py-24 bg-slate-50/60 border-t border-slate-100">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             
-            <div className="text-center max-w-3xl mx-auto mb-14">
-              <span className="text-xs font-bold text-[#0070f3] uppercase tracking-widest">
-                EXPERIÊNCIA INTEGRADA
-              </span>
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#0c2340] tracking-tight mt-2">
-                Toda a comunidade acadêmica conectada
-              </h2>
-              <p className="text-sm sm:text-base text-slate-600 mt-3 font-medium">
+            {/* Header da Seção lado a lado conforme referência */}
+            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-10 lg:mb-12">
+              <div className="max-w-xl">
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-serif font-bold text-[#0c2340] tracking-tight leading-tight">
+                  Toda a comunidade acadêmica conectada
+                </h2>
+              </div>
+              <p className="text-xs sm:text-sm lg:text-[15px] text-slate-600 max-w-lg font-normal leading-relaxed lg:text-right">
                 O CREESER aproxima pessoas, facilita a comunicação e integra processos, criando uma experiência fluida para toda a instituição.
               </p>
             </div>
 
+            {/* Grid dos 4 Cards com Fotos Institucionais */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               
-              {/* Aluno */}
-              <div className="bg-slate-50 rounded-3xl p-6 border border-slate-200/80 text-center hover:-translate-y-1 transition duration-200">
-                <div className="w-16 h-16 rounded-full bg-blue-100 text-[#0070f3] flex items-center justify-center mx-auto mb-4 text-2xl shadow-inner">
-                  🎓
+              {/* Card 1: Aluno */}
+              <div className="bg-white rounded-[20px] sm:rounded-[24px] overflow-hidden border border-slate-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col group">
+                <div className="relative w-full h-44 sm:h-48 overflow-hidden bg-slate-100">
+                  <img
+                    src="/images/foto01.png"
+                    alt="Aluno CREESER"
+                    className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                  />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900 mb-2">Aluno</h3>
-                <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                  Acesso simples a boletim, horários, histórico, aulas e solicitações acadêmicas pelo computador ou celular.
-                </p>
+                <div className="p-5 sm:p-6 flex flex-col flex-1 bg-white">
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <div className="w-7 h-7 rounded-lg bg-teal-50 text-[#00897b] flex items-center justify-center flex-shrink-0">
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                      </svg>
+                    </div>
+                    <h3 className="text-base sm:text-lg font-bold text-[#0c2340]">Aluno</h3>
+                  </div>
+                  <p className="text-xs sm:text-[13px] text-slate-600 leading-relaxed font-normal">
+                    Acesso às informações, serviços e acompanhamento da sua vida acadêmica.
+                  </p>
+                </div>
               </div>
 
-              {/* Professor */}
-              <div className="bg-slate-50 rounded-3xl p-6 border border-slate-200/80 text-center hover:-translate-y-1 transition duration-200">
-                <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-4 text-2xl shadow-inner">
-                  👨‍🏫
+              {/* Card 2: Professor */}
+              <div className="bg-white rounded-[20px] sm:rounded-[24px] overflow-hidden border border-slate-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col group">
+                <div className="relative w-full h-44 sm:h-48 overflow-hidden bg-slate-100">
+                  <img
+                    src="/images/foto02.png"
+                    alt="Professor CREESER"
+                    className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                  />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900 mb-2">Professor</h3>
-                <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                  Gestão das turmas, diário de classe eletrônico, lançamento ágil de notas e comunicação direta com alunos.
-                </p>
+                <div className="p-5 sm:p-6 flex flex-col flex-1 bg-white">
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#0070f3] flex items-center justify-center flex-shrink-0">
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                    </div>
+                    <h3 className="text-base sm:text-lg font-bold text-[#0c2340]">Professor</h3>
+                  </div>
+                  <p className="text-xs sm:text-[13px] text-slate-600 leading-relaxed font-normal">
+                    Gestão das turmas, diário de classe, lançamento de notas e comunicação com alunos.
+                  </p>
+                </div>
               </div>
 
-              {/* Secretaria */}
-              <div className="bg-slate-50 rounded-3xl p-6 border border-slate-200/80 text-center hover:-translate-y-1 transition duration-200">
-                <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto mb-4 text-2xl shadow-inner">
-                  👩‍💼
+              {/* Card 3: Secretaria */}
+              <div className="bg-white rounded-[20px] sm:rounded-[24px] overflow-hidden border border-slate-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col group">
+                <div className="relative w-full h-44 sm:h-48 overflow-hidden bg-slate-100">
+                  <img
+                    src="/images/foto03.png"
+                    alt="Secretaria CREESER"
+                    className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                  />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900 mb-2">Secretaria</h3>
-                <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                  Processos mais rápidos, documentos oficiais, matrículas organizadas e conformidade regulatória.
-                </p>
+                <div className="p-5 sm:p-6 flex flex-col flex-1 bg-white">
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#0070f3] flex items-center justify-center flex-shrink-0">
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                        <path d="m9 12 2 2 4-4" />
+                      </svg>
+                    </div>
+                    <h3 className="text-base sm:text-lg font-bold text-[#0c2340]">Secretaria</h3>
+                  </div>
+                  <p className="text-xs sm:text-[13px] text-slate-600 leading-relaxed font-normal">
+                    Processos mais ágeis, organizados e integrados.
+                  </p>
+                </div>
               </div>
 
-              {/* Gestão */}
-              <div className="bg-slate-50 rounded-3xl p-6 border border-slate-200/80 text-center hover:-translate-y-1 transition duration-200">
-                <div className="w-16 h-16 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center mx-auto mb-4 text-2xl shadow-inner">
-                  📊
+              {/* Card 4: Gestão */}
+              <div className="bg-white rounded-[20px] sm:rounded-[24px] overflow-hidden border border-slate-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.04)] hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col group">
+                <div className="relative w-full h-44 sm:h-48 overflow-hidden bg-slate-100">
+                  <img
+                    src="/images/foto04.png"
+                    alt="Gestão CREESER"
+                    className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                  />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900 mb-2">Gestão</h3>
-                <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                  Visão executiva em tempo real com dados acadêmicos e financeiros para decisões estratégicas seguras.
-                </p>
+                <div className="p-5 sm:p-6 flex flex-col flex-1 bg-white">
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#0070f3] flex items-center justify-center flex-shrink-0">
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <polyline points="16 11 18 13 22 9" />
+                      </svg>
+                    </div>
+                    <h3 className="text-base sm:text-lg font-bold text-[#0c2340]">Gestão</h3>
+                  </div>
+                  <p className="text-xs sm:text-[13px] text-slate-600 leading-relaxed font-normal">
+                    Visão completa da instituição com dados confiáveis e indicadores estratégicos.
+                  </p>
+                </div>
               </div>
 
             </div>
@@ -519,123 +791,58 @@ export default function LandingPage() {
         </section>
 
         {/* ─────────────────────────────────────────────────────────────────────
-            7. SEÇÃO: SEGURANÇA, LGPD E MOBILIDADE
+            8. CTA COMERCIAL FINAL - 100% LARGURA HORIZONTAL
         ───────────────────────────────────────────────────────────────────── */}
-        <section id="seguranca" className="py-16 lg:py-24 bg-slate-900 text-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-              
-              {/* Esquerda: Segurança & LGPD */}
-              <div>
-                <span className="inline-block px-3 py-1 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 text-xs font-bold uppercase tracking-wider mb-4">
-                  Segurança e Confiabilidade
+        <section
+          className="w-full relative py-12 sm:py-16 lg:py-20 text-white overflow-hidden bg-[#0c2340] border-t border-blue-400/20 shadow-2xl"
+          style={{
+            backgroundImage: "url('/images/campos2.png?v=2')",
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        >
+          {/* Overlay sutil em degradê para garantir máxima legibilidade do texto preservando a foto */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0c2340]/95 via-[#0c2340]/75 to-[#0c2340]/40 sm:to-transparent pointer-events-none" />
+
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="flex flex-col lg:flex-row items-center justify-between gap-6 lg:gap-10 min-h-[140px] lg:min-h-[160px]"
+            >
+              {/* Lado Esquerdo: Textos */}
+              <div className="max-w-2xl text-left">
+                <span className="text-[11px] sm:text-xs font-extrabold uppercase tracking-widest text-cyan-300 block mb-1.5 drop-shadow-sm">
+                  VAMOS CONVERSAR?
                 </span>
-                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight mb-5">
-                  Seus dados seguros,<br />
-                  sua instituição protegida.
-                </h2>
-                <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-medium mb-8">
-                  O CREESER adota as melhores práticas de segurança da informação, com criptografia avançada, isolamento de permissões e total conformidade com a LGPD.
-                </p>
-
-                <div className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-teal-500 text-slate-900 flex items-center justify-center flex-shrink-0 font-bold text-xs mt-0.5">
-                      ✓
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-white">Controle de acesso granular</p>
-                      <p className="text-xs text-slate-400">Cada usuário acessa estritamente as informações necessárias ao seu perfil.</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-teal-500 text-slate-900 flex items-center justify-center flex-shrink-0 font-bold text-xs mt-0.5">
-                      ✓
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-white">Isolamento e integridade de dados</p>
-                      <p className="text-xs text-slate-400">Camada de autenticação segura com suporte a multi-ambientes.</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-teal-500 text-slate-900 flex items-center justify-center flex-shrink-0 font-bold text-xs mt-0.5">
-                      ✓
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-white">Conformidade com a LGPD</p>
-                      <p className="text-xs text-slate-400">Tratamento e proteção de dados de alunos, colaboradores e docentes.</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Direita: Mobilidade e Acesso */}
-              <div className="bg-slate-800/80 rounded-3xl p-8 border border-slate-700 backdrop-blur-sm">
-                <span className="text-xs font-bold text-blue-400 uppercase tracking-widest">
-                  ACESSO EM QUALQUER LUGAR
-                </span>
-                <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight mt-2 mb-4">
-                  Mobilidade para o seu dia a dia
+                <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white leading-snug drop-shadow-md">
+                  Sua instituição está pronta para uma gestão mais integrada e eficiente?
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium mb-6">
-                  Acesse o sistema pelo computador, tablet ou smartphone. Uma experiência web moderna e 100% responsiva para secretários, professores e gestores.
+                <p className="text-xs sm:text-sm lg:text-base text-blue-100/90 mt-2 leading-relaxed drop-shadow-sm">
+                  Conheça o CREESER e descubra como podemos contribuir para o crescimento da sua instituição de ensino.
                 </p>
-
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-700/80">
-                  <div className="bg-slate-900/60 p-4 rounded-2xl border border-slate-700/60">
-                    <p className="text-xl font-bold text-teal-400">100%</p>
-                    <p className="text-[11px] text-slate-400 font-medium mt-1">Nuvem e Web Responsiva</p>
-                  </div>
-                  <div className="bg-slate-900/60 p-4 rounded-2xl border border-slate-700/60">
-                    <p className="text-xl font-bold text-[#0070f3]">24/7</p>
-                    <p className="text-[11px] text-slate-400 font-medium mt-1">Disponibilidade e Acesso</p>
-                  </div>
-                </div>
               </div>
 
-            </div>
-          </div>
-        </section>
+              {/* Lado Direito: Ações / Botões */}
+              <div className="flex flex-col sm:flex-row lg:flex-col gap-3 flex-shrink-0 w-full sm:w-auto lg:w-64">
+                <button
+                  onClick={() => setModalDemoAberto(true)}
+                  className="w-full px-5 py-3 text-xs sm:text-sm font-bold text-[#0c2340] bg-white hover:bg-slate-100 active:scale-95 rounded-xl shadow-lg transition-all duration-200 flex items-center justify-center gap-2 group cursor-pointer"
+                >
+                  <span>Solicitar demonstração</span>
+                  <span className="group-hover:translate-x-1 transition-transform">→</span>
+                </button>
 
-        {/* ─────────────────────────────────────────────────────────────────────
-            8. CTA COMERCIAL FINAL
-        ───────────────────────────────────────────────────────────────────── */}
-        <section className="py-16 lg:py-24 bg-gradient-to-br from-[#0c2340] via-[#0d2e54] to-[#0a1e38] text-white relative overflow-hidden">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
-            
-            <span className="inline-block px-3.5 py-1.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 text-xs font-bold uppercase tracking-wider mb-4">
-              VAMOS CONVERSAR?
-            </span>
-            
-            <h2 className="text-2xl sm:text-3xl lg:text-5xl font-black tracking-tight max-w-3xl mx-auto mb-6">
-              Sua instituição está pronta para uma gestão mais integrada e eficiente?
-            </h2>
-            
-            <p className="text-sm sm:text-base text-slate-300 font-medium max-w-xl mx-auto mb-8 leading-relaxed">
-              Conheça o CREESER e descubra como podemos contribuir para o crescimento e organização da sua instituição de ensino.
-            </p>
-
-            <div className="flex flex-wrap items-center justify-center gap-4">
-              <button
-                onClick={() => setModalDemoAberto(true)}
-                className="px-8 py-4 text-sm font-bold text-slate-900 bg-white hover:bg-slate-100 rounded-xl transition shadow-xl shadow-black/20 flex items-center gap-2"
-              >
-                <span>Solicitar demonstração</span>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                </svg>
-              </button>
-              
-              <Link
-                href="/login"
-                className="px-8 py-4 text-sm font-bold text-white bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl transition"
-              >
-                Acessar o Sistema
-              </Link>
-            </div>
-
+                <button
+                  onClick={() => setModalDemoAberto(true)}
+                  className="w-full px-5 py-2.5 text-xs sm:text-sm font-bold text-white bg-white/10 hover:bg-white/20 border border-white/80 active:scale-95 rounded-xl transition-all duration-200 text-center backdrop-blur-xs cursor-pointer"
+                >
+                  Falar com nossa equipe
+                </button>
+              </div>
+            </motion.div>
           </div>
         </section>
 

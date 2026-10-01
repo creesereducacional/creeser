@@ -139,7 +139,12 @@ export default function AlunoDashboard() {
       <div className="space-y-8 max-w-7xl mx-auto pb-10">
         
         {/* ── 1. BANNER HERO BOAS-VINDAS ──────────────────────────────── */}
-        <div className="relative bg-gradient-to-br from-teal-800 via-teal-900 to-slate-900 rounded-[28px] p-6 sm:p-8 lg:p-10 text-white shadow-xl overflow-hidden border border-teal-700/30">
+        <div className="relative bg-gradient-to-br from-teal-900/95 via-teal-950/95 to-slate-950/95 rounded-[28px] p-6 sm:p-8 lg:p-10 text-white shadow-xl overflow-hidden border border-teal-700/30">
+          {/* Background Image do Portal */}
+          <div 
+            className="absolute inset-0 bg-cover bg-center mix-blend-overlay opacity-30 pointer-events-none"
+            style={{ backgroundImage: "url('/images/bg_portal.png')" }}
+          />
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="max-w-2xl">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/20 text-teal-300 border border-teal-400/30 text-xs font-bold uppercase tracking-wider mb-3 backdrop-blur-sm">

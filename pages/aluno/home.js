@@ -67,7 +67,12 @@ export default function AlunoHome() {
       <div className="space-y-8 max-w-7xl mx-auto pb-10">
         
         {/* Banner de Boas-Vindas */}
-        <div className="bg-gradient-to-br from-teal-800 via-teal-900 to-slate-900 rounded-[28px] p-6 sm:p-8 lg:p-10 text-white shadow-xl relative overflow-hidden border border-teal-700/30">
+        <div className="bg-gradient-to-br from-teal-900/95 via-teal-950/95 to-slate-950/95 rounded-[28px] p-6 sm:p-8 lg:p-10 text-white shadow-xl relative overflow-hidden border border-teal-700/30">
+          {/* Background Image do Portal */}
+          <div 
+            className="absolute inset-0 bg-cover bg-center mix-blend-overlay opacity-30 pointer-events-none"
+            style={{ backgroundImage: "url('/images/bg_portal.png')" }}
+          />
           <div className="relative z-10 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/20 text-teal-300 border border-teal-400/30 text-xs font-bold uppercase tracking-wider mb-3">
               <span>🎓 Portal Acadêmico CREESER</span>
