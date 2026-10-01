@@ -403,157 +403,270 @@ export default function LandingPage() {
         </section>
 
         {/* ─────────────────────────────────────────────────────────────────────
-            4. SEÇÃO: UMA PLATAFORMA PARA TODA A GESTÃO
+            4. SEÇÃO: UMA PLATAFORMA PARA TODA A GESTÃO (area02.png)
         ───────────────────────────────────────────────────────────────────── */}
-        <section id="solucoes" className="py-16 lg:py-24 bg-slate-50 border-t border-slate-100">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section
+          id="solucoes"
+          className="w-full relative py-8 sm:py-10 lg:py-12 bg-cover bg-no-repeat overflow-hidden border-t border-slate-100"
+          style={{
+            backgroundImage: "url('/images/area02.png')",
+            backgroundSize: 'cover',
+            backgroundPosition: 'center top',
+          }}
+        >
+          {/* Overlay suave para telas menores */}
+          <div className="absolute inset-0 bg-white/40 lg:hidden pointer-events-none" />
+
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             
-            {/* Header da Seção */}
-            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-12 lg:mb-16">
-              <div>
-                <span className="text-xs font-bold text-[#0070f3] uppercase tracking-widest">
-                  SOLUÇÃO COMPLETA
-                </span>
-                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#0c2340] tracking-tight mt-2">
-                  Uma plataforma para toda<br />
-                  a gestão da sua instituição.
-                </h2>
-              </div>
-              <p className="text-sm sm:text-base text-slate-600 max-w-md font-medium leading-relaxed">
+            {/* Header da Seção - Compacto e Visualmente Equilibrado */}
+            <div className="max-w-2xl mb-6 lg:mb-7">
+              <span className="inline-block px-3 py-0.5 rounded-full bg-blue-100/90 text-[#0070f3] text-[11px] font-bold uppercase tracking-wider mb-2 border border-blue-200/60 shadow-xs">
+                SOLUÇÃO COMPLETA
+              </span>
+              <h2 className="text-xl sm:text-2xl lg:text-[28px] xl:text-[32px] font-black text-[#0c2340] tracking-tight leading-[1.15] mb-2">
+                Uma plataforma para toda a gestão <span className="text-[#0070f3]">da sua instituição.</span>
+              </h2>
+              <p className="text-xs sm:text-[13px] lg:text-sm text-slate-600 max-w-xl font-medium leading-snug">
                 Do processo seletivo à colação de grau, o CREESER integra as principais áreas da sua instituição em um único ambiente moderno e intuitivo.
               </p>
             </div>
 
-            {/* Grid dos 8 Módulos */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Grid dos 8 Módulos - 4 colunas x 2 linhas compacto */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 lg:gap-4">
               
               {/* 1. Gestão Acadêmica */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs hover:shadow-md transition group">
-                <div className="w-12 h-12 rounded-xl bg-blue-500 text-white flex items-center justify-center mb-5 shadow-md shadow-blue-500/20">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+              <div className="bg-white/95 backdrop-blur-xs rounded-2xl p-4 lg:p-4.5 border border-slate-200/80 border-b-[3px] border-b-blue-500 shadow-[0_4px_16px_rgba(0,0,0,0.03)] relative overflow-hidden group hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
+                {/* Marca d'água de fundo */}
+                <div className="absolute -top-1 -right-1 text-blue-500/10 pointer-events-none group-hover:text-blue-500/15 transition-colors">
+                  <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 14l9-5-9-5-9 5 9 5z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
                   </svg>
                 </div>
-                <h3 className="text-base font-bold text-slate-900 mb-2">Gestão Acadêmica</h3>
-                <ul className="text-xs text-slate-500 space-y-1.5 font-medium">
-                  <li>• Cursos e matrizes curriculares</li>
-                  <li>• Turmas e disciplinas</li>
-                  <li>• Matrículas e rematrículas</li>
-                  <li>• Notas, faltas e histórico</li>
-                </ul>
+                <div>
+                  <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center mb-2.5 shadow-xs">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-sm font-bold text-[#0c2340] mb-2 leading-tight">Gestão Acadêmica</h3>
+                  <ul className="text-[11.5px] lg:text-xs text-slate-600 space-y-1 font-medium leading-tight">
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5 flex-shrink-0" />Cursos e matrizes curriculares</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5 flex-shrink-0" />Turmas e disciplinas</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5 flex-shrink-0" />Matrículas e rematrículas</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5 flex-shrink-0" />Notas, faltas e histórico</li>
+                  </ul>
+                </div>
+                <div className="w-5 h-5 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center self-end mt-2 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
               </div>
 
               {/* 2. Secretaria */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs hover:shadow-md transition group">
-                <div className="w-12 h-12 rounded-xl bg-sky-500 text-white flex items-center justify-center mb-5 shadow-md shadow-sky-500/20">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <div className="bg-white/95 backdrop-blur-xs rounded-2xl p-4 lg:p-4.5 border border-slate-200/80 border-b-[3px] border-b-sky-400 shadow-[0_4px_16px_rgba(0,0,0,0.03)] relative overflow-hidden group hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
+                {/* Marca d'água de fundo */}
+                <div className="absolute -top-1 -right-1 text-sky-400/10 pointer-events-none group-hover:text-sky-400/15 transition-colors">
+                  <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </div>
-                <h3 className="text-base font-bold text-slate-900 mb-2">Secretaria</h3>
-                <ul className="text-xs text-slate-500 space-y-1.5 font-medium">
-                  <li>• Documentos acadêmicos</li>
-                  <li>• Declarações e certificados</li>
-                  <li>• Histórico escolar oficial</li>
-                  <li>• Processos e protocolos</li>
-                </ul>
+                <div>
+                  <div className="w-8 h-8 rounded-lg bg-sky-500 text-white flex items-center justify-center mb-2.5 shadow-xs">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-sm font-bold text-[#0c2340] mb-2 leading-tight">Secretaria</h3>
+                  <ul className="text-[11.5px] lg:text-xs text-slate-600 space-y-1 font-medium leading-tight">
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-sky-400 mr-1.5 flex-shrink-0" />Documentos acadêmicos</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-sky-400 mr-1.5 flex-shrink-0" />Declarações e certificados</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-sky-400 mr-1.5 flex-shrink-0" />Histórico escolar oficial</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-sky-400 mr-1.5 flex-shrink-0" />Processos e protocolos</li>
+                  </ul>
+                </div>
+                <div className="w-5 h-5 rounded-full bg-sky-50 text-sky-500 flex items-center justify-center self-end mt-2 group-hover:bg-sky-500 group-hover:text-white transition-colors">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
               </div>
 
               {/* 3. Financeiro */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs hover:shadow-md transition group">
-                <div className="w-12 h-12 rounded-xl bg-emerald-500 text-white flex items-center justify-center mb-5 shadow-md shadow-emerald-500/20">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <div className="bg-white/95 backdrop-blur-xs rounded-2xl p-4 lg:p-4.5 border border-slate-200/80 border-b-[3px] border-b-emerald-500 shadow-[0_4px_16px_rgba(0,0,0,0.03)] relative overflow-hidden group hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
+                {/* Marca d'água de fundo */}
+                <div className="absolute -top-1 -right-1 text-emerald-500/10 pointer-events-none group-hover:text-emerald-500/15 transition-colors">
+                  <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
-                <h3 className="text-base font-bold text-slate-900 mb-2">Financeiro</h3>
-                <ul className="text-xs text-slate-500 space-y-1.5 font-medium">
-                  <li>• Mensalidades e carnês</li>
-                  <li>• Recebimentos e baixas</li>
-                  <li>• Bolsas, convênios e descontos</li>
-                  <li>• Relatórios financeiros completos</li>
-                </ul>
+                <div>
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500 text-white flex items-center justify-center mb-2.5 shadow-xs">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-sm font-bold text-[#0c2340] mb-2 leading-tight">Financeiro</h3>
+                  <ul className="text-[11.5px] lg:text-xs text-slate-600 space-y-1 font-medium leading-tight">
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 flex-shrink-0" />Mensalidades e carnês</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 flex-shrink-0" />Recebimentos e baixas</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 flex-shrink-0" />Bolsas, convênios e descontos</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 flex-shrink-0" />Relatórios financeiros completos</li>
+                  </ul>
+                </div>
+                <div className="w-5 h-5 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center self-end mt-2 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
               </div>
 
               {/* 4. Pedagógico */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs hover:shadow-md transition group">
-                <div className="w-12 h-12 rounded-xl bg-amber-500 text-white flex items-center justify-center mb-5 shadow-md shadow-amber-500/20">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              <div className="bg-white/95 backdrop-blur-xs rounded-2xl p-4 lg:p-4.5 border border-slate-200/80 border-b-[3px] border-b-amber-500 shadow-[0_4px_16px_rgba(0,0,0,0.03)] relative overflow-hidden group hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
+                {/* Marca d'água de fundo */}
+                <div className="absolute -top-1 -right-1 text-amber-500/10 pointer-events-none group-hover:text-amber-500/15 transition-colors">
+                  <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                   </svg>
                 </div>
-                <h3 className="text-base font-bold text-slate-900 mb-2">Pedagógico</h3>
-                <ul className="text-xs text-slate-500 space-y-1.5 font-medium">
-                  <li>• Planejamento acadêmico</li>
-                  <li>• Avaliações e diários</li>
-                  <li>• Acompanhamento docente</li>
-                  <li>• Indicadores de desempenho</li>
-                </ul>
+                <div>
+                  <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center mb-2.5 shadow-xs">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                  </div>
+                  <h3 className="text-sm font-bold text-[#0c2340] mb-2 leading-tight">Pedagógico</h3>
+                  <ul className="text-[11.5px] lg:text-xs text-slate-600 space-y-1 font-medium leading-tight">
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5 flex-shrink-0" />Planejamento acadêmico</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5 flex-shrink-0" />Avaliações e diários</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5 flex-shrink-0" />Acompanhamento docente</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5 flex-shrink-0" />Indicadores de desempenho</li>
+                  </ul>
+                </div>
+                <div className="w-5 h-5 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center self-end mt-2 group-hover:bg-amber-500 group-hover:text-white transition-colors">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
               </div>
 
               {/* 5. Professores */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs hover:shadow-md transition group">
-                <div className="w-12 h-12 rounded-xl bg-purple-500 text-white flex items-center justify-center mb-5 shadow-md shadow-purple-500/20">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              <div className="bg-white/95 backdrop-blur-xs rounded-2xl p-4 lg:p-4.5 border border-slate-200/80 border-b-[3px] border-b-purple-500 shadow-[0_4px_16px_rgba(0,0,0,0.03)] relative overflow-hidden group hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
+                {/* Marca d'água de fundo */}
+                <div className="absolute -top-1 -right-1 text-purple-500/10 pointer-events-none group-hover:text-purple-500/15 transition-colors">
+                  <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                 </div>
-                <h3 className="text-base font-bold text-slate-900 mb-2">Professores</h3>
-                <ul className="text-xs text-slate-500 space-y-1.5 font-medium">
-                  <li>• Portal exclusivo do docente</li>
-                  <li>• Diário de classe online</li>
-                  <li>• Lançamento de notas e frequências</li>
-                  <li>• Comunicação com alunos</li>
-                </ul>
+                <div>
+                  <div className="w-8 h-8 rounded-lg bg-purple-500 text-white flex items-center justify-center mb-2.5 shadow-xs">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-sm font-bold text-[#0c2340] mb-2 leading-tight">Professores</h3>
+                  <ul className="text-[11.5px] lg:text-xs text-slate-600 space-y-1 font-medium leading-tight">
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-purple-500 mr-1.5 flex-shrink-0" />Portal exclusivo do docente</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-purple-500 mr-1.5 flex-shrink-0" />Diário de classe online</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-purple-500 mr-1.5 flex-shrink-0" />Lançamento de notas e frequências</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-purple-500 mr-1.5 flex-shrink-0" />Comunicação com alunos</li>
+                  </ul>
+                </div>
+                <div className="w-5 h-5 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center self-end mt-2 group-hover:bg-purple-500 group-hover:text-white transition-colors">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
               </div>
 
               {/* 6. Alunos */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs hover:shadow-md transition group">
-                <div className="w-12 h-12 rounded-xl bg-rose-500 text-white flex items-center justify-center mb-5 shadow-md shadow-rose-500/20">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <div className="bg-white/95 backdrop-blur-xs rounded-2xl p-4 lg:p-4.5 border border-slate-200/80 border-b-[3px] border-b-rose-500 shadow-[0_4px_16px_rgba(0,0,0,0.03)] relative overflow-hidden group hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
+                {/* Marca d'água de fundo */}
+                <div className="absolute -top-1 -right-1 text-rose-500/10 pointer-events-none group-hover:text-rose-500/15 transition-colors">
+                  <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
-                <h3 className="text-base font-bold text-slate-900 mb-2">Alunos</h3>
-                <ul className="text-xs text-slate-500 space-y-1.5 font-medium">
-                  <li>• Portal do aluno moderno</li>
-                  <li>• Boletim e documentos digitais</li>
-                  <li>• Aulas e materiais EAD</li>
-                  <li>• Solicitações e serviços</li>
-                </ul>
+                <div>
+                  <div className="w-8 h-8 rounded-lg bg-rose-500 text-white flex items-center justify-center mb-2.5 shadow-xs">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-sm font-bold text-[#0c2340] mb-2 leading-tight">Alunos</h3>
+                  <ul className="text-[11.5px] lg:text-xs text-slate-600 space-y-1 font-medium leading-tight">
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5 flex-shrink-0" />Portal do aluno moderno</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5 flex-shrink-0" />Boletim e documentos digitais</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5 flex-shrink-0" />Aulas e materiais EAD</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5 flex-shrink-0" />Solicitações e serviços</li>
+                  </ul>
+                </div>
+                <div className="w-5 h-5 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center self-end mt-2 group-hover:bg-rose-500 group-hover:text-white transition-colors">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
               </div>
 
               {/* 7. Relatórios e Gestão */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs hover:shadow-md transition group">
-                <div className="w-12 h-12 rounded-xl bg-teal-500 text-white flex items-center justify-center mb-5 shadow-md shadow-teal-500/20">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              <div className="bg-white/95 backdrop-blur-xs rounded-2xl p-4 lg:p-4.5 border border-slate-200/80 border-b-[3px] border-b-teal-500 shadow-[0_4px_16px_rgba(0,0,0,0.03)] relative overflow-hidden group hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
+                {/* Marca d'água de fundo */}
+                <div className="absolute -top-1 -right-1 text-teal-500/10 pointer-events-none group-hover:text-teal-500/15 transition-colors">
+                  <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
                 </div>
-                <h3 className="text-base font-bold text-slate-900 mb-2">Relatórios e Gestão</h3>
-                <ul className="text-xs text-slate-500 space-y-1.5 font-medium">
-                  <li>• Dashboards executivos em tempo real</li>
-                  <li>• Indicadores institucionais</li>
-                  <li>• Relatórios operacionais</li>
-                  <li>• Tomada de decisão fundamentada</li>
-                </ul>
+                <div>
+                  <div className="w-8 h-8 rounded-lg bg-teal-500 text-white flex items-center justify-center mb-2.5 shadow-xs">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-sm font-bold text-[#0c2340] mb-2 leading-tight">Relatórios e Gestão</h3>
+                  <ul className="text-[11.5px] lg:text-xs text-slate-600 space-y-1 font-medium leading-tight">
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-teal-500 mr-1.5 flex-shrink-0" />Dashboards executivos em tempo real</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-teal-500 mr-1.5 flex-shrink-0" />Indicadores institucionais</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-teal-500 mr-1.5 flex-shrink-0" />Relatórios operacionais</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-teal-500 mr-1.5 flex-shrink-0" />Tomada de decisão fundamentada</li>
+                  </ul>
+                </div>
+                <div className="w-5 h-5 rounded-full bg-teal-50 text-teal-500 flex items-center justify-center self-end mt-2 group-hover:bg-teal-500 group-hover:text-white transition-colors">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
               </div>
 
               {/* 8. E muito mais */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs hover:shadow-md transition group">
-                <div className="w-12 h-12 rounded-xl bg-indigo-500 text-white flex items-center justify-center mb-5 shadow-md shadow-indigo-500/20">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+              <div className="bg-white/95 backdrop-blur-xs rounded-2xl p-4 lg:p-4.5 border border-slate-200/80 border-b-[3px] border-b-indigo-500 shadow-[0_4px_16px_rgba(0,0,0,0.03)] relative overflow-hidden group hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between">
+                {/* Marca d'água de fundo */}
+                <div className="absolute -top-1 -right-1 text-indigo-500/10 pointer-events-none group-hover:text-indigo-500/15 transition-colors">
+                  <svg className="w-14 h-14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                   </svg>
                 </div>
-                <h3 className="text-base font-bold text-slate-900 mb-2">E muito mais</h3>
-                <ul className="text-xs text-slate-500 space-y-1.5 font-medium">
-                  <li>• Gestão de pré-cadastros e captação</li>
-                  <li>• Fórum acadêmico integrado</li>
-                  <li>• Contratos com assinatura digital</li>
-                  <li>• Evolução contínua da plataforma</li>
-                </ul>
+                <div>
+                  <div className="w-8 h-8 rounded-lg bg-indigo-500 text-white flex items-center justify-center mb-2.5 shadow-xs">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-sm font-bold text-[#0c2340] mb-2 leading-tight">E muito mais</h3>
+                  <ul className="text-[11.5px] lg:text-xs text-slate-600 space-y-1 font-medium leading-tight">
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mr-1.5 flex-shrink-0" />Gestão de pré-cadastros e captação</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mr-1.5 flex-shrink-0" />Fórum acadêmico integrado</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mr-1.5 flex-shrink-0" />Contratos com assinatura digital</li>
+                    <li className="flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mr-1.5 flex-shrink-0" />Evolução contínua da plataforma</li>
+                  </ul>
+                </div>
+                <div className="w-5 h-5 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center self-end mt-2 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
               </div>
 
             </div>
