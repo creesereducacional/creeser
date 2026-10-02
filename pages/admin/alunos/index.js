@@ -547,82 +547,82 @@ export default function ListagemAlunos() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
               
               {/* 1. Total de Alunos */}
-              <div className="relative overflow-hidden bg-gradient-to-br from-blue-50/80 via-blue-50/40 to-white rounded-2xl p-4.5 border border-blue-200/80 shadow-xs transition-all hover:shadow-sm">
-                <div className="flex items-start justify-between">
-                  <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center text-lg flex-shrink-0 border border-blue-200 shadow-2xs">
+              <div className="bg-gradient-to-b from-blue-50/70 to-blue-50/20 rounded-2xl p-5 border border-blue-100 shadow-xs flex flex-col justify-between min-h-[150px] transition-all hover:shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-blue-100/80 text-blue-700 flex items-center justify-center text-lg flex-shrink-0 border border-blue-200/60">
                     👥
                   </div>
-                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-full border border-blue-200/60">
+                  <span className="text-[11px] font-semibold text-blue-700 bg-blue-100/70 px-2.5 py-0.5 rounded-full border border-blue-200/50">
                     Geral
                   </span>
                 </div>
-                <div className="mt-3">
-                  <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{totalAlunosGeral}</h3>
-                  <p className="text-xs font-semibold text-slate-500 mt-0.5">Total de Alunos</p>
+                <div className="my-2">
+                  <h3 className="text-2xl font-bold text-slate-900 tracking-tight leading-none">{totalAlunosGeral}</h3>
+                  <p className="text-xs font-medium text-slate-500 mt-1">Total de Alunos</p>
                 </div>
-                <div className="mt-3 pt-2.5 border-t border-blue-100/90 flex items-center justify-between text-xs">
-                  <span className="text-slate-500 font-medium">Matriculados no sistema</span>
-                  <span className="font-bold text-blue-700">100%</span>
+                <div className="pt-2.5 border-t border-blue-100/80 flex items-center justify-between text-xs gap-2">
+                  <span className="text-slate-500 truncate font-normal">Matriculados no sistema</span>
+                  <span className="font-semibold text-blue-700 shrink-0">100%</span>
                 </div>
               </div>
 
               {/* 2. Alunos Ativos */}
-              <div className="relative overflow-hidden bg-gradient-to-br from-emerald-50/80 via-emerald-50/40 to-white rounded-2xl p-4.5 border border-emerald-200/80 shadow-xs transition-all hover:shadow-sm">
-                <div className="flex items-start justify-between">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-lg flex-shrink-0 border border-emerald-200 shadow-2xs">
+              <div className="bg-gradient-to-b from-emerald-50/70 to-emerald-50/20 rounded-2xl p-5 border border-emerald-100 shadow-xs flex flex-col justify-between min-h-[150px] transition-all hover:shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-100/80 text-emerald-700 flex items-center justify-center text-lg flex-shrink-0 border border-emerald-200/60">
                     🎓
                   </div>
-                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full border border-emerald-200/60">
+                  <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100/70 px-2.5 py-0.5 rounded-full border border-emerald-200/50">
                     +{percAtivos}%
                   </span>
                 </div>
-                <div className="mt-3">
-                  <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{totalAtivos}</h3>
-                  <p className="text-xs font-semibold text-slate-500 mt-0.5">Alunos Ativos</p>
+                <div className="my-2">
+                  <h3 className="text-2xl font-bold text-slate-900 tracking-tight leading-none">{totalAtivos}</h3>
+                  <p className="text-xs font-medium text-slate-500 mt-1">Alunos Ativos</p>
                 </div>
-                <div className="mt-3 pt-2.5 border-t border-emerald-100/90 flex items-center justify-between text-xs">
-                  <span className="text-slate-500 font-medium">Em curso regular</span>
-                  <span className="font-bold text-emerald-700">{percAtivos}% do total</span>
+                <div className="pt-2.5 border-t border-emerald-100/80 flex items-center justify-between text-xs gap-2">
+                  <span className="text-slate-500 truncate font-normal">Em curso regular</span>
+                  <span className="font-semibold text-emerald-700 shrink-0">{percAtivos}% do total</span>
                 </div>
               </div>
 
               {/* 3. Pré-Cadastro */}
-              <div className="relative overflow-hidden bg-gradient-to-br from-amber-50/80 via-amber-50/40 to-white rounded-2xl p-4.5 border border-amber-200/80 shadow-xs transition-all hover:shadow-sm">
-                <div className="flex items-start justify-between">
-                  <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-lg flex-shrink-0 border border-amber-200 shadow-2xs">
+              <div className="bg-gradient-to-b from-amber-50/70 to-amber-50/20 rounded-2xl p-5 border border-amber-100 shadow-xs flex flex-col justify-between min-h-[150px] transition-all hover:shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100/80 text-amber-700 flex items-center justify-center text-lg flex-shrink-0 border border-amber-200/60">
                     ⏳
                   </div>
-                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-full border border-amber-200/60">
+                  <span className="text-[11px] font-semibold text-amber-700 bg-amber-100/70 px-2.5 py-0.5 rounded-full border border-amber-200/50">
                     Pendente
                   </span>
                 </div>
-                <div className="mt-3">
-                  <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{totalPre}</h3>
-                  <p className="text-xs font-semibold text-slate-500 mt-0.5">Pré-Cadastro</p>
+                <div className="my-2">
+                  <h3 className="text-2xl font-bold text-slate-900 tracking-tight leading-none">{totalPre}</h3>
+                  <p className="text-xs font-medium text-slate-500 mt-1">Pré-Cadastro</p>
                 </div>
-                <div className="mt-3 pt-2.5 border-t border-amber-100/90 flex items-center justify-between text-xs">
-                  <span className="text-slate-500 font-medium">Aguardando matrícula</span>
-                  <span className="font-bold text-amber-700">{percPre}% do total</span>
+                <div className="pt-2.5 border-t border-amber-100/80 flex items-center justify-between text-xs gap-2">
+                  <span className="text-slate-500 truncate font-normal">Aguardando matrícula</span>
+                  <span className="font-semibold text-amber-700 shrink-0">{percPre}% do total</span>
                 </div>
               </div>
 
               {/* 4. Transferidos / Egressos */}
-              <div className="relative overflow-hidden bg-gradient-to-br from-rose-50/80 via-rose-50/40 to-white rounded-2xl p-4.5 border border-rose-200/80 shadow-xs transition-all hover:shadow-sm">
-                <div className="flex items-start justify-between">
-                  <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center text-lg flex-shrink-0 border border-rose-200 shadow-2xs">
+              <div className="bg-gradient-to-b from-rose-50/70 to-rose-50/20 rounded-2xl p-5 border border-rose-100 shadow-xs flex flex-col justify-between min-h-[150px] transition-all hover:shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-rose-100/80 text-rose-700 flex items-center justify-center text-lg flex-shrink-0 border border-rose-200/60">
                     🚪
                   </div>
-                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-100/80 px-2 py-0.5 rounded-full border border-rose-200/60">
+                  <span className="text-[11px] font-semibold text-rose-700 bg-rose-100/70 px-2.5 py-0.5 rounded-full border border-rose-200/50">
                     Histórico
                   </span>
                 </div>
-                <div className="mt-3">
-                  <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{totalEgressos}</h3>
-                  <p className="text-xs font-semibold text-slate-500 mt-0.5">Transferidos / Egressos</p>
+                <div className="my-2">
+                  <h3 className="text-2xl font-bold text-slate-900 tracking-tight leading-none">{totalEgressos}</h3>
+                  <p className="text-xs font-medium text-slate-500 mt-1">Transferidos / Egressos</p>
                 </div>
-                <div className="mt-3 pt-2.5 border-t border-rose-100/90 flex items-center justify-between text-xs">
-                  <span className="text-slate-500 font-medium">Concluídos e desligados</span>
-                  <span className="font-bold text-rose-700">{percEgressos}% do total</span>
+                <div className="pt-2.5 border-t border-rose-100/80 flex items-center justify-between text-xs gap-2">
+                  <span className="text-slate-500 truncate font-normal">Concluídos e desligados</span>
+                  <span className="font-semibold text-rose-700 shrink-0">{percEgressos}% do total</span>
                 </div>
               </div>
 
