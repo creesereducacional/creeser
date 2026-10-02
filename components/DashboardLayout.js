@@ -33,6 +33,15 @@ export default function DashboardLayout({ children }) {
     return () => router.events.off('routeChangeComplete', handleRouteChange);
   }, [router.events]);
 
+  // Auto-expandir grupo do item ativo
+  useEffect(() => {
+    menuItems.forEach((item) => {
+      if (item.submenu?.some(sub => router.pathname === sub.url || (sub.url !== '#' && router.pathname.startsWith(sub.url)))) {
+        setExpandedSubmenus(prev => ({ ...prev, [item.id]: true }));
+      }
+    });
+  }, [router.pathname]);
+
   const user = usuario;
 
   // Verificação de permissões e redirecionamento de rotas administrativas
@@ -427,11 +436,11 @@ export default function DashboardLayout({ children }) {
       <aside
         className={`${
           sidebarOpen ? 'w-64' : 'w-20'
-        } bg-[#0B2545] text-[#E2E8F0] shadow-2xl transition-all duration-300 fixed h-full left-0 top-0 z-50 flex flex-col border-r border-[#153a66] select-none`}
+        } bg-[#021B33] text-[#E2E8F0] shadow-2xl transition-all duration-300 fixed h-full left-0 top-0 z-50 flex flex-col border-r border-[#0B2E54] select-none`}
       >
         
         {/* 1. Topo / Logo */}
-        <div className="p-3.5 pt-4 pb-3.5 flex items-center justify-between min-h-[76px] border-b border-[#153a66]/70 bg-[#081d38]/40">
+        <div className="p-3.5 pt-4 pb-3.5 flex items-center justify-between min-h-[76px] border-b border-[#0B2E54] bg-[#021B33]">
           {sidebarOpen ? (
             <div className="flex items-center justify-center w-full px-1">
               <img
@@ -441,7 +450,7 @@ export default function DashboardLayout({ children }) {
               />
             </div>
           ) : (
-            <div className="w-10 h-10 rounded-xl bg-[#1E3A5F] text-teal-300 font-black text-lg flex items-center justify-center mx-auto shadow-inner">
+            <div className="w-10 h-10 rounded-xl bg-[#0D3B66] text-white font-black text-lg flex items-center justify-center mx-auto shadow-inner">
               C
             </div>
           )}
@@ -475,16 +484,13 @@ export default function DashboardLayout({ children }) {
                     return (
                       <Link href={inicioItem.url}>
                         <div
-                          className={`relative flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors duration-150 text-[14px] cursor-pointer min-h-[38px] ${
+                          className={`relative flex items-center gap-2.5 px-3 py-2 rounded-xl transition-colors duration-150 text-[13.5px] cursor-pointer min-h-[38px] ${
                             isActive
-                              ? 'bg-[#173B63] text-white font-semibold shadow-xs'
-                              : 'text-slate-300 hover:bg-white/5 hover:text-white font-medium'
+                              ? 'bg-[#0D3B66] text-white font-semibold shadow-xs'
+                              : 'text-[#CBD5E1] hover:bg-white/5 hover:text-white font-medium'
                           } ${!sidebarOpen ? 'justify-center px-0' : ''}`}
                         >
-                          {isActive && (
-                            <span className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-teal-400 rounded-r-full" />
-                          )}
-                          <span className={`text-base flex-shrink-0 ${isActive ? 'text-teal-300' : 'text-slate-300'}`}>
+                          <span className={`text-base flex-shrink-0 ${isActive ? 'text-white' : 'text-slate-300'}`}>
                             {inicioItem.icon}
                           </span>
                           {sidebarOpen && <span className="truncate">{inicioItem.nome}</span>}
@@ -509,17 +515,18 @@ export default function DashboardLayout({ children }) {
                     
                     {/* Título da Seção */}
                     {sidebarOpen ? (
-                      <div className="px-3 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                      <div className="px-3 pt-2.5 pb-1 text-[11px] font-bold uppercase tracking-wider text-[#5A82A6]">
                         {secao}
                       </div>
                     ) : (
-                      <div className="h-px bg-slate-700/40 my-1.5 mx-2" />
+                      <div className="h-px bg-white/10 my-1.5 mx-2" />
                     )}
 
                     {/* Itens da Seção */}
                     <div className="space-y-0.5">
                       {items.map((item) => {
-                        const isAnySubActive = item.submenu?.some(sub => router.pathname === sub.url);
+                        const isAnySubActive = item.submenu?.some(sub => router.pathname === sub.url || (sub.url !== '#' && router.pathname.startsWith(sub.url)));
+                        const isExpanded = expandedSubmenus[item.id];
                         const isActive = router.pathname === item.url || isAnySubActive;
 
                         return (
@@ -532,19 +539,16 @@ export default function DashboardLayout({ children }) {
                                     ...prev,
                                     [item.id]: !prev[item.id]
                                   }))}
-                                  className={`relative w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-lg transition-colors duration-150 text-[14px] cursor-pointer min-h-[38px] ${
-                                    isAnySubActive || expandedSubmenus[item.id]
-                                      ? 'bg-[#173B63] text-white font-semibold shadow-xs'
+                                  className={`relative w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-xl transition-colors duration-150 text-[13.5px] cursor-pointer min-h-[38px] ${
+                                    isExpanded || isAnySubActive
+                                      ? 'bg-[#0D3B66] text-white font-semibold shadow-xs'
                                       : item.em_breve
                                       ? 'text-slate-500 hover:bg-white/5 hover:text-slate-300'
-                                      : 'text-slate-300 hover:bg-white/5 hover:text-white font-medium'
+                                      : 'text-[#CBD5E1] hover:bg-white/5 hover:text-white font-medium'
                                   } ${!sidebarOpen ? 'justify-center px-0' : ''}`}
                                 >
-                                  {isAnySubActive && (
-                                    <span className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-teal-400 rounded-r-full" />
-                                  )}
                                   <div className="flex items-center gap-2.5 min-w-0">
-                                    <span className={`text-base flex-shrink-0 ${isAnySubActive ? 'text-teal-300' : 'text-slate-300'} ${item.em_breve ? 'opacity-50' : ''}`}>
+                                    <span className={`text-base flex-shrink-0 ${isExpanded || isAnySubActive ? 'text-white' : 'text-slate-300'} ${item.em_breve ? 'opacity-50' : ''}`}>
                                       {item.icon}
                                     </span>
                                     {sidebarOpen && <span className="truncate">{item.nome}</span>}
@@ -552,27 +556,30 @@ export default function DashboardLayout({ children }) {
                                   {sidebarOpen && (
                                     <svg
                                       className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-200 ${
-                                        expandedSubmenus[item.id] ? 'rotate-90 text-teal-300' : 'text-slate-400'
+                                        isExpanded ? 'rotate-90 text-white' : 'text-[#648BAF]'
                                       }`}
                                       fill="none"
                                       stroke="currentColor"
                                       viewBox="0 0 24 24"
                                     >
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
                                     </svg>
                                   )}
                                 </button>
 
                                 {/* Tooltip quando colapsado */}
                                 {!sidebarOpen && (
-                                  <div className="hidden group-hover:block absolute left-20 top-0 bg-[#0B2545] text-white px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap z-50 border border-slate-700 shadow-xl">
+                                  <div className="hidden group-hover:block absolute left-20 top-0 bg-[#021B33] text-white px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap z-50 border border-[#0B2E54] shadow-xl">
                                     {item.nome}
                                   </div>
                                 )}
 
                                 {/* Submenu Aberto */}
-                                {sidebarOpen && expandedSubmenus[item.id] && (
-                                  <div className="bg-[#081d38]/90 rounded-lg my-1 py-1 px-1.5 ml-3 border-l-2 border-teal-500/50 space-y-0.5">
+                                {sidebarOpen && isExpanded && (
+                                  <div className="relative ml-3 pl-3.5 my-1 space-y-0.5">
+                                    {/* Linha vertical contínua da árvore */}
+                                    <div className="absolute left-1.5 top-1.5 bottom-1.5 w-[1.5px] bg-white/20 rounded-full pointer-events-none" />
+
                                     {item.submenu.map((subitem) => {
                                       const isSubActive = router.pathname === subitem.url;
                                       const isSubEmBreve = subitem.em_breve;
@@ -580,16 +587,16 @@ export default function DashboardLayout({ children }) {
                                       return (
                                         <Link key={subitem.id} href={subitem.url}>
                                           <div
-                                            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-colors text-[13px] cursor-pointer min-h-[30px] ${
+                                            className={`relative flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition-colors text-[13px] cursor-pointer min-h-[30px] ${
                                               isSubActive
-                                                ? 'bg-teal-500/20 text-teal-200 font-semibold border-l-2 border-teal-400'
+                                                ? 'bg-[#0D3B66] text-white font-semibold shadow-xs'
                                                 : isSubEmBreve
                                                 ? 'text-slate-500 hover:bg-white/5 hover:text-slate-300 font-normal'
-                                                : 'text-slate-300 hover:bg-white/5 hover:text-white font-medium'
+                                                : 'text-[#CBD5E1] hover:bg-white/5 hover:text-white font-normal'
                                             }`}
                                           >
-                                            <span className={`text-[10px] flex-shrink-0 ${isSubActive ? 'text-teal-300' : 'text-teal-500/70'}`}>
-                                              ·
+                                            <span className={`text-[8px] flex-shrink-0 ${isSubActive ? 'text-white' : 'text-[#94A3B8]'}`}>
+                                              ●
                                             </span>
                                             <span className="truncate">{subitem.nome}</span>
                                           </div>
@@ -608,18 +615,15 @@ export default function DashboardLayout({ children }) {
                                   <div className="relative group">
                                     <Link href={item.url}>
                                       <div
-                                        className={`relative flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors duration-150 text-[14px] cursor-pointer min-h-[38px] ${
+                                        className={`relative flex items-center gap-2.5 px-3 py-2 rounded-xl transition-colors duration-150 text-[13.5px] cursor-pointer min-h-[38px] ${
                                           isActive
-                                            ? 'bg-[#173B63] text-white font-semibold shadow-xs'
+                                            ? 'bg-[#0D3B66] text-white font-semibold shadow-xs'
                                             : isEmBreve
                                             ? 'text-slate-500 hover:bg-white/5 hover:text-slate-300 font-normal'
-                                            : 'text-slate-300 hover:bg-white/5 hover:text-white font-medium'
+                                            : 'text-[#CBD5E1] hover:bg-white/5 hover:text-white font-medium'
                                         } ${!sidebarOpen ? 'justify-center px-0' : ''}`}
                                       >
-                                        {isActive && (
-                                          <span className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-teal-400 rounded-r-full" />
-                                        )}
-                                        <span className={`text-base flex-shrink-0 ${isActive ? 'text-teal-300' : 'text-slate-300'} ${isEmBreve ? 'opacity-50' : ''}`}>
+                                        <span className={`text-base flex-shrink-0 ${isActive ? 'text-white' : 'text-slate-300'} ${isEmBreve ? 'opacity-50' : ''}`}>
                                           {item.icon}
                                         </span>
                                         {sidebarOpen && <span className="truncate">{item.nome}</span>}
@@ -628,7 +632,7 @@ export default function DashboardLayout({ children }) {
 
                                     {/* Tooltip quando colapsado */}
                                     {!sidebarOpen && (
-                                      <div className="hidden group-hover:block absolute left-20 top-0 bg-[#0B2545] text-white px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap z-50 border border-slate-700 shadow-xl">
+                                      <div className="hidden group-hover:block absolute left-20 top-0 bg-[#021B33] text-white px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap z-50 border border-[#0B2E54] shadow-xl">
                                         {item.nome}
                                       </div>
                                     )}
@@ -648,10 +652,10 @@ export default function DashboardLayout({ children }) {
         </nav>
 
         {/* 4. Botão Recolher menu fixado no rodapé */}
-        <div className="p-3 bg-[#081d38]/90 border-t border-[#153a66] flex-shrink-0">
+        <div className="p-3 bg-[#021B33] border-t border-[#0B2E54] flex-shrink-0">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="w-full py-2.5 px-3 bg-[#0f325d] hover:bg-[#164177] active:bg-[#0c2748] border border-slate-700/50 rounded-xl transition-all text-xs text-[#E2E8F0] hover:text-white font-bold flex items-center justify-center gap-2 shadow-xs"
+            className="w-full py-2.5 px-3 bg-[#0B2B4D] hover:bg-[#0F3864] active:bg-[#08223E] border border-white/10 rounded-xl transition-all text-xs text-[#CBD5E1] hover:text-white font-semibold flex items-center justify-center gap-2 shadow-xs cursor-pointer"
           >
             <svg
               className={`w-4 h-4 transition-transform duration-200 ${!sidebarOpen ? 'rotate-180' : ''}`}
