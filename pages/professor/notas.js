@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import ProfessorLayout from "../../components/ProfessorLayout";
 
 export default function ProfessorNotas() {
   const [registros, setRegistros] = useState([]);
@@ -162,7 +161,7 @@ export default function ProfessorNotas() {
   });
 
   return (
-    <ProfessorLayout title="Lançamento & Gestão de Notas">
+    <>
       <div className="space-y-6 max-w-7xl mx-auto pb-10 font-sans">
         
         {/* Header da Página */}
@@ -427,6 +426,6 @@ export default function ProfessorNotas() {
         )}
 
       </div>
-    </ProfessorLayout>
+    </>
   );
 }

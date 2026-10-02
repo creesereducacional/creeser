@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import ProfessorLayout from "../../components/ProfessorLayout";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -43,7 +42,7 @@ export default function ProfessorDashboard() {
   ];
 
   return (
-    <ProfessorLayout title="Dashboard do Professor">
+    <>
       <div className="space-y-8 max-w-7xl mx-auto pb-10 font-sans">
         
         {/* ── 1. BANNER HERO BOAS-VINDAS PROFESSOR ────────────────────── */}
@@ -159,6 +158,6 @@ export default function ProfessorDashboard() {
         </div>
 
       </div>
-    </ProfessorLayout>
+    </>
   );
 }

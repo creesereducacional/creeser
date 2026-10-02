@@ -1,8 +1,7 @@
-import DashboardLayout from '@/components/DashboardLayout';
 
 export default function CalendarioAulas() {
   return (
-    <DashboardLayout>
+    <>
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center gap-2 mb-6">
           <span>📆</span>
@@ -13,6 +12,6 @@ export default function CalendarioAulas() {
           <p className="text-gray-600 text-lg">Esta página está em desenvolvimento</p>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

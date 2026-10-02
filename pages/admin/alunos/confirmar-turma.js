@@ -8,7 +8,6 @@
  * Acesso: grupo_admin, instituicao_admin, admin
  */
 import { useEffect, useState } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import Link from 'next/link';
 
 const STATUS_LABELS = {
@@ -88,7 +87,7 @@ export default function ConfirmarTurmaPage() {
     );
 
   return (
-    <DashboardLayout titulo="Confirmar Turma / Ativar Alunos">
+    <>
       <div className="space-y-5 max-w-5xl">
 
         {/* Cabeçalho informativo */}
@@ -185,6 +184,6 @@ export default function ConfirmarTurmaPage() {
           </Link>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import DashboardLayout from '@/components/DashboardLayout';
 import { formatarCNPJ, formatarCEP, formatarTelefone } from '@/utils/formatadores';
 
 export default function EditarUnidade() {
@@ -276,16 +275,16 @@ export default function EditarUnidade() {
 
   if (carregando) {
     return (
-      <DashboardLayout>
+      <>
         <div className="flex justify-center items-center h-96">
           <p className="text-lg text-gray-600">⏳ Carregando dados...</p>
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
           <Link href="/admin/unidades">
@@ -752,6 +751,6 @@ export default function EditarUnidade() {
           </div>
         </form>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

@@ -3,7 +3,6 @@
  * Exportação operacional de dados e documentação de backup.
  */
 
-import DashboardLayout from '@/components/DashboardLayout';
 import PageHeader from '@/components/ui/PageHeader';
 import { useState } from 'react';
 
@@ -61,7 +60,7 @@ function ExportCard({ tipo, icon, titulo, descricao }) {
 
 export default function Backup() {
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-6">
         <PageHeader
           icon="💾"
@@ -144,6 +143,6 @@ export default function Backup() {
           </a>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

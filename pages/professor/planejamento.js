@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import ProfessorLayout from "../../components/ProfessorLayout";
 
 export default function ProfessorPlanejamento() {
   const router = useRouter();
@@ -116,7 +115,7 @@ export default function ProfessorPlanejamento() {
   });
 
   return (
-    <ProfessorLayout title={editId ? "Editar Planejamento de Aula" : "Novo Planejamento de Aula"}>
+    <>
       <div className="max-w-4xl mx-auto pb-10 font-sans space-y-6">
         
         {/* Header da Página */}
@@ -285,6 +284,6 @@ export default function ProfessorPlanejamento() {
         </form>
 
       </div>
-    </ProfessorLayout>
+    </>
   );
 }

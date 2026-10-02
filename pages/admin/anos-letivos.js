@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import CustomModal from '@/components/CustomModal';
 import ConfirmModal from '@/components/ConfirmModal';
 
@@ -208,7 +207,7 @@ export default function AnosLetivos() {
   const paginatedAnosLetivos = filteredAnosLetivos.slice(startIndex, endIndex);
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-4 md:p-6 max-w-7xl">
         <h1 className="text-2xl font-bold text-gray-800 mb-6">Gerenciar Anos Letivos</h1>
 
@@ -500,6 +499,6 @@ export default function AnosLetivos() {
         onConfirm={handleConfirmDelete}
         onClose={() => setConfirmDelete({ isOpen: false, id: null })}
       />
-    </DashboardLayout>
+    </>
   );
 }

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import DashboardLayout from '../../../components/DashboardLayout';
 
 export default function CampanhasMatriculas() {
   const router = useRouter();
@@ -78,14 +77,14 @@ export default function CampanhasMatriculas() {
 
   if (loading) {
     return (
-      <DashboardLayout>
+      <>
         <div className="p-4 md:p-6 text-center">Carregando...</div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-4 md:p-6 max-w-5xl">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6">Campanhas de Matrículas</h1>
 
@@ -209,6 +208,6 @@ export default function CampanhasMatriculas() {
           </button>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

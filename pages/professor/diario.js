@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import ProfessorLayout from "../../components/ProfessorLayout";
 import Link from "next/link";
 
 export default function ProfessorDiario() {
@@ -31,7 +30,7 @@ export default function ProfessorDiario() {
   });
 
   return (
-    <ProfessorLayout title="Diário de Classe & Planejamentos">
+    <>
       <div className="space-y-6 max-w-7xl mx-auto pb-10 font-sans">
         
         {/* Header da Página */}
@@ -141,6 +140,6 @@ export default function ProfessorDiario() {
           </div>
         )}
       </div>
-    </ProfessorLayout>
+    </>
   );
 }

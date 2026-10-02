@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import DashboardLayout from '../../../components/DashboardLayout';
 
 export default function EditarPlanejamentoDiario() {
   const router = useRouter();
@@ -95,14 +94,14 @@ export default function EditarPlanejamentoDiario() {
 
   if (loading) {
     return (
-      <DashboardLayout>
+      <>
         <div className="p-4 md:p-6 text-center">Carregando...</div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-4 md:p-6 max-w-4xl mx-auto">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6">
           Editar Plano de Ensino
@@ -324,6 +323,6 @@ export default function EditarPlanejamentoDiario() {
           </div>
         </form>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import DashboardLayout from '../../../components/DashboardLayout';
 import PageHeader from '@/components/ui/PageHeader';
 import EmptyState   from '@/components/ui/EmptyState';
 import { SkeletonTable } from '@/components/ui/LoadingSkeleton';
@@ -199,7 +198,7 @@ export default function ListagemTurmas() {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-4 md:p-6 max-w-7xl mx-auto">
         {/* Cabeçalho */}
         <PageHeader
@@ -410,6 +409,6 @@ export default function ListagemTurmas() {
           type="delete"
         />
       </div>
-    </DashboardLayout>
+    </>
   );
 }

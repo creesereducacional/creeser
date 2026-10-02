@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
-import PortalLayout from "@/components/portal/PortalLayout";
 
 export default function AlunoHome() {
   const router = useRouter();
@@ -63,7 +62,7 @@ export default function AlunoHome() {
   const cursosContinuar = cursos.slice(0, 3);
 
   return (
-    <PortalLayout title="Início — Meus Cursos" tipoRequerido="aluno">
+    <>
       <div className="space-y-8 max-w-7xl mx-auto pb-10">
         
         {/* Banner de Boas-Vindas */}
@@ -145,7 +144,18 @@ export default function AlunoHome() {
           </div>
 
           {carregando ? (
-            <div className="py-12 text-center text-slate-400 text-sm">Carregando cursos...</div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-pulse">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-xs h-72 flex flex-col justify-between p-5">
+                  <div className="h-36 bg-slate-200 rounded-xl -m-5 mb-4" />
+                  <div className="space-y-2">
+                    <div className="h-4 bg-slate-200 rounded w-3/4" />
+                    <div className="h-3 bg-slate-100 rounded w-full" />
+                  </div>
+                  <div className="h-2 bg-slate-100 rounded-full w-full mt-4" />
+                </div>
+              ))}
+            </div>
           ) : cursosContinuar.length === 0 ? (
             <div className="p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-500 text-sm">
               Nenhum curso disponível no momento.
@@ -256,6 +266,6 @@ export default function AlunoHome() {
         </div>
 
       </div>
-    </PortalLayout>
+    </>
   );
 }

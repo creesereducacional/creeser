@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import DashboardLayout from '../../../components/DashboardLayout';
 import CustomModal from '../../../components/CustomModal';
 import ConfirmModal from '../../../components/ConfirmModal';
 
@@ -364,7 +363,7 @@ export default function GerenciarGrades() {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <div className="max-w-6xl mx-auto p-4">
         {/* Header com Voltar */}
         <div className="flex items-center gap-4 mb-8">
@@ -679,6 +678,6 @@ export default function GerenciarGrades() {
         onConfirm={handleConfirmDelete}
         onClose={() => setConfirmDelete({ isOpen: false, id: null })}
       />
-    </DashboardLayout>
+    </>
   );
 }

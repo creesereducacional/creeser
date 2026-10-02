@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import Link from 'next/link';
 import StatusBadge  from '@/components/ui/StatusBadge';
 import EmptyState   from '@/components/ui/EmptyState';
@@ -77,7 +76,7 @@ export default function RelatorioContratos() {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="max-w-7xl mx-auto space-y-5">
 
         {/* Cabeçalho */}
@@ -264,6 +263,6 @@ export default function RelatorioContratos() {
           </>
         )}
       </div>
-    </DashboardLayout>
+    </>
   );
 }

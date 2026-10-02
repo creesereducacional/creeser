@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import ProfessorLayout from "../../components/ProfessorLayout";
 
 export default function ProfessorFrequencia() {
   const [aulas, setAulas] = useState([]);
@@ -106,7 +105,7 @@ export default function ProfessorFrequencia() {
   };
 
   return (
-    <ProfessorLayout title="Frequência & Controle de Presença">
+    <>
       <div className="space-y-6 max-w-7xl mx-auto pb-10 font-sans">
         
         {/* Top Header Card */}
@@ -286,6 +285,6 @@ export default function ProfessorFrequencia() {
           </div>
         )}
       </div>
-    </ProfessorLayout>
+    </>
   );
 }

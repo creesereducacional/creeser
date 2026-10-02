@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import DashboardLayout from '../../../components/DashboardLayout';
 
 export default function GerenciarMatriculadores() {
   const router = useRouter();
@@ -83,14 +82,14 @@ export default function GerenciarMatriculadores() {
 
   if (loading) {
     return (
-      <DashboardLayout>
+      <>
         <div className="p-4 md:p-6 text-center">Carregando...</div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-4 md:p-6 max-w-5xl">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6">Gerenciar Matriculadores</h1>
 
@@ -198,6 +197,6 @@ export default function GerenciarMatriculadores() {
           </button>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

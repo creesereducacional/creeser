@@ -1,54 +1,73 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
+import { usePortalLayout } from "@/context/PortalLayoutContext";
 
-/**
- * Layout unificado para o Portal Acadêmico (portal.creeser.com.br).
- * Atende perfis de ALUNO e PROFESSOR com navegação contextual,
- * design moderno em tons de teal/esmeralda e total responsividade.
- * 
- * @param {object} props
- * @param {React.ReactNode} props.children
- * @param {string} [props.title] - Título da página exibido no TopBar
- * @param {'aluno'|'professor'|'todos'} [props.tipoRequerido] - Tipo de acesso exigido
- */
-export default function PortalLayout({ children, title = "Portal Acadêmico", tipoRequerido = "aluno" }) {
+const ROUTE_TITLES = {
+  "/aluno/home": "Início — Meus Cursos",
+  "/aluno/dashboard": "Painel EAD do Aluno",
+  "/aluno/boletim": "Meu Boletim Escolar",
+  "/aluno/forum": "Fórum de Dúvidas e Discussão",
+  "/enviar-documentos": "Envio de Documentos e Trabalhos",
+  "/professor/dashboard": "Dashboard do Professor",
+  "/professor/diario": "Diário de Classe & Planejamentos",
+  "/professor/frequencia": "Frequência & Controle de Presença",
+  "/professor/notas": "Lançamento & Gestão de Notas",
+  "/professor/alunos": "Meus Alunos & Turmas",
+  "/professor/planejamento": "Planejamento de Aula",
+};
+
+export default function PortalLayout({ children, title, tipoRequerido = "aluno" }) {
   const router = useRouter();
-  const tiposPermitidos = tipoRequerido === "todos" ? ["aluno", "professor"] : [tipoRequerido];
+  const portalContext = usePortalLayout();
 
-  const { usuario, carregando } = useAuth({
+  // Tipo efetivo: detecta professor pela rota, independente da prop
+  const effectiveTipoRequerido = router.pathname.startsWith("/professor/")
+    ? "professor"
+    : tipoRequerido;
+
+  // Título do Topbar: prop > mapa de rotas > contexto > padrão
+  const displayTitle =
+    title ||
+    ROUTE_TITLES[router.pathname] ||
+    portalContext?.title ||
+    "Portal Acadêmico";
+
+  // Sincroniza título externo com contexto (apenas quando a página passa title via prop)
+  useEffect(() => {
+    if (title && portalContext?.setTitle) {
+      portalContext.setTitle(title);
+    }
+  }, [title]);
+
+  // Autenticação — somente leitura de estado; redirect gerenciado pelo useAuth
+  const tiposPermitidos =
+    effectiveTipoRequerido === "todos"
+      ? ["aluno", "professor"]
+      : [effectiveTipoRequerido];
+
+  const { usuario } = useAuth({
     tiposPermitidos,
     redirectTo: "/login",
-    redirectIfUnauthorized: tipoRequerido === "aluno" ? "/professor/dashboard" : "/aluno/home",
+    redirectIfUnauthorized:
+      effectiveTipoRequerido === "aluno" ? "/professor/dashboard" : "/aluno/home",
   });
 
+  // Controle do drawer mobile — não afeta Sidebar nem Topbar no desktop
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const handleLogout = async () => {
-    try {
-      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-    } catch (e) {
-      console.error("Erro ao deslogar:", e);
-    } finally {
-      localStorage.removeItem("usuario");
-      localStorage.removeItem("token");
-      router.push("/login");
-    }
-  };
+  useEffect(() => {
+    const closeSidebar = () => setSidebarOpen(false);
+    router.events.on("routeChangeComplete", closeSidebar);
+    return () => router.events.off("routeChangeComplete", closeSidebar);
+  }, [router.events]);
 
-  if (carregando || !usuario) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-[#f0f9f8]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-teal-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-teal-800 font-semibold text-sm">Carregando Portal Acadêmico...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const isAluno = usuario.tipo === "aluno";
+  // ── Dados derivados do usuário ──────────────────────────────────
+  const isAluno =
+    (usuario?.tipo ||
+      (router.pathname.startsWith("/professor/") ? "professor" : "aluno")) ===
+    "aluno";
 
   const menuItems = isAluno
     ? [
@@ -67,7 +86,7 @@ export default function PortalLayout({ children, title = "Portal Acadêmico", ti
         { label: "Planejamento", href: "/professor/planejamento", icon: "📝" },
       ];
 
-  const userDisplayName = usuario.nomeCompleto || usuario.nome || "Usuário";
+  const userDisplayName = usuario?.nomeCompleto || usuario?.nome || "Usuário";
   const userInitials = userDisplayName
     .split(" ")
     .filter(Boolean)
@@ -75,25 +94,44 @@ export default function PortalLayout({ children, title = "Portal Acadêmico", ti
     .map((n) => n[0].toUpperCase())
     .join("");
 
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    } catch (e) {
+      console.error("Erro ao deslogar:", e);
+    } finally {
+      localStorage.removeItem("usuario");
+      localStorage.removeItem("token");
+      router.push("/login");
+    }
+  };
+
+  // ── Shell permanente ────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#f4f8f7] flex font-sans text-gray-800 antialiased">
-      {/* ── Sidebar Mobile Backdrop ─────────────────────────────────── */}
+
+      {/* Backdrop mobile — não afeta desktop */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-40 md:hidden transition-opacity"
+          className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-40 md:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* ── Sidebar Principal ────────────────────────────────────────── */}
+      {/* ── SIDEBAR — permanece montado ─────────────────────────── */}
       <aside
-        className={`fixed md:sticky top-0 left-0 h-screen w-64 bg-gradient-to-b from-teal-800 via-teal-900 to-slate-900 text-white flex flex-col z-50 transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        className={`fixed md:sticky top-0 left-0 h-screen w-64 bg-gradient-to-b from-teal-800 via-teal-900 to-slate-900 text-white flex flex-col z-50 shadow-2xl md:shadow-none md:translate-x-0 md:transition-none ${
+          sidebarOpen
+            ? "translate-x-0 transition-transform duration-300 ease-in-out"
+            : "-translate-x-full transition-transform duration-300 ease-in-out"
         }`}
       >
-        {/* Topo / Logo */}
+        {/* Logo */}
         <div className="p-5 border-b border-teal-700/50 flex items-center justify-between">
-          <Link href={isAluno ? "/aluno/home" : "/professor/dashboard"} className="flex items-center gap-3 group">
+          <Link
+            href={isAluno ? "/aluno/home" : "/professor/dashboard"}
+            className="flex items-center gap-3 group"
+          >
             <div className="h-10 px-2 rounded-xl bg-white/95 shadow-md flex items-center justify-center">
               <img
                 src="/images/logo_creeser.png"
@@ -107,7 +145,6 @@ export default function PortalLayout({ children, title = "Portal Acadêmico", ti
               </span>
             </div>
           </Link>
-
           <button
             onClick={() => setSidebarOpen(false)}
             className="md:hidden text-teal-200 hover:text-white p-1"
@@ -116,44 +153,48 @@ export default function PortalLayout({ children, title = "Portal Acadêmico", ti
           </button>
         </div>
 
-        {/* Itens de Navegação */}
+        {/* Itens de navegação — next/link em todos */}
         <nav className="flex-1 py-5 px-3 space-y-1.5 overflow-y-auto">
           {menuItems.map((item) => {
             const isActive = router.pathname === item.href;
             return (
-              <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}>
-                <div
-                  className={`flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl transition-all duration-150 text-sm font-semibold cursor-pointer group ${
-                    isActive
-                      ? "bg-teal-500 text-white shadow-md shadow-teal-950/20"
-                      : "text-teal-100/80 hover:bg-white/10 hover:text-white"
-                  }`}
-                >
-                  <span className="text-lg flex-shrink-0 transition-transform group-hover:scale-110">
-                    {item.icon}
-                  </span>
-                  <span className="truncate">{item.label}</span>
-                </div>
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl transition-all duration-150 text-sm font-semibold cursor-pointer group ${
+                  isActive
+                    ? "bg-teal-500 text-white shadow-md shadow-teal-950/20"
+                    : "text-teal-100/80 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <span className="text-lg flex-shrink-0 transition-transform group-hover:scale-110">
+                  {item.icon}
+                </span>
+                <span className="truncate">{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        {/* Rodapé / Perfil e Logout */}
+        {/* Perfil e Logout */}
         <div className="p-4 border-t border-teal-700/40 bg-black/20">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-9 h-9 bg-teal-500 text-white rounded-full flex items-center justify-center font-bold text-xs shadow-sm border border-teal-300/40">
               {userInitials || "U"}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold text-white truncate leading-tight">{userDisplayName}</p>
-              <p className="text-[11px] text-teal-200/80 truncate">{usuario.email}</p>
+              <p className="text-xs font-bold text-white truncate leading-tight">
+                {userDisplayName}
+              </p>
+              <p className="text-[11px] text-teal-200/80 truncate">
+                {usuario?.email || "portal@creeser.com.br"}
+              </p>
             </div>
           </div>
-
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-rose-600/90 hover:bg-rose-600 text-white rounded-xl text-xs font-bold transition shadow-sm"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-rose-600/90 hover:bg-rose-600 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
           >
             <span>🚪</span>
             <span>Sair do Portal</span>
@@ -161,9 +202,10 @@ export default function PortalLayout({ children, title = "Portal Acadêmico", ti
         </div>
       </aside>
 
-      {/* ── Área de Conteúdo Principal ───────────────────────────────── */}
+      {/* ── COLUNA DIREITA ─────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* TopBar */}
+
+        {/* ── TOPBAR — permanece montado ────────────────────────── */}
         <header className="bg-white border-b border-gray-200/80 sticky top-0 z-30 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
           <div className="px-4 sm:px-8 py-3.5 flex justify-between items-center gap-4">
             <div className="flex items-center gap-3">
@@ -176,10 +218,9 @@ export default function PortalLayout({ children, title = "Portal Acadêmico", ti
                 </svg>
               </button>
               <h1 className="text-base sm:text-lg font-bold text-gray-800 tracking-tight truncate">
-                {title}
+                {displayTitle}
               </h1>
             </div>
-
             <div className="flex items-center gap-3">
               <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-teal-50 text-teal-700 border border-teal-200/60">
                 <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
@@ -189,12 +230,13 @@ export default function PortalLayout({ children, title = "Portal Acadêmico", ti
           </div>
         </header>
 
-        {/* Conteúdo Dinâmico */}
+        {/* ── MAIN — ÚNICO elemento que troca por rota ─────────── */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
           <div className="max-w-7xl mx-auto">
             {children}
           </div>
         </main>
+
       </div>
     </div>
   );

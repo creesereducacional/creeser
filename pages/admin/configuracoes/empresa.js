@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
-import DashboardLayout from '../../../components/DashboardLayout';
 import RichTextEditor from '../../../components/RichTextEditor';
 import ConfirmModal from '../../../components/ConfirmModal';
 
@@ -790,7 +789,7 @@ export default function ConfiguracaoEmpresa() {
   ];
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-4 md:p-6 max-w-5xl">
         <div className="mb-6 space-y-3">
           <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -3326,6 +3325,6 @@ export default function ConfiguracaoEmpresa() {
         message={confirmModal.message}
         type={confirmModal.type}
       />
-    </DashboardLayout>
+    </>
   );
 }

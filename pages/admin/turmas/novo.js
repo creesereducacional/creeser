@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import DashboardLayout from '../../../components/DashboardLayout';
 import CustomModal from '../../../components/CustomModal';
 import ModalPreviewContrato from '@/components/ModalPreviewContrato';
 
@@ -197,7 +196,7 @@ export default function NovoTurma() {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-4 md:p-6 max-w-5xl mx-auto">
         {/* Cabeçalho */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -681,6 +680,6 @@ export default function NovoTurma() {
         contratoId={formData.contratoId}
         instituicaoNome={opcoes.instituicoes.find((i) => String(i.id) === String(formData.instituicaoId))?.nome}
       />
-    </DashboardLayout>
+    </>
   );
 }

@@ -1,5 +1,4 @@
 import AdminHeader from '../../components/AdminHeader';
-import DashboardLayout from '../../components/DashboardLayout';
 import AdminAvaliacoes from '../../components/AdminAvaliacoes';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -15,8 +14,8 @@ export default function AvaliacoesPage() {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <AdminAvaliacoes />
-    </DashboardLayout>
+    </>
   );
 }

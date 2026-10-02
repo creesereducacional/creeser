@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import DashboardLayout from '@/components/DashboardLayout';
 import Link from 'next/link';
 
 export default function EditarPerfil() {
@@ -142,11 +141,11 @@ export default function EditarPerfil() {
   };
 
   if (!user) {
-    return <DashboardLayout><div className="text-center py-8">Carregando...</div></DashboardLayout>;
+    return <><div className="text-center py-8">Carregando...</div></>;
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="max-w-4xl mx-auto px-0">
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-6 sm:mb-8">
           <Link href="/admin/dashboard">
@@ -305,6 +304,6 @@ export default function EditarPerfil() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

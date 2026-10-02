@@ -1,5 +1,4 @@
 import AdminHeader from '../../components/AdminHeader';
-import DashboardLayout from '../../components/DashboardLayout';
 import AdminBlog from '../../components/AdminBlog';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -15,8 +14,8 @@ export default function BlogPage() {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <AdminBlog />
-    </DashboardLayout>
+    </>
   );
 }

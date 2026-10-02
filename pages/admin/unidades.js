@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import Link from 'next/link';
 
 export default function AdminUnidades() {
@@ -90,7 +89,7 @@ export default function AdminUnidades() {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-6 max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-800 mb-6">Gerenciar Unidades</h1>
 
@@ -252,6 +251,6 @@ export default function AdminUnidades() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

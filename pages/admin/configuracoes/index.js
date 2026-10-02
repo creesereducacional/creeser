@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import DashboardLayout from '../../../components/DashboardLayout';
 import PageHeader from '@/components/ui/PageHeader';
 
 const ABAS = [
@@ -996,14 +995,14 @@ export default function Configuracoes() {
 
   if (carregando) {
     return (
-      <DashboardLayout>
+      <>
         <div className="flex items-center justify-center h-64 text-gray-400 text-sm">Carregando configurações…</div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-5">
         <PageHeader
           icon="⚙️"
@@ -1051,6 +1050,6 @@ export default function Configuracoes() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

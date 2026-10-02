@@ -1,5 +1,4 @@
 import AdminHeader from "@/components/AdminHeader";
-import DashboardLayout from "@/components/DashboardLayout";
 import Forum from "@/components/Forum";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -11,8 +10,8 @@ export default function ForumAdminPage() {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <Forum />
-    </DashboardLayout>
+    </>
   );
 }

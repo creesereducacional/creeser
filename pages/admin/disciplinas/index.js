@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import DashboardLayout from '../../../components/DashboardLayout';
 import ConfirmModal from '../../../components/ConfirmModal';
 import CustomModal from '../../../components/CustomModal';
 
@@ -119,7 +118,7 @@ export default function ListagemDisciplinas() {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-4 md:p-6 max-w-7xl mx-auto">
         {/* Cabeçalho */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -347,6 +346,6 @@ export default function ListagemDisciplinas() {
         onConfirm={handleConfirmDelete}
         onClose={() => setConfirmDelete({ isOpen: false, id: null })}
       />
-    </DashboardLayout>
+    </>
   );
 }

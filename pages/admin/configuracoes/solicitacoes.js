@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import DashboardLayout from '../../../components/DashboardLayout';
 import CustomModal from '../../../components/CustomModal';
 import ConfirmModal from '../../../components/ConfirmModal';
 import { v4 as uuidv4 } from 'uuid';
@@ -173,7 +172,7 @@ export default function Solicitacoes() {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-4 md:p-6 max-w-6xl">
         <h1 className="text-2xl font-bold text-gray-800 mb-6">Configurar Solicitações</h1>
 
@@ -616,6 +615,6 @@ export default function Solicitacoes() {
         onConfirm={handleConfirmDelete}
         onClose={() => setConfirmDelete({ isOpen: false, id: null })}
       />
-    </DashboardLayout>
+    </>
   );
 }

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import DashboardLayout from '../../../components/DashboardLayout';
 
 export default function DiplomaDigital() {
   const router = useRouter();
@@ -49,7 +48,7 @@ export default function DiplomaDigital() {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-4 md:p-6 max-w-3xl">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6">Configuração de Diploma Digital</h1>
 
@@ -175,6 +174,6 @@ export default function DiplomaDigital() {
           </div>
         </form>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

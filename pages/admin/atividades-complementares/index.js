@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import DashboardLayout from '../../../components/DashboardLayout';
 
 export default function AtividadesComplementares() {
   const router = useRouter();
@@ -66,14 +65,14 @@ export default function AtividadesComplementares() {
 
   if (loading) {
     return (
-      <DashboardLayout>
+      <>
         <div className="p-4 md:p-6 text-center">Carregando...</div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-4 md:p-6 max-w-full">
         {/* Cabeçalho com Abas */}
         <div className="flex items-center gap-4 mb-6">
@@ -213,6 +212,6 @@ export default function AtividadesComplementares() {
           )}
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

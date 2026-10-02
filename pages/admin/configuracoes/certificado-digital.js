@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import DashboardLayout from '../../../components/DashboardLayout';
 
 export default function CertificadoDigital() {
   const router = useRouter();
@@ -50,7 +49,7 @@ export default function CertificadoDigital() {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-4 md:p-6 max-w-3xl">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6">Configuração de Certificado Digital</h1>
 
@@ -191,6 +190,6 @@ export default function CertificadoDigital() {
           </div>
         </form>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

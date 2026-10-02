@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 
 const CATEGORIA_ORDER = ['Instituição', 'Usuários', 'Comercial', 'Acadêmico', 'Financeiro', 'Contratos', 'Segurança'];
 
@@ -41,7 +40,7 @@ export default function GoLiveChecklist() {
   }, {});
 
   return (
-    <DashboardLayout>
+    <>
       <div className="max-w-3xl mx-auto space-y-6">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between gap-4">
@@ -153,6 +152,6 @@ export default function GoLiveChecklist() {
           </>
         )}
       </div>
-    </DashboardLayout>
+    </>
   );
 }

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import Link from 'next/link';
 import PageHeader   from '@/components/ui/PageHeader';
 import { DashboardCard, SectionCard, StatsGrid } from '@/components/ui';
@@ -109,7 +108,7 @@ export default function DashboardContratos() {
   const scoreBar   = scorePct === 100 ? 'bg-green-500'  : scorePct >= 60 ? 'bg-amber-400'  : 'bg-red-500';
 
   return (
-    <DashboardLayout>
+    <>
       <div className="max-w-6xl mx-auto space-y-6">
 
         {/* Cabeçalho */}
@@ -275,6 +274,6 @@ export default function DashboardContratos() {
           </>
         )}
       </div>
-    </DashboardLayout>
+    </>
   );
 }

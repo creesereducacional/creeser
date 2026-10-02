@@ -4,7 +4,6 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 import PageHeader from '@/components/ui/PageHeader';
 import EmptyState from '@/components/ui/EmptyState';
 import { SkeletonTable } from '@/components/ui/LoadingSkeleton';
@@ -101,7 +100,7 @@ export default function AdminLogs() {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-6">
         <PageHeader
           icon="📋"
@@ -262,6 +261,6 @@ export default function AdminLogs() {
           </div>
         )}
       </div>
-    </DashboardLayout>
+    </>
   );
 }

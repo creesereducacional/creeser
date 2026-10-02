@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import DashboardLayout from '../../../components/DashboardLayout';
 import CustomModal from '../../../components/CustomModal';
 import ConfirmModal from '../../../components/ConfirmModal';
 
@@ -141,14 +140,14 @@ export default function NotasFaltas() {
 
   if (loading) {
     return (
-      <DashboardLayout>
+      <>
         <div className="p-4 md:p-6 text-center">Carregando...</div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-4 md:p-6 max-w-full">
         {/* Cabeçalho */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -458,6 +457,6 @@ export default function NotasFaltas() {
         onConfirm={handleConfirmDelete}
         onClose={() => setConfirmDelete({ isOpen: false, id: null })}
       />
-    </DashboardLayout>
+    </>
   );
 }

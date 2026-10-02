@@ -1,47 +1,54 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { useAuthContext } from '@/context/AuthContext';
 
 /**
- * Hook de autenticação que verifica a sessão via cookie (creeser_token).
+ * Hook de autenticação que verifica a sessão via cookie (creeser_token)
+ * e compartilha o estado globalmente via AuthContext.
  *
  * @param {object} options
  * @param {string[]} [options.tiposPermitidos]  - Tipos de usuário permitidos (ex: ['admin'])
  * @param {string}  [options.redirectTo]        - Para onde redirecionar se não autorizado (padrão: '/login')
- * @param {string}  [options.redirectIfAdmin]   - Para onde redirecionar se não for admin (padrão: '/dashboard')
+ * @param {string}  [options.redirectIfUnauthorized]   - Para onde redirecionar se não autorizado
  *
  * @returns {{ usuario: object|null, carregando: boolean }}
  */
 export function useAuth({ tiposPermitidos = [], redirectTo = '/login', redirectIfUnauthorized = '/dashboard' } = {}) {
   const router = useRouter();
-  const [usuario, setUsuario] = useState(null);
-  const [carregando, setCarregando] = useState(true);
+  const context = useAuthContext();
+  const [localUser, setLocalUser] = useState(context?.usuario || null);
+  const [localCarregando, setLocalCarregando] = useState(context ? context.carregando : true);
+
+  const usuario = context?.usuario !== undefined ? context.usuario : localUser;
+  const carregando = context ? context.carregando : localCarregando;
 
   useEffect(() => {
-    let cancelled = false;
-
-    fetch('/api/auth/me', { credentials: 'include' })
-      .then((res) => {
-        if (!res.ok) throw new Error('não autenticado');
-        return res.json();
-      })
-      .then(({ usuario: user }) => {
-        if (cancelled) return;
-
-        if (tiposPermitidos.length > 0 && !tiposPermitidos.includes(user.tipo)) {
-          router.replace(redirectIfUnauthorized);
-          return;
+    if (!usuario) {
+      try {
+        const uStr = localStorage.getItem('usuario');
+        if (uStr) {
+          const u = JSON.parse(uStr);
+          setLocalUser(u);
         }
+      } catch (e) {}
+    }
+  }, [usuario]);
 
-        setUsuario(user);
-        setCarregando(false);
-      })
-      .catch(() => {
-        if (cancelled) return;
+  const tiposPermitidosKey = Array.isArray(tiposPermitidos) ? tiposPermitidos.join(',') : '';
+
+  useEffect(() => {
+    if (!carregando) {
+      if (!usuario) {
         router.replace(redirectTo);
-      });
-
-    return () => { cancelled = true; };
-  }, []);
+        return;
+      }
+      const allowed = tiposPermitidosKey ? tiposPermitidosKey.split(',') : [];
+      if (allowed.length > 0 && !allowed.includes(usuario.tipo)) {
+        router.replace(redirectIfUnauthorized);
+      }
+    }
+  }, [carregando, usuario, redirectTo, redirectIfUnauthorized, tiposPermitidosKey]);
 
   return { usuario, carregando };
 }
+

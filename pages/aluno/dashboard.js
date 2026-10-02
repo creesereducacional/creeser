@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
-import PortalLayout from "@/components/portal/PortalLayout";
 
 export default function AlunoDashboard() {
   const router = useRouter();
@@ -135,7 +134,7 @@ export default function AlunoDashboard() {
   const cursoDestaque = cursos.find((c) => c.progresso > 0 && c.progresso < 100) || cursos[0];
 
   return (
-    <PortalLayout title="Painel EAD do Aluno" tipoRequerido="aluno">
+    <>
       <div className="space-y-8 max-w-7xl mx-auto pb-10">
         
         {/* ── 1. BANNER HERO BOAS-VINDAS ──────────────────────────────── */}
@@ -350,9 +349,21 @@ export default function AlunoDashboard() {
 
           {/* Grid de Cursos */}
           {carregando ? (
-            <div className="py-20 text-center text-slate-400 text-sm flex flex-col items-center gap-3">
-              <div className="w-8 h-8 border-3 border-teal-600 border-t-transparent rounded-full animate-spin" />
-              <span>Carregando sua grade de cursos...</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="bg-white rounded-2xl overflow-hidden border border-slate-200/80 shadow-xs h-[360px] flex flex-col justify-between p-5">
+                  <div className="h-40 bg-slate-200 rounded-xl -m-5 mb-4" />
+                  <div className="space-y-2">
+                    <div className="h-4 bg-slate-200 rounded w-3/4" />
+                    <div className="h-3 bg-slate-100 rounded w-full" />
+                    <div className="h-3 bg-slate-100 rounded w-2/3" />
+                  </div>
+                  <div className="space-y-3 mt-4">
+                    <div className="h-2 bg-slate-100 rounded-full w-full" />
+                    <div className="h-9 bg-slate-200 rounded-xl w-full" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : cursosFiltrados.length === 0 ? (
             <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 text-slate-500 text-sm">
@@ -514,6 +525,6 @@ export default function AlunoDashboard() {
         </div>
 
       </div>
-    </PortalLayout>
+    </>
   );
 }

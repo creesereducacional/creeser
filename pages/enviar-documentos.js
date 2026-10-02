@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import PortalLayout from '@/components/portal/PortalLayout';
 
 export default function EnviarDocumentos() {
   const router = useRouter();
@@ -127,7 +126,7 @@ export default function EnviarDocumentos() {
   };
 
   return (
-    <PortalLayout title="Envio de Documentos e Trabalhos" tipoRequerido="aluno">
+    <>
       <div className="space-y-6">
         <div>
           <h2 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">
@@ -325,7 +324,7 @@ export default function EnviarDocumentos() {
           </div>
         </div>
       </div>
-    </PortalLayout>
+    </>
   );
 }
 

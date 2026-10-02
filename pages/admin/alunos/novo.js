@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import DashboardLayout from '@/components/DashboardLayout';
 import Link from 'next/link';
 import { validarCPF } from '@/utils/validacoes';
 import ConfirmModal from '@/components/ConfirmModal';
@@ -651,7 +650,7 @@ export default function CadastroAluno() {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <div className="max-w-6xl mx-auto">
         {/* Cabeçalho */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
@@ -1596,6 +1595,6 @@ export default function CadastroAluno() {
         message={modalAlerta.message}
         type={modalAlerta.type}
       />
-    </DashboardLayout>
+    </>
   );
 }

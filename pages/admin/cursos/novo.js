@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import DashboardLayout from '../../../components/DashboardLayout';
 
 const formatarMilhar = (val) => {
   if (val === null || val === undefined || val === '') return '';
@@ -405,7 +404,7 @@ export default function CadastroCurso() {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <div className="max-w-6xl mx-auto">
         {/* Cabeçalho */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
@@ -875,6 +874,6 @@ export default function CadastroCurso() {
           </div>
         </form>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import DashboardLayout from '@/components/DashboardLayout';
 import Link from 'next/link';
 
 export default function CadastroFuncionario() {
@@ -115,7 +114,7 @@ export default function CadastroFuncionario() {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <div className="max-w-6xl mx-auto">
         {/* Cabeçalho */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
@@ -516,6 +515,6 @@ export default function CadastroFuncionario() {
           </div>
         </form>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

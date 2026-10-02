@@ -1,5 +1,4 @@
 import AdminHeader from '../../components/AdminHeader';
-import DashboardLayout from '../../components/DashboardLayout';
 import AdminEmails from '../../components/AdminEmails';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -18,8 +17,8 @@ export default function Emails() {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <AdminEmails />
-    </DashboardLayout>
+    </>
   );
 }

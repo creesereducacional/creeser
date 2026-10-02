@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import DashboardLayout from '@/components/DashboardLayout';
 import Link from 'next/link';
 import PageHeader from '@/components/ui/PageHeader';
 import BarraFiltros from '@/components/AdminFinanceiro/BarraFiltros';
@@ -333,7 +332,7 @@ export default function ListagemAlunos() {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Cabeçalho */}
         <PageHeader
@@ -698,7 +697,7 @@ export default function ListagemAlunos() {
         message={`Tem certeza que deseja deletar o aluno "${modalDelete.nome}"? Esta ação não poderá ser desfeita.`}
         type="delete"
       />
-    </DashboardLayout>
+    </>
   );
 }
 

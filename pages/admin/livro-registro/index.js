@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import DashboardLayout from '../../../components/DashboardLayout';
 
 export default function LivroRegistro() {
   const router = useRouter();
@@ -75,14 +74,14 @@ export default function LivroRegistro() {
 
   if (loading) {
     return (
-      <DashboardLayout>
+      <>
         <div className="p-4 md:p-6 text-center">Carregando...</div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="p-4 md:p-6 max-w-full">
         {/* Cabeçalho */}
         <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6">Livro de registro</h1>
@@ -275,6 +274,6 @@ export default function LivroRegistro() {
           </button>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

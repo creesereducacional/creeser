@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from 'react';
-import DashboardLayout from '@/components/DashboardLayout';
 
 const STATUS_FORMACAO = {
   EM_FORMACAO:       { label: 'Em Formação',       cor: 'bg-yellow-100 text-yellow-800 border-yellow-300', dot: 'bg-yellow-400', borda: 'border-l-yellow-400', fundo: 'bg-yellow-50'  },
@@ -397,7 +396,7 @@ export default function FormacaoTurmas() {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-6 p-6">
 
         {/* Cabeçalho */}
@@ -550,6 +549,6 @@ export default function FormacaoTurmas() {
           onSave={handleSaveModal}
         />
       )}
-    </DashboardLayout>
+    </>
   );
 }

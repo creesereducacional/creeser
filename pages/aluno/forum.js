@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Forum from "@/components/Forum";
-import PortalLayout from "@/components/portal/PortalLayout";
 
 export default function AlunoForumPage() {
   const router = useRouter();
@@ -19,7 +18,7 @@ export default function AlunoForumPage() {
   }, []);
 
   return (
-    <PortalLayout title="Fórum de Dúvidas e Discussão" tipoRequerido="aluno">
+    <>
       <div className="space-y-6">
         <div>
           <h2 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">
@@ -34,7 +33,7 @@ export default function AlunoForumPage() {
           <Forum usuario={usuario} />
         </div>
       </div>
-    </PortalLayout>
+    </>
   );
 }
 
