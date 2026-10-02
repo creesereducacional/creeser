@@ -547,81 +547,82 @@ export default function ListagemAlunos() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
               
               {/* 1. Total de Alunos */}
-              <div className="bg-white rounded-2xl p-4.5 border border-slate-200/80 shadow-xs flex items-center justify-between">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-xl bg-teal-50 text-[#009688] flex items-center justify-center text-xl flex-shrink-0 border border-teal-100/80">
+              <div className="relative overflow-hidden bg-gradient-to-br from-blue-50/80 via-blue-50/40 to-white rounded-2xl p-4.5 border border-blue-200/80 shadow-xs transition-all hover:shadow-sm">
+                <div className="flex items-start justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center text-lg flex-shrink-0 border border-blue-200 shadow-2xs">
                     👥
                   </div>
-                  <div>
-                    <p className="text-xs font-semibold text-slate-500">Total de Alunos</p>
-                    <h3 className="text-2xl font-extrabold text-slate-900 mt-0.5">{totalAlunosGeral}</h3>
-                    <p className="text-[11px] text-slate-400 font-medium">matriculados no sistema</p>
-                  </div>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-full border border-blue-200/60">
+                    Geral
+                  </span>
                 </div>
-                <div className="text-[#009688] opacity-50">
-                  <svg className="w-7 h-7" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M4 19h4V9H4v10zm6 0h4V5h-4v14zm6 0h4v-7h-4v7z" />
-                  </svg>
+                <div className="mt-3">
+                  <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{totalAlunosGeral}</h3>
+                  <p className="text-xs font-semibold text-slate-500 mt-0.5">Total de Alunos</p>
+                </div>
+                <div className="mt-3 pt-2.5 border-t border-blue-100/90 flex items-center justify-between text-xs">
+                  <span className="text-slate-500 font-medium">Matriculados no sistema</span>
+                  <span className="font-bold text-blue-700">100%</span>
                 </div>
               </div>
 
               {/* 2. Alunos Ativos */}
-              <div className="bg-white rounded-2xl p-4.5 border border-slate-200/80 shadow-xs flex items-center justify-between">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl flex-shrink-0 border border-emerald-100/80">
-                    👥
+              <div className="relative overflow-hidden bg-gradient-to-br from-emerald-50/80 via-emerald-50/40 to-white rounded-2xl p-4.5 border border-emerald-200/80 shadow-xs transition-all hover:shadow-sm">
+                <div className="flex items-start justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-lg flex-shrink-0 border border-emerald-200 shadow-2xs">
+                    🎓
                   </div>
-                  <div>
-                    <p className="text-xs font-semibold text-slate-500">Alunos Ativos</p>
-                    <h3 className="text-2xl font-extrabold text-slate-900 mt-0.5">{totalAtivos}</h3>
-                    <p className="text-[11px] text-emerald-600 font-bold">{percAtivos}% do total</p>
-                  </div>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full border border-emerald-200/60">
+                    +{percAtivos}%
+                  </span>
                 </div>
-                <div className="relative w-8 h-8 flex items-center justify-center">
-                  <svg className="w-8 h-8 transform -rotate-90" viewBox="0 0 36 36">
-                    <path className="text-slate-100" strokeWidth="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                    <path className="text-[#009688]" strokeDasharray={`${percAtivos}, 100`} strokeWidth="3.5" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                  </svg>
+                <div className="mt-3">
+                  <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{totalAtivos}</h3>
+                  <p className="text-xs font-semibold text-slate-500 mt-0.5">Alunos Ativos</p>
+                </div>
+                <div className="mt-3 pt-2.5 border-t border-emerald-100/90 flex items-center justify-between text-xs">
+                  <span className="text-slate-500 font-medium">Em curso regular</span>
+                  <span className="font-bold text-emerald-700">{percAtivos}% do total</span>
                 </div>
               </div>
 
               {/* 3. Pré-Cadastro */}
-              <div className="bg-white rounded-2xl p-4.5 border border-slate-200/80 shadow-xs flex items-center justify-between">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl flex-shrink-0 border border-amber-100/80">
-                    👥
+              <div className="relative overflow-hidden bg-gradient-to-br from-amber-50/80 via-amber-50/40 to-white rounded-2xl p-4.5 border border-amber-200/80 shadow-xs transition-all hover:shadow-sm">
+                <div className="flex items-start justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-lg flex-shrink-0 border border-amber-200 shadow-2xs">
+                    ⏳
                   </div>
-                  <div>
-                    <p className="text-xs font-semibold text-slate-500">Pré-Cadastro</p>
-                    <h3 className="text-2xl font-extrabold text-slate-900 mt-0.5">{totalPre}</h3>
-                    <p className="text-[11px] text-amber-600 font-bold">{percPre}% do total</p>
-                  </div>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-full border border-amber-200/60">
+                    Pendente
+                  </span>
                 </div>
-                <div className="relative w-8 h-8 flex items-center justify-center">
-                  <svg className="w-8 h-8 transform -rotate-90" viewBox="0 0 36 36">
-                    <path className="text-slate-100" strokeWidth="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                    <path className="text-amber-500" strokeDasharray={`${percPre}, 100`} strokeWidth="3.5" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                  </svg>
+                <div className="mt-3">
+                  <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{totalPre}</h3>
+                  <p className="text-xs font-semibold text-slate-500 mt-0.5">Pré-Cadastro</p>
+                </div>
+                <div className="mt-3 pt-2.5 border-t border-amber-100/90 flex items-center justify-between text-xs">
+                  <span className="text-slate-500 font-medium">Aguardando matrícula</span>
+                  <span className="font-bold text-amber-700">{percPre}% do total</span>
                 </div>
               </div>
 
               {/* 4. Transferidos / Egressos */}
-              <div className="bg-white rounded-2xl p-4.5 border border-slate-200/80 shadow-xs flex items-center justify-between">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center text-xl flex-shrink-0 border border-rose-100/80">
-                    👤
+              <div className="relative overflow-hidden bg-gradient-to-br from-rose-50/80 via-rose-50/40 to-white rounded-2xl p-4.5 border border-rose-200/80 shadow-xs transition-all hover:shadow-sm">
+                <div className="flex items-start justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center text-lg flex-shrink-0 border border-rose-200 shadow-2xs">
+                    🚪
                   </div>
-                  <div>
-                    <p className="text-xs font-semibold text-slate-500">Transferidos/Egressos</p>
-                    <h3 className="text-2xl font-extrabold text-slate-900 mt-0.5">{totalEgressos}</h3>
-                    <p className="text-[11px] text-slate-400 font-medium">{percEgressos}% do total</p>
-                  </div>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-100/80 px-2 py-0.5 rounded-full border border-rose-200/60">
+                    Histórico
+                  </span>
                 </div>
-                <div className="relative w-8 h-8 flex items-center justify-center">
-                  <svg className="w-8 h-8 transform -rotate-90" viewBox="0 0 36 36">
-                    <path className="text-slate-100" strokeWidth="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                    <path className="text-slate-300" strokeDasharray={`${percEgressos}, 100`} strokeWidth="3.5" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                  </svg>
+                <div className="mt-3">
+                  <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{totalEgressos}</h3>
+                  <p className="text-xs font-semibold text-slate-500 mt-0.5">Transferidos / Egressos</p>
+                </div>
+                <div className="mt-3 pt-2.5 border-t border-rose-100/90 flex items-center justify-between text-xs">
+                  <span className="text-slate-500 font-medium">Concluídos e desligados</span>
+                  <span className="font-bold text-rose-700">{percEgressos}% do total</span>
                 </div>
               </div>
 
@@ -900,18 +901,18 @@ export default function ListagemAlunos() {
                                     </button>
                                   </Link>
 
-                                  {/* Menu de Mais Ações (Trigger para Portal Flutuante) */}
+                                   {/* Menu de Mais Ações (Trigger para Portal Flutuante) */}
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      if (menuAcoesData?.aluno?.id === aluno.id) {
+                                      if (menuAcoesData?.rowId === rowKey) {
                                         setMenuAcoesData(null);
                                       } else {
-                                        setMenuAcoesData({ aluno, anchorEl: e.currentTarget });
+                                        setMenuAcoesData({ aluno, rowId: rowKey, anchorEl: e.currentTarget });
                                       }
                                     }}
                                     className={`p-1.5 rounded-lg transition cursor-pointer ${
-                                      menuAcoesData?.aluno?.id === aluno.id
+                                      menuAcoesData?.rowId === rowKey
                                         ? 'bg-slate-200 text-slate-800'
                                         : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
                                     }`}
