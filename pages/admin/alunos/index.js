@@ -31,7 +31,16 @@ export default function ListagemAlunos() {
   const [turmaVal, setTurmaVal] = useState('');
   const [anoLetivoVal, setAnoLetivoVal] = useState('');
 
+  // Estados da Paginação
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [itensPorPagina] = useState(10);
+
   const [errorMsg, setErrorMsg] = useState(null);
+
+  // Resetar para primeira página ao alterar qualquer filtro
+  useEffect(() => {
+    setPaginaAtual(1);
+  }, [searchVal, statusVal, unidadeVal, cursoVal, turmaVal, anoLetivoVal]);
 
   useEffect(() => {
     carregarAlunos();
@@ -186,6 +195,30 @@ export default function ListagemAlunos() {
       return true;
     });
   }, [alunos, searchVal, statusVal, unidadeVal, cursoVal, turmaVal, anoLetivoVal]);
+
+  // Cálculos de Paginação
+  const totalRegistros = filteredAlunos.length;
+  const totalPaginas = Math.ceil(totalRegistros / itensPorPagina) || 1;
+  const indiceInicial = (paginaAtual - 1) * itensPorPagina;
+  const indiceFinal = Math.min(indiceInicial + itensPorPagina, totalRegistros);
+
+  const alunosPaginados = useMemo(() => {
+    return filteredAlunos.slice(indiceInicial, indiceFinal);
+  }, [filteredAlunos, indiceInicial, indiceFinal]);
+
+  // Lista de páginas para o componente de navegação
+  const getPaginasVisiveis = () => {
+    if (totalPaginas <= 7) {
+      return Array.from({ length: totalPaginas }, (_, i) => i + 1);
+    }
+    if (paginaAtual <= 4) {
+      return [1, 2, 3, 4, 5, '...', totalPaginas];
+    }
+    if (paginaAtual >= totalPaginas - 3) {
+      return [1, '...', totalPaginas - 4, totalPaginas - 3, totalPaginas - 2, totalPaginas - 1, totalPaginas];
+    }
+    return [1, '...', paginaAtual - 1, paginaAtual, paginaAtual + 1, '...', totalPaginas];
+  };
 
   const solicitarDeletar = (aluno) => {
     setModalDelete({
@@ -443,172 +476,235 @@ export default function ListagemAlunos() {
               ) : filteredAlunos.length === 0 ? (
                 <div className="p-12 text-center text-gray-500">Nenhum aluno ou matrícula encontrado com os filtros selecionados.</div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="bg-teal-50 border-b border-teal-200">
-                        <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">#ID ALUNO</th>
-                        <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Nome do Aluno</th>
-                        <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">A. Letivo</th>
-                        <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Turma</th>
-                        <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Curso</th>
-                        <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Matrícula</th>
-                        <th className="text-center px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Status</th>
-                        <th className="text-center px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Contrato</th>
-                        <th className="text-center px-4 py-3 text-xs font-bold text-teal-900">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {filteredAlunos.map((aluno) => {
-                        const rowKey = aluno.matricula_id ? `${aluno.id}-${aluno.matricula_id}` : `${aluno.id}-${aluno.turmaid || 'legado'}`;
-                        const turmaNomeExibicao = aluno.turma_nome || aluno.turma || 'Sem turma';
-                        const cursoNomeExibicao = aluno.curso_nome || aluno.curso || '—';
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-teal-50 border-b border-teal-200">
+                          <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">#ID ALUNO</th>
+                          <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Nome do Aluno</th>
+                          <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">A. Letivo</th>
+                          <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Turma</th>
+                          <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Curso</th>
+                          <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Matrícula</th>
+                          <th className="text-center px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Status</th>
+                          <th className="text-center px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Contrato</th>
+                          <th className="text-center px-4 py-3 text-xs font-bold text-teal-900">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {alunosPaginados.map((aluno) => {
+                          const rowKey = aluno.matricula_id ? `${aluno.id}-${aluno.matricula_id}` : `${aluno.id}-${aluno.turmaid || 'legado'}`;
+                          const turmaNomeExibicao = aluno.turma_nome || aluno.turma || 'Sem turma';
+                          const cursoNomeExibicao = aluno.curso_nome || aluno.curso || '—';
 
-                        return (
-                          <tr key={rowKey} className="hover:bg-teal-50/50 transition">
-                            <td className="px-4 py-3 text-sm font-bold text-teal-800 border-r border-gray-200 whitespace-nowrap">
-                              #{aluno.numero_id || aluno.id}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-900 font-semibold border-r border-gray-200">
-                              {aluno.nome}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200 whitespace-nowrap">
-                              {aluno.ano_letivo ?? aluno.anoLetivo ?? '—'}{aluno.semestre ? `/${aluno.semestre}` : ''}
-                            </td>
-                            <td className="px-4 py-3 text-sm font-medium text-gray-800 border-r border-gray-200">
-                              {turmaNomeExibicao}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">
-                              <div className="flex items-center gap-1.5">
-                                <span>{cursoNomeExibicao}</span>
-                                {aluno.is_principal === false && (
-                                  <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold" title="Matrícula Simultânea Adicional">
-                                    Simultâneo
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-sm font-mono text-gray-700 border-r border-gray-200 whitespace-nowrap">
-                              {aluno.matricula_codigo || aluno.matricula || aluno.numero_id || '—'}
-                            </td>
-                            <td className="px-4 py-3 text-center border-r border-gray-200 whitespace-nowrap">
-                              <StatusBadge status={aluno.status || aluno.status_administrativo} />
-                            </td>
-                            <td className="px-4 py-3 border-r border-gray-200">
-                              {/* Badge status_contrato */}
-                              {(() => {
-                                const sc = aluno.status_contrato || 'NAO_GERADO';
-                                const BADGE = {
-                                  NAO_GERADO:         'bg-gray-100 text-gray-500 border-gray-300',
-                                  GERADO:             'bg-blue-100 text-blue-700 border-blue-300',
-                                  ENVIADO_ASSINATURA: 'bg-yellow-100 text-yellow-700 border-yellow-300',
-                                  ASSINADO:           'bg-green-100 text-green-700 border-green-300',
-                                  RECUSADO:           'bg-red-100 text-red-700 border-red-300',
-                                  EXPIRADO:           'bg-orange-100 text-orange-700 border-orange-300',
-                                };
-                                const LABEL = {
-                                  NAO_GERADO:         'Não Gerado',
-                                  GERADO:             'Gerado',
-                                  ENVIADO_ASSINATURA: 'Enviado',
-                                  ASSINADO:           'Assinado',
-                                  RECUSADO:           'Recusado',
-                                  EXPIRADO:           'Expirado',
-                                };
-                                return (
-                                  <div className="flex flex-col gap-1.5">
-                                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold border ${BADGE[sc] || 'bg-gray-100 text-gray-500 border-gray-200'}`}>
-                                      {LABEL[sc] || sc}
+                          return (
+                            <tr key={rowKey} className="hover:bg-teal-50/50 transition">
+                              <td className="px-4 py-3 text-sm font-bold text-teal-800 border-r border-gray-200 whitespace-nowrap">
+                                #{aluno.numero_id || aluno.id}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-900 font-semibold border-r border-gray-200">
+                                {aluno.nome}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200 whitespace-nowrap">
+                                {aluno.ano_letivo ?? aluno.anoLetivo ?? '—'}{aluno.semestre ? `/${aluno.semestre}` : ''}
+                              </td>
+                              <td className="px-4 py-3 text-sm font-medium text-gray-800 border-r border-gray-200">
+                                {turmaNomeExibicao}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">
+                                <div className="flex items-center gap-1.5">
+                                  <span>{cursoNomeExibicao}</span>
+                                  {aluno.is_principal === false && (
+                                    <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold" title="Matrícula Simultânea Adicional">
+                                      Simultâneo
                                     </span>
-                                    <div className="flex gap-1 flex-wrap">
-                                      <button
-                                        onClick={() => { abrirContratoAluno(aluno); marcarContratoGerado(aluno.id); }}
-                                        className="px-1.5 py-0.5 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
-                                        title="Gerar contrato"
-                                      >Gerar</button>
-                                      <button
-                                        onClick={() => iniciarAssinaturaDigital(aluno.id)}
-                                        className="px-1.5 py-0.5 text-xs rounded border border-blue-300 text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
-                                        title="Enviar para Assinafy"
-                                      >Assinafy</button>
-                                      <button
-                                        onClick={() => consultarAssinaturaDigital(aluno.id)}
-                                        className="px-1.5 py-0.5 text-xs rounded border border-teal-300 text-teal-600 hover:bg-teal-50 transition-colors cursor-pointer"
-                                        title="Ver status da assinatura"
-                                      >Status</button>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-sm font-mono text-gray-700 border-r border-gray-200 whitespace-nowrap">
+                                {aluno.matricula_codigo || aluno.matricula || aluno.numero_id || '—'}
+                              </td>
+                              <td className="px-4 py-3 text-center border-r border-gray-200 whitespace-nowrap">
+                                <StatusBadge status={aluno.status || aluno.status_administrativo} />
+                              </td>
+                              <td className="px-4 py-3 border-r border-gray-200">
+                                {/* Badge status_contrato */}
+                                {(() => {
+                                  const sc = aluno.status_contrato || 'NAO_GERADO';
+                                  const BADGE = {
+                                    NAO_GERADO:         'bg-gray-100 text-gray-500 border-gray-300',
+                                    GERADO:             'bg-blue-100 text-blue-700 border-blue-300',
+                                    ENVIADO_ASSINATURA: 'bg-yellow-100 text-yellow-700 border-yellow-300',
+                                    ASSINADO:           'bg-green-100 text-green-700 border-green-300',
+                                    RECUSADO:           'bg-red-100 text-red-700 border-red-300',
+                                    EXPIRADO:           'bg-orange-100 text-orange-700 border-orange-300',
+                                  };
+                                  const LABEL = {
+                                    NAO_GERADO:         'Não Gerado',
+                                    GERADO:             'Gerado',
+                                    ENVIADO_ASSINATURA: 'Enviado',
+                                    ASSINADO:           'Assinado',
+                                    RECUSADO:           'Recusado',
+                                    EXPIRADO:           'Expirado',
+                                  };
+                                  return (
+                                    <div className="flex flex-col gap-1.5">
+                                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold border ${BADGE[sc] || 'bg-gray-100 text-gray-500 border-gray-200'}`}>
+                                        {LABEL[sc] || sc}
+                                      </span>
+                                      <div className="flex gap-1 flex-wrap">
+                                        <button
+                                          onClick={() => { abrirContratoAluno(aluno); marcarContratoGerado(aluno.id); }}
+                                          className="px-1.5 py-0.5 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+                                          title="Gerar contrato"
+                                        >Gerar</button>
+                                        <button
+                                          onClick={() => iniciarAssinaturaDigital(aluno.id)}
+                                          className="px-1.5 py-0.5 text-xs rounded border border-blue-300 text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                                          title="Enviar para Assinafy"
+                                        >Assinafy</button>
+                                        <button
+                                          onClick={() => consultarAssinaturaDigital(aluno.id)}
+                                          className="px-1.5 py-0.5 text-xs rounded border border-teal-300 text-teal-600 hover:bg-teal-50 transition-colors cursor-pointer"
+                                          title="Ver status da assinatura"
+                                        >Status</button>
+                                      </div>
                                     </div>
-                                  </div>
-                                );
-                              })()}
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <div className="flex items-center justify-center gap-1 flex-wrap">
-                                <Link href={`/admin/alunos/${aluno.id}`}>
-                                  <button
-                                    className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition cursor-pointer"
-                                    title="Editar Dados do Aluno"
-                                  >
-                                    ✏️
-                                  </button>
-                                </Link>
-                                <Link href={`/admin/alunos/ficha?id=${aluno.id}`} target="_blank" rel="noopener noreferrer">
-                                  <button
-                                    className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition cursor-pointer"
-                                    title="Gerar PDF da Ficha do Aluno"
-                                  >
-                                    🖨️
-                                  </button>
-                                </Link>
-                                <button
-                                  className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition cursor-pointer"
-                                  title="Resetar Senha"
-                                >
-                                  🔑
-                                </button>
-                                <button
-                                  onClick={() => abrirContratoAluno(aluno)}
-                                  className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition cursor-pointer"
-                                  title="Contrato para impressão"
-                                >
-                                  📄
-                                </button>
-                                <Link href={`/admin/alunos/historico?id=${aluno.id}`}>
+                                  );
+                                })()}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <div className="flex items-center justify-center gap-1 flex-wrap">
+                                  <Link href={`/admin/alunos/${aluno.id}`}>
+                                    <button
+                                      className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition cursor-pointer"
+                                      title="Editar Dados do Aluno"
+                                    >
+                                      ✏️
+                                    </button>
+                                  </Link>
+                                  <Link href={`/admin/alunos/ficha?id=${aluno.id}`} target="_blank" rel="noopener noreferrer">
+                                    <button
+                                      className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition cursor-pointer"
+                                      title="Gerar PDF da Ficha do Aluno"
+                                    >
+                                      🖨️
+                                    </button>
+                                  </Link>
                                   <button
                                     className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition cursor-pointer"
-                                    title="Histórico Escolar"
+                                    title="Resetar Senha"
                                   >
-                                    📜
+                                    🔑
                                   </button>
-                                </Link>
-                                <Link href={`/admin/alunos/declaracao?id=${aluno.id}&tipo=matricula`}>
                                   <button
+                                    onClick={() => abrirContratoAluno(aluno)}
                                     className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition cursor-pointer"
-                                    title="Declaração de Matrícula"
+                                    title="Contrato para impressão"
                                   >
-                                    📝
+                                    📄
                                   </button>
-                                </Link>
-                                <button
-                                  onClick={() => setModalRematricula(aluno)}
-                                  className="p-1.5 text-teal-600 hover:text-teal-800 hover:bg-teal-50 rounded transition cursor-pointer"
-                                  title="Transferência / Rematrícula / Novo Curso"
-                                >
-                                  🔄
-                                </button>
-                                <button
-                                  onClick={() => solicitarDeletar(aluno)}
-                                  className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition cursor-pointer"
-                                  title="Deletar"
-                                >
-                                  ❌
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                                  <Link href={`/admin/alunos/historico?id=${aluno.id}`}>
+                                    <button
+                                      className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition cursor-pointer"
+                                      title="Histórico Escolar"
+                                    >
+                                      📜
+                                    </button>
+                                  </Link>
+                                  <Link href={`/admin/alunos/declaracao?id=${aluno.id}&tipo=matricula`}>
+                                    <button
+                                      className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition cursor-pointer"
+                                      title="Declaração de Matrícula"
+                                    >
+                                      📝
+                                    </button>
+                                  </Link>
+                                  <button
+                                    onClick={() => setModalRematricula(aluno)}
+                                    className="p-1.5 text-teal-600 hover:text-teal-800 hover:bg-teal-50 rounded transition cursor-pointer"
+                                    title="Transferência / Rematrícula / Novo Curso"
+                                  >
+                                    🔄
+                                  </button>
+                                  <button
+                                    onClick={() => solicitarDeletar(aluno)}
+                                    className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition cursor-pointer"
+                                    title="Deletar"
+                                  >
+                                    ❌
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Barra de Paginação */}
+                  {totalRegistros > 0 && (
+                    <div className="px-6 py-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white select-none">
+                      <div className="text-xs sm:text-sm text-slate-500 font-normal">
+                        Mostrando {indiceInicial + 1} até {indiceFinal} de {totalRegistros} registros
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        {/* Botão Anterior */}
+                        <button
+                          onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
+                          disabled={paginaAtual === 1}
+                          className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition disabled:opacity-40 disabled:hover:bg-slate-100 disabled:cursor-not-allowed text-xs font-bold cursor-pointer"
+                          title="Página Anterior"
+                        >
+                          ‹
+                        </button>
+
+                        {/* Botões de Página */}
+                        {getPaginasVisiveis().map((pag, idx) => {
+                          if (pag === '...') {
+                            return (
+                              <span
+                                key={`ellipsis-${idx}`}
+                                className="w-8 h-8 flex items-center justify-center text-slate-400 text-xs font-semibold"
+                              >
+                                ...
+                              </span>
+                            );
+                          }
+
+                          const isCurrent = pag === paginaAtual;
+
+                          return (
+                            <button
+                              key={`pag-${pag}`}
+                              onClick={() => setPaginaAtual(pag)}
+                              className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold transition cursor-pointer ${
+                                isCurrent
+                                  ? 'bg-[#009688] text-white shadow-xs'
+                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                              }`}
+                            >
+                              {pag}
+                            </button>
+                          );
+                        })}
+
+                        {/* Botão Próximo */}
+                        <button
+                          onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))}
+                          disabled={paginaAtual === totalPaginas}
+                          className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition disabled:opacity-40 disabled:hover:bg-slate-100 disabled:cursor-not-allowed text-xs font-bold cursor-pointer"
+                          title="Próxima Página"
+                        >
+                          ›
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
