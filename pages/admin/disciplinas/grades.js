@@ -110,7 +110,7 @@ export default function GerenciarGrades() {
       const res = await fetch('/api/grades');
       if (res.ok) {
         const data = await res.json();
-        setGrades(data);
+        setGrades(Array.isArray(data) ? data : []);
       }
     } catch (error) {
       console.error('Erro ao carregar grades:', error);
@@ -125,16 +125,47 @@ export default function GerenciarGrades() {
 
   const filtrarGrades = () => {
     return grades.filter(grade => {
-      const nomeMatch = grade.nome.toLowerCase().includes(searchNome.toLowerCase());
+      const nomeMatch = (grade.nome || '').toLowerCase().includes(searchNome.toLowerCase());
       const situacaoMatch = searchSituacao === '' || grade.situacao === searchSituacao;
       return nomeMatch && situacaoMatch;
     });
   };
 
   const gradesFiltradas = filtrarGrades();
-  const totalPages = Math.ceil(gradesFiltradas.length / recordsPerPage);
+  const totalPages = Math.ceil(gradesFiltradas.length / recordsPerPage) || 1;
   const startIndex = (currentPage - 1) * recordsPerPage;
   const gradesExibidas = gradesFiltradas.slice(startIndex, startIndex + recordsPerPage);
+
+  // Métricas dos Cards de KPI
+  const totalGradesGeral = grades.length;
+  const totalGradesAtivas = useMemo(
+    () => grades.filter((g) => String(g.situacao || 'ATIVO').toUpperCase() === 'ATIVO').length,
+    [grades]
+  );
+  const totalGradesInativas = useMemo(
+    () => grades.filter((g) => String(g.situacao || '').toUpperCase() === 'INATIVO').length,
+    [grades]
+  );
+  const totalCursosComGrade = useMemo(() => {
+    const ids = new Set(grades.map((g) => g.cursoId || g.cursoid || g.curso_id).filter(Boolean));
+    return ids.size;
+  }, [grades]);
+
+  const percAtivas = totalGradesGeral > 0 ? Math.round((totalGradesAtivas / totalGradesGeral) * 100) : 0;
+  const percInativas = totalGradesGeral > 0 ? Math.round((totalGradesInativas / totalGradesGeral) * 100) : 0;
+
+  const getPaginasVisiveis = () => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    if (currentPage <= 4) {
+      return [1, 2, 3, 4, 5, '...', totalPages];
+    }
+    if (currentPage >= totalPages - 3) {
+      return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    }
+    return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -164,7 +195,6 @@ export default function GerenciarGrades() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Form submitted with data:', formData);
 
     if (!formData.nome.trim()) {
       setModal({
@@ -220,7 +250,6 @@ export default function GerenciarGrades() {
 
     try {
       if (editingId) {
-        console.log('Updating grade:', editingId);
         const res = await fetch(`/api/grades/${editingId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -229,8 +258,6 @@ export default function GerenciarGrades() {
             id: editingId
           })
         });
-
-        console.log('Update response:', res.status);
 
         if (res.ok) {
           await carregarGrades();
@@ -241,9 +268,8 @@ export default function GerenciarGrades() {
             type: 'success'
           });
           resetForm();
+          setShowForm(false);
         } else {
-          const error = await res.text();
-          console.error('Update error:', error);
           setModal({
             isOpen: true,
             title: 'Erro!',
@@ -252,14 +278,11 @@ export default function GerenciarGrades() {
           });
         }
       } else {
-        console.log('Creating new grade');
         const res = await fetch('/api/grades', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-
-        console.log('Create response:', res.status);
 
         if (res.ok) {
           await carregarGrades();
@@ -270,9 +293,8 @@ export default function GerenciarGrades() {
             type: 'success'
           });
           resetForm();
+          setShowForm(false);
         } else {
-          const error = await res.text();
-          console.error('Create error:', error);
           setModal({
             isOpen: true,
             title: 'Erro!',
@@ -303,7 +325,6 @@ export default function GerenciarGrades() {
     const cursoId = String(getValue(grade, 'cursoId') || getValue(grade, 'cursoid') || '');
     const ano = String(getValue(grade, 'ano') || '');
 
-    // Se a grade legada não tiver instituicaoId gravado diretamente, deduz pelo curso selecionado
     if (!instituicaoId && cursoId) {
       const cursoVinculado = cursos.find(c => String(getValue(c, 'id')) === cursoId);
       if (cursoVinculado) {
@@ -364,286 +385,503 @@ export default function GerenciarGrades() {
 
   return (
     <>
-      <div className="max-w-6xl mx-auto p-4">
-        {/* Header com Voltar */}
-        <div className="flex items-center gap-4 mb-8">
-          <Link href="/admin/disciplinas">
-            <button type="button" className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-semibold transition text-sm flex items-center gap-2">
-              ← Voltar
+      <div className="max-w-7xl mx-auto space-y-6 pb-12 font-sans">
+        {/* ── 1. HEADER / BREADCRUMB & TÍTULO ─────────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium mb-1">
+              <Link href="/admin/dashboard" className="hover:text-slate-600 transition">Admin</Link>
+              <span>›</span>
+              <Link href="/admin/disciplinas" className="hover:text-slate-600 transition">Disciplinas</Link>
+              <span>›</span>
+              <span className="text-slate-600 font-semibold">Grades</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-[#009688] text-white flex items-center justify-center text-2xl shadow-xs flex-shrink-0">
+                ⚙️
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                  Gerenciar Grades Curriculares
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-500 font-normal">
+                  {gradesFiltradas.length} grade{gradesFiltradas.length !== 1 ? 's' : ''} encontrada{gradesFiltradas.length !== 1 ? 's' : ''} no sistema
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 self-start sm:self-auto">
+            <Link href="/admin/disciplinas">
+              <button
+                type="button"
+                className="inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold px-4 py-2.5 rounded-xl text-sm shadow-2xs transition cursor-pointer"
+              >
+                <span>←</span>
+                <span>Disciplinas</span>
+              </button>
+            </Link>
+
+            <button
+              onClick={() => {
+                setShowForm(true);
+                resetForm();
+              }}
+              className="inline-flex items-center justify-center gap-2 bg-[#009688] hover:bg-[#00796B] active:bg-[#00695C] text-white font-semibold px-5 py-2.5 rounded-xl text-sm shadow-xs transition cursor-pointer"
+            >
+              <span className="text-lg leading-none">+</span>
+              <span>Nova Grade</span>
             </button>
-          </Link>
-          <h1 className="text-2xl md:text-3xl font-bold text-teal-600 flex items-center gap-2">
-            ⚙️ Gerenciar Grades
-          </h1>
+          </div>
         </div>
 
-        {/* Abas - Listar e Inserir */}
-        <div className="flex gap-4 mb-6">
+        {/* ── 2. ABAS (Listar, Inserir) ───────────────────────────────────────── */}
+        <div className="flex gap-2 border-b border-slate-200/80">
           <button
             onClick={() => setShowForm(false)}
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition ${
+            className={`px-5 py-2.5 font-bold text-sm flex items-center gap-2 transition cursor-pointer ${
               !showForm
-                ? 'bg-teal-600 text-white'
-                : 'bg-white text-teal-600 border-2 border-teal-600 hover:bg-teal-50'
+                ? 'text-[#009688] border-b-2 border-[#009688]'
+                : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            <span className="text-lg">📋</span> Listar
+            📋 Listar
           </button>
           <button
             onClick={() => {
               setShowForm(true);
               resetForm();
             }}
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition ${
+            className={`px-5 py-2.5 font-bold text-sm flex items-center gap-2 transition cursor-pointer ${
               showForm
-                ? 'bg-teal-600 text-white'
-                : 'bg-white text-teal-600 border-2 border-teal-600 hover:bg-teal-50'
+                ? 'text-[#009688] border-b-2 border-[#009688]'
+                : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            <span className="text-lg">➕</span> Inserir
+            {editingId ? '✏️ Editar' : '➕ Inserir'}
           </button>
         </div>
 
-        {/* ABA LISTAR */}
+        {/* ── ABA LISTAR ──────────────────────────────────────────────────────── */}
         {!showForm && (
           <div className="space-y-6">
-            {/* Filtros */}
-            <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 md:p-6">
-              <h3 className="text-sm font-semibold text-teal-800 mb-4 flex items-center gap-2">
-                🔍 Filtros de Busca
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <input
-                  type="text"
-                  placeholder="Nome da Grade"
-                  value={searchNome}
-                  onChange={(e) => {
-                    setSearchNome(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="px-3 py-2 border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm"
-                />
-                <select
-                  value={searchSituacao}
-                  onChange={(e) => {
-                    setSearchSituacao(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="px-3 py-2 border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm"
-                >
-                  <option value="">Todas</option>
-                  <option value="ATIVO">ATIVO</option>
-                  <option value="INATIVO">INATIVO</option>
-                </select>
+            {/* ── 3. KPI METRIC CARDS ────────────────────────────────────────── */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+              {/* 1. Total de Grades */}
+              <div className="bg-gradient-to-b from-blue-50/70 to-blue-50/20 rounded-2xl p-5 border border-blue-100 shadow-xs flex flex-col justify-between min-h-[150px] transition-all hover:shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-blue-100/80 text-blue-700 flex items-center justify-center text-lg flex-shrink-0 border border-blue-200/60">
+                    ⚙️
+                  </div>
+                  <span className="text-[11px] font-semibold text-blue-700 bg-blue-100/70 px-2.5 py-0.5 rounded-full border border-blue-200/50">
+                    Geral
+                  </span>
+                </div>
+                <div className="my-2">
+                  <h3 className="text-2xl font-bold text-slate-900 tracking-tight leading-none">{totalGradesGeral}</h3>
+                  <p className="text-xs font-medium text-slate-500 mt-1">Total de Grades</p>
+                </div>
+                <div className="pt-2.5 border-t border-blue-100/80 flex items-center justify-between text-xs gap-2">
+                  <span className="text-slate-500 truncate font-normal">Matrizes no sistema</span>
+                  <span className="font-semibold text-blue-700 shrink-0">100%</span>
+                </div>
+              </div>
+
+              {/* 2. Grades Ativas */}
+              <div className="bg-gradient-to-b from-emerald-50/70 to-emerald-50/20 rounded-2xl p-5 border border-emerald-100 shadow-xs flex flex-col justify-between min-h-[150px] transition-all hover:shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-100/80 text-emerald-700 flex items-center justify-center text-lg flex-shrink-0 border border-emerald-200/60">
+                    ✅
+                  </div>
+                  <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100/70 px-2.5 py-0.5 rounded-full border border-emerald-200/50">
+                    +{percAtivas}%
+                  </span>
+                </div>
+                <div className="my-2">
+                  <h3 className="text-2xl font-bold text-slate-900 tracking-tight leading-none">{totalGradesAtivas}</h3>
+                  <p className="text-xs font-medium text-slate-500 mt-1">Grades Ativas</p>
+                </div>
+                <div className="pt-2.5 border-t border-emerald-100/80 flex items-center justify-between text-xs gap-2">
+                  <span className="text-slate-500 truncate font-normal">Matrizes vigentes</span>
+                  <span className="font-semibold text-emerald-700 shrink-0">{percAtivas}% do total</span>
+                </div>
+              </div>
+
+              {/* 3. Grades Inativas */}
+              <div className="bg-gradient-to-b from-amber-50/70 to-amber-50/20 rounded-2xl p-5 border border-amber-100 shadow-xs flex flex-col justify-between min-h-[150px] transition-all hover:shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100/80 text-amber-700 flex items-center justify-center text-lg flex-shrink-0 border border-amber-200/60">
+                    ⏸️
+                  </div>
+                  <span className="text-[11px] font-semibold text-amber-700 bg-amber-100/70 px-2.5 py-0.5 rounded-full border border-amber-200/50">
+                    Inativas
+                  </span>
+                </div>
+                <div className="my-2">
+                  <h3 className="text-2xl font-bold text-slate-900 tracking-tight leading-none">{totalGradesInativas}</h3>
+                  <p className="text-xs font-medium text-slate-500 mt-1">Grades Inativas</p>
+                </div>
+                <div className="pt-2.5 border-t border-amber-100/80 flex items-center justify-between text-xs gap-2">
+                  <span className="text-slate-500 truncate font-normal">Descontinuadas</span>
+                  <span className="font-semibold text-amber-700 shrink-0">{percInativas}% do total</span>
+                </div>
+              </div>
+
+              {/* 4. Cursos Atendidos */}
+              <div className="bg-gradient-to-b from-rose-50/70 to-rose-50/20 rounded-2xl p-5 border border-rose-100 shadow-xs flex flex-col justify-between min-h-[150px] transition-all hover:shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="w-10 h-10 rounded-xl bg-rose-100/80 text-rose-700 flex items-center justify-center text-lg flex-shrink-0 border border-rose-200/60">
+                    🎓
+                  </div>
+                  <span className="text-[11px] font-semibold text-rose-700 bg-rose-100/70 px-2.5 py-0.5 rounded-full border border-rose-200/50">
+                    Cursos
+                  </span>
+                </div>
+                <div className="my-2">
+                  <h3 className="text-2xl font-bold text-slate-900 tracking-tight leading-none">{totalCursosComGrade}</h3>
+                  <p className="text-xs font-medium text-slate-500 mt-1">Cursos com Matriz</p>
+                </div>
+                <div className="pt-2.5 border-t border-rose-100/80 flex items-center justify-between text-xs gap-2">
+                  <span className="text-slate-500 truncate font-normal">Oferta vinculada</span>
+                  <span className="font-semibold text-rose-700 shrink-0">Currículo</span>
+                </div>
+              </div>
+            </div>
+
+            {/* ── 4. BARRA DE FILTROS DA DASHBOARD ───────────────────────────── */}
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                {/* 1. Nome da Grade */}
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-semibold text-slate-600 mb-1 block">Buscar por Nome</label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-sm">
+                      🔍
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="Nome da grade curricular..."
+                      value={searchNome}
+                      onChange={(e) => {
+                        setSearchNome(e.target.value);
+                        setCurrentPage(1);
+                      }}
+                      className="w-full h-10 pl-10 pr-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-slate-50/50 hover:bg-white transition-colors text-slate-700"
+                    />
+                  </div>
+                </div>
+
+                {/* 2. Situação */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 mb-1 block">Situação</label>
+                  <select
+                    value={searchSituacao}
+                    onChange={(e) => {
+                      setSearchSituacao(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="w-full h-10 px-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer"
+                  >
+                    <option value="">Todas</option>
+                    <option value="ATIVO">ATIVO</option>
+                    <option value="INATIVO">INATIVO</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-1">
                 <button
                   onClick={() => {
                     setSearchNome('');
                     setSearchSituacao('ATIVO');
                     setCurrentPage(1);
                   }}
-                  className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold transition text-sm"
+                  className="h-10 px-4 border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5"
                 >
-                  🔄 Limpar Filtros
+                  <span>🧹</span>
+                  <span>Limpar Filtros</span>
+                </button>
+
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  className="h-10 px-5 bg-[#009688] hover:bg-[#00796B] active:bg-[#00695C] text-white font-semibold text-xs rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5"
+                >
+                  <span>⚡</span>
+                  <span>Aplicar Filtros</span>
                 </button>
               </div>
             </div>
 
-            {/* Listagem */}
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              <div className="p-4 md:p-6 border-b border-gray-200 flex justify-between items-center">
-                <h3 className="text-sm font-semibold text-teal-800 flex items-center gap-2">
-                  📋 Listagem das Grades
-                </h3>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={recordsPerPage}
-                    onChange={(e) => setRecordsPerPage(Number(e.target.value))}
-                    className="px-2 py-1 border border-gray-300 rounded text-xs"
-                  >
-                    <option value="10">10</option>
-                    <option value="25">25</option>
-                    <option value="50">50</option>
-                    <option value="100">100</option>
-                  </select>
-                  <span className="text-xs text-gray-600">Registros por página</span>
+            {/* ── 5. LISTAGEM EM TABELA ───────────────────────────────────────── */}
+            <div className="bg-white rounded-2xl shadow-xs border border-slate-200/80 overflow-hidden">
+              {/* Header da Tabela */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:px-6 border-b border-slate-200/80 gap-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">📋</span>
+                  <div>
+                    <h2 className="text-base font-bold text-slate-800 leading-tight">
+                      Listagem das Grades Curriculares
+                    </h2>
+                    <p className="text-xs text-slate-400 font-normal">
+                      Visualize, edite e gerencie as matrizes cadastradas
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={recordsPerPage}
+                      onChange={(e) => {
+                        setRecordsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="h-8 px-2 border border-slate-200 rounded-lg text-xs bg-white text-slate-700 cursor-pointer"
+                    >
+                      <option value="10">10 por pág.</option>
+                      <option value="25">25 por pág.</option>
+                      <option value="50">50 por pág.</option>
+                      <option value="100">100 por pág.</option>
+                    </select>
+                  </div>
+                  <span className="text-xs text-slate-500 font-medium">
+                    Total: <strong className="text-slate-800">{gradesFiltradas.length}</strong>
+                  </span>
                 </div>
               </div>
 
-              {gradesFiltradas.length > 0 ? (
+              {gradesFiltradas.length === 0 ? (
+                <div className="p-12 text-center">
+                  <p className="text-slate-400 text-sm font-medium">Nenhuma grade curricular encontrada</p>
+                </div>
+              ) : (
                 <>
                   <div className="overflow-x-auto">
-                    <table className="w-full">
+                    <table className="w-full text-left border-collapse">
                       <thead>
-                        <tr className="bg-teal-100 border-b border-teal-300">
-                          <th className="text-left px-4 py-3 text-xs font-semibold text-teal-800">#</th>
-                          <th className="text-left px-4 py-3 text-xs font-semibold text-teal-800">Nome</th>
-                          <th className="text-left px-4 py-3 text-xs font-semibold text-teal-800">Ano</th>
-                          <th className="text-left px-4 py-3 text-xs font-semibold text-teal-800">Situação</th>
-                          <th className="text-center px-4 py-3 text-xs font-semibold text-teal-800">Ações</th>
+                        <tr className="bg-slate-50 text-slate-600 font-bold text-xs border-b border-slate-200 select-none">
+                          <th className="px-5 py-3.5 w-16">#</th>
+                          <th className="px-5 py-3.5">Nome da Grade</th>
+                          <th className="px-5 py-3.5">Ano da Matriz</th>
+                          <th className="px-5 py-3.5 text-center">Situação</th>
+                          <th className="px-5 py-3.5 text-center">Ações</th>
                         </tr>
                       </thead>
-                      <tbody>
-                        {gradesExibidas.map((grade, index) => (
-                          <tr key={grade.id} className="border-b border-gray-200 hover:bg-teal-50 transition">
-                            <td className="px-4 py-3 text-sm text-gray-700">{startIndex + index + 1}</td>
-                            <td className="px-4 py-3 text-sm text-gray-700 font-semibold">{grade.nome}</td>
-                            <td className="px-4 py-3 text-sm text-gray-700">{getValue(grade, 'ano') || '-'}</td>
-                            <td className="px-4 py-3 text-sm">
-                              <span
-                                className={`px-2 py-1 rounded text-xs font-semibold ${
-                                  grade.situacao === 'ATIVO'
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-red-100 text-red-800'
-                                }`}
-                              >
-                                {grade.situacao}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-center space-x-2">
-                              <button
-                                onClick={() => handleEdit(grade)}
-                                className="text-orange-600 hover:text-orange-800 text-lg"
-                                title="Editar"
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                onClick={() => handleDelete(grade.id)}
-                                className="text-red-600 hover:text-red-800 text-lg"
-                                title="Deletar"
-                              >
-                                ❌
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                      <tbody className="divide-y divide-slate-150 text-sm">
+                        {gradesExibidas.map((grade, index) => {
+                          const isAtivo = String(grade.situacao || 'ATIVO').toUpperCase() === 'ATIVO';
+
+                          return (
+                            <tr key={grade.id} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="px-5 py-3.5 text-xs font-bold text-slate-700 whitespace-nowrap">
+                                #{startIndex + index + 1}
+                              </td>
+                              <td className="px-5 py-3.5 font-bold text-slate-900">
+                                {grade.nome}
+                              </td>
+                              <td className="px-5 py-3.5 text-xs font-mono text-slate-600 whitespace-nowrap">
+                                {getValue(grade, 'ano') || '—'}
+                              </td>
+                              <td className="px-5 py-3.5 text-center whitespace-nowrap">
+                                <span
+                                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                                    isAtivo
+                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
+                                      : 'bg-rose-50 text-rose-700 border-rose-200/80'
+                                  }`}
+                                >
+                                  {isAtivo ? 'Ativo' : 'Inativo'}
+                                </span>
+                              </td>
+                              <td className="px-5 py-3.5 text-center whitespace-nowrap">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <button
+                                    onClick={() => handleEdit(grade)}
+                                    className="p-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition cursor-pointer"
+                                    title="Editar Grade"
+                                  >
+                                    ✏️
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(grade.id)}
+                                    className="p-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                                    title="Excluir Grade"
+                                  >
+                                    ❌
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
 
-                  {/* Paginação */}
-                  <div className="p-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
-                    <p className="text-xs text-gray-600">
-                      Mostrando {startIndex + 1} a {Math.min(startIndex + recordsPerPage, gradesFiltradas.length)} de {gradesFiltradas.length} resultados
-                    </p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                        disabled={currentPage === 1}
-                        className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50"
-                      >
-                        ← Anterior
-                      </button>
-                      <span className="px-3 py-1 text-sm font-semibold text-white bg-teal-600 rounded">
-                        {currentPage}
-                      </span>
-                      <button
-                        onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                        disabled={currentPage === totalPages}
-                        className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50"
-                      >
-                        Próximo →
-                      </button>
+                  {/* ── Barra de Paginação ───────────────────────────────────── */}
+                  {gradesFiltradas.length > 0 && (
+                    <div className="px-6 py-4 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white select-none">
+                      <div className="text-xs sm:text-sm text-slate-500 font-normal">
+                        Mostrando {startIndex + 1} até {Math.min(startIndex + recordsPerPage, gradesFiltradas.length)} de {gradesFiltradas.length} grades
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        {/* Botão Anterior */}
+                        <button
+                          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                          disabled={currentPage === 1}
+                          className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition disabled:opacity-40 disabled:hover:bg-slate-100 disabled:cursor-not-allowed text-xs font-bold cursor-pointer"
+                          title="Página Anterior"
+                        >
+                          ‹
+                        </button>
+
+                        {/* Botões de Página */}
+                        {getPaginasVisiveis().map((pag, idx) => {
+                          if (pag === '...') {
+                            return (
+                              <span
+                                key={`ellipsis-${idx}`}
+                                className="w-8 h-8 flex items-center justify-center text-slate-400 text-xs font-semibold"
+                              >
+                                ...
+                              </span>
+                            );
+                          }
+
+                          const isCurrent = pag === currentPage;
+
+                          return (
+                            <button
+                              key={`pag-${pag}`}
+                              onClick={() => setCurrentPage(pag)}
+                              className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold transition cursor-pointer ${
+                                isCurrent
+                                  ? 'bg-[#009688] text-white shadow-xs'
+                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                              }`}
+                            >
+                              {pag}
+                            </button>
+                          );
+                        })}
+
+                        {/* Botão Próximo */}
+                        <button
+                          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                          disabled={currentPage === totalPages}
+                          className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition disabled:opacity-40 disabled:hover:bg-slate-100 disabled:cursor-not-allowed text-xs font-bold cursor-pointer"
+                          title="Próxima Página"
+                        >
+                          ›
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </>
-              ) : (
-                <div className="p-6 text-center">
-                  <p className="text-gray-500 text-sm">Nenhuma grade encontrada</p>
-                </div>
               )}
             </div>
           </div>
         )}
 
-        {/* ABA INSERIR */}
+        {/* ── ABA INSERIR / EDITAR ────────────────────────────────────────────── */}
         {showForm && (
-          <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
-            <h3 className="text-lg font-bold text-teal-600 mb-6 flex items-center gap-2">
-              {editingId ? '✏️ Editar Grade' : '➕ Inserir Grade'}
-            </h3>
+          <div className="bg-white rounded-2xl shadow-xs border border-slate-200/80 p-6 space-y-6">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                {editingId ? '✏️ Editar Grade Curricular' : '➕ Nova Grade Curricular'}
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                Preencha os dados abaixo para estruturar a matriz curricular
+              </p>
+            </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="block text-xs font-semibold text-teal-600 mb-2">Instituição *</label>
-                <select
-                  name="instituicaoId"
-                  value={formData.instituicaoId}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm"
-                  disabled={loadingOpcoes}
-                >
-                  <option value="">Selecione a instituição</option>
-                  {instituicoes.map((instituicao) => (
-                    <option key={getValue(instituicao, 'id')} value={getValue(instituicao, 'id')}>
-                      {getValue(instituicao, 'nome')}
-                    </option>
-                  ))}
-                </select>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Instituição *</label>
+                  <select
+                    name="instituicaoId"
+                    value={formData.instituicaoId}
+                    onChange={handleInputChange}
+                    className="w-full h-11 px-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 disabled:bg-slate-100 disabled:text-slate-500 cursor-pointer"
+                    disabled={loadingOpcoes}
+                  >
+                    <option value="">Selecione a instituição</option>
+                    {instituicoes.map((instituicao) => (
+                      <option key={getValue(instituicao, 'id')} value={getValue(instituicao, 'id')}>
+                        {getValue(instituicao, 'nome')}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Curso *</label>
+                  <select
+                    name="cursoId"
+                    value={formData.cursoId}
+                    onChange={handleInputChange}
+                    className="w-full h-11 px-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 disabled:bg-slate-100 disabled:text-slate-500 cursor-pointer"
+                    disabled={!formData.instituicaoId || loadingOpcoes}
+                  >
+                    <option value="">{formData.instituicaoId ? 'Selecione o curso' : 'Selecione a instituição primeiro'}</option>
+                    {cursosFiltradosPorInstituicao.map((curso) => (
+                      <option key={getValue(curso, 'id')} value={getValue(curso, 'id')}>
+                        {getValue(curso, 'nome')}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-2">
+                  <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Nome da Grade *</label>
+                  <input
+                    type="text"
+                    name="nome"
+                    value={formData.nome}
+                    onChange={handleInputChange}
+                    placeholder="Ex.: Matriz 2026 / 1"
+                    className="w-full h-11 px-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Ano da Matriz *</label>
+                  <input
+                    type="text"
+                    name="ano"
+                    value={formData.ano}
+                    onChange={handleInputChange}
+                    placeholder="Ex.: 2026"
+                    maxLength={4}
+                    className="w-full h-11 px-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 font-mono"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-teal-600 mb-2">Curso *</label>
-                <select
-                  name="cursoId"
-                  value={formData.cursoId}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm"
-                  disabled={!formData.instituicaoId || loadingOpcoes}
-                >
-                  <option value="">{formData.instituicaoId ? 'Selecione o curso' : 'Selecione a instituição primeiro'}</option>
-                  {cursosFiltradosPorInstituicao.map((curso) => (
-                    <option key={getValue(curso, 'id')} value={getValue(curso, 'id')}>
-                      {getValue(curso, 'nome')}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-teal-600 mb-2">Nome *</label>
-                <input
-                  type="text"
-                  name="nome"
-                  value={formData.nome}
-                  onChange={handleInputChange}
-                  placeholder="Nome da Grade"
-                  className="w-full px-4 py-3 border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-teal-600 mb-2">Ano *</label>
-                <input
-                  type="text"
-                  name="ano"
-                  value={formData.ano}
-                  onChange={handleInputChange}
-                  placeholder="Ex.: 2026"
-                  maxLength={4}
-                  className="w-full px-4 py-3 border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-teal-600 mb-2">Status</label>
+                <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Situação</label>
                 <select
                   name="situacao"
                   value={formData.situacao}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm"
+                  className="w-full h-11 px-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer"
                 >
                   <option value="ATIVO">ATIVO</option>
                   <option value="INATIVO">INATIVO</option>
                 </select>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
                 <button
                   type="submit"
-                  className="px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold transition text-sm"
+                  className="inline-flex items-center justify-center gap-2 bg-[#009688] hover:bg-[#00796B] active:bg-[#00695C] text-white font-semibold px-6 py-2.5 rounded-xl text-sm shadow-xs transition cursor-pointer"
                 >
-                  💾 Salvar
+                  <span>💾</span>
+                  <span>Salvar Grade</span>
                 </button>
                 <button
                   type="button"
@@ -651,9 +889,10 @@ export default function GerenciarGrades() {
                     resetForm();
                     setShowForm(false);
                   }}
-                  className="px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-semibold transition text-sm"
+                  className="inline-flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-5 py-2.5 rounded-xl text-sm transition cursor-pointer"
                 >
-                  ✕ Cancelar
+                  <span>✕</span>
+                  <span>Cancelar</span>
                 </button>
               </div>
             </form>
