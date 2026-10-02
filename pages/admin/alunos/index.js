@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import PageHeader from '@/components/ui/PageHeader';
@@ -37,10 +38,16 @@ export default function ListagemAlunos() {
 
   const [errorMsg, setErrorMsg] = useState(null);
 
-  // Resetar para primeira página ao alterar qualquer filtro
+  // Resetar para primeira página ao alterar qualquer filtro e fechar menu de ações
   useEffect(() => {
     setPaginaAtual(1);
+    setMenuAcoesData(null);
   }, [searchVal, statusVal, unidadeVal, cursoVal, turmaVal, anoLetivoVal]);
+
+  // Fechar menu de ações ao trocar de página
+  useEffect(() => {
+    setMenuAcoesData(null);
+  }, [paginaAtual]);
 
   useEffect(() => {
     carregarAlunos();
@@ -232,7 +239,7 @@ export default function ListagemAlunos() {
 
   // Seleção de linhas (Checkboxes)
   const [selectedAlunos, setSelectedAlunos] = useState([]);
-  const [menuAcoesAberto, setMenuAcoesAberto] = useState(null);
+  const [menuAcoesData, setMenuAcoesData] = useState(null);
 
   const toggleSelectAll = () => {
     if (selectedAlunos.length === alunosPaginados.length) {
@@ -893,89 +900,25 @@ export default function ListagemAlunos() {
                                     </button>
                                   </Link>
 
-                                  {/* Menu de Mais Ações */}
-                                  <div className="relative inline-block text-left">
-                                    <button
-                                      onClick={() => setMenuAcoesAberto(menuAcoesAberto === aluno.id ? null : aluno.id)}
-                                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition cursor-pointer"
-                                      title="Mais Ações"
-                                    >
-                                      •••
-                                    </button>
-
-                                    {menuAcoesAberto === aluno.id && (
-                                      <div
-                                        className="fixed inset-0 z-40"
-                                        onClick={() => setMenuAcoesAberto(null)}
-                                      />
-                                    )}
-
-                                    {menuAcoesAberto === aluno.id && (
-                                      <div className="absolute right-0 mt-1 w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 text-xs text-left">
-                                        <button
-                                          onClick={() => {
-                                            setMenuAcoesAberto(null);
-                                            abrirContratoAluno(aluno);
-                                            marcarContratoGerado(aluno.id);
-                                          }}
-                                          className="w-full px-3.5 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
-                                        >
-                                          <span>📄</span>
-                                          <span>Gerar Contrato Impresso</span>
-                                        </button>
-                                        <button
-                                          onClick={() => {
-                                            setMenuAcoesAberto(null);
-                                            iniciarAssinaturaDigital(aluno.id);
-                                          }}
-                                          className="w-full px-3.5 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
-                                        >
-                                          <span>✍️</span>
-                                          <span>Enviar para Assinafy</span>
-                                        </button>
-                                        <button
-                                          onClick={() => {
-                                            setMenuAcoesAberto(null);
-                                            consultarAssinaturaDigital(aluno.id);
-                                          }}
-                                          className="w-full px-3.5 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
-                                        >
-                                          <span>🔍</span>
-                                          <span>Status da Assinatura</span>
-                                        </button>
-                                        <Link href={`/admin/alunos/declaracao?id=${aluno.id}&tipo=matricula`}>
-                                          <div
-                                            onClick={() => setMenuAcoesAberto(null)}
-                                            className="w-full px-3.5 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
-                                          >
-                                            <span>📝</span>
-                                            <span>Declaração de Matrícula</span>
-                                          </div>
-                                        </Link>
-                                        <button
-                                          onClick={() => {
-                                            setMenuAcoesAberto(null);
-                                            setModalRematricula(aluno);
-                                          }}
-                                          className="w-full px-3.5 py-2 text-teal-700 hover:bg-teal-50 flex items-center gap-2 font-semibold cursor-pointer"
-                                        >
-                                          <span>🔄</span>
-                                          <span>Rematrícula / Novo Curso</span>
-                                        </button>
-                                        <div className="h-px bg-slate-150 my-1" />
-                                        <button
-                                          onClick={() => {
-                                            setMenuAcoesAberto(null);
-                                            solicitarDeletar(aluno);
-                                          }}
-                                          className="w-full px-3.5 py-2 text-rose-600 hover:bg-rose-50 flex items-center gap-2 font-semibold cursor-pointer"
-                                        >
-                                          <span>❌</span>
-                                          <span>Excluir Aluno</span>
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
+                                  {/* Menu de Mais Ações (Trigger para Portal Flutuante) */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (menuAcoesData?.aluno?.id === aluno.id) {
+                                        setMenuAcoesData(null);
+                                      } else {
+                                        setMenuAcoesData({ aluno, anchorEl: e.currentTarget });
+                                      }
+                                    }}
+                                    className={`p-1.5 rounded-lg transition cursor-pointer ${
+                                      menuAcoesData?.aluno?.id === aluno.id
+                                        ? 'bg-slate-200 text-slate-800'
+                                        : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                                    }`}
+                                    title="Mais Ações"
+                                  >
+                                    •••
+                                  </button>
                                 </div>
                               </td>
                             </tr>
@@ -1134,7 +1077,229 @@ export default function ListagemAlunos() {
         message={`Tem certeza que deseja deletar o aluno "${modalDelete.nome}"? Esta ação não poderá ser desfeita.`}
         type="delete"
       />
+
+      {/* Dropdown de Ações Flutuante via Portal fora do container/overflow da tabela */}
+      {menuAcoesData && (
+        <MenuAcoesFlutuante
+          anchorEl={menuAcoesData.anchorEl}
+          aluno={menuAcoesData.aluno}
+          onClose={() => setMenuAcoesData(null)}
+          abrirContratoAluno={abrirContratoAluno}
+          marcarContratoGerado={marcarContratoGerado}
+          iniciarAssinaturaDigital={iniciarAssinaturaDigital}
+          consultarAssinaturaDigital={consultarAssinaturaDigital}
+          setModalRematricula={setModalRematricula}
+          solicitarDeletar={solicitarDeletar}
+        />
+      )}
     </>
+  );
+}
+
+/**
+ * Menu de Ações Flutuante com Portal
+ * Renderizado diretamente em document.body com position: fixed,
+ * garantindo que nunca fique cortado pelo overflow da tabela.
+ */
+function MenuAcoesFlutuante({
+  anchorEl,
+  aluno,
+  onClose,
+  abrirContratoAluno,
+  marcarContratoGerado,
+  iniciarAssinaturaDigital,
+  consultarAssinaturaDigital,
+  setModalRematricula,
+  solicitarDeletar,
+}) {
+  const [style, setStyle] = useState({});
+  const [isReady, setIsReady] = useState(false);
+  const menuRef = useRef(null);
+
+  const updatePosition = useCallback(() => {
+    if (!anchorEl) return;
+    const rect = anchorEl.getBoundingClientRect();
+
+    // Se o elemento não existe ou está invisível
+    if (rect.width === 0 && rect.height === 0) {
+      onClose();
+      return;
+    }
+
+    // Se o elemento foi scrollado completamente para fora da tela
+    if (rect.bottom < -20 || rect.top > window.innerHeight + 20) {
+      onClose();
+      return;
+    }
+
+    const menuWidth = 224; // Largura aproximada de 220px
+    const estimatedHeight = 250;
+    const gap = 6;
+    const padding = 12;
+
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+
+    const spaceBelow = viewportHeight - rect.bottom;
+    const spaceAbove = rect.top;
+
+    // Se não houver espaço suficiente abaixo e houver mais espaço acima, abre para cima
+    const openUpward = spaceBelow < estimatedHeight && spaceAbove > spaceBelow;
+
+    // Alinhamento padrão: alinha à direita do botão acionador
+    let left = rect.right - menuWidth;
+
+    // Evita transbordamento nas laterais da janela
+    if (left < padding) {
+      left = padding;
+    } else if (left + menuWidth > viewportWidth - padding) {
+      left = viewportWidth - menuWidth - padding;
+    }
+
+    if (openUpward) {
+      setStyle({
+        position: 'fixed',
+        bottom: `${Math.round(viewportHeight - rect.top + gap)}px`,
+        left: `${Math.round(left)}px`,
+        width: `${menuWidth}px`,
+        zIndex: 99999,
+      });
+    } else {
+      setStyle({
+        position: 'fixed',
+        top: `${Math.round(rect.bottom + gap)}px`,
+        left: `${Math.round(left)}px`,
+        width: `${menuWidth}px`,
+        zIndex: 99999,
+      });
+    }
+    setIsReady(true);
+  }, [anchorEl, onClose]);
+
+  useEffect(() => {
+    updatePosition();
+  }, [updatePosition]);
+
+  useEffect(() => {
+    const handleScrollOrResize = () => {
+      updatePosition();
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    const handleClickOutside = (e) => {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target) &&
+        anchorEl &&
+        !anchorEl.contains(e.target)
+      ) {
+        onClose();
+      }
+    };
+
+    window.addEventListener('resize', handleScrollOrResize);
+    window.addEventListener('scroll', handleScrollOrResize, true); // Captura scroll em containers internos (tabela)
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+
+    return () => {
+      window.removeEventListener('resize', handleScrollOrResize);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [anchorEl, onClose, updatePosition]);
+
+  if (typeof document === 'undefined' || !anchorEl) return null;
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      style={{
+        ...style,
+        opacity: isReady ? 1 : 0,
+        transform: isReady ? 'scale(1)' : 'scale(0.95)',
+        transition: 'opacity 120ms ease-out, transform 120ms ease-out',
+      }}
+      className="bg-white rounded-xl shadow-xl shadow-slate-900/10 border border-slate-200/90 py-1.5 text-xs text-left select-none"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        onClick={() => {
+          onClose();
+          abrirContratoAluno(aluno);
+          marcarContratoGerado(aluno.id);
+        }}
+        className="w-full px-3.5 py-2.5 text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer transition-colors text-left"
+      >
+        <span className="text-sm">📄</span>
+        <span className="font-medium">Gerar Contrato Impresso</span>
+      </button>
+
+      <button
+        onClick={() => {
+          onClose();
+          iniciarAssinaturaDigital(aluno.id);
+        }}
+        className="w-full px-3.5 py-2.5 text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer transition-colors text-left"
+      >
+        <span className="text-sm">✍️</span>
+        <span className="font-medium">Enviar para Assinafy</span>
+      </button>
+
+      <button
+        onClick={() => {
+          onClose();
+          consultarAssinaturaDigital(aluno.id);
+        }}
+        className="w-full px-3.5 py-2.5 text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer transition-colors text-left"
+      >
+        <span className="text-sm">🔍</span>
+        <span className="font-medium">Status da Assinatura</span>
+      </button>
+
+      <Link href={`/admin/alunos/declaracao?id=${aluno.id}&tipo=matricula`}>
+        <div
+          onClick={onClose}
+          className="w-full px-3.5 py-2.5 text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer transition-colors text-left"
+        >
+          <span className="text-sm">📝</span>
+          <span className="font-medium">Declaração de Matrícula</span>
+        </div>
+      </Link>
+
+      <button
+        onClick={() => {
+          onClose();
+          setModalRematricula(aluno);
+        }}
+        className="w-full px-3.5 py-2.5 text-teal-700 hover:bg-teal-50 flex items-center gap-2.5 font-semibold cursor-pointer transition-colors text-left"
+      >
+        <span className="text-sm">🔄</span>
+        <span>Rematrícula / Novo Curso</span>
+      </button>
+
+      <div className="h-px bg-slate-100 my-1" />
+
+      <button
+        onClick={() => {
+          onClose();
+          solicitarDeletar(aluno);
+        }}
+        className="w-full px-3.5 py-2.5 text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 font-semibold cursor-pointer transition-colors text-left"
+      >
+        <span className="text-sm">❌</span>
+        <span>Excluir Aluno</span>
+      </button>
+    </div>,
+    document.body
   );
 }
 
