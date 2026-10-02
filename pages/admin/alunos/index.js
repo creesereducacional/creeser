@@ -629,9 +629,9 @@ export default function ListagemAlunos() {
             </div>
 
             {/* ── 4. FILTROS DA DASHBOARD ────────────────────────────────────── */}
-            <div className="bg-white rounded-2xl p-4.5 border border-slate-200/80 shadow-xs space-y-3.5">
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3.5">
               {/* Linha 1 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-sm">
                     🔍
@@ -641,14 +641,14 @@ export default function ListagemAlunos() {
                     placeholder="Aluno, Matrícula, CPF ou Responsável..."
                     value={searchVal}
                     onChange={(e) => setSearchVal(e.target.value)}
-                    className="w-full pl-10 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-slate-50/50"
+                    className="w-full h-10 pl-10 pr-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-slate-50/50 hover:bg-white transition-colors text-slate-700"
                   />
                 </div>
 
                 <select
                   value={statusVal}
                   onChange={(e) => setStatusVal(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] bg-white text-slate-700"
+                  className="w-full h-10 px-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer"
                 >
                   <option value="">Todos os Status</option>
                   <option value="ATIVO">Ativo</option>
@@ -665,7 +665,7 @@ export default function ListagemAlunos() {
                 <select
                   value={unidadeVal}
                   onChange={(e) => setUnidadeVal(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] bg-white text-slate-700"
+                  className="w-full h-10 px-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer"
                 >
                   <option value="">Todas as Unidades</option>
                   {unidades.map((u) => (
@@ -676,7 +676,7 @@ export default function ListagemAlunos() {
                 <select
                   value={cursoVal}
                   onChange={(e) => setCursoVal(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] bg-white text-slate-700"
+                  className="w-full h-10 px-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer"
                 >
                   <option value="">Todos os Cursos</option>
                   {cursos.map((c) => (
@@ -686,12 +686,12 @@ export default function ListagemAlunos() {
               </div>
 
               {/* Linha 2 */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 max-w-xl">
+              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 flex-1 max-w-xl">
                   <select
                     value={turmaVal}
                     onChange={(e) => setTurmaVal(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] bg-white text-slate-700"
+                    className="w-full h-10 px-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer"
                   >
                     <option value="">Todas as Turmas</option>
                     {turmasFiltradasOpcoes.map((t) => (
@@ -702,7 +702,7 @@ export default function ListagemAlunos() {
                   <select
                     value={anoLetivoVal}
                     onChange={(e) => setAnoLetivoVal(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] bg-white text-slate-700"
+                    className="w-full h-10 px-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer"
                   >
                     <option value="">Todos os Anos Letivos</option>
                     {anosLetivos.map((ano) => (
@@ -711,10 +711,10 @@ export default function ListagemAlunos() {
                   </select>
                 </div>
 
-                <div className="flex items-center gap-2.5 self-end sm:self-center">
+                <div className="flex items-center gap-2.5 self-end md:self-center">
                   <button
                     onClick={limparFiltros}
-                    className="px-4 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5"
+                    className="h-10 px-4 border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5"
                   >
                     <span>🧹</span>
                     <span>Limpar Filtros</span>
@@ -722,7 +722,7 @@ export default function ListagemAlunos() {
 
                   <button
                     onClick={() => setPaginaAtual(1)}
-                    className="px-5 py-2.5 bg-[#009688] hover:bg-[#00796B] active:bg-[#00695C] text-white font-semibold text-xs rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5"
+                    className="h-10 px-5 bg-[#009688] hover:bg-[#00796B] active:bg-[#00695C] text-white font-semibold text-xs rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5"
                   >
                     <span>⚡</span>
                     <span>Aplicar Filtros</span>
