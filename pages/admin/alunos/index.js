@@ -220,6 +220,82 @@ export default function ListagemAlunos() {
     return [1, '...', paginaAtual - 1, paginaAtual, paginaAtual + 1, '...', totalPaginas];
   };
 
+  // Métricas para os KPI Cards
+  const totalAlunosGeral = alunos.length;
+  const totalAtivos = useMemo(() => alunos.filter(a => String(a.status || a.status_administrativo).toUpperCase() === 'ATIVO').length, [alunos]);
+  const totalPre = useMemo(() => alunos.filter(a => String(a.status || a.status_administrativo).toUpperCase() === 'PRE_CADASTRO').length, [alunos]);
+  const totalEgressos = useMemo(() => alunos.filter(a => ['CONCLUIDO', 'TRANSFERIDO', 'DESISTENTE', 'CANCELADO', 'INATIVO', 'TRANCADO'].includes(String(a.status || a.status_administrativo).toUpperCase())).length, [alunos]);
+
+  const percAtivos = totalAlunosGeral > 0 ? Math.round((totalAtivos / totalAlunosGeral) * 100) : 0;
+  const percPre = totalAlunosGeral > 0 ? Math.round((totalPre / totalAlunosGeral) * 100) : 0;
+  const percEgressos = totalAlunosGeral > 0 ? Math.round((totalEgressos / totalAlunosGeral) * 100) : 0;
+
+  // Seleção de linhas (Checkboxes)
+  const [selectedAlunos, setSelectedAlunos] = useState([]);
+  const [menuAcoesAberto, setMenuAcoesAberto] = useState(null);
+
+  const toggleSelectAll = () => {
+    if (selectedAlunos.length === alunosPaginados.length) {
+      setSelectedAlunos([]);
+    } else {
+      setSelectedAlunos(alunosPaginados.map(a => a.id));
+    }
+  };
+
+  const toggleSelectOne = (id) => {
+    setSelectedAlunos(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const getAvatarInitials = (nome) => {
+    if (!nome) return 'AL';
+    const parts = nome.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
+  const getAvatarBg = (id) => {
+    const colors = [
+      'bg-amber-100 text-amber-800 border-amber-200',
+      'bg-indigo-100 text-indigo-800 border-indigo-200',
+      'bg-teal-100 text-teal-800 border-teal-200',
+      'bg-rose-100 text-rose-800 border-rose-200',
+      'bg-sky-100 text-sky-800 border-sky-200',
+      'bg-purple-100 text-purple-800 border-purple-200',
+      'bg-emerald-100 text-emerald-800 border-emerald-200'
+    ];
+    const num = Number(id) || 0;
+    return colors[num % colors.length];
+  };
+
+  const exportarCSV = () => {
+    if (filteredAlunos.length === 0) {
+      alert('Nenhum aluno para exportar.');
+      return;
+    }
+    const cabecalhos = ['ID', 'Nome', 'CPF', 'Ano Letivo', 'Turma', 'Curso', 'Matricula', 'Status', 'Contrato'];
+    const linhas = filteredAlunos.map(a => [
+      a.numero_id || a.id,
+      `"${(a.nome || '').replace(/"/g, '""')}"`,
+      `"${a.cpf || ''}"`,
+      `"${a.ano_letivo ?? a.anoLetivo ?? ''}"`,
+      `"${(a.turma_nome || a.turma || '').replace(/"/g, '""')}"`,
+      `"${(a.curso_nome || a.curso || '').replace(/"/g, '""')}"`,
+      `"${a.matricula_codigo || a.matricula || ''}"`,
+      `"${a.status || a.status_administrativo || ''}"`,
+      `"${a.status_contrato || 'NAO_GERADO'}"`
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [cabecalhos.join(';'), ...linhas.map(e => e.join(';'))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `alunos_creeser_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const solicitarDeletar = (aluno) => {
     setModalDelete({
       isOpen: true,
@@ -343,298 +419,563 @@ export default function ListagemAlunos() {
   };
 
   const StatusBadge = ({ status }) => {
-    const cfg = {
-      ATIVO:                          { cls: 'bg-green-100 text-green-800 border-green-200',   label: 'Ativo' },
-      INATIVO:                        { cls: 'bg-red-100 text-red-800 border-red-200',       label: 'Inativo' },
-      PRE_CADASTRO:                   { cls: 'bg-gray-100 text-gray-700 border-gray-200',     label: 'Pré-Cadastro' },
-      AGUARDANDO_PAGAMENTO:           { cls: 'bg-purple-100 text-purple-800 border-purple-200', label: 'Ag. Pagamento' },
-      AGUARDANDO_PAGAMENTO_MATRICULA: { cls: 'bg-purple-100 text-purple-800 border-purple-200', label: 'Ag. Pagamento' },
-      AGUARDANDO_TURMA:               { cls: 'bg-indigo-100 text-indigo-800 border-indigo-200', label: 'Ag. Turma' },
-      AGUARDANDO_FORMACAO_TURMA:      { cls: 'bg-indigo-100 text-indigo-800 border-indigo-200', label: 'Ag. Turma' },
-      TRANCADO:                       { cls: 'bg-amber-100 text-amber-800 border-amber-200',   label: 'Trancado' },
-      DESISTENTE:                     { cls: 'bg-orange-100 text-orange-800 border-orange-200', label: 'Desistente' },
-      CANCELADO:                      { cls: 'bg-rose-100 text-rose-800 border-rose-200',     label: 'Cancelado' },
-      CONCLUIDO:                      { cls: 'bg-teal-100 text-teal-800 border-teal-200',     label: 'Concluído' },
-    }[String(status).toUpperCase()] || { cls: 'bg-gray-100 text-gray-800 border-gray-200', label: status || '—' };
+    const raw = String(status || '').toUpperCase();
+    const map = {
+      ATIVO:                          { cls: 'bg-emerald-50 text-emerald-700 border-emerald-200/80', label: 'Ativo' },
+      INATIVO:                        { cls: 'bg-rose-50 text-rose-700 border-rose-200/80',           label: 'Inativo' },
+      PRE_CADASTRO:                   { cls: 'bg-sky-50 text-sky-700 border-sky-200/80',             label: 'Pré-Cadastro' },
+      AGUARDANDO_PAGAMENTO:           { cls: 'bg-purple-50 text-purple-700 border-purple-200/80',     label: 'Ag. Pagamento' },
+      AGUARDANDO_PAGAMENTO_MATRICULA: { cls: 'bg-purple-50 text-purple-700 border-purple-200/80',     label: 'Ag. Pagamento' },
+      AGUARDANDO_TURMA:               { cls: 'bg-indigo-50 text-indigo-700 border-indigo-200/80',     label: 'Ag. Turma' },
+      AGUARDANDO_FORMACAO_TURMA:      { cls: 'bg-indigo-50 text-indigo-700 border-indigo-200/80',     label: 'Ag. Turma' },
+      TRANCADO:                       { cls: 'bg-amber-50 text-amber-700 border-amber-200/80',         label: 'Trancado' },
+      DESISTENTE:                     { cls: 'bg-orange-50 text-orange-700 border-orange-200/80',     label: 'Desistente' },
+      CANCELADO:                      { cls: 'bg-rose-50 text-rose-700 border-rose-200/80',           label: 'Cancelado' },
+      CONCLUIDO:                      { cls: 'bg-teal-50 text-teal-700 border-teal-200/80',           label: 'Concluído' },
+    };
+    const current = map[raw] || { cls: 'bg-slate-100 text-slate-700 border-slate-200', label: status || '—' };
 
     return (
-      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold border ${cfg.cls}`}>
-        {cfg.label}
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${current.cls}`}>
+        {current.label}
+      </span>
+    );
+  };
+
+  const ContratoBadge = ({ status }) => {
+    const sc = status || 'NAO_GERADO';
+    const BADGE = {
+      NAO_GERADO:         'bg-slate-100 text-slate-600 border-slate-200/70',
+      GERADO:             'bg-emerald-50 text-emerald-700 border-emerald-200/80',
+      ENVIADO_ASSINATURA: 'bg-amber-50 text-amber-700 border-amber-200/80',
+      ASSINADO:           'bg-teal-50 text-teal-700 border-teal-200/80',
+      RECUSADO:           'bg-rose-50 text-rose-700 border-rose-200/80',
+      EXPIRADO:           'bg-orange-50 text-orange-700 border-orange-200/80',
+    };
+    const LABEL = {
+      NAO_GERADO:         'Não Gerado',
+      GERADO:             'Gerado',
+      ENVIADO_ASSINATURA: 'Enviado',
+      ASSINADO:           'Assinado',
+      RECUSADO:           'Recusado',
+      EXPIRADO:           'Expirado',
+    };
+
+    return (
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${BADGE[sc] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+        {LABEL[sc] || sc}
       </span>
     );
   };
 
   return (
     <>
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Cabeçalho */}
-        <PageHeader
-          icon="👨‍🎓"
-          title="Gerenciar Alunos"
-          subtitle={loading ? 'Carregando...' : `${filteredAlunos.length} registro${filteredAlunos.length !== 1 ? 's' : ''} de matrícula encontrado${filteredAlunos.length !== 1 ? 's' : ''}`}
-          breadcrumbs={[{ label: 'Admin', href: '/admin/dashboard' }, { label: 'Alunos' }]}
-          actions={
-            <Link href="/admin/alunos/novo">
-              <button className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-xl transition-colors cursor-pointer shadow-sm">
-                + Novo Aluno
-              </button>
-            </Link>
-          }
-        />
+      <div className="max-w-7xl mx-auto space-y-6 pb-12 font-sans">
+        
+        {/* ── 1. HEADER / BREADCRUMB & TÍTULO ─────────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium mb-1">
+              <Link href="/admin/dashboard" className="hover:text-slate-600 transition">Admin</Link>
+              <span>›</span>
+              <span className="text-slate-600 font-semibold">Alunos</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-[#009688] text-white flex items-center justify-center text-2xl shadow-xs flex-shrink-0">
+                🎓
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                  Gerenciar Alunos
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-500 font-normal">
+                  Cadastre, gerencie e acompanhe os alunos da sua instituição
+                </p>
+              </div>
+            </div>
+          </div>
 
-        {/* Abas - Listar, Inserir e Importação */}
-        <div className="flex gap-2 border-b border-gray-200">
+          <Link href="/admin/alunos/novo">
+            <button className="inline-flex items-center justify-center gap-2 bg-[#009688] hover:bg-[#00796B] active:bg-[#00695C] text-white font-semibold px-5 py-2.5 rounded-xl text-sm shadow-xs transition cursor-pointer self-start sm:self-auto">
+              <span className="text-lg leading-none">+</span>
+              <span>Novo Aluno</span>
+            </button>
+          </Link>
+        </div>
+
+        {/* ── 2. ABAS (Listar, Inserir, Importação) ─────────────────────────── */}
+        <div className="flex gap-2 border-b border-slate-200/80">
           <button 
             onClick={() => setAbaAtiva('listar')}
-            className={`px-6 py-3 font-semibold flex items-center gap-2 transition cursor-pointer ${
+            className={`px-5 py-2.5 font-bold text-sm flex items-center gap-2 transition cursor-pointer ${
               abaAtiva === 'listar' 
-                ? 'text-teal-600 border-b-2 border-teal-600' 
-                : 'text-gray-500 hover:text-teal-600'
+                ? 'text-[#009688] border-b-2 border-[#009688]' 
+                : 'text-slate-500 hover:text-slate-800'
             }`}
           >
             📋 Listar
           </button>
           <Link href="/admin/alunos/novo">
-            <button className="px-6 py-3 text-gray-500 hover:text-teal-600 font-semibold flex items-center gap-2 transition cursor-pointer">
+            <button className="px-5 py-2.5 text-slate-500 hover:text-slate-800 font-semibold text-sm flex items-center gap-2 transition cursor-pointer">
               ➕ Inserir
             </button>
           </Link>
           <button 
             onClick={() => setAbaAtiva('importacao')}
-            className={`px-6 py-3 font-semibold flex items-center gap-2 transition cursor-pointer ${
+            className={`px-5 py-2.5 font-semibold text-sm flex items-center gap-2 transition cursor-pointer ${
               abaAtiva === 'importacao' 
-                ? 'text-teal-600 border-b-2 border-teal-600' 
-                : 'text-gray-500 hover:text-teal-600'
+                ? 'text-[#009688] border-b-2 border-[#009688]' 
+                : 'text-slate-500 hover:text-slate-800'
             }`}
           >
             📥 Importação
           </button>
         </div>
 
-        {/* ABA LISTAR - Barra de Filtros Padronizada e Listagem */}
+        {/* ── ABA LISTAR ─────────────────────────────────────────────────────── */}
         {abaAtiva === 'listar' && (
           <div className="space-y-6">
-            {/* Barra de Filtros Padronizada */}
-            <BarraFiltros
-              searchPlaceholder="🔍 Aluno, Matrícula, CPF ou Responsável..."
-              searchValue={searchVal}
-              onSearchChange={setSearchVal}
-              statusValue={statusVal}
-              onStatusChange={setStatusVal}
-              statusOptions={[
-                { value: "ATIVO", label: "Ativo" },
-                { value: "PRE_CADASTRO", label: "Pré-Cadastro" },
-                { value: "AGUARDANDO_PAGAMENTO", label: "Aguardando Pagamento" },
-                { value: "AGUARDANDO_TURMA", label: "Aguardando Turma" },
-                { value: "TRANCADO", label: "Trancado" },
-                { value: "CANCELADO", label: "Cancelado" },
-                { value: "DESISTENTE", label: "Desistente" },
-                { value: "CONCLUIDO", label: "Concluído" },
-                { value: "INATIVO", label: "Inativo" }
-              ]}
-              unidadeValue={unidadeVal}
-              onUnidadeChange={setUnidadeVal}
-              unidades={unidades}
-              cursoValue={cursoVal}
-              onCursoChange={setCursoVal}
-              cursos={cursos}
-              turmaValue={turmaVal}
-              onTurmaChange={setTurmaVal}
-              turmas={turmasFiltradasOpcoes}
-              anoLetivoValue={anoLetivoVal}
-              onAnoLetivoChange={setAnoLetivoVal}
-              anosLetivos={anosLetivos}
-              onClear={limparFiltros}
-            />
+            
+            {/* ── 3. KPI METRIC CARDS ────────────────────────────────────────── */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+              
+              {/* 1. Total de Alunos */}
+              <div className="bg-white rounded-2xl p-4.5 border border-slate-200/80 shadow-xs flex items-center justify-between">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-teal-50 text-[#009688] flex items-center justify-center text-xl flex-shrink-0 border border-teal-100/80">
+                    👥
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500">Total de Alunos</p>
+                    <h3 className="text-2xl font-extrabold text-slate-900 mt-0.5">{totalAlunosGeral}</h3>
+                    <p className="text-[11px] text-slate-400 font-medium">matriculados no sistema</p>
+                  </div>
+                </div>
+                <div className="text-[#009688] opacity-50">
+                  <svg className="w-7 h-7" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M4 19h4V9H4v10zm6 0h4V5h-4v14zm6 0h4v-7h-4v7z" />
+                  </svg>
+                </div>
+              </div>
 
-            {/* Listagem em Tabela */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="flex items-center justify-between p-4 md:p-6 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-700 flex items-center gap-2">
-                  📚 Listagem de Alunos e Matrículas
-                </h2>
-                <div className="flex items-center gap-4">
-                  <span className="text-sm text-gray-600">
-                    Registros Exibidos: <strong>{filteredAlunos.length}</strong>
+              {/* 2. Alunos Ativos */}
+              <div className="bg-white rounded-2xl p-4.5 border border-slate-200/80 shadow-xs flex items-center justify-between">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl flex-shrink-0 border border-emerald-100/80">
+                    👥
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500">Alunos Ativos</p>
+                    <h3 className="text-2xl font-extrabold text-slate-900 mt-0.5">{totalAtivos}</h3>
+                    <p className="text-[11px] text-emerald-600 font-bold">{percAtivos}% do total</p>
+                  </div>
+                </div>
+                <div className="relative w-8 h-8 flex items-center justify-center">
+                  <svg className="w-8 h-8 transform -rotate-90" viewBox="0 0 36 36">
+                    <path className="text-slate-100" strokeWidth="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    <path className="text-[#009688]" strokeDasharray={`${percAtivos}, 100`} strokeWidth="3.5" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* 3. Pré-Cadastro */}
+              <div className="bg-white rounded-2xl p-4.5 border border-slate-200/80 shadow-xs flex items-center justify-between">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl flex-shrink-0 border border-amber-100/80">
+                    👥
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500">Pré-Cadastro</p>
+                    <h3 className="text-2xl font-extrabold text-slate-900 mt-0.5">{totalPre}</h3>
+                    <p className="text-[11px] text-amber-600 font-bold">{percPre}% do total</p>
+                  </div>
+                </div>
+                <div className="relative w-8 h-8 flex items-center justify-center">
+                  <svg className="w-8 h-8 transform -rotate-90" viewBox="0 0 36 36">
+                    <path className="text-slate-100" strokeWidth="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    <path className="text-amber-500" strokeDasharray={`${percPre}, 100`} strokeWidth="3.5" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* 4. Transferidos / Egressos */}
+              <div className="bg-white rounded-2xl p-4.5 border border-slate-200/80 shadow-xs flex items-center justify-between">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center text-xl flex-shrink-0 border border-rose-100/80">
+                    👤
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500">Transferidos/Egressos</p>
+                    <h3 className="text-2xl font-extrabold text-slate-900 mt-0.5">{totalEgressos}</h3>
+                    <p className="text-[11px] text-slate-400 font-medium">{percEgressos}% do total</p>
+                  </div>
+                </div>
+                <div className="relative w-8 h-8 flex items-center justify-center">
+                  <svg className="w-8 h-8 transform -rotate-90" viewBox="0 0 36 36">
+                    <path className="text-slate-100" strokeWidth="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    <path className="text-slate-300" strokeDasharray={`${percEgressos}, 100`} strokeWidth="3.5" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  </svg>
+                </div>
+              </div>
+
+            </div>
+
+            {/* ── 4. FILTROS DA DASHBOARD ────────────────────────────────────── */}
+            <div className="bg-white rounded-2xl p-4.5 border border-slate-200/80 shadow-xs space-y-3.5">
+              {/* Linha 1 */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-sm">
+                    🔍
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Aluno, Matrícula, CPF ou Responsável..."
+                    value={searchVal}
+                    onChange={(e) => setSearchVal(e.target.value)}
+                    className="w-full pl-10 pr-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-slate-50/50"
+                  />
+                </div>
+
+                <select
+                  value={statusVal}
+                  onChange={(e) => setStatusVal(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] bg-white text-slate-700"
+                >
+                  <option value="">Todos os Status</option>
+                  <option value="ATIVO">Ativo</option>
+                  <option value="PRE_CADASTRO">Pré-Cadastro</option>
+                  <option value="AGUARDANDO_PAGAMENTO">Aguardando Pagamento</option>
+                  <option value="AGUARDANDO_TURMA">Aguardando Turma</option>
+                  <option value="TRANCADO">Trancado</option>
+                  <option value="CANCELADO">Cancelado</option>
+                  <option value="DESISTENTE">Desistente</option>
+                  <option value="CONCLUIDO">Concluído</option>
+                  <option value="INATIVO">Inativo</option>
+                </select>
+
+                <select
+                  value={unidadeVal}
+                  onChange={(e) => setUnidadeVal(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] bg-white text-slate-700"
+                >
+                  <option value="">Todas as Unidades</option>
+                  {unidades.map((u) => (
+                    <option key={u.id} value={u.id}>{u.nome}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={cursoVal}
+                  onChange={(e) => setCursoVal(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] bg-white text-slate-700"
+                >
+                  <option value="">Todos os Cursos</option>
+                  {cursos.map((c) => (
+                    <option key={c.id} value={c.id}>{c.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Linha 2 */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1 max-w-xl">
+                  <select
+                    value={turmaVal}
+                    onChange={(e) => setTurmaVal(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] bg-white text-slate-700"
+                  >
+                    <option value="">Todas as Turmas</option>
+                    {turmasFiltradasOpcoes.map((t) => (
+                      <option key={t.id} value={t.id}>{t.nome}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={anoLetivoVal}
+                    onChange={(e) => setAnoLetivoVal(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] bg-white text-slate-700"
+                  >
+                    <option value="">Todos os Anos Letivos</option>
+                    {anosLetivos.map((ano) => (
+                      <option key={ano} value={ano}>{ano}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2.5 self-end sm:self-center">
+                  <button
+                    onClick={limparFiltros}
+                    className="px-4 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>🧹</span>
+                    <span>Limpar Filtros</span>
+                  </button>
+
+                  <button
+                    onClick={() => setPaginaAtual(1)}
+                    className="px-5 py-2.5 bg-[#009688] hover:bg-[#00796B] active:bg-[#00695C] text-white font-semibold text-xs rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>⚡</span>
+                    <span>Aplicar Filtros</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* ── 5. LISTAGEM EM TABELA ───────────────────────────────────────── */}
+            <div className="bg-white rounded-2xl shadow-xs border border-slate-200/80 overflow-hidden">
+              
+              {/* Header da Tabela */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:px-6 border-b border-slate-200/80 gap-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xl">📚</span>
+                  <div>
+                    <h2 className="text-base font-bold text-slate-800 leading-tight">
+                      Listagem de Alunos e Matrículas
+                    </h2>
+                    <p className="text-xs text-slate-400 font-normal">
+                      Visualize, edite e gerencie os alunos da instituição
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={exportarCSV}
+                    className="px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                  >
+                    <span>📥</span>
+                    <span>Exportar</span>
+                  </button>
+                  <span className="text-xs text-slate-500 font-medium">
+                    Registros Exibidos: <strong className="text-slate-800">{filteredAlunos.length}</strong>
                   </span>
                 </div>
               </div>
 
               {loading ? (
-                <div className="p-12 text-center text-gray-500 font-medium">Carregando alunos e matrículas...</div>
+                <div className="p-16 text-center text-slate-500 font-medium animate-pulse">
+                  Carregando alunos e matrículas...
+                </div>
               ) : errorMsg ? (
-                <div className="p-12 text-center space-y-3">
-                  <div className="text-red-500 text-3xl">⚠️</div>
-                  <div className="text-gray-800 font-bold">{errorMsg}</div>
+                <div className="p-16 text-center space-y-3">
+                  <div className="text-rose-500 text-4xl">⚠️</div>
+                  <div className="text-slate-800 font-bold text-sm">{errorMsg}</div>
                   <button
                     onClick={carregarAlunos}
-                    className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-sm font-semibold transition"
+                    className="px-4 py-2 bg-[#009688] hover:bg-teal-700 text-white rounded-xl text-xs font-semibold transition"
                   >
                     Tentar Novamente
                   </button>
                 </div>
               ) : filteredAlunos.length === 0 ? (
-                <div className="p-12 text-center text-gray-500">Nenhum aluno ou matrícula encontrado com os filtros selecionados.</div>
+                <div className="p-16 text-center text-slate-500 text-sm">
+                  Nenhum aluno ou matrícula encontrado com os filtros selecionados.
+                </div>
               ) : (
                 <>
                   <div className="overflow-x-auto">
-                    <table className="w-full border-collapse">
+                    <table className="w-full border-collapse text-left">
                       <thead>
-                        <tr className="bg-teal-50 border-b border-teal-200">
-                          <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">#ID ALUNO</th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Nome do Aluno</th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">A. Letivo</th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Turma</th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Curso</th>
-                          <th className="text-left px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Matrícula</th>
-                          <th className="text-center px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Status</th>
-                          <th className="text-center px-4 py-3 text-xs font-bold text-teal-900 border-r border-teal-200">Contrato</th>
-                          <th className="text-center px-4 py-3 text-xs font-bold text-teal-900">Ações</th>
+                        <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                          <th className="px-4 py-3 w-10 text-center">
+                            <input
+                              type="checkbox"
+                              checked={alunosPaginados.length > 0 && selectedAlunos.length === alunosPaginados.length}
+                              onChange={toggleSelectAll}
+                              className="rounded border-slate-300 text-[#009688] focus:ring-[#009688] cursor-pointer"
+                            />
+                          </th>
+                          <th className="px-4 py-3">#ID</th>
+                          <th className="px-4 py-3">
+                            <div className="flex items-center gap-1 cursor-pointer">
+                              <span>Nome do Aluno</span>
+                              <span className="text-[10px] text-slate-400">▾</span>
+                            </div>
+                          </th>
+                          <th className="px-4 py-3">A. Letivo</th>
+                          <th className="px-4 py-3">Turma</th>
+                          <th className="px-4 py-3">Curso</th>
+                          <th className="px-4 py-3">Matrícula</th>
+                          <th className="px-4 py-3 text-center">Status</th>
+                          <th className="px-4 py-3 text-center">Contrato</th>
+                          <th className="px-4 py-3 text-center">Ações</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
+                      <tbody className="divide-y divide-slate-150">
                         {alunosPaginados.map((aluno) => {
                           const rowKey = aluno.matricula_id ? `${aluno.id}-${aluno.matricula_id}` : `${aluno.id}-${aluno.turmaid || 'legado'}`;
                           const turmaNomeExibicao = aluno.turma_nome || aluno.turma || 'Sem turma';
                           const cursoNomeExibicao = aluno.curso_nome || aluno.curso || '—';
+                          const isSelected = selectedAlunos.includes(aluno.id);
 
                           return (
-                            <tr key={rowKey} className="hover:bg-teal-50/50 transition">
-                              <td className="px-4 py-3 text-sm font-bold text-teal-800 border-r border-gray-200 whitespace-nowrap">
+                            <tr key={rowKey} className={`hover:bg-slate-50/80 transition-colors ${isSelected ? 'bg-teal-50/40' : ''}`}>
+                              <td className="px-4 py-3.5 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleSelectOne(aluno.id)}
+                                  className="rounded border-slate-300 text-[#009688] focus:ring-[#009688] cursor-pointer"
+                                />
+                              </td>
+                              <td className="px-4 py-3.5 text-xs font-bold text-slate-700 whitespace-nowrap">
                                 #{aluno.numero_id || aluno.id}
                               </td>
-                              <td className="px-4 py-3 text-sm text-gray-900 font-semibold border-r border-gray-200">
-                                {aluno.nome}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200 whitespace-nowrap">
-                                {aluno.ano_letivo ?? aluno.anoLetivo ?? '—'}{aluno.semestre ? `/${aluno.semestre}` : ''}
-                              </td>
-                              <td className="px-4 py-3 text-sm font-medium text-gray-800 border-r border-gray-200">
-                                {turmaNomeExibicao}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-gray-700 border-r border-gray-200">
-                                <div className="flex items-center gap-1.5">
-                                  <span>{cursoNomeExibicao}</span>
-                                  {aluno.is_principal === false && (
-                                    <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold" title="Matrícula Simultânea Adicional">
-                                      Simultâneo
-                                    </span>
+                              <td className="px-4 py-3.5">
+                                <div className="flex items-center gap-3">
+                                  {aluno.foto ? (
+                                    <img
+                                      src={aluno.foto}
+                                      alt={aluno.nome}
+                                      className="w-8 h-8 rounded-full object-cover border border-slate-200 flex-shrink-0"
+                                    />
+                                  ) : (
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 border ${getAvatarBg(aluno.id)}`}>
+                                      {getAvatarInitials(aluno.nome)}
+                                    </div>
                                   )}
+                                  <div>
+                                    <p className="text-sm font-bold text-slate-900 leading-tight">
+                                      {aluno.nome}
+                                    </p>
+                                    {aluno.is_principal === false && (
+                                      <span className="inline-block mt-0.5 px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">
+                                        Simultâneo
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
-                              <td className="px-4 py-3 text-sm font-mono text-gray-700 border-r border-gray-200 whitespace-nowrap">
+                              <td className="px-4 py-3.5 text-xs text-slate-600 font-medium whitespace-nowrap">
+                                {aluno.ano_letivo ?? aluno.anoLetivo ?? '—'}{aluno.semestre ? `/${aluno.semestre}` : ''}
+                              </td>
+                              <td className="px-4 py-3.5 text-xs text-slate-700 font-medium">
+                                {turmaNomeExibicao}
+                              </td>
+                              <td className="px-4 py-3.5 text-xs text-slate-700">
+                                {cursoNomeExibicao}
+                              </td>
+                              <td className="px-4 py-3.5 text-xs font-mono text-slate-600 whitespace-nowrap">
                                 {aluno.matricula_codigo || aluno.matricula || aluno.numero_id || '—'}
                               </td>
-                              <td className="px-4 py-3 text-center border-r border-gray-200 whitespace-nowrap">
+                              <td className="px-4 py-3.5 text-center whitespace-nowrap">
                                 <StatusBadge status={aluno.status || aluno.status_administrativo} />
                               </td>
-                              <td className="px-4 py-3 border-r border-gray-200">
-                                {/* Badge status_contrato */}
-                                {(() => {
-                                  const sc = aluno.status_contrato || 'NAO_GERADO';
-                                  const BADGE = {
-                                    NAO_GERADO:         'bg-gray-100 text-gray-500 border-gray-300',
-                                    GERADO:             'bg-blue-100 text-blue-700 border-blue-300',
-                                    ENVIADO_ASSINATURA: 'bg-yellow-100 text-yellow-700 border-yellow-300',
-                                    ASSINADO:           'bg-green-100 text-green-700 border-green-300',
-                                    RECUSADO:           'bg-red-100 text-red-700 border-red-300',
-                                    EXPIRADO:           'bg-orange-100 text-orange-700 border-orange-300',
-                                  };
-                                  const LABEL = {
-                                    NAO_GERADO:         'Não Gerado',
-                                    GERADO:             'Gerado',
-                                    ENVIADO_ASSINATURA: 'Enviado',
-                                    ASSINADO:           'Assinado',
-                                    RECUSADO:           'Recusado',
-                                    EXPIRADO:           'Expirado',
-                                  };
-                                  return (
-                                    <div className="flex flex-col gap-1.5">
-                                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold border ${BADGE[sc] || 'bg-gray-100 text-gray-500 border-gray-200'}`}>
-                                        {LABEL[sc] || sc}
-                                      </span>
-                                      <div className="flex gap-1 flex-wrap">
-                                        <button
-                                          onClick={() => { abrirContratoAluno(aluno); marcarContratoGerado(aluno.id); }}
-                                          className="px-1.5 py-0.5 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
-                                          title="Gerar contrato"
-                                        >Gerar</button>
-                                        <button
-                                          onClick={() => iniciarAssinaturaDigital(aluno.id)}
-                                          className="px-1.5 py-0.5 text-xs rounded border border-blue-300 text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
-                                          title="Enviar para Assinafy"
-                                        >Assinafy</button>
-                                        <button
-                                          onClick={() => consultarAssinaturaDigital(aluno.id)}
-                                          className="px-1.5 py-0.5 text-xs rounded border border-teal-300 text-teal-600 hover:bg-teal-50 transition-colors cursor-pointer"
-                                          title="Ver status da assinatura"
-                                        >Status</button>
-                                      </div>
-                                    </div>
-                                  );
-                                })()}
+                              <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                                <ContratoBadge status={aluno.status_contrato} />
                               </td>
-                              <td className="px-4 py-3 text-center">
-                                <div className="flex items-center justify-center gap-1 flex-wrap">
+                              <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                                <div className="flex items-center justify-center gap-1.5">
                                   <Link href={`/admin/alunos/${aluno.id}`}>
                                     <button
-                                      className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition cursor-pointer"
-                                      title="Editar Dados do Aluno"
+                                      className="p-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition cursor-pointer"
+                                      title="Editar Aluno"
                                     >
                                       ✏️
                                     </button>
                                   </Link>
-                                  <Link href={`/admin/alunos/ficha?id=${aluno.id}`} target="_blank" rel="noopener noreferrer">
-                                    <button
-                                      className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition cursor-pointer"
-                                      title="Gerar PDF da Ficha do Aluno"
-                                    >
-                                      🖨️
-                                    </button>
-                                  </Link>
-                                  <button
-                                    className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition cursor-pointer"
-                                    title="Resetar Senha"
-                                  >
-                                    🔑
-                                  </button>
-                                  <button
-                                    onClick={() => abrirContratoAluno(aluno)}
-                                    className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition cursor-pointer"
-                                    title="Contrato para impressão"
-                                  >
-                                    📄
-                                  </button>
                                   <Link href={`/admin/alunos/historico?id=${aluno.id}`}>
                                     <button
-                                      className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition cursor-pointer"
-                                      title="Histórico Escolar"
+                                      className="p-1.5 text-sky-600 hover:text-sky-700 hover:bg-sky-50 rounded-lg transition cursor-pointer"
+                                      title="Histórico / Detalhes"
                                     >
-                                      📜
+                                      👁️
                                     </button>
                                   </Link>
-                                  <Link href={`/admin/alunos/declaracao?id=${aluno.id}&tipo=matricula`}>
+                                  <Link href={`/admin/alunos/ficha?id=${aluno.id}`} target="_blank" rel="noopener noreferrer">
                                     <button
-                                      className="p-1.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition cursor-pointer"
-                                      title="Declaração de Matrícula"
+                                      className="p-1.5 text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                                      title="Ficha do Aluno"
                                     >
-                                      📝
+                                      📄
                                     </button>
                                   </Link>
-                                  <button
-                                    onClick={() => setModalRematricula(aluno)}
-                                    className="p-1.5 text-teal-600 hover:text-teal-800 hover:bg-teal-50 rounded transition cursor-pointer"
-                                    title="Transferência / Rematrícula / Novo Curso"
-                                  >
-                                    🔄
-                                  </button>
-                                  <button
-                                    onClick={() => solicitarDeletar(aluno)}
-                                    className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition cursor-pointer"
-                                    title="Deletar"
-                                  >
-                                    ❌
-                                  </button>
+
+                                  {/* Menu de Mais Ações */}
+                                  <div className="relative inline-block text-left">
+                                    <button
+                                      onClick={() => setMenuAcoesAberto(menuAcoesAberto === aluno.id ? null : aluno.id)}
+                                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                                      title="Mais Ações"
+                                    >
+                                      •••
+                                    </button>
+
+                                    {menuAcoesAberto === aluno.id && (
+                                      <div
+                                        className="fixed inset-0 z-40"
+                                        onClick={() => setMenuAcoesAberto(null)}
+                                      />
+                                    )}
+
+                                    {menuAcoesAberto === aluno.id && (
+                                      <div className="absolute right-0 mt-1 w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 text-xs text-left">
+                                        <button
+                                          onClick={() => {
+                                            setMenuAcoesAberto(null);
+                                            abrirContratoAluno(aluno);
+                                            marcarContratoGerado(aluno.id);
+                                          }}
+                                          className="w-full px-3.5 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                                        >
+                                          <span>📄</span>
+                                          <span>Gerar Contrato Impresso</span>
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            setMenuAcoesAberto(null);
+                                            iniciarAssinaturaDigital(aluno.id);
+                                          }}
+                                          className="w-full px-3.5 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                                        >
+                                          <span>✍️</span>
+                                          <span>Enviar para Assinafy</span>
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            setMenuAcoesAberto(null);
+                                            consultarAssinaturaDigital(aluno.id);
+                                          }}
+                                          className="w-full px-3.5 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                                        >
+                                          <span>🔍</span>
+                                          <span>Status da Assinatura</span>
+                                        </button>
+                                        <Link href={`/admin/alunos/declaracao?id=${aluno.id}&tipo=matricula`}>
+                                          <div
+                                            onClick={() => setMenuAcoesAberto(null)}
+                                            className="w-full px-3.5 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                                          >
+                                            <span>📝</span>
+                                            <span>Declaração de Matrícula</span>
+                                          </div>
+                                        </Link>
+                                        <button
+                                          onClick={() => {
+                                            setMenuAcoesAberto(null);
+                                            setModalRematricula(aluno);
+                                          }}
+                                          className="w-full px-3.5 py-2 text-teal-700 hover:bg-teal-50 flex items-center gap-2 font-semibold cursor-pointer"
+                                        >
+                                          <span>🔄</span>
+                                          <span>Rematrícula / Novo Curso</span>
+                                        </button>
+                                        <div className="h-px bg-slate-150 my-1" />
+                                        <button
+                                          onClick={() => {
+                                            setMenuAcoesAberto(null);
+                                            solicitarDeletar(aluno);
+                                          }}
+                                          className="w-full px-3.5 py-2 text-rose-600 hover:bg-rose-50 flex items-center gap-2 font-semibold cursor-pointer"
+                                        >
+                                          <span>❌</span>
+                                          <span>Excluir Aluno</span>
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
@@ -644,9 +985,9 @@ export default function ListagemAlunos() {
                     </table>
                   </div>
 
-                  {/* Barra de Paginação */}
+                  {/* ── Barra de Paginação ─────────────────────────────────── */}
                   {totalRegistros > 0 && (
-                    <div className="px-6 py-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white select-none">
+                    <div className="px-6 py-4 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white select-none">
                       <div className="text-xs sm:text-sm text-slate-500 font-normal">
                         Mostrando {indiceInicial + 1} até {indiceFinal} de {totalRegistros} registros
                       </div>
@@ -710,23 +1051,23 @@ export default function ListagemAlunos() {
           </div>
         )}
 
-        {/* ABA IMPORTAÇÃO */}
+        {/* ── ABA IMPORTAÇÃO ─────────────────────────────────────────────────── */}
         {abaAtiva === 'importacao' && (
-          <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
-            <div className="mb-6">
-              <h2 className="text-xl font-bold text-teal-600 mb-2 flex items-center gap-2">
+          <div className="bg-white rounded-2xl shadow-xs border border-slate-200/80 p-6 space-y-6">
+            <div>
+              <h2 className="text-xl font-bold text-[#009688] mb-1 flex items-center gap-2">
                 📥 Envio de Arquivo para Importação de Alunos
               </h2>
-              <p className="text-sm text-gray-600">Selecione a turma e o arquivo de alunos para importar</p>
+              <p className="text-xs sm:text-sm text-slate-500">Selecione a turma e o arquivo de alunos para importar</p>
             </div>
 
-            <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6">
-              <h3 className="text-lg font-bold text-teal-600 mb-4">Configuração</h3>
+            <div className="bg-slate-50/60 rounded-xl p-5 border border-slate-200 space-y-4">
+              <h3 className="text-sm font-bold text-[#009688]">Configuração</h3>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-medium text-teal-600 mb-1 block">TURMA</label>
-                  <select className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50">
+                  <label className="text-xs font-semibold text-slate-700 mb-1 block">TURMA</label>
+                  <select className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-[#009688] bg-white text-slate-700">
                     <option value="">Selecione a turma</option>
                     {turmas.map(t => (
                       <option key={t.id} value={t.id}>{t.nome}</option>
@@ -735,8 +1076,8 @@ export default function ListagemAlunos() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-teal-600 mb-1 block">ANO LETIVO</label>
-                  <select className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50">
+                  <label className="text-xs font-semibold text-slate-700 mb-1 block">ANO LETIVO</label>
+                  <select className="w-full px-3.5 py-2.5 text-xs sm:text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-[#009688] bg-white text-slate-700">
                     <option value="">Escolha o ano letivo</option>
                     {anosLetivos.map(ano => (
                       <option key={ano} value={ano}>{ano}</option>
@@ -746,19 +1087,19 @@ export default function ListagemAlunos() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-teal-600 mb-1 block">ARQUIVO EXCEL</label>
-                <div className="border-2 border-dashed border-teal-300 rounded-lg p-6 text-center cursor-pointer hover:bg-teal-50 transition">
+                <label className="text-xs font-semibold text-slate-700 mb-1 block">ARQUIVO EXCEL</label>
+                <div className="border-2 border-dashed border-teal-300 rounded-xl p-8 text-center cursor-pointer hover:bg-teal-50/50 transition">
                   <input type="file" className="hidden" accept=".xlsx,.xls,.csv" />
-                  <div className="text-gray-500">
-                    <p className="text-sm">Clique ou arraste o arquivo aqui</p>
-                    <p className="text-xs text-gray-400 mt-1">Nenhum arquivo 😢</p>
+                  <div className="text-slate-500">
+                    <p className="text-sm font-semibold">Clique ou arraste o arquivo aqui</p>
+                    <p className="text-xs text-slate-400 mt-1">Formatos aceitos: .xlsx, .xls, .csv</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex gap-4 mb-6">
-              <button className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition text-sm cursor-pointer">
+            <div className="flex gap-4">
+              <button className="px-6 py-2.5 bg-[#009688] hover:bg-teal-700 text-white rounded-xl font-semibold transition text-sm cursor-pointer shadow-xs">
                 IMPORTAR ALUNOS
               </button>
             </div>
