@@ -544,17 +544,38 @@ export default function NovoPrecadastro() {
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      // Leitura resiliente do corpo da resposta (proteção contra respostas não-JSON/HTML)
+      const rawText = await res.text();
+      let data = null;
+      try {
+        data = rawText ? JSON.parse(rawText) : {};
+      } catch (parseErr) {
+        console.error('Resposta não-JSON retornada pelo backend:', {
+          status: res.status,
+          contentType: res.headers.get('content-type'),
+          bodySnippet: rawText.slice(0, 300)
+        });
+        const msgServidor = `Falha no servidor (HTTP ${res.status}): A resposta não pôde ser interpretada. Tente novamente ou contate o suporte.`;
+        setErro(msgServidor);
+        setModalAlerta({
+          isOpen: true,
+          title: 'Erro de Comunicação',
+          message: msgServidor,
+          type: 'error'
+        });
+        return;
+      }
 
       if (!res.ok) {
-        setErro(data.error || 'Erro ao realizar o cadastro do aluno.');
+        const mensagemErro = data?.error || data?.message || `Erro ${res.status} ao realizar o cadastro do aluno.`;
+        setErro(mensagemErro);
         if (res.status === 409 && data.aluno_id) {
           setDuplicateId(data.aluno_id);
         }
         setModalAlerta({
           isOpen: true,
           title: 'Erro no Cadastro',
-          message: data.error || 'Não foi possível salvar o cadastro do aluno. Verifique os dados.',
+          message: mensagemErro,
           type: 'error'
         });
         return;
@@ -563,7 +584,7 @@ export default function NovoPrecadastro() {
       setModalAlerta({
         isOpen: true,
         title: 'Cadastro Concluído',
-        message: 'O aluno foi cadastrado com sucesso no CREESER!',
+        message: data?.mensagem || 'O aluno foi cadastrado com sucesso no CREESER!',
         type: 'success'
       });
 
@@ -571,8 +592,15 @@ export default function NovoPrecadastro() {
         router.push('/recepcao/pre-cadastros');
       }, 1500);
     } catch (err) {
-      console.error('Erro de conexão ao salvar aluno:', err);
-      setErro('Falha de conexão com o servidor.');
+      console.error('Erro de requisição ao salvar aluno:', err);
+      const msgErro = err?.message ? `Erro de conexão: ${err.message}` : 'Falha de conexão com o servidor.';
+      setErro(msgErro);
+      setModalAlerta({
+        isOpen: true,
+        title: 'Falha de Conexão',
+        message: msgErro,
+        type: 'error'
+      });
     } finally {
       setSalvando(false);
     }
