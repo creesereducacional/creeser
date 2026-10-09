@@ -60,9 +60,14 @@ export function AuthProvider({ children }) {
 
   const atualizarUsuario = (novoUsuario) => {
     setUsuario(novoUsuario);
+    setCarregando(false);
     if (novoUsuario) {
       try {
         localStorage.setItem("usuario", JSON.stringify(novoUsuario));
+      } catch (e) {}
+    } else {
+      try {
+        localStorage.removeItem("usuario");
       } catch (e) {}
     }
   };

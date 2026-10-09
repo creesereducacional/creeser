@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
+import { useAuthContext } from "@/context/AuthContext";
 import {
   resolveDomainContext,
   validarCompatibilidadeAmbiente,
@@ -10,6 +11,7 @@ import {
 
 export default function Login() {
   const router = useRouter();
+  const { atualizarUsuario } = useAuthContext();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [mostrarSenha, setMostrarSenha] = useState(false);
@@ -66,12 +68,14 @@ export default function Login() {
         // Se o perfil for incompatível com o subdomínio acessado, desloga a sessão criada
         await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
         localStorage.removeItem("usuario");
+        atualizarUsuario(null);
         setErro(validacao.mensagemErro || "Seu perfil não tem permissão para acessar este ambiente.");
         setCarregando(false);
         return;
       }
 
       localStorage.setItem("usuario", JSON.stringify(usuario));
+      atualizarUsuario(usuario);
 
       // ── Destino inteligente pós-login ────────────────────────────────────
       const destino = getDestinoPosLogin(usuario, contexto);
