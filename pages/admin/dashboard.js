@@ -160,6 +160,24 @@ export default function AdminDashboard() {
         }));
 
       // Logs de Atividades Recentes
+      const formatarDetalhesLog = (log) => {
+        if (log.entidade) return `${log.acao || "Ação"} em ${log.entidade}${log.id_entidade ? ` #${log.id_entidade}` : ""}`;
+        if (!log.detalhes) return "Operação realizada com sucesso";
+        if (typeof log.detalhes === "string") return log.detalhes;
+        if (typeof log.detalhes === "object") {
+          if (log.detalhes.motivo) return `Motivo: ${log.detalhes.motivo}`;
+          if (log.detalhes.status) return `Status: ${log.detalhes.status}`;
+          if (log.detalhes.observacao) return log.detalhes.observacao;
+          if (log.detalhes.valor_pago) return `Valor: R$ ${log.detalhes.valor_pago}`;
+          try {
+            return JSON.stringify(log.detalhes);
+          } catch {
+            return "Operação registrada";
+          }
+        }
+        return String(log.detalhes);
+      };
+
       const logsAtividades = (logsData?.logs || (Array.isArray(logsData) ? logsData : []))
         .slice(0, 5)
         .map((log, idx) => ({
@@ -167,7 +185,7 @@ export default function AdminDashboard() {
           data: log.created_at || new Date().toISOString(),
           usuario: log.usuario_email?.split("@")[0] || log.usuario_nome || "Sistema",
           acao: log.acao || "Atualização",
-          detalhes: log.entidade ? `${log.acao || "Ação"} em ${log.entidade}` : log.detalhes || "Operação realizada com sucesso",
+          detalhes: formatarDetalhesLog(log),
         }));
 
       // Evolução dos alunos nos últimos 12 meses
@@ -220,7 +238,7 @@ export default function AdminDashboard() {
           .map((cid) => {
             const curso = cursos.find((c) => String(c.id) === String(cid));
             return {
-              titulo: curso ? curso.titulo : `Curso ID ${cid}`,
+              titulo: curso ? (curso.nome || curso.titulo || `Curso #${cid}`) : `Curso #${cid}`,
               total: contagem[cid],
             };
           })
