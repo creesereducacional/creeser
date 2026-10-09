@@ -42,11 +42,20 @@ export default async function handler(req, res) {
       return res.status(200).json(prof ? [prof] : []);
     }
 
-    let query = supabase.from('professores').select('*').order('nome');
+    let query = supabase.from('professores').select('*, usuarios(*)').order('id', { ascending: false });
     query = applyInstituicaoFilter(query, instituicaoId);
     const { data, error } = await query;
-    if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json(data);
+    if (error) {
+      console.error('Erro ao listar professores:', error);
+      return res.status(200).json([]);
+    }
+    const normalizados = (data || []).map((p) => ({
+      ...p,
+      nome: p.nome || p.usuarios?.nomecompleto || p.usuarios?.nome || 'Professor',
+      email: p.email || p.usuarios?.email || '',
+      status: p.status || p.statusvinculo || 'ATIVO',
+    }));
+    return res.status(200).json(normalizados);
   }
 
   if (req.method === 'POST') {

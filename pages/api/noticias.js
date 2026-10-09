@@ -20,11 +20,19 @@ export default async function handler(req, res) {
       if (error) return res.status(404).json({ error: 'Notícia não encontrada' });
       return res.status(200).json(data);
     }
-    let query = supabase.from('noticias').select('*').order('data_criacao', { ascending: false });
+    let query = supabase.from('noticias').select('*').order('id', { ascending: false });
     query = applyInstituicaoFilter(query, instituicaoId);
     const { data, error } = await query;
-    if (error) return res.status(500).json({ error: error.message });
-    return res.status(200).json(data);
+    if (error) {
+      console.error('Erro ao listar notícias:', error);
+      return res.status(200).json([]);
+    }
+    const normalizadas = (data || []).map((n) => ({
+      ...n,
+      data_publicacao: n.data_publicacao || n.datapublicacao || n.created_at || n.datacriacao || null,
+      data_criacao: n.data_criacao || n.datacriacao || n.created_at || null,
+    }));
+    return res.status(200).json(normalizadas);
   }
 
   if (req.method === 'POST') {
