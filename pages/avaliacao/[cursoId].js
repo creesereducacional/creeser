@@ -33,11 +33,20 @@ export default function AvaliacaoCurso() {
     setCarregando(true);
     try {
       let cursoEncontrado = null;
-      const res = await fetch('/api/cursos', { credentials: 'include' });
-      if (res.ok) {
-        const cursos = await res.json();
-        if (Array.isArray(cursos)) {
-          cursoEncontrado = cursos.find((c) => String(c.id) === String(cursoId));
+      try {
+        const resEadSingle = await fetch(`/api/ead/cursos/${cursoId}`);
+        if (resEadSingle.ok) {
+          cursoEncontrado = await resEadSingle.json();
+        }
+      } catch (e) {}
+
+      if (!cursoEncontrado) {
+        const res = await fetch('/api/cursos', { credentials: 'include' });
+        if (res.ok) {
+          const cursos = await res.json();
+          if (Array.isArray(cursos)) {
+            cursoEncontrado = cursos.find((c) => String(c.id) === String(cursoId));
+          }
         }
       }
 
@@ -49,6 +58,14 @@ export default function AvaliacaoCurso() {
       }
 
       if (cursoEncontrado) {
+        // Bloquear avaliação de curso em rascunho para alunos
+        const isStaff = ['admin', 'grupo_admin', 'instituicao_admin', 'coordenador', 'professor'].includes(usuario.perfil || usuario.tipo);
+        if (cursoEncontrado.ativo === false && !isStaff) {
+          alert('A avaliação deste curso não está disponível pois o curso encontra-se em modo rascunho.');
+          router.push('/dashboard_ead');
+          return;
+        }
+
         setCurso(cursoEncontrado);
 
         // 2. Extrair ou estruturar avaliação do curso

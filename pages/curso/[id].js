@@ -36,18 +36,34 @@ export default function CursoDetalhes() {
 
   const carregarCurso = async () => {
     try {
-      // Adiciona timestamp para evitar cache do navegador
-      const response = await fetch(`/api/cursos?t=${Date.now()}`);
-      const cursos = await response.json();
-      const cursoEncontrado = cursos.find(c => c.id === parseInt(id));
+      // Tenta buscar diretamente da API EAD
+      let cursoEncontrado = null;
+      try {
+        const resEad = await fetch(`/api/ead/cursos/${id}?t=${Date.now()}`);
+        if (resEad.ok) {
+          cursoEncontrado = await resEad.json();
+        }
+      } catch (e) {}
+
+      // Fallback para api/cursos
+      if (!cursoEncontrado) {
+        const response = await fetch(`/api/cursos?t=${Date.now()}`);
+        if (response.ok) {
+          const cursos = await response.json();
+          if (Array.isArray(cursos)) {
+            cursoEncontrado = cursos.find(c => String(c.id) === String(id));
+          }
+        }
+      }
       
       if (cursoEncontrado) {
-        // Verificar se o usuário é admin
-        const usuarioStr = localStorage.getItem('usuario');
+        // Verificar se o usuário possui perfil administrativo
+        const usuarioStr = localStorage.getItem('usuario') || localStorage.getItem('usuario_ead');
         const usuario = usuarioStr ? JSON.parse(usuarioStr) : null;
-        const isAdmin = usuario?.tipo === 'admin';
+        const perfilNormalizado = String(usuario?.perfil || usuario?.tipo || '').toLowerCase();
+        const isAdmin = ['admin', 'grupo_admin', 'instituicao_admin', 'coordenador'].includes(perfilNormalizado);
         
-        // Se o curso está inativo e o usuário não é admin, redirecionar
+        // Se o curso está em rascunho (inativo) e o usuário não é gestor/admin, redirecionar
         if (!cursoEncontrado.ativo && !isAdmin) {
           router.push('/');
           return;

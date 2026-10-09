@@ -47,17 +47,26 @@ export default function AssistirCurso() {
   const carregarCursoEProgresso = async (alunoId) => {
     setCarregando(true);
     try {
-      // 1. Carregar curso via API CREESER
+      // 1. Carregar curso via API EAD ou CREESER
       let cursoEncontrado = null;
-      const res = await fetch('/api/cursos', { credentials: 'include' });
-      if (res.ok) {
-        const cursos = await res.json();
-        if (Array.isArray(cursos)) {
-          cursoEncontrado = cursos.find((c) => String(c.id) === String(cursoId));
+      try {
+        const resEadSingle = await fetch(`/api/ead/cursos/${cursoId}`);
+        if (resEadSingle.ok) {
+          cursoEncontrado = await resEadSingle.json();
+        }
+      } catch (e) {}
+
+      if (!cursoEncontrado) {
+        const res = await fetch('/api/cursos', { credentials: 'include' });
+        if (res.ok) {
+          const cursos = await res.json();
+          if (Array.isArray(cursos)) {
+            cursoEncontrado = cursos.find((c) => String(c.id) === String(cursoId));
+          }
         }
       }
 
-      // Fallback para endpoint individual se necessário
+      // Fallback para endpoint individual tradicional se necessário
       if (!cursoEncontrado) {
         const resSingle = await fetch(`/api/cursos/${cursoId}`, { credentials: 'include' });
         if (resSingle.ok) {
@@ -66,6 +75,14 @@ export default function AssistirCurso() {
       }
 
       if (cursoEncontrado) {
+        // Se o curso for rascunho e o usuário logado for aluno, impedir acesso
+        const isStaff = ['admin', 'grupo_admin', 'instituicao_admin', 'coordenador', 'professor'].includes(usuario.perfil || usuario.tipo);
+        if (cursoEncontrado.ativo === false && !isStaff) {
+          alert('Este curso encontra-se em modo rascunho e não está disponível no momento.');
+          router.push('/dashboard_ead');
+          return;
+        }
+
         setCurso(cursoEncontrado);
 
         let progressoMap = {};

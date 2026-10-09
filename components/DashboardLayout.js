@@ -101,10 +101,11 @@ export default function DashboardLayout({ children }) {
       }
     }
 
-    // 4. Validar Módulo Acadêmico / Secretaria Geral (/admin/alunos, /admin/cursos, /admin/professores, etc.)
+    // 4. Validar Módulo Acadêmico / Secretaria Geral / EAD (/admin/alunos, /admin/cursos, /admin/ead, etc.)
     const rotasAcademicas = [
       '/admin/alunos',
       '/admin/cursos',
+      '/admin/ead',
       '/admin/professores',
       '/admin/disciplinas',
       '/admin/turmas',
@@ -211,6 +212,7 @@ export default function DashboardLayout({ children }) {
       secao: 'Gestão Acadêmica',
       perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
       submenu: [
+        { id: 'ead-cursos', nome: 'Gerenciar Cursos EAD', icon: '📖', url: '/admin/ead/cursos', em_breve: false, completed: true },
         { id: 'ead-forum', nome: 'Fórum', icon: '▪', url: '/admin/forum', em_breve: false, completed: true },
         { id: 'ead-emails', nome: 'E-mails', icon: '▪', url: '/admin/emails', em_breve: false, completed: true },
         { id: 'ead-avaliacoes', nome: 'Avaliações', icon: '▪', url: '/admin/avaliacoes', em_breve: false, completed: true },
