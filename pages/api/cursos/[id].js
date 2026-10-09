@@ -424,14 +424,16 @@ export default async function handler(req, res) {
         }
       }
 
-      const instituicaoId = isGroupAdmin ? (requestedInstituicaoId || null) : userInstituicaoId;
-
       let query = supabase
         .from('cursos')
         .select('*')
         .eq('id', id);
 
-      query = applyInstituicaoFilter(query, instituicaoId);
+      if (!isGroupAdmin) {
+        query = applyInstituicaoFilter(query, userInstituicaoId);
+      } else if (requestedInstituicaoId) {
+        query = applyInstituicaoFilter(query, requestedInstituicaoId);
+      }
 
       const { data, error } = await query.maybeSingle();
 

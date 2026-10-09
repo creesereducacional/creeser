@@ -522,7 +522,11 @@ export default async function handler(req, res) {
         .select('*')
         .order('id', { ascending: false });
 
-      query = applyInstituicaoFilter(query, instituicaoId);
+      if (!isGroupAdmin) {
+        query = applyInstituicaoFilter(query, userInstituicaoId);
+      } else if (requestedInstituicaoId) {
+        query = applyInstituicaoFilter(query, requestedInstituicaoId);
+      }
 
       // Filtro opcional por situacao (ex: ATIVO)
       if (req.query.situacao) {
