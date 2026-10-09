@@ -524,6 +524,35 @@ export default async function handler(req, res) {
 
       query = applyInstituicaoFilter(query, instituicaoId);
 
+      // Filtro opcional por situacao (ex: ATIVO)
+      if (req.query.situacao) {
+        query = query.eq('situacao', String(req.query.situacao).toUpperCase());
+      } else if (req.query.apenas_ativos === 'true' || req.query.ativo === 'true') {
+        query = query.eq('situacao', 'ATIVO');
+      }
+
+      // Filtro opcional por unidade_id / unidadeId via vinculos na tabela curso_unidade
+      const filterUnidadeId = parseInteger(req.query.unidadeId || req.query.unidade_id || req.query.unidade);
+      if (filterUnidadeId !== null) {
+        const schema = await getCursoUnidadeSchema();
+        if (schema) {
+          const { data: bindings, error: bindingsError } = await supabase
+            .from('curso_unidade')
+            .select(schema.cursoCol)
+            .eq(schema.unidadeCol, filterUnidadeId);
+
+          if (bindingsError) {
+            console.error('Erro ao consultar curso_unidade para filtro:', bindingsError);
+          } else {
+            const boundCursoIds = [...new Set((bindings || []).map((b) => parseInteger(b[schema.cursoCol])).filter((id) => id !== null))];
+            if (boundCursoIds.length === 0) {
+              return res.status(200).json([]);
+            }
+            query = query.in('id', boundCursoIds);
+          }
+        }
+      }
+
       const { data, error } = await query;
 
       if (error) {

@@ -44,7 +44,7 @@ export default async function handler(req, res) {
     if (body.grade) {
       const { data: gradeData } = await supabase
         .from('grades')
-        .select('id, curso_id, cursoid')
+        .select('id, cursoid')
         .eq('id', body.grade)
         .maybeSingle();
       gradeInfo = gradeData || null;
@@ -77,6 +77,16 @@ export default async function handler(req, res) {
 
     if (!numericCursoId) {
       return res.status(400).json({ error: 'Não foi possível determinar o curso da disciplina' });
+    }
+
+    // Validar se a grade informada pertence ao curso
+    if (gradeInfo) {
+      const gradeCursoId = gradeInfo.curso_id || gradeInfo.cursoid;
+      if (gradeCursoId && Number(gradeCursoId) !== Number(numericCursoId)) {
+        return res.status(400).json({
+          error: 'A Matriz Curricular selecionada não pertence ao curso informado.'
+        });
+      }
     }
 
     // Montar payload APENAS com colunas que existem na tabela real

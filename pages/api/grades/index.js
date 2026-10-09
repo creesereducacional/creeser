@@ -43,6 +43,13 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       let query = supabase.from('grades').select('*').order('nome', { ascending: true });
       query = applyInstituicaoFilter(query, instituicaoId);
+
+      // Filtro por curso específico (Integridade Acadêmica)
+      const rawCId = Number(req.query.curso_id || req.query.cursoId || req.query.cursoid);
+      if (!Number.isNaN(rawCId) && Number.isFinite(rawCId) && rawCId > 0) {
+        query = query.eq('cursoid', rawCId);
+      }
+
       const { data, error } = await query;
       if (error) return res.status(500).json({ error: error.message });
 

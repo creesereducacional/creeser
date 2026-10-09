@@ -115,7 +115,7 @@ export default async function handler(req, res) {
     // Validar se a grade existe
     const { data: gradeData, error: gradeError } = await supabase
       .from('grades')
-      .select('id, curso_id, cursoid')
+      .select('id, cursoid')
       .eq('id', body.grade)
       .maybeSingle();
 
@@ -136,18 +136,46 @@ export default async function handler(req, res) {
     }
 
     if (!numericCursoId) {
-      // Deduzir pelo curso da grade
-      const cId = gradeData.curso_id || gradeData.cursoid;
-      if (cId) numericCursoId = Number(cId);
+      return res.status(400).json({ error: 'O Curso da disciplina é obrigatório e deve ser selecionado.' });
     }
 
-    if (!numericCursoId) {
-      const { data: primeiro } = await supabase.from('cursos').select('id').limit(1).maybeSingle();
-      if (primeiro) numericCursoId = Number(primeiro.id);
+    // Verificar se o curso existe
+    const { data: cursoData, error: cursoError } = await supabase
+      .from('cursos')
+      .select('id, nome, situacao')
+      .eq('id', numericCursoId)
+      .maybeSingle();
+
+    if (cursoError || !cursoData) {
+      return res.status(400).json({ error: 'O Curso selecionado não existe ou é inválido.' });
     }
 
-    if (!numericCursoId) {
-      return res.status(400).json({ error: 'Não foi possível determinar o curso da disciplina' });
+    // Integridade Acadêmica: Validar que a Matriz Curricular (grade) pertence ao Curso informado
+    const gradeCursoId = gradeData.curso_id || gradeData.cursoid;
+    if (gradeCursoId && Number(gradeCursoId) !== Number(numericCursoId)) {
+      return res.status(400).json({
+        error: 'A Matriz Curricular selecionada não pertence ao curso informado.'
+      });
+    }
+
+    // Validar se o curso pertence à unidade selecionada (se unidadeId for enviada)
+    const rawUnidadeId = body.unidadeId || body.unidade_id || body.unidadeid;
+    if (rawUnidadeId) {
+      const numericUnidadeId = Number(rawUnidadeId);
+      if (!Number.isNaN(numericUnidadeId) && numericUnidadeId > 0) {
+        const { data: vinculo, error: vinculoErr } = await supabase
+          .from('curso_unidade')
+          .select('id')
+          .eq('cursoid', numericCursoId)
+          .eq('unidadeid', numericUnidadeId)
+          .maybeSingle();
+
+        if (vinculoErr || !vinculo) {
+          return res.status(400).json({
+            error: 'O curso selecionado não está vinculado à unidade informada.'
+          });
+        }
+      }
     }
 
     // Montar payload APENAS com colunas que existem na tabela

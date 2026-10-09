@@ -8,6 +8,7 @@ export default function NovaDisciplina() {
   const [formData, setFormData] = useState({
     codigo: '',
     nome: '',
+    unidadeId: '',
     curso: '',
     cursoId: null,
     periodo: '',
@@ -27,50 +28,315 @@ export default function NovaDisciplina() {
   });
 
   const [loading, setLoading] = useState(false);
-  const [cursos, setCursos] = useState([]);
-  const [grades, setGrades] = useState([]);
-  const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'success', redirectOnClose: null });
 
+  // Estados de dados, carregamento e erros para cascata Unidade -> Curso -> Matriz
+  const [unidades, setUnidades] = useState([]);
+  const [loadingUnidades, setLoadingUnidades] = useState(true);
+  const [erroUnidades, setErroUnidades] = useState(null);
+
+  const [cursos, setCursos] = useState([]);
+  const [loadingCursos, setLoadingCursos] = useState(false);
+  const [erroCursos, setErroCursos] = useState(null);
+
+  const [grades, setGrades] = useState([]);
+  const [loadingGrades, setLoadingGrades] = useState(false);
+  const [erroGrades, setErroGrades] = useState(null);
+
+  const [modal, setModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'success',
+    redirectOnClose: null,
+  });
+
+  // 1. Carregar lista de Unidades disponíveis ao montar o componente
   useEffect(() => {
-    Promise.all([
-      fetch('/api/cursos', { credentials: 'include' }).then(r => r.ok ? r.json() : []),
-      fetch('/api/grades', { credentials: 'include' }).then(r => r.ok ? r.json() : [])
-    ]).then(([dataCursos, dataGrades]) => {
-      setCursos(Array.isArray(dataCursos) ? dataCursos : []);
-      setGrades(Array.isArray(dataGrades) ? dataGrades : []);
-    }).catch(console.error);
+    let isMounted = true;
+    setLoadingUnidades(true);
+    setErroUnidades(null);
+
+    fetch('/api/unidades', { credentials: 'include' })
+      .then(async (r) => {
+        if (!r.ok) {
+          const errData = await r.json().catch(() => null);
+          throw new Error(errData?.error || `Erro ${r.status} ao carregar unidades.`);
+        }
+        return r.json();
+      })
+      .then((data) => {
+        if (!isMounted) return;
+        const lista = Array.isArray(data) ? data : [];
+        const ativas = lista.filter(u => String(u.situacao || 'ATIVO').toUpperCase() === 'ATIVO');
+        setUnidades(ativas);
+
+        // Se houver exatamente uma unidade, seleciona automaticamente por conveniência
+        if (ativas.length === 1) {
+          const uId = String(ativas[0].id);
+          setFormData((prev) => ({ ...prev, unidadeId: uId }));
+        }
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        console.error('Erro ao buscar unidades:', err);
+        setErroUnidades(err.message || 'Falha ao carregar unidades.');
+      })
+      .finally(() => {
+        if (isMounted) setLoadingUnidades(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  // 2. Quando a Unidade for alterada: carregar cursos vinculados à unidade selecionada
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!formData.unidadeId) {
+      setCursos([]);
+      setGrades([]);
+      setFormData((prev) => ({
+        ...prev,
+        curso: '',
+        cursoId: null,
+        grade: '',
+      }));
+      setLoadingCursos(false);
+      setErroCursos(null);
+      return;
+    }
+
+    setLoadingCursos(true);
+    setErroCursos(null);
+    setCursos([]);
+    setGrades([]);
+
+    fetch(`/api/cursos?unidade_id=${formData.unidadeId}&situacao=ATIVO`, { credentials: 'include' })
+      .then(async (r) => {
+        if (!r.ok) {
+          const errData = await r.json().catch(() => null);
+          throw new Error(errData?.error || `Erro ${r.status} ao carregar cursos.`);
+        }
+        return r.json();
+      })
+      .then((data) => {
+        if (!isMounted) return;
+        const lista = Array.isArray(data) ? data : [];
+        const cursosAtivos = lista.filter(c => String(c.situacao || 'ATIVO').toUpperCase() === 'ATIVO');
+        setCursos(cursosAtivos);
+
+        // Se houver apenas 1 curso na unidade, pode selecionar automaticamente
+        if (cursosAtivos.length === 1) {
+          const cUnico = cursosAtivos[0];
+          setFormData((prev) => ({
+            ...prev,
+            cursoId: Number(cUnico.id),
+            curso: cUnico.nome,
+            grade: '',
+          }));
+        }
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        console.error('Erro ao buscar cursos da unidade:', err);
+        setErroCursos(err.message || 'Falha ao carregar cursos da unidade.');
+      })
+      .finally(() => {
+        if (isMounted) setLoadingCursos(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [formData.unidadeId]);
+
+  // 3. Quando o Curso for alterado: carregar exclusivamente as matrizes pertencentes ao curso
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!formData.cursoId) {
+      setGrades([]);
+      setFormData((prev) => ({ ...prev, grade: '' }));
+      setLoadingGrades(false);
+      setErroGrades(null);
+      return;
+    }
+
+    setLoadingGrades(true);
+    setErroGrades(null);
+    setGrades([]);
+
+    fetch(`/api/grades?curso_id=${formData.cursoId}`, { credentials: 'include' })
+      .then(async (r) => {
+        if (!r.ok) {
+          const errData = await r.json().catch(() => null);
+          throw new Error(errData?.error || `Erro ${r.status} ao carregar matrizes.`);
+        }
+        return r.json();
+      })
+      .then((data) => {
+        if (!isMounted) return;
+        const lista = Array.isArray(data) ? data : [];
+        // Filtro estrito: garantir que curso_id/cursoid corresponda ao curso selecionado
+        const matrizesDoCurso = lista.filter((g) => {
+          const gCursoId = g.curso_id !== undefined && g.curso_id !== null ? Number(g.curso_id) : g.cursoid !== undefined && g.cursoid !== null ? Number(g.cursoid) : null;
+          return gCursoId === Number(formData.cursoId);
+        });
+
+        setGrades(matrizesDoCurso);
+
+        // Se houver apenas 1 matriz, seleciona automaticamente por conveniência
+        if (matrizesDoCurso.length === 1) {
+          setFormData((prev) => ({
+            ...prev,
+            grade: String(matrizesDoCurso[0].id),
+          }));
+        }
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        console.error('Erro ao buscar matrizes do curso:', err);
+        setErroGrades(err.message || 'Falha ao carregar matrizes curriculares.');
+      })
+      .finally(() => {
+        if (isMounted) setLoadingGrades(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [formData.cursoId]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    if (name === 'curso') {
-      // Quando seleciona um curso pelo nome, guarda também o ID
-      const cursoObj = cursos.find(c => c.nome === value);
-      setFormData(prev => ({
+
+    if (name === 'unidadeId') {
+      // Ao mudar de unidade: limpa curso e grade selecionados
+      setFormData((prev) => ({
         ...prev,
-        curso: value,
-        cursoId: cursoObj ? cursoObj.id : null,
+        unidadeId: value,
+        curso: '',
+        cursoId: null,
+        grade: '',
       }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: type === 'checkbox' ? checked : value
-      }));
+      return;
     }
+
+    if (name === 'cursoId') {
+      // Ao mudar de curso: seleciona o ID, nome e limpa a grade anteriormente selecionada
+      const numId = value ? Number(value) : null;
+      const cursoObj = cursos.find((c) => Number(c.id) === numId);
+      setFormData((prev) => ({
+        ...prev,
+        cursoId: numId,
+        curso: cursoObj ? cursoObj.nome : '',
+        grade: '',
+      }));
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value,
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!formData.unidadeId) {
+      setModal({
+        isOpen: true,
+        title: 'Atenção!',
+        message: 'Por favor, selecione a Unidade da disciplina.',
+        type: 'warning',
+      });
+      return;
+    }
+
+    if (!formData.cursoId) {
+      setModal({
+        isOpen: true,
+        title: 'Atenção!',
+        message: 'Por favor, selecione o Curso da disciplina.',
+        type: 'warning',
+      });
+      return;
+    }
+
+    if (!formData.periodo) {
+      setModal({
+        isOpen: true,
+        title: 'Atenção!',
+        message: 'Por favor, selecione o Período da disciplina.',
+        type: 'warning',
+      });
+      return;
+    }
+
+    if (!formData.nome.trim()) {
+      setModal({
+        isOpen: true,
+        title: 'Atenção!',
+        message: 'Por favor, informe o Nome da disciplina.',
+        type: 'warning',
+      });
+      return;
+    }
+
+    if (!formData.cargaHoraria.trim()) {
+      setModal({
+        isOpen: true,
+        title: 'Atenção!',
+        message: 'Por favor, informe a Carga Horária da disciplina.',
+        type: 'warning',
+      });
+      return;
+    }
+
+    if (formData.compoeMatriz && !formData.grade) {
+      setModal({
+        isOpen: true,
+        title: 'Atenção!',
+        message: 'Para disciplinas que compõem matriz, selecione uma Matriz Curricular (Grade).',
+        type: 'warning',
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
+      const payload = {
+        ...formData,
+        unidadeId: formData.unidadeId ? Number(formData.unidadeId) : null,
+        cursoId: formData.cursoId ? Number(formData.cursoId) : null,
+      };
+
       const res = await fetch('/api/disciplinas', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
+
+      const rawText = await res.text();
+      let data = null;
+      try {
+        data = rawText ? JSON.parse(rawText) : {};
+      } catch (parseErr) {
+        console.error('Resposta não-JSON da API de disciplinas:', res.status, rawText);
+        setModal({
+          isOpen: true,
+          title: 'Erro de Servidor',
+          message: `Falha no servidor (HTTP ${res.status}). A resposta retornada não pôde ser interpretada.`,
+          type: 'error',
+        });
+        return;
+      }
 
       if (res.ok) {
         setModal({
@@ -78,23 +344,24 @@ export default function NovaDisciplina() {
           title: 'Sucesso!',
           message: 'Disciplina cadastrada com sucesso!',
           type: 'success',
-          redirectOnClose: '/admin/disciplinas'
+          redirectOnClose: '/admin/disciplinas',
         });
       } else {
+        const mensagemErro = data?.error || data?.message || `Erro ${res.status} ao cadastrar disciplina.`;
         setModal({
           isOpen: true,
-          title: 'Erro!',
-          message: 'Erro ao cadastrar disciplina.',
-          type: 'error'
+          title: 'Erro no Cadastro',
+          message: mensagemErro,
+          type: 'error',
         });
       }
     } catch (error) {
-      console.error('Erro ao cadastrar disciplina:', error);
+      console.error('Erro de requisição ao cadastrar disciplina:', error);
       setModal({
         isOpen: true,
-        title: 'Erro!',
-        message: 'Erro ao cadastrar disciplina.',
-        type: 'error'
+        title: 'Erro de Conexão',
+        message: error?.message || 'Falha de comunicação com o servidor.',
+        type: 'error',
       });
     } finally {
       setLoading(false);
@@ -103,7 +370,7 @@ export default function NovaDisciplina() {
 
   return (
     <>
-      <div className="p-4 md:p-6 max-w-5xl mx-auto">
+      <div className="p-4 md:p-6 max-w-5xl mx-auto font-sans">
         {/* Cabeçalho */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div className="flex items-center gap-2">
@@ -126,35 +393,85 @@ export default function NovaDisciplina() {
 
         {/* Formulário */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Seção: Configuração Básica */}
-          <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
-            <h3 className="text-lg font-bold text-teal-600 mb-4">➕ Inserir Disciplina</h3>
-            
+          {/* Seção: Configuração Básica e Vínculos */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
+            <h3 className="text-lg font-bold text-teal-600 mb-4 flex items-center gap-2">
+              <span>➕</span> Inserir Disciplina
+            </h3>
+
+            {/* Linha 1: Unidade, Curso e Período */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div>
-                <label className="text-xs font-medium text-teal-600 mb-1 block">CURSO *</label>
+                <label className="text-xs font-semibold text-teal-700 mb-1 block uppercase tracking-wide">
+                  UNIDADE *
+                </label>
                 <select
-                  name="curso"
-                  value={formData.curso}
+                  name="unidadeId"
+                  value={formData.unidadeId}
                   onChange={handleChange}
                   required
-                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                  disabled={loadingUnidades}
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-teal-50/50 disabled:bg-gray-100 disabled:text-gray-400 transition"
                 >
-                  <option value="">- ESCOLHA UM CURSO -</option>
-                  {cursos.map(c => (
-                    <option key={c.id} value={c.nome}>{c.nome}</option>
+                  <option value="">{loadingUnidades ? 'Carregando unidades...' : '- ESCOLHA UMA UNIDADE -'}</option>
+                  {unidades.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.nome}
+                    </option>
                   ))}
                 </select>
+                {erroUnidades && (
+                  <p className="text-xs text-rose-600 mt-1 font-medium">{erroUnidades}</p>
+                )}
               </div>
 
               <div>
-                <label className="text-xs font-medium text-teal-600 mb-1 block">PERÍODO *</label>
+                <label className="text-xs font-semibold text-teal-700 mb-1 block uppercase tracking-wide">
+                  CURSO *
+                </label>
+                <select
+                  name="cursoId"
+                  value={formData.cursoId || ''}
+                  onChange={handleChange}
+                  required
+                  disabled={!formData.unidadeId || loadingCursos || cursos.length === 0}
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-teal-50/50 disabled:bg-gray-100 disabled:text-gray-400 transition"
+                >
+                  {!formData.unidadeId ? (
+                    <option value="">- PRIMEIRO SELECIONE UMA UNIDADE -</option>
+                  ) : loadingCursos ? (
+                    <option value="">Carregando cursos da unidade...</option>
+                  ) : cursos.length === 0 ? (
+                    <option value="">- NENHUM CURSO VINCULADO A ESTA UNIDADE -</option>
+                  ) : (
+                    <>
+                      <option value="">- ESCOLHA UM CURSO -</option>
+                      {cursos.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nome}
+                        </option>
+                      ))}
+                    </>
+                  )}
+                </select>
+                {erroCursos && (
+                  <p className="text-xs text-rose-600 mt-1 font-medium">{erroCursos}</p>
+                )}
+                {formData.unidadeId && !loadingCursos && cursos.length === 0 && !erroCursos && (
+                  <p className="text-xs text-amber-700 mt-1">Nenhum curso ativo vinculado a esta unidade.</p>
+                )}
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-teal-700 mb-1 block uppercase tracking-wide">
+                  PERÍODO *
+                </label>
                 <select
                   name="periodo"
                   value={formData.periodo}
                   onChange={handleChange}
                   required
-                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-teal-50/50 transition"
                 >
                   <option value="">- ESCOLHA UM PERÍODO -</option>
                   <option value="1">01º Período</option>
@@ -169,9 +486,14 @@ export default function NovaDisciplina() {
                   <option value="10">10º Período</option>
                 </select>
               </div>
+            </div>
 
-              <div>
-                <label className="text-xs font-medium text-teal-600 mb-1 block">NOME *</label>
+            {/* Linha 2: Nome, Carga Horária, Crédito e Qtd Aulas */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="md:col-span-1">
+                <label className="text-xs font-semibold text-teal-700 mb-1 block uppercase tracking-wide">
+                  NOME *
+                </label>
                 <input
                   type="text"
                   name="nome"
@@ -179,14 +501,14 @@ export default function NovaDisciplina() {
                   onChange={handleChange}
                   required
                   placeholder="Nome da Disciplina"
-                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-teal-50/50 transition"
                 />
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="text-xs font-medium text-teal-600 mb-1 block">CARGA HORÁRIA *</label>
+                <label className="text-xs font-semibold text-teal-700 mb-1 block uppercase tracking-wide">
+                  CARGA HORÁRIA *
+                </label>
                 <input
                   type="text"
                   name="cargaHoraria"
@@ -194,86 +516,118 @@ export default function NovaDisciplina() {
                   onChange={handleChange}
                   required
                   placeholder="Somente Números"
-                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-teal-50/50 transition"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-medium text-teal-600 mb-1 block">CRÉDITO</label>
+                <label className="text-xs font-semibold text-teal-700 mb-1 block uppercase tracking-wide">
+                  CRÉDITO
+                </label>
                 <input
                   type="text"
                   name="credito"
                   value={formData.credito || ''}
                   onChange={handleChange}
                   placeholder="Crédito"
-                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-teal-50/50 transition"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-medium text-teal-600 mb-1 block">QTD. AULAS</label>
+                <label className="text-xs font-semibold text-teal-700 mb-1 block uppercase tracking-wide">
+                  QTD. AULAS
+                </label>
                 <input
                   type="text"
                   name="qtdAulas"
                   value={formData.qtdAulas || ''}
                   onChange={handleChange}
                   placeholder="Qtd. Aulas"
-                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-teal-50/50 transition"
                 />
               </div>
             </div>
           </div>
 
           {/* Seção: Grade Pertencente */}
-          <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
             <h3 className="text-lg font-bold text-teal-600 mb-4">Grade Pertencente</h3>
-            
-            <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-4">
-              <h4 className="font-semibold text-yellow-800 mb-2 flex items-center gap-2">
+
+            <div className="bg-amber-50/80 border-l-4 border-amber-500 p-4 mb-4 rounded-r-lg">
+              <h4 className="font-semibold text-amber-800 mb-2 flex items-center gap-2">
                 ⚠️ DICAS IMPORTANTES!
               </h4>
-              <ul className="text-sm text-yellow-900 space-y-1">
-                <li>Caso <strong>NÃO SELECIONE UMA GRADE</strong>, a disciplina será relacionada diretamente ao curso.</li>
-                <li>Caso exista uma ou mais grades relacionadas ao curso, as mesmas serão priorizadas nos cadastros de novas turmas.</li>
-                <li>Clique em <strong>Gerenciar Grades</strong> para CADASTRAR UMA NOVA GRADE ou ALTERAR UMA JÁ EXISTENTE.</li>
+              <ul className="text-sm text-amber-900 space-y-1">
+                <li>
+                  Caso <strong>NÃO SELECIONE UMA GRADE</strong>, a disciplina será relacionada diretamente ao curso.
+                </li>
+                <li>
+                  Caso exista uma ou mais grades relacionadas ao curso, as mesmas serão priorizadas nos cadastros de novas turmas.
+                </li>
+                <li>
+                  Clique em <strong>Gerenciar Grade</strong> para CADASTRAR UMA NOVA GRADE ou ALTERAR UMA JÁ EXISTENTE.
+                </li>
               </ul>
             </div>
 
             <div>
-              <label className="text-xs font-medium text-teal-600 mb-1 block">GRADE DA DISCIPLINA</label>
+              <label className="text-xs font-semibold text-teal-700 mb-1 block uppercase tracking-wide">
+                GRADE DA DISCIPLINA / MATRIZ CURRICULAR *
+              </label>
               <div className="flex flex-col gap-3">
                 <select
                   name="grade"
                   value={formData.grade}
                   onChange={handleChange}
                   required
-                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                  disabled={!formData.cursoId || loadingGrades || grades.length === 0}
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-teal-50/50 disabled:bg-gray-100 disabled:text-gray-400 transition"
                 >
-                  <option value="">Escolha uma Grade *</option>
-                  {grades
-                    .filter(g => {
-                      if (!formData.curso) return true;
-                      const cursoObj = cursos.find(c => c.nome === formData.curso || String(c.id) === String(formData.curso));
-                      const cursoId = cursoObj ? Number(cursoObj.id) : null;
-                      const gCursoId = g.curso_id || g.cursoId || g.cursoid;
-                      const gCursoNome = g.curso_nome || g.cursoNome || g.cursonome;
-
-                      return (
-                        (gCursoNome && gCursoNome === formData.curso) ||
-                        (cursoId && gCursoId && Number(gCursoId) === cursoId) ||
-                        (!gCursoNome && !gCursoId)
-                      );
-                    })
-                    .map(g => (
-                      <option key={g.id} value={g.id}>{g.nome} ({g.ano})</option>
-                    ))}
+                  {!formData.cursoId ? (
+                    <option value="">- PRIMEIRO ESCOLHA UM CURSO -</option>
+                  ) : loadingGrades ? (
+                    <option value="">Carregando matrizes do curso...</option>
+                  ) : grades.length === 0 ? (
+                    <option value="">- NENHUMA MATRIZ CADASTRADA PARA ESTE CURSO -</option>
+                  ) : (
+                    <>
+                      <option value="">Escolha uma Grade *</option>
+                      {grades.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.nome} ({g.ano})
+                        </option>
+                      ))}
+                    </>
+                  )}
                 </select>
-                <Link href="/admin/disciplinas/grades">
+
+                {erroGrades && (
+                  <p className="text-xs text-rose-600 font-medium">{erroGrades}</p>
+                )}
+
+                {/* Orientação quando o curso selecionado não possui matrizes */}
+                {formData.cursoId && !loadingGrades && grades.length === 0 && !erroGrades && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3.5 text-xs text-amber-800 flex items-start gap-2.5">
+                    <span className="text-base leading-none">ℹ️</span>
+                    <div>
+                      <p className="font-semibold text-amber-900 mb-0.5">
+                        Curso sem Matriz Curricular Cadastrada
+                      </p>
+                      <p>
+                        O curso <strong>{formData.curso}</strong> ainda não possui grades cadastradas no sistema.
+                        Para vincular disciplinas a este curso, clique no botão <strong>Gerenciar Grade</strong> abaixo e cadastre a primeira matriz curricular.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <Link href={`/admin/disciplinas/grades${formData.cursoId ? `?curso_id=${formData.cursoId}` : ''}`}>
                   <button
                     type="button"
-                    className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition text-sm flex items-center justify-center gap-2"
+                    className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition text-sm flex items-center justify-center gap-2 shadow-xs"
                   >
-                    ⚙️ Gerenciar Grade
+                    ⚙️ Gerenciar Grade {formData.curso ? `de ${formData.curso}` : ''}
                   </button>
                 </Link>
               </div>
@@ -281,78 +635,80 @@ export default function NovaDisciplina() {
           </div>
 
           {/* Seção: Ementa */}
-          <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
             <h3 className="text-lg font-bold text-teal-600 mb-4">Ementa</h3>
-            
+
             <textarea
               name="ementa"
               value={formData.ementa}
               onChange={handleChange}
-              placeholder="Descrição da ementa"
+              placeholder="Descrição da ementa da disciplina"
               rows="4"
-              className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+              className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-teal-50/50 transition"
             ></textarea>
           </div>
 
           {/* Seção: Configurações */}
-          <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
             <h3 className="text-lg font-bold text-teal-600 mb-4">Configurações</h3>
-            
+
             <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-6">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     name="complementar"
                     checked={formData.complementar}
                     onChange={handleChange}
-                    className="w-5 h-5"
+                    className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500"
                   />
-                  <span className="text-sm">Complementar?</span>
+                  <span className="text-sm text-gray-700 font-medium">Complementar?</span>
                 </label>
 
-                <label className="flex items-center gap-2">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     name="optativa"
                     checked={formData.optativa}
                     onChange={handleChange}
-                    className="w-5 h-5"
+                    className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500"
                   />
-                  <span className="text-sm">Optativa?</span>
+                  <span className="text-sm text-gray-700 font-medium">Optativa?</span>
                 </label>
 
-                <label className="flex items-center gap-2">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     name="compoeMatriz"
                     checked={formData.compoeMatriz}
                     onChange={handleChange}
-                    className="w-5 h-5"
+                    className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500"
                   />
-                  <span className="text-sm">Compõe a matriz?</span>
+                  <span className="text-sm text-gray-700 font-medium">Compõe a matriz?</span>
                 </label>
 
-                <label className="flex items-center gap-2">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     name="requerDeferimento"
                     checked={formData.requerDeferimento}
                     onChange={handleChange}
-                    className="w-5 h-5"
+                    className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500"
                   />
-                  <span className="text-sm">Requer Deferimento?</span>
+                  <span className="text-sm text-gray-700 font-medium">Requer Deferimento?</span>
                 </label>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                 <div>
-                  <label className="text-xs font-medium text-teal-600 mb-1 block">Nº AVALIAÇÕES</label>
+                  <label className="text-xs font-semibold text-teal-700 mb-1 block uppercase tracking-wide">
+                    Nº AVALIAÇÕES
+                  </label>
                   <select
                     name="avaliacoes"
                     value={formData.avaliacoes}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                    className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-teal-50/50 transition"
                   >
                     <option value="">- Qtd. de Avaliações -</option>
                     <option value="1">1</option>
@@ -361,16 +717,16 @@ export default function NovaDisciplina() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="flex items-center gap-2">
+                <div className="flex items-center pt-5">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
                     <input
                       type="checkbox"
                       name="estagio"
                       checked={formData.estagio}
                       onChange={handleChange}
-                      className="w-5 h-5"
+                      className="w-4 h-4 text-teal-600 rounded focus:ring-teal-500"
                     />
-                    <span className="text-sm">Estágio</span>
+                    <span className="text-sm text-gray-700 font-medium">Estágio</span>
                   </label>
                 </div>
               </div>
@@ -378,14 +734,14 @@ export default function NovaDisciplina() {
           </div>
 
           {/* Seção: Status */}
-          <div className="bg-white rounded-lg shadow-md p-4 md:p-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
             <h3 className="text-lg font-bold text-teal-600 mb-4">Status</h3>
-            
+
             <select
               name="situacao"
               value={formData.situacao}
               onChange={handleChange}
-              className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+              className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-teal-50/50 transition"
             >
               <option value="ATIVO">ATIVO</option>
               <option value="INATIVO">INATIVO</option>
@@ -397,14 +753,14 @@ export default function NovaDisciplina() {
             <button
               type="submit"
               disabled={loading}
-              className="px-8 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold transition text-sm disabled:opacity-50"
+              className="px-8 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold transition text-sm disabled:opacity-50 shadow-xs cursor-pointer"
             >
               {loading ? 'CADASTRANDO...' : 'CADASTRAR'}
             </button>
             <Link href="/admin/disciplinas">
               <button
                 type="button"
-                className="px-8 py-2 bg-gray-400 hover:bg-gray-500 text-white rounded-lg font-semibold transition text-sm"
+                className="px-8 py-2.5 bg-gray-400 hover:bg-gray-500 text-white rounded-lg font-semibold transition text-sm cursor-pointer"
               >
                 CANCELAR
               </button>
@@ -420,7 +776,7 @@ export default function NovaDisciplina() {
         type={modal.type}
         onClose={() => {
           const redirect = modal.redirectOnClose;
-          setModal(prev => ({ ...prev, isOpen: false }));
+          setModal((prev) => ({ ...prev, isOpen: false }));
           if (redirect) router.push(redirect);
         }}
       />

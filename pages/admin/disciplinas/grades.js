@@ -1,13 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/router';
 import Link from 'next/link';
 import CustomModal from '../../../components/CustomModal';
 import ConfirmModal from '../../../components/ConfirmModal';
 
 export default function GerenciarGrades() {
+  const router = useRouter();
   const [grades, setGrades] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [searchNome, setSearchNome] = useState('');
+  const [searchCurso, setSearchCurso] = useState('');
   const [searchSituacao, setSearchSituacao] = useState('ATIVO');
   const [currentPage, setCurrentPage] = useState(1);
   const [recordsPerPage, setRecordsPerPage] = useState(10);
@@ -124,10 +127,12 @@ export default function GerenciarGrades() {
   };
 
   const filtrarGrades = () => {
-    return grades.filter(grade => {
+    return grades.filter((grade) => {
       const nomeMatch = (grade.nome || '').toLowerCase().includes(searchNome.toLowerCase());
       const situacaoMatch = searchSituacao === '' || grade.situacao === searchSituacao;
-      return nomeMatch && situacaoMatch;
+      const gCursoId = String(grade.cursoId || grade.cursoid || grade.curso_id || '');
+      const cursoMatch = !searchCurso || gCursoId === String(searchCurso);
+      return nomeMatch && situacaoMatch && cursoMatch;
     });
   };
 
@@ -552,7 +557,7 @@ export default function GerenciarGrades() {
             <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3.5">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {/* 1. Nome da Grade */}
-                <div className="sm:col-span-2">
+                <div>
                   <label className="text-xs font-semibold text-slate-600 mb-1 block">Buscar por Nome</label>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-sm">
@@ -571,7 +576,27 @@ export default function GerenciarGrades() {
                   </div>
                 </div>
 
-                {/* 2. Situação */}
+                {/* 2. Curso */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 mb-1 block">Curso</label>
+                  <select
+                    value={searchCurso}
+                    onChange={(e) => {
+                      setSearchCurso(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="w-full h-10 px-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer"
+                  >
+                    <option value="">Todos os Cursos</option>
+                    {cursos.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 3. Situação */}
                 <div>
                   <label className="text-xs font-semibold text-slate-600 mb-1 block">Situação</label>
                   <select
@@ -593,6 +618,7 @@ export default function GerenciarGrades() {
                 <button
                   onClick={() => {
                     setSearchNome('');
+                    setSearchCurso('');
                     setSearchSituacao('ATIVO');
                     setCurrentPage(1);
                   }}
