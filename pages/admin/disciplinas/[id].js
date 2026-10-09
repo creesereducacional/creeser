@@ -9,6 +9,7 @@ export default function EditarDisciplina() {
   const [formData, setFormData] = useState({
     codigo: '',
     nome: '',
+    instituicaoId: '',
     unidadeId: '',
     curso: '',
     cursoId: null,
@@ -30,8 +31,11 @@ export default function EditarDisciplina() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const [instituicoes, setInstituicoes] = useState([]);
+  const [loadingInstituicoes, setLoadingInstituicoes] = useState(true);
+
   const [unidades, setUnidades] = useState([]);
-  const [loadingUnidades, setLoadingUnidades] = useState(true);
+  const [loadingUnidades, setLoadingUnidades] = useState(false);
 
   const [cursos, setCursos] = useState([]);
   const [loadingCursos, setLoadingCursos] = useState(false);
@@ -47,10 +51,38 @@ export default function EditarDisciplina() {
     redirectOnClose: null,
   });
 
-  // 1. Carregar Unidades ao montar
+  // 1. Carregar Instituições ao montar
   useEffect(() => {
+    setLoadingInstituicoes(true);
+    fetch('/api/instituicoes', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        const ativas = (Array.isArray(data) ? data : []).filter((i) => i.ativa !== false);
+        setInstituicoes(ativas);
+      })
+      .catch((err) => console.error('Erro ao buscar instituições:', err))
+      .finally(() => setLoadingInstituicoes(false));
+  }, []);
+
+  // 1.1. Carregar Unidades filtradas por Instituição
+  useEffect(() => {
+    if (!formData.instituicaoId) {
+      setLoadingUnidades(true);
+      fetch('/api/unidades', { credentials: 'include' })
+        .then((r) => (r.ok ? r.json() : []))
+        .then((data) => {
+          const ativas = (Array.isArray(data) ? data : []).filter(
+            (u) => String(u.situacao || 'ATIVO').toUpperCase() === 'ATIVO'
+          );
+          setUnidades(ativas);
+        })
+        .catch((err) => console.error('Erro ao buscar unidades:', err))
+        .finally(() => setLoadingUnidades(false));
+      return;
+    }
+
     setLoadingUnidades(true);
-    fetch('/api/unidades', { credentials: 'include' })
+    fetch(`/api/unidades?instituicao_id=${formData.instituicaoId}`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
         const ativas = (Array.isArray(data) ? data : []).filter(
@@ -58,9 +90,9 @@ export default function EditarDisciplina() {
         );
         setUnidades(ativas);
       })
-      .catch((err) => console.error('Erro ao buscar unidades:', err))
+      .catch((err) => console.error('Erro ao buscar unidades da instituição:', err))
       .finally(() => setLoadingUnidades(false));
-  }, []);
+  }, [formData.instituicaoId]);
 
   // 2. Carregar Disciplina para edição
   useEffect(() => {
@@ -177,6 +209,18 @@ export default function EditarDisciplina() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+
+    if (name === 'instituicaoId') {
+      setFormData((prev) => ({
+        ...prev,
+        instituicaoId: value,
+        unidadeId: '',
+        curso: '',
+        cursoId: null,
+        grade: '',
+      }));
+      return;
+    }
 
     if (name === 'unidadeId') {
       setFormData((prev) => ({
@@ -314,8 +358,28 @@ export default function EditarDisciplina() {
               <span>✏️</span> Dados da Disciplina
             </h3>
 
-            {/* Linha 1: Unidade, Curso e Período */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            {/* Linha 1: Instituição, Unidade, Curso e Período */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+              <div>
+                <label className="text-xs font-semibold text-teal-700 mb-1 block uppercase tracking-wide">
+                  INSTITUIÇÃO
+                </label>
+                <select
+                  name="instituicaoId"
+                  value={formData.instituicaoId}
+                  onChange={handleChange}
+                  disabled={loadingInstituicoes}
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-teal-50/50 transition"
+                >
+                  <option value="">- TODAS AS INSTITUIÇÕES -</option>
+                  {instituicoes.map((inst) => (
+                    <option key={inst.id} value={inst.id}>
+                      {inst.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="text-xs font-semibold text-teal-700 mb-1 block uppercase tracking-wide">
                   UNIDADE

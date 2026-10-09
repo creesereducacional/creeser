@@ -248,10 +248,17 @@ export default async function handler(req, res) {
   if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria', 'admin'])) return;
   try {
     if (req.method === 'GET') {
-      const { data, error } = await supabase
+      let query = supabase
         .from('unidades')
         .select('*')
         .order('id', { ascending: false });
+
+      const instId = req.query.instituicao_id || req.query.instituicaoId;
+      if (instId) {
+        query = query.eq('instituicao_id', instId);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Supabase GET error:', error);

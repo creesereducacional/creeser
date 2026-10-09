@@ -8,6 +8,7 @@ export default function NovaDisciplina() {
   const [formData, setFormData] = useState({
     codigo: '',
     nome: '',
+    instituicaoId: '',
     unidadeId: '',
     curso: '',
     cursoId: null,
@@ -29,9 +30,13 @@ export default function NovaDisciplina() {
 
   const [loading, setLoading] = useState(false);
 
-  // Estados de dados, carregamento e erros para cascata Unidade -> Curso -> Matriz
+  // Estados de dados, carregamento e erros para cascata Instituição -> Unidade -> Curso -> Matriz
+  const [instituicoes, setInstituicoes] = useState([]);
+  const [loadingInstituicoes, setLoadingInstituicoes] = useState(true);
+  const [erroInstituicoes, setErroInstituicoes] = useState(null);
+
   const [unidades, setUnidades] = useState([]);
-  const [loadingUnidades, setLoadingUnidades] = useState(true);
+  const [loadingUnidades, setLoadingUnidades] = useState(false);
   const [erroUnidades, setErroUnidades] = useState(null);
 
   const [cursos, setCursos] = useState([]);
@@ -50,13 +55,73 @@ export default function NovaDisciplina() {
     redirectOnClose: null,
   });
 
-  // 1. Carregar lista de Unidades disponíveis ao montar o componente
+  // 1. Carregar lista de Instituições disponíveis ao montar o componente
   useEffect(() => {
     let isMounted = true;
+    setLoadingInstituicoes(true);
+    setErroInstituicoes(null);
+
+    fetch('/api/instituicoes', { credentials: 'include' })
+      .then(async (r) => {
+        if (!r.ok) {
+          const errData = await r.json().catch(() => null);
+          throw new Error(errData?.error || `Erro ${r.status} ao carregar instituições.`);
+        }
+        return r.json();
+      })
+      .then((data) => {
+        if (!isMounted) return;
+        const lista = Array.isArray(data) ? data : [];
+        const ativas = lista.filter((i) => i.ativa !== false);
+        setInstituicoes(ativas);
+
+        // Se houver apenas 1 instituição, seleciona automaticamente
+        if (ativas.length === 1) {
+          const instId = String(ativas[0].id);
+          setFormData((prev) => ({ ...prev, instituicaoId: instId }));
+        }
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        console.error('Erro ao buscar instituições:', err);
+        setErroInstituicoes(err.message || 'Falha ao carregar instituições.');
+      })
+      .finally(() => {
+        if (isMounted) setLoadingInstituicoes(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // 2. Quando a Instituição for alterada: carregar Unidades vinculadas àquela Instituição
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!formData.instituicaoId) {
+      setUnidades([]);
+      setCursos([]);
+      setGrades([]);
+      setFormData((prev) => ({
+        ...prev,
+        unidadeId: '',
+        curso: '',
+        cursoId: null,
+        grade: '',
+      }));
+      setLoadingUnidades(false);
+      setErroUnidades(null);
+      return;
+    }
+
     setLoadingUnidades(true);
     setErroUnidades(null);
+    setUnidades([]);
+    setCursos([]);
+    setGrades([]);
 
-    fetch('/api/unidades', { credentials: 'include' })
+    fetch(`/api/unidades?instituicao_id=${formData.instituicaoId}`, { credentials: 'include' })
       .then(async (r) => {
         if (!r.ok) {
           const errData = await r.json().catch(() => null);
@@ -67,10 +132,12 @@ export default function NovaDisciplina() {
       .then((data) => {
         if (!isMounted) return;
         const lista = Array.isArray(data) ? data : [];
-        const ativas = lista.filter(u => String(u.situacao || 'ATIVO').toUpperCase() === 'ATIVO');
+        const ativas = lista.filter(
+          (u) => String(u.situacao || 'ATIVO').toUpperCase() === 'ATIVO'
+        );
         setUnidades(ativas);
 
-        // Se houver exatamente uma unidade, seleciona automaticamente por conveniência
+        // Se houver exatamente uma unidade para a instituição selecionada, seleciona automaticamente
         if (ativas.length === 1) {
           const uId = String(ativas[0].id);
           setFormData((prev) => ({ ...prev, unidadeId: uId }));
@@ -88,9 +155,9 @@ export default function NovaDisciplina() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [formData.instituicaoId]);
 
-  // 2. Quando a Unidade for alterada: carregar cursos vinculados à unidade selecionada
+  // 3. Quando a Unidade for alterada: carregar cursos vinculados à unidade selecionada
   useEffect(() => {
     let isMounted = true;
 
@@ -152,7 +219,7 @@ export default function NovaDisciplina() {
     };
   }, [formData.unidadeId]);
 
-  // 3. Quando o Curso for alterado: carregar exclusivamente as matrizes pertencentes ao curso
+  // 4. Quando o Curso for alterado: carregar exclusivamente as matrizes pertencentes ao curso
   useEffect(() => {
     let isMounted = true;
 
@@ -212,6 +279,19 @@ export default function NovaDisciplina() {
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
 
+    if (name === 'instituicaoId') {
+      // Ao mudar de instituição: limpa unidade, curso e grade selecionados
+      setFormData((prev) => ({
+        ...prev,
+        instituicaoId: value,
+        unidadeId: '',
+        curso: '',
+        cursoId: null,
+        grade: '',
+      }));
+      return;
+    }
+
     if (name === 'unidadeId') {
       // Ao mudar de unidade: limpa curso e grade selecionados
       setFormData((prev) => ({
@@ -245,6 +325,16 @@ export default function NovaDisciplina() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (instituicoes.length > 0 && !formData.instituicaoId) {
+      setModal({
+        isOpen: true,
+        title: 'Atenção!',
+        message: 'Por favor, selecione a Instituição da disciplina.',
+        type: 'warning',
+      });
+      return;
+    }
 
     if (!formData.unidadeId) {
       setModal({
@@ -399,8 +489,32 @@ export default function NovaDisciplina() {
               <span>➕</span> Inserir Disciplina
             </h3>
 
-            {/* Linha 1: Unidade, Curso e Período */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            {/* Linha 1: Instituição, Unidade, Curso e Período */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+              <div>
+                <label className="text-xs font-semibold text-teal-700 mb-1 block uppercase tracking-wide">
+                  INSTITUIÇÃO *
+                </label>
+                <select
+                  name="instituicaoId"
+                  value={formData.instituicaoId}
+                  onChange={handleChange}
+                  required
+                  disabled={loadingInstituicoes}
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-teal-50/50 disabled:bg-gray-100 disabled:text-gray-400 transition"
+                >
+                  <option value="">{loadingInstituicoes ? 'Carregando instituições...' : '- ESCOLHA UMA INSTITUIÇÃO -'}</option>
+                  {instituicoes.map((inst) => (
+                    <option key={inst.id} value={inst.id}>
+                      {inst.nome}
+                    </option>
+                  ))}
+                </select>
+                {erroInstituicoes && (
+                  <p className="text-xs text-rose-600 mt-1 font-medium">{erroInstituicoes}</p>
+                )}
+              </div>
+
               <div>
                 <label className="text-xs font-semibold text-teal-700 mb-1 block uppercase tracking-wide">
                   UNIDADE *
@@ -410,18 +524,31 @@ export default function NovaDisciplina() {
                   value={formData.unidadeId}
                   onChange={handleChange}
                   required
-                  disabled={loadingUnidades}
+                  disabled={!formData.instituicaoId || loadingUnidades || unidades.length === 0}
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-teal-50/50 disabled:bg-gray-100 disabled:text-gray-400 transition"
                 >
-                  <option value="">{loadingUnidades ? 'Carregando unidades...' : '- ESCOLHA UMA UNIDADE -'}</option>
-                  {unidades.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.nome}
-                    </option>
-                  ))}
+                  {!formData.instituicaoId ? (
+                    <option value="">- PRIMEIRO SELECIONE UMA INSTITUIÇÃO -</option>
+                  ) : loadingUnidades ? (
+                    <option value="">Carregando unidades da instituição...</option>
+                  ) : unidades.length === 0 ? (
+                    <option value="">- NENHUMA UNIDADE VINCULADA -</option>
+                  ) : (
+                    <>
+                      <option value="">- ESCOLHA UMA UNIDADE -</option>
+                      {unidades.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.nome}
+                        </option>
+                      ))}
+                    </>
+                  )}
                 </select>
                 {erroUnidades && (
                   <p className="text-xs text-rose-600 mt-1 font-medium">{erroUnidades}</p>
+                )}
+                {formData.instituicaoId && !loadingUnidades && unidades.length === 0 && !erroUnidades && (
+                  <p className="text-xs text-amber-700 mt-1">Nenhuma unidade ativa vinculada a esta instituição.</p>
                 )}
               </div>
 
