@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import AdminFinanceiroLayout from '@/components/AdminFinanceiro/Layout';
 import BarraFiltros from '@/components/AdminFinanceiro/BarraFiltros';
 import ModalContratoAluno from '@/components/ModalContratoAluno';
+import ModalBaixaManual from '@/components/AdminFinanceiro/ModalBaixaManual';
 import { FinanceEngine } from '../../lib/financeiro/FinanceEngine';
 
 const PLANOS_FINANCEIROS = [
@@ -1315,6 +1316,8 @@ export default function AlunosFinanceiroPage() {
   const [gerandoBoletoAluno, setGerandoBoletoAluno] = useState(null);
   const [modalConfirmarAluno, setModalConfirmarAluno] = useState(null);
   const [modalCancelarParcelaAluno, setModalCancelarParcelaAluno] = useState(null);
+  const [modalBaixaManual, setModalBaixaManual] = useState(null); // { parcela, carne, aluno }
+  const [baixandoParcela, setBaixandoParcela] = useState(false);
   const [modalWhatsapp, setModalWhatsapp] = useState(null);
 
   const fetchOrdensAluno = async (alunoId, force = false) => {
@@ -1493,6 +1496,34 @@ export default function AlunosFinanceiroPage() {
       console.error(e);
     } finally {
       setCancelandoParcelaAluno(false);
+    }
+  };
+
+  const handleBaixarManualAluno = async (formData) => {
+    if (!modalBaixaManual) return;
+    const { parcela, aluno } = modalBaixaManual;
+    const alunoId = aluno?.id;
+    setBaixandoParcela(true);
+    try {
+      const res = await fetch(`/api/admin-financeiro/parcelas/${parcela.id}/pagar`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Erro ao registrar baixa');
+      setModalBaixaManual(null);
+      if (data.aviso) alert('⚠️ ' + data.aviso);
+      if (alunoId) {
+        setCarnesCache(prev => { const n = { ...prev }; delete n[alunoId]; return n; });
+        setOrdensCache(prev => { const n = { ...prev }; delete n[alunoId]; return n; });
+        await fetchOrdensAluno(alunoId, true);
+      }
+      await carregarDados();
+    } catch (err) {
+      alert('Erro: ' + err.message);
+    } finally {
+      setBaixandoParcela(false);
     }
   };
 
@@ -2014,11 +2045,19 @@ export default function AlunosFinanceiroPage() {
                                                                   </a>
                                                                 )}
                                                                 {cancelavel && (
-                                                                  <button onClick={() => handleCancelarParcelaAluno(carne, parcela, aluno.id)} disabled={cancelandoParcelaAluno}
-                                                                    title="Cancelar Parcela"
-                                                                    className="w-9 h-9 flex items-center justify-center rounded-full bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 hover:scale-105 hover:shadow-sm transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
-                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                                                  </button>
+                                                                  <>
+                                                                    <button
+                                                                      onClick={() => setModalBaixaManual({ parcela, carne, aluno })}
+                                                                      title="Registrar Baixa"
+                                                                      className="w-9 h-9 flex items-center justify-center rounded-full bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 hover:scale-105 hover:shadow-sm transition-all duration-200 cursor-pointer">
+                                                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                                    </button>
+                                                                    <button onClick={() => handleCancelarParcelaAluno(carne, parcela, aluno.id)} disabled={cancelandoParcelaAluno}
+                                                                      title="Cancelar Parcela"
+                                                                      className="w-9 h-9 flex items-center justify-center rounded-full bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 hover:scale-105 hover:shadow-sm transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+                                                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                                    </button>
+                                                                  </>
                                                                 )}
                                                               </div>
                                                             </td>
@@ -2288,6 +2327,16 @@ export default function AlunosFinanceiroPage() {
             setModalWhatsapp(null);
           }}
           onClose={() => setModalWhatsapp(null)}
+        />
+      )}
+      {modalBaixaManual && (
+        <ModalBaixaManual
+          parcela={modalBaixaManual.parcela}
+          numeroParcela={modalBaixaManual.parcela?.numero_parcela}
+          alunoNome={modalBaixaManual.aluno?.nome || modalBaixaManual.carne?.aluno_nome}
+          onConfirm={handleBaixarManualAluno}
+          onClose={() => setModalBaixaManual(null)}
+          loading={baixandoParcela}
         />
       )}
     </AdminFinanceiroLayout>
