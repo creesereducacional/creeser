@@ -4,7 +4,13 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { requireAuth, requirePerfil, hasPerfil } from '../../lib/auth-server';
+import {
+  requireAuth,
+  requirePerfil,
+  hasPerfil,
+  resolveContextoUsuario,
+  getUserVinculos,
+} from '../../lib/auth-server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -20,7 +26,7 @@ export default async function handler(req, res) {
 
     // GET - Listar instituições autorizadas para o usuário logado
     if (method === 'GET') {
-      const isGrupoAdmin = hasPerfil(authUser, ['grupo_admin']);
+      const isGrupoAdmin = hasPerfil(authUser, ['grupo_admin']) || authUser.is_superadmin;
 
       if (isGrupoAdmin) {
         const { data, error } = await supabase
@@ -33,19 +39,34 @@ export default async function handler(req, res) {
         return res.status(200).json(data || []);
       }
 
-      // Usuário comum: retorna apenas sua própria instituição
-      if (!authUser.instituicao_id) {
+      // Usuário comum: consultar vínculos para retornar todas as instituições às quais tem acesso
+      let instIds = [];
+      try {
+        const vinculos = await getUserVinculos(authUser.id);
+        instIds = [...new Set((vinculos || []).map(v => v.instituicao_id).filter(Boolean))];
+      } catch (e) {
+        console.warn('[instituicoes] Falha ao buscar vinculos:', e.message);
+      }
+
+      if (instIds.length === 0) {
+        const ctx = await resolveContextoUsuario(req, authUser);
+        const resolvedId = ctx?.instituicaoId || authUser.instituicao_id;
+        if (resolvedId) instIds = [resolvedId];
+      }
+
+      if (instIds.length === 0) {
         return res.status(200).json([]);
       }
 
       const { data, error } = await supabase
         .from('instituicoes')
         .select('*')
-        .eq('id', authUser.instituicao_id)
-        .maybeSingle();
+        .in('id', instIds)
+        .order('ordem', { ascending: true })
+        .order('nome', { ascending: true });
 
       if (error) throw error;
-      return res.status(200).json(data ? [data] : []);
+      return res.status(200).json(data || []);
     }
 
     if (!requirePerfil(authUser, res, ['grupo_admin'])) {

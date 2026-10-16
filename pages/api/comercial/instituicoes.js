@@ -3,6 +3,7 @@ import {
   requireAuth,
   requirePerfil,
   resolveContextoUsuario,
+  getUserVinculos,
 } from '../../../lib/auth-server';
 
 const supabase = createClient(
@@ -42,17 +43,31 @@ export default async function handler(req, res) {
     return res.status(200).json(data || []);
   }
 
-  // Usuário comum: retorna apenas sua própria instituição resolvida pelo contexto
-  const userInstituicaoId = ctx.instituicaoId;
-  if (!userInstituicaoId) return res.status(200).json([]);
+  // Usuário comum: consultar vínculos para retornar todas as instituições às quais tem acesso
+  let instIds = [];
+  try {
+    const vinculos = await getUserVinculos(authUser.id);
+    instIds = [...new Set((vinculos || []).map(v => v.instituicao_id).filter(Boolean))];
+  } catch (e) {
+    console.warn('[comercial/instituicoes] Falha ao buscar vinculos:', e.message);
+  }
+
+  if (instIds.length === 0) {
+    const userInstituicaoId = ctx.instituicaoId || authUser.instituicao_id;
+    if (userInstituicaoId) instIds = [userInstituicaoId];
+  }
+
+  if (instIds.length === 0) return res.status(200).json([]);
 
   const { data, error } = await supabase
     .from('instituicoes')
     .select('id, nome, tipo_instituicao')
-    .eq('id', userInstituicaoId)
-    .maybeSingle();
+    .in('id', instIds)
+    .eq('ativa', true)
+    .order('ordem', { ascending: true })
+    .order('nome', { ascending: true });
 
   if (error) return res.status(500).json({ error: error.message });
-  return res.status(200).json(data ? [data] : []);
+  return res.status(200).json(data || []);
 }
 

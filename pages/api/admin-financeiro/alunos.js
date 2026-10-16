@@ -107,14 +107,12 @@ export default async function handler(req, res) {
       .order('nome', { ascending: true });
 
     const reqInstituicaoId = req.query.instituicao_id || req.query.instituicaoId;
-    const effectiveInstituicaoId = isGroupAdmin
-      ? (reqInstituicaoId ? String(reqInstituicaoId) : null)
-      : instituicaoId;
+    const effectiveInstituicaoId = reqInstituicaoId ? String(reqInstituicaoId) : instituicaoId;
 
-    if (!isGroupAdmin) {
-      alunosQuery = applyInstituicaoFilter(alunosQuery, instituicaoId);
-    } else if (effectiveInstituicaoId) {
+    if (effectiveInstituicaoId) {
       alunosQuery = alunosQuery.eq('instituicao_id', effectiveInstituicaoId);
+    } else if (!isGroupAdmin) {
+      alunosQuery = applyInstituicaoFilter(alunosQuery, instituicaoId);
     }
 
     // Aplicar filtros dinâmicos
@@ -156,10 +154,10 @@ export default async function handler(req, res) {
       .from('alunos')
       .select('id', { count: 'exact', head: true });
 
-    if (!isGroupAdmin) {
-      totalGeralQuery = applyInstituicaoFilter(totalGeralQuery, instituicaoId);
-    } else if (effectiveInstituicaoId) {
+    if (effectiveInstituicaoId) {
       totalGeralQuery = totalGeralQuery.eq('instituicao_id', effectiveInstituicaoId);
+    } else if (!isGroupAdmin) {
+      totalGeralQuery = applyInstituicaoFilter(totalGeralQuery, instituicaoId);
     }
 
     const [{ count: totalGeralCount }, { data: alunosData, error: alunosError }] = await Promise.all([

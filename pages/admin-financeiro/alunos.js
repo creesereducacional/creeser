@@ -1611,25 +1611,38 @@ export default function AlunosFinanceiroPage() {
       }
 
       if (!carregouOpcoes) {
-        const [resOpcoes, resTurmas, resInstituicoes, resCursos] = await Promise.all([
+        const [resOpcoes, resTurmas, resComercialInst, resInstituicoes, resCursos] = await Promise.all([
           fetch('/api/turmas/opcoes'),
           fetch('/api/turmas'),
           fetch('/api/comercial/instituicoes'),
+          fetch('/api/instituicoes'),
           fetch('/api/cursos')
         ]);
+
+        let instList = [];
         if (resOpcoes.ok) {
           const dataOpcoes = await resOpcoes.json();
           if (dataOpcoes.unidades) setTodasUnidades(dataOpcoes.unidades);
-          if (dataOpcoes.instituicoes && dataOpcoes.instituicoes.length > 0) {
-            setInstituicoes(dataOpcoes.instituicoes);
+          if (Array.isArray(dataOpcoes.instituicoes) && dataOpcoes.instituicoes.length > 0) {
+            instList = dataOpcoes.instituicoes;
           }
         }
-        if (resInstituicoes.ok) {
+        if (resComercialInst.ok) {
+          const dataInst = await resComercialInst.json();
+          if (Array.isArray(dataInst) && dataInst.length > 0) {
+            instList = dataInst;
+          }
+        }
+        if (instList.length === 0 && resInstituicoes.ok) {
           const dataInst = await resInstituicoes.json();
           if (Array.isArray(dataInst) && dataInst.length > 0) {
-            setInstituicoes(dataInst);
+            instList = dataInst;
           }
         }
+        if (instList.length > 0) {
+          setInstituicoes(instList);
+        }
+
         if (resCursos.ok) {
           const dataCursos = await resCursos.json();
           const listC = Array.isArray(dataCursos) ? dataCursos : dataCursos.cursos || [];
