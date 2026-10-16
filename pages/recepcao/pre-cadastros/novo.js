@@ -65,6 +65,7 @@ export default function NovoPrecadastro() {
     // 1. Identificação Acadêmica
     instituicao_id: '',
     instituicao: '',
+    unidade_id: '',
     cursoid: '',
     turmaid: '',
     anoLetivo: new Date().getFullYear().toString(),
@@ -166,10 +167,14 @@ export default function NovoPrecadastro() {
 
   // Auxiliares de carregamento de opções
   const [instituicoes, setInstituicoes] = useState([]);
+  const [unidades, setUnidades] = useState([]);
+  const [todosCursos, setTodosCursos] = useState([]);
   const [cursos, setCursos] = useState([]);
+  const [todasTurmas, setTodasTurmas] = useState([]);
   const [turmas, setTurmas] = useState([]);
   const [anosLetivos, setAnosLetivos] = useState([]);
 
+  const [carregandoUnidades, setCarregandoUnidades] = useState(false);
   const [carregandoCursos, setCarregandoCursos] = useState(false);
   const [carregandoTurmas, setCarregandoTurmas] = useState(false);
   const [salvando, setSalvando] = useState(false);
@@ -215,6 +220,20 @@ export default function NovoPrecadastro() {
       })
       .catch(() => {});
 
+    // Carregar opções gerais (unidades, cursos com unidade_ids, turmas)
+    setCarregandoUnidades(true);
+    fetch('/api/recepcao/pre-cadastros?include_options=true', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data && typeof data === 'object') {
+          if (Array.isArray(data.unidades)) setUnidades(data.unidades);
+          if (Array.isArray(data.cursos)) setTodosCursos(data.cursos);
+          if (Array.isArray(data.turmas)) setTodasTurmas(data.turmas);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setCarregandoUnidades(false));
+
     // Anos letivos
     fetch('/api/configuracoes/anos-letivos', { credentials: 'include' })
       .then(r => r.ok ? r.json() : [])
@@ -224,37 +243,54 @@ export default function NovoPrecadastro() {
       .catch(() => {});
   }, []);
 
-  // ── Carregar Cursos quando instituicao_id muda ────────────────────────
+  // ── Filtrar Cursos disponíveis quando a Unidade é selecionada ─────────
   useEffect(() => {
-    setCarregandoCursos(true);
-    const url = form.instituicao_id
-      ? `/api/comercial/cursos?instituicao_id=${form.instituicao_id}`
-      : '/api/comercial/cursos';
-
-    fetch(url, { credentials: 'include' })
-      .then(r => r.ok ? r.json() : [])
-      .then(data => setCursos(Array.isArray(data) ? data : []))
-      .catch(() => setCursos([]))
-      .finally(() => setCarregandoCursos(false));
-  }, [form.instituicao_id]);
-
-  // ── Carregar Turmas quando cursoid ou instituicao_id muda ─────────────
-  useEffect(() => {
-    if (!form.cursoid) {
+    if (!form.unidade_id) {
+      setCursos([]);
       setTurmas([]);
-      setForm(prev => ({ ...prev, turmaid: '' }));
       return;
     }
 
-    setCarregandoTurmas(true);
-    const url = `/api/comercial/turmas?cursoid=${form.cursoid}${form.instituicao_id ? `&instituicao_id=${form.instituicao_id}` : ''}`;
+    const unidIdNum = Number(form.unidade_id);
+    const cursosDaUnidade = todosCursos.filter(c => {
+      if (Array.isArray(c.unidade_ids) && c.unidade_ids.length > 0) {
+        return c.unidade_ids.includes(unidIdNum);
+      }
+      return true;
+    });
 
-    fetch(url, { credentials: 'include' })
-      .then(r => r.ok ? r.json() : [])
-      .then(data => setTurmas(Array.isArray(data) ? data : []))
-      .catch(() => setTurmas([]))
-      .finally(() => setCarregandoTurmas(false));
-  }, [form.cursoid, form.instituicao_id]);
+    setCursos(cursosDaUnidade);
+
+    // Se o curso atual não pertencer à nova unidade, limpar curso e turma
+    if (form.cursoid && !cursosDaUnidade.some(c => String(c.id) === String(form.cursoid))) {
+      setForm(prev => ({ ...prev, cursoid: '', turmaid: '' }));
+      setTurmas([]);
+    }
+  }, [form.unidade_id, todosCursos]);
+
+  // ── Filtrar Turmas disponíveis quando Unidade e Curso são selecionados ──
+  useEffect(() => {
+    if (!form.cursoid || !form.unidade_id) {
+      setTurmas([]);
+      return;
+    }
+
+    const unidIdNum = Number(form.unidade_id);
+    const cursoIdNum = Number(form.cursoid);
+
+    const turmasFiltradas = todasTurmas.filter(t => {
+      const matchCurso = Number(t.cursoid) === cursoIdNum;
+      const matchUnidade = t.unidadeid == null || Number(t.unidadeid) === unidIdNum;
+      return matchCurso && matchUnidade;
+    });
+
+    setTurmas(turmasFiltradas);
+
+    // Se a turma atual não pertencer à combinação, limpar turma
+    if (form.turmaid && !turmasFiltradas.some(t => String(t.id) === String(form.turmaid))) {
+      setForm(prev => ({ ...prev, turmaid: '' }));
+    }
+  }, [form.cursoid, form.unidade_id, todasTurmas]);
 
   // Atualizar valores financeiros padrão ao selecionar Turma (se a turma tiver mensalidade)
   useEffect(() => {
@@ -475,7 +511,10 @@ export default function NovoPrecadastro() {
     } else if (n === 4) {
       // Dados Acadêmicos
       if (instituicoes.length > 1 && !form.instituicao_id) {
-        e.instituicao_id = 'Selecione a instituição / unidade de atendimento.';
+        e.instituicao_id = 'Selecione a instituição de atendimento.';
+      }
+      if (!form.unidade_id) {
+        e.unidade_id = 'Unidade é obrigatória.';
       }
       if (!form.cursoid) {
         e.cursoid = 'Curso de interesse é obrigatório.';
@@ -527,8 +566,9 @@ export default function NovoPrecadastro() {
       const payload = {
         ...form,
         foto: fotoUrl,
-        // Garantir compatibilidade institucional
+        // Garantir compatibilidade institucional e de unidade
         instituicao_id: form.instituicao_id || undefined,
+        unidade_id: form.unidade_id ? Number(form.unidade_id) : undefined,
         // Campos que a API de pré-cadastros espera
         cursoid: form.cursoid ? Number(form.cursoid) : undefined,
         turmaid: form.turmaid ? Number(form.turmaid) : undefined,
@@ -607,9 +647,10 @@ export default function NovoPrecadastro() {
   };
 
   // Nomes de referência para exibição na etapa de conferência
-  const instNome  = instituicoes.find(i => String(i.id) === String(form.instituicao_id))?.nome || form.instituicao || '—';
-  const cursoNome = cursos.find(c => String(c.id) === String(form.cursoid))?.nome || '—';
-  const turmaNome = turmas.find(t => String(t.id) === String(form.turmaid))?.nome || 'Sem turma (provisório)';
+  const instNome    = instituicoes.find(i => String(i.id) === String(form.instituicao_id))?.nome || form.instituicao || '—';
+  const unidadeNome = unidades.find(u => String(u.id) === String(form.unidade_id))?.nome || '—';
+  const cursoNome   = cursos.find(c => String(c.id) === String(form.cursoid))?.nome || '—';
+  const turmaNome   = turmas.find(t => String(t.id) === String(form.turmaid))?.nome || 'Sem turma (provisório)';
 
   return (
     <RecepcaoLayout titulo="Novo Cadastro Completo de Aluno">
@@ -1335,10 +1376,10 @@ export default function NovoPrecadastro() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Seleção de Instituição / Unidade */}
+                {/* Seleção de Instituição (caso haja mais de uma para o usuário) */}
                 {instituicoes.length > 1 && (
                   <div className="sm:col-span-2">
-                    <label className={labelCls}>Instituição / Unidade *</label>
+                    <label className={labelCls}>Instituição Mantenedora *</label>
                     <select
                       name="instituicao_id"
                       value={form.instituicao_id}
@@ -1348,14 +1389,14 @@ export default function NovoPrecadastro() {
                           ...prev,
                           instituicao_id: e.target.value,
                           instituicao: sel?.nome || '',
+                          unidade_id: '',
                           cursoid: '',
                           turmaid: ''
                         }));
                       }}
                       className={`${inputCls} ${erros.instituicao_id ? inputErr : inputOk}`}
-                      autoFocus
                     >
-                      <option value="">— Selecione a Instituição / Unidade —</option>
+                      <option value="">— Selecione a Instituição —</option>
                       {instituicoes.map(i => (
                         <option key={i.id} value={String(i.id)}>{i.nome}</option>
                       ))}
@@ -1364,10 +1405,42 @@ export default function NovoPrecadastro() {
                   </div>
                 )}
 
-                {/* Seleção de Curso */}
+                {/* 1. Seleção de Unidade * */}
                 <div className="sm:col-span-2">
                   <label className={labelCls}>
-                    Curso de Interesse * {carregandoCursos && '(Carregando cursos...)'}
+                    Unidade * {carregandoUnidades && <span className="font-normal normal-case text-slate-400">(Carregando unidades...)</span>}
+                  </label>
+                  <select
+                    name="unidade_id"
+                    value={form.unidade_id}
+                    onChange={e => {
+                      const novaUnidade = e.target.value;
+                      setForm(prev => ({
+                        ...prev,
+                        unidade_id: novaUnidade,
+                        cursoid: '',
+                        turmaid: ''
+                      }));
+                      if (erros.unidade_id) {
+                        setErros(prev => ({ ...prev, unidade_id: null }));
+                      }
+                    }}
+                    disabled={carregandoUnidades}
+                    className={`${inputCls} ${erros.unidade_id ? inputErr : inputOk}`}
+                    autoFocus
+                  >
+                    <option value="">— Selecione a Unidade —</option>
+                    {unidades.map(u => (
+                      <option key={u.id} value={String(u.id)}>{u.nome}</option>
+                    ))}
+                  </select>
+                  {erros.unidade_id && <p className="text-xs text-rose-600 mt-1">{erros.unidade_id}</p>}
+                </div>
+
+                {/* 2. Seleção de Curso de Interesse * */}
+                <div className="sm:col-span-2">
+                  <label className={labelCls}>
+                    Curso de Interesse * {carregandoCursos && <span className="font-normal normal-case text-slate-400">(Carregando cursos...)</span>}
                   </label>
                   <select
                     name="cursoid"
@@ -1376,17 +1449,19 @@ export default function NovoPrecadastro() {
                       setCampo('cursoid', e.target.value);
                       setCampo('turmaid', '');
                     }}
-                    disabled={carregandoCursos || cursos.length === 0}
-                    className={`${inputCls} ${erros.cursoid ? inputErr : inputOk} ${cursos.length === 0 ? 'opacity-50' : ''}`}
+                    disabled={!form.unidade_id || carregandoCursos || cursos.length === 0}
+                    className={`${inputCls} ${erros.cursoid ? inputErr : inputOk} ${!form.unidade_id || cursos.length === 0 ? 'opacity-60' : ''}`}
                   >
-                    <option value="">— Selecione o Curso —</option>
+                    <option value="">
+                      {!form.unidade_id ? '— Selecione uma unidade primeiro —' : '— Selecione o Curso —'}
+                    </option>
                     {cursos.map(c => (
                       <option key={c.id} value={String(c.id)}>{c.nome}</option>
                     ))}
                   </select>
                   {erros.cursoid && <p className="text-xs text-rose-600 mt-1">{erros.cursoid}</p>}
-                  {!carregandoCursos && cursos.length === 0 && (
-                    <p className="text-xs text-amber-600 mt-1">Nenhum curso disponível para a unidade selecionada.</p>
+                  {form.unidade_id && !carregandoCursos && cursos.length === 0 && (
+                    <p className="text-xs text-amber-600 mt-1">⚠️ Nenhum curso disponível para a unidade selecionada.</p>
                   )}
                 </div>
 
@@ -1891,10 +1966,13 @@ export default function NovoPrecadastro() {
                       Editar
                     </button>
                   </div>
-                  <p><strong className="text-slate-500">Unidade:</strong> {instNome}</p>
+                  <p><strong className="text-slate-500">Unidade:</strong> {unidadeNome}</p>
                   <p><strong className="text-slate-500">Curso:</strong> {cursoNome}</p>
                   <p><strong className="text-slate-500">Turma:</strong> {turmaNome}</p>
                   <p><strong className="text-slate-500">Ano Letivo:</strong> {form.anoLetivo || '—'}</p>
+                  {instituicoes.length > 1 && (
+                    <p><strong className="text-slate-500">Instituição:</strong> {instNome}</p>
+                  )}
                 </div>
 
                 {/* Card 4: Responsáveis */}

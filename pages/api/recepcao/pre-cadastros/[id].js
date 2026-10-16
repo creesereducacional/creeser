@@ -36,6 +36,8 @@ async function enriquecerDadosCursoTurma(dadosAluno) {
   if (!dadosAluno) return dadosAluno;
   let curso_nome = null;
   let turma_nome = null;
+  let unidade_id = null;
+  let unidade_nome = null;
 
   if (dadosAluno.cursoid) {
     const { data: curso } = await supabase
@@ -49,11 +51,28 @@ async function enriquecerDadosCursoTurma(dadosAluno) {
   if (dadosAluno.turmaid) {
     const { data: turma } = await supabase
       .from('turmas')
-      .select('nome, turno')
+      .select('id, nome, turno, unidadeid, unidades(id, nome)')
       .eq('id', dadosAluno.turmaid)
       .maybeSingle();
     if (turma?.nome) {
       turma_nome = turma.nome + (turma.turno ? ` — ${turma.turno}` : '');
+    }
+    if (turma?.unidadeid != null) {
+      unidade_id = turma.unidadeid;
+      unidade_nome = turma.unidades?.nome || null;
+    }
+  }
+
+  // Fallback: se não tiver turma com unidade, verificar curso_unidade
+  if (!unidade_id && dadosAluno.cursoid) {
+    const { data: cuLinks } = await supabase
+      .from('curso_unidade')
+      .select('unidadeid, unidades(id, nome)')
+      .eq('cursoid', dadosAluno.cursoid);
+
+    if (Array.isArray(cuLinks) && cuLinks.length === 1) {
+      unidade_id = cuLinks[0].unidadeid;
+      unidade_nome = cuLinks[0].unidades?.nome || null;
     }
   }
 
@@ -61,6 +80,8 @@ async function enriquecerDadosCursoTurma(dadosAluno) {
     ...dadosAluno,
     curso_nome,
     turma_nome,
+    unidade_id,
+    unidade_nome,
   };
 }
 
@@ -112,6 +133,54 @@ export default async function handler(req, res) {
       const cid = Number(cursoid);
       if (!Number.isInteger(cid) || cid <= 0) {
         return res.status(400).json({ error: 'Curso inválido' });
+      }
+    }
+
+    // Validar coerência de unidade_id, cursoid e turmaid se fornecidos
+    const { unidade_id } = req.body || {};
+    const unidadeIdNum = unidade_id ? Number(unidade_id) : null;
+    const cursoIdNum = (cursoid !== undefined && cursoid !== null && cursoid !== '') ? Number(cursoid) : (cursoid === null || cursoid === '' ? null : aluno.cursoid);
+    const turmaIdNum = (turmaid !== undefined && turmaid !== null && turmaid !== '') ? Number(turmaid) : (turmaid === null || turmaid === '' ? null : aluno.turmaid);
+
+    if (unidadeIdNum && cursoIdNum) {
+      const { data: vinculoCu } = await supabase
+        .from('curso_unidade')
+        .select('id')
+        .eq('cursoid', cursoIdNum)
+        .eq('unidadeid', unidadeIdNum)
+        .limit(1);
+
+      if (!vinculoCu || vinculoCu.length === 0) {
+        const { data: turmasDaUnid } = await supabase
+          .from('turmas')
+          .select('id')
+          .eq('cursoid', cursoIdNum)
+          .eq('unidadeid', unidadeIdNum)
+          .limit(1);
+
+        if (!turmasDaUnid || turmasDaUnid.length === 0) {
+          return res.status(400).json({ error: 'O curso selecionado não é ofertado na unidade escolhida.' });
+        }
+      }
+    }
+
+    if (turmaIdNum) {
+      const { data: turmaValida } = await supabase
+        .from('turmas')
+        .select('id, cursoid, unidadeid')
+        .eq('id', turmaIdNum)
+        .maybeSingle();
+
+      if (!turmaValida) {
+        return res.status(400).json({ error: 'Turma selecionada não encontrada.' });
+      }
+
+      if (cursoIdNum && Number(turmaValida.cursoid) !== cursoIdNum) {
+        return res.status(400).json({ error: 'A turma selecionada não pertence ao curso escolhido.' });
+      }
+
+      if (unidadeIdNum && turmaValida.unidadeid && Number(turmaValida.unidadeid) !== unidadeIdNum) {
+        return res.status(400).json({ error: 'A turma selecionada não pertence à unidade escolhida.' });
       }
     }
 

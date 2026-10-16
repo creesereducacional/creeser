@@ -204,10 +204,32 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Instituição não definida para este usuário.' });
       }
 
+      const unidadeIdVal = parseInteger(body.unidade_id || body.unidadeId);
       const cursoIdVal = parseInteger(body.cursoid || body.curso);
       const turmaIdVal = parseInteger(body.turmaid || body.turma);
 
-      // Se cursoid for informado, validar se o curso pertence à instituição
+      // Validação obrigatória da Unidade se informada ou esperada
+      if (body.unidade_id !== undefined && !unidadeIdVal) {
+        return res.status(400).json({ error: 'Unidade selecionada é inválida.' });
+      }
+
+      // Se unidade for informada, validar se pertence à instituição
+      if (unidadeIdVal) {
+        const { data: unidValida } = await supabase
+          .from('unidades')
+          .select('id, instituicao_id')
+          .eq('id', unidadeIdVal)
+          .maybeSingle();
+
+        if (!unidValida) {
+          return res.status(400).json({ error: 'Unidade não encontrada.' });
+        }
+        if (unidValida.instituicao_id && String(unidValida.instituicao_id) !== String(efetivInstituicaoId) && !isGroupAdmin) {
+          return res.status(403).json({ error: 'A unidade selecionada pertence a outra instituição.' });
+        }
+      }
+
+      // Se cursoid for informado, validar se o curso pertence à instituição e à unidade
       if (cursoIdVal) {
         const { data: cursoValido } = await supabase
           .from('cursos')
@@ -215,23 +237,60 @@ export default async function handler(req, res) {
           .eq('id', cursoIdVal)
           .maybeSingle();
 
-        if (cursoValido && cursoValido.instituicao_id && String(cursoValido.instituicao_id) !== String(efetivInstituicaoId) && !isGroupAdmin) {
-          return res.status(400).json({ error: 'O curso selecionado não está disponível para sua unidade.' });
+        if (!cursoValido) {
+          return res.status(400).json({ error: 'Curso não encontrado.' });
+        }
+        if (cursoValido.instituicao_id && String(cursoValido.instituicao_id) !== String(efetivInstituicaoId) && !isGroupAdmin) {
+          return res.status(400).json({ error: 'O curso selecionado não está disponível para sua instituição.' });
+        }
+
+        // Se a unidade também foi informada, validar vínculo em curso_unidade
+        if (unidadeIdVal) {
+          const { data: vinculoCu } = await supabase
+            .from('curso_unidade')
+            .select('id')
+            .eq('cursoid', cursoIdVal)
+            .eq('unidadeid', unidadeIdVal)
+            .limit(1);
+
+          if (!vinculoCu || vinculoCu.length === 0) {
+            // Verificar também se há turmas deste curso nesta unidade como vínculo direto
+            const { data: turmasDaUnid } = await supabase
+              .from('turmas')
+              .select('id')
+              .eq('cursoid', cursoIdVal)
+              .eq('unidadeid', unidadeIdVal)
+              .limit(1);
+
+            if (!turmasDaUnid || turmasDaUnid.length === 0) {
+              return res.status(400).json({ error: 'O curso selecionado não é ofertado na unidade escolhida.' });
+            }
+          }
         }
       }
 
-      // Se turma for informada, verificar existência
+      // Se turma for informada, verificar existência e compatibilidade com curso e unidade
       let turmaFinalId = null;
       if (turmaIdVal) {
         const { data: turmaValida } = await supabase
           .from('turmas')
-          .select('id')
+          .select('id, cursoid, unidadeid, instituicao_id')
           .eq('id', turmaIdVal)
           .maybeSingle();
 
-        if (turmaValida) {
-          turmaFinalId = turmaValida.id;
+        if (!turmaValida) {
+          return res.status(400).json({ error: 'Turma selecionada não encontrada.' });
         }
+
+        if (cursoIdVal && Number(turmaValida.cursoid) !== cursoIdVal) {
+          return res.status(400).json({ error: 'A turma selecionada não pertence ao curso escolhido.' });
+        }
+
+        if (unidadeIdVal && turmaValida.unidadeid != null && Number(turmaValida.unidadeid) !== unidadeIdVal) {
+          return res.status(400).json({ error: 'A turma selecionada não pertence à unidade escolhida.' });
+        }
+
+        turmaFinalId = turmaValida.id;
       }
 
       // Validação de unicidade de CPF por instituição
