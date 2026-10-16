@@ -1282,6 +1282,7 @@ export default function AlunosFinanceiroPage() {
       });
   };
   const [alunos, setAlunos] = useState([]);
+  const [totalGeral, setTotalGeral] = useState(0);
   const [turmas, setTurmas] = useState([]);
   const [cursos, setCursos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1602,7 +1603,9 @@ export default function AlunosFinanceiroPage() {
       const res = await fetch(`/api/admin-financeiro/alunos?${query.toString()}`);
       if (res.ok) {
         const data = await res.json();
-        setAlunos(Array.isArray(data.alunos) ? data.alunos : []);
+        const listaAlunos = Array.isArray(data.alunos) ? data.alunos : [];
+        setAlunos(listaAlunos);
+        setTotalGeral(typeof data.totalGeral === 'number' ? data.totalGeral : listaAlunos.length);
         if (data.turmas) setTurmas(data.turmas);
         if (data.cursos) setCursos(data.cursos);
       }
@@ -1789,8 +1792,20 @@ export default function AlunosFinanceiroPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-gradient-to-br from-teal-50 to-cyan-50 border border-teal-200 rounded-lg p-4">
-            <p className="text-sm text-teal-700 font-semibold">Total de Alunos</p>
-            <p className="text-3xl font-bold text-teal-900 mt-1">{resumo.totalAlunos}</p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-teal-700 font-semibold">Total de Alunos</p>
+              {totalGeral > 0 && totalGeral !== resumo.totalAlunos && (
+                <span className="text-xs font-medium text-teal-600 bg-teal-100/60 px-2 py-0.5 rounded-full">
+                  Geral: {totalGeral}
+                </span>
+              )}
+            </div>
+            <p className="text-3xl font-bold text-teal-900 mt-1">
+              {resumo.totalAlunos}
+              {totalGeral > 0 && totalGeral !== resumo.totalAlunos && (
+                <span className="text-sm font-normal text-teal-600 ml-1.5">filtrados</span>
+              )}
+            </p>
           </div>
           <div className="bg-gradient-to-br from-blue-50 to-sky-50 border border-blue-200 rounded-lg p-4">
             <p className="text-sm text-blue-700 font-semibold">Aberto</p>

@@ -33,16 +33,17 @@ export default function BarraFiltros({
   const showAnoLetivo = onAnoLetivoChange !== undefined;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+    <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-3">
+      {/* Linha 1: Busca | Status | Instituição | Unidade | Curso | Turma */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-center">
         {showSearch && (
-          <div className="flex flex-col col-span-1 md:col-span-2 relative">
+          <div className="relative w-full">
             <input
               type="text"
               placeholder={searchPlaceholder}
               value={searchValue || ''}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm"
+              className="w-full h-10 px-3.5 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm placeholder-gray-400 bg-white"
             />
           </div>
         )}
@@ -51,7 +52,7 @@ export default function BarraFiltros({
           <select
             value={statusValue || ''}
             onChange={(e) => onStatusChange(e.target.value)}
-            className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm bg-white"
+            className="w-full h-10 px-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm bg-white text-gray-700 truncate"
           >
             <option value="">Todos os Status</option>
             {statusOptions.map((opt) => (
@@ -66,7 +67,7 @@ export default function BarraFiltros({
           <select
             value={instituicaoValue || ''}
             onChange={(e) => onInstituicaoChange(e.target.value)}
-            className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm bg-white"
+            className="w-full h-10 px-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm bg-white text-gray-700 truncate"
           >
             <option value="">Todas as Instituições</option>
             {instituicoes.map((inst) => (
@@ -81,7 +82,7 @@ export default function BarraFiltros({
           <select
             value={unidadeValue || ''}
             onChange={(e) => onUnidadeChange(e.target.value)}
-            className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm bg-white"
+            className="w-full h-10 px-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm bg-white text-gray-700 truncate"
           >
             <option value="">Todas as Unidades</option>
             {unidades.map((u) => (
@@ -96,7 +97,7 @@ export default function BarraFiltros({
           <select
             value={cursoValue || ''}
             onChange={(e) => onCursoChange(e.target.value)}
-            className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm bg-white"
+            className="w-full h-10 px-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm bg-white text-gray-700 truncate"
           >
             <option value="">Todos os Cursos</option>
             {cursos.map((c) => (
@@ -111,7 +112,7 @@ export default function BarraFiltros({
           <select
             value={turmaValue || ''}
             onChange={(e) => onTurmaChange(e.target.value)}
-            className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm bg-white"
+            className="w-full h-10 px-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm bg-white text-gray-700 truncate"
           >
             <option value="">Todas as Turmas</option>
             {turmas.map((t) => (
@@ -123,14 +124,15 @@ export default function BarraFiltros({
         )}
       </div>
 
+      {/* Linha 2: Ano Letivo à esquerda e Limpar Filtros à direita */}
       {(showAnoLetivo || onClear) && (
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-gray-100">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2.5 border-t border-gray-100">
+          <div className="flex items-center gap-3">
             {showAnoLetivo && (
               <select
                 value={anoLetivoValue || ''}
                 onChange={(e) => onAnoLetivoChange(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm bg-white"
+                className="h-9 px-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm bg-white text-gray-700"
               >
                 <option value="">Todos os Anos Letivos</option>
                 {anosLetivos.map((ano) => (
@@ -145,9 +147,11 @@ export default function BarraFiltros({
           {onClear && (
             <button
               onClick={onClear}
-              className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-teal-600 border border-gray-300 rounded-lg hover:border-teal-500 transition-colors bg-white cursor-pointer"
+              type="button"
+              className="h-9 px-4 inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-gray-600 hover:text-teal-700 border border-gray-300 rounded-lg hover:border-teal-500 transition-colors bg-white hover:bg-gray-50 cursor-pointer shadow-sm"
             >
-              🧹 Limpar Filtros
+              <span>🧹</span>
+              <span>Limpar Filtros</span>
             </button>
           )}
         </div>

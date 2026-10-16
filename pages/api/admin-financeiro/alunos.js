@@ -152,7 +152,20 @@ export default async function handler(req, res) {
       alunosQuery = alunosQuery.or(orFilter);
     }
 
-    const { data: alunosData, error: alunosError } = await alunosQuery;
+    let totalGeralQuery = supabase
+      .from('alunos')
+      .select('id', { count: 'exact', head: true });
+
+    if (!isGroupAdmin) {
+      totalGeralQuery = applyInstituicaoFilter(totalGeralQuery, instituicaoId);
+    } else if (effectiveInstituicaoId) {
+      totalGeralQuery = totalGeralQuery.eq('instituicao_id', effectiveInstituicaoId);
+    }
+
+    const [{ count: totalGeralCount }, { data: alunosData, error: alunosError }] = await Promise.all([
+      totalGeralQuery,
+      alunosQuery
+    ]);
 
     if (alunosError) throw alunosError;
 
@@ -342,7 +355,9 @@ export default async function handler(req, res) {
       alunos: alunosComResumo,
       turmas: turmas || [],
       cursos: cursos || [],
-      total: alunosComResumo.length
+      total: alunosComResumo.length,
+      totalFiltrado: alunosComResumo.length,
+      totalGeral: totalGeralCount ?? alunosComResumo.length
     });
   } catch (error) {
     console.error('Erro ao listar alunos:', error);
