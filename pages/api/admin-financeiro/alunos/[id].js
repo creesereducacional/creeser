@@ -206,8 +206,9 @@ export default async function handler(req, res) {
           .from('alunos')
           .update({
             statusmatricula: 'ATIVO',
-            data_reabertura: agora,
-            ...(obsReabertura ? { observacao_reabertura: obsReabertura } : {})
+            data_ativacao: agora.slice(0, 10),
+            data_trancamento: null,
+            observacao_trancamento: null
           })
           .eq('id', aluno.id)
           .select()
@@ -221,7 +222,11 @@ export default async function handler(req, res) {
         try {
           await supabase
             .from('matriculas')
-            .update({ status_administrativo: 'ATIVO' })
+            .update({
+              status_administrativo: 'ATIVO',
+              data_trancamento: null,
+              observacao_trancamento: null
+            })
             .eq('aluno_id', aluno.id)
             .in('status_administrativo', ['TRANCADO', 'TRANCADO_COM_DEBITO']);
         } catch (_) {}
