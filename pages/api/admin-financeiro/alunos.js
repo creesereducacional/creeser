@@ -106,10 +106,15 @@ export default async function handler(req, res) {
       )
       .order('nome', { ascending: true });
 
+    const reqInstituicaoId = req.query.instituicao_id || req.query.instituicaoId;
+    const effectiveInstituicaoId = isGroupAdmin
+      ? (reqInstituicaoId ? String(reqInstituicaoId) : null)
+      : instituicaoId;
+
     if (!isGroupAdmin) {
       alunosQuery = applyInstituicaoFilter(alunosQuery, instituicaoId);
-    } else if (req.query.instituicao_id) {
-      alunosQuery = alunosQuery.eq('instituicao_id', req.query.instituicao_id);
+    } else if (effectiveInstituicaoId) {
+      alunosQuery = alunosQuery.eq('instituicao_id', effectiveInstituicaoId);
     }
 
     // Aplicar filtros dinâmicos
@@ -254,7 +259,7 @@ export default async function handler(req, res) {
       .select('id, nome')
       .order('nome', { ascending: true });
 
-    turmasQuery = applyInstituicaoFilter(turmasQuery, instituicaoId);
+    turmasQuery = applyInstituicaoFilter(turmasQuery, effectiveInstituicaoId);
     const { data: turmas, error: turmasError } = await turmasQuery;
 
     if (turmasError) throw turmasError;
@@ -265,7 +270,7 @@ export default async function handler(req, res) {
       .select('id, nome')
       .order('nome', { ascending: true });
 
-    cursosQuery = applyInstituicaoFilter(cursosQuery, instituicaoId);
+    cursosQuery = applyInstituicaoFilter(cursosQuery, effectiveInstituicaoId);
     const { data: cursos, error: cursosError } = await cursosQuery;
 
     if (cursosError) throw cursosError;
@@ -276,7 +281,7 @@ export default async function handler(req, res) {
       .from('financeiro_parcelas')
       .select('valor, status, data_vencimento, financeiro_ordens_pagamento!inner(aluno_id)');
 
-    parcelasQuery = applyInstituicaoFilter(parcelasQuery, instituicaoId);
+    parcelasQuery = applyInstituicaoFilter(parcelasQuery, effectiveInstituicaoId);
     const { data: parcelas } = await parcelasQuery;
 
     // Agregar por aluno_id

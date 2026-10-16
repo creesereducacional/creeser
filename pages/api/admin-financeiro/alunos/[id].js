@@ -141,12 +141,14 @@ export default async function handler(req, res) {
     try {
       const { acao, observacao_trancamento } = req.body || {};
 
-      if (acao !== 'trancar') {
+      if (acao !== 'trancar' && acao !== 'reabrir') {
         return res.status(400).json({ message: 'Ação inválida ou não suportada' });
       }
 
-      if (!observacao_trancamento || !observacao_trancamento.trim()) {
-        return res.status(400).json({ message: 'Observação de trancamento é obrigatória' });
+      if (acao === 'trancar') {
+        if (!observacao_trancamento || !observacao_trancamento.trim()) {
+          return res.status(400).json({ message: 'Observação de trancamento é obrigatória' });
+        }
       }
 
       // Buscar aluno
@@ -188,7 +190,83 @@ export default async function handler(req, res) {
       }
       // ──────────────────────────────────────────────────────────────────────
 
-      // Bloquear trancamento de alunos cancelados/desistentes
+      const usuarioId = authUser.id ? Number(authUser.id) : null;
+      const agora = new Date().toISOString();
+
+      // ── REABRIR MATRÍCULA ──────────────────────────────────────────────────
+      if (acao === 'reabrir') {
+        const isTrancado = aluno.statusmatricula === 'TRANCADO' || aluno.statusmatricula === 'TRANCADO_COM_DEBITO';
+        if (!isTrancado) {
+          return res.status(422).json({ message: `Aluno com status ${aluno.statusmatricula} não pode ser reaberto. Apenas matrículas trancadas podem ser reabertas.` });
+        }
+
+        const obsReabertura = (req.body?.observacao_reabertura || req.body?.observacao || '').trim();
+
+        const { data: alunoReaberto, error: updateReabrirError } = await supabase
+          .from('alunos')
+          .update({
+            statusmatricula: 'ATIVO',
+            data_reabertura: agora,
+            ...(obsReabertura ? { observacao_reabertura: obsReabertura } : {})
+          })
+          .eq('id', aluno.id)
+          .select()
+          .single();
+
+        if (updateReabrirError) {
+          return res.status(500).json({ message: 'Erro ao reabrir matrícula: ' + updateReabrirError.message });
+        }
+
+        // Sincronizar status_administrativo na tabela matriculas caso exista
+        try {
+          await supabase
+            .from('matriculas')
+            .update({ status_administrativo: 'ATIVO' })
+            .eq('aluno_id', aluno.id)
+            .in('status_administrativo', ['TRANCADO', 'TRANCADO_COM_DEBITO']);
+        } catch (_) {}
+
+        // Registrar logs
+        try {
+          await supabase.from('financeiro_logs').insert({
+            aluno_id: aluno.id,
+            instituicao_id: aluno.instituicao_id || null,
+            usuario_id: usuarioId,
+            acao: 'reabrir_matricula',
+            observacao: obsReabertura || 'Reabertura de matrícula efetuada pelo módulo financeiro',
+            dados_extras: {
+              data_reabertura: agora,
+              statusmatricula_anterior: aluno.statusmatricula,
+              statusmatricula_novo: 'ATIVO'
+            }
+          });
+        } catch (_) {}
+
+        try {
+          await supabase.from('audit_logs').insert({
+            usuario_id: usuarioId,
+            usuario_email: authUser.email || null,
+            perfil: authUser.perfil || authUser.tipo || null,
+            acao: 'REABRIR_MATRICULA',
+            modulo: 'financeiro',
+            entidade: 'aluno',
+            id_entidade: String(aluno.id),
+            detalhes: {
+              observacao: obsReabertura || 'Reabertura de matrícula realizada',
+              status_anterior: aluno.statusmatricula,
+              status_novo: 'ATIVO'
+            }
+          });
+        } catch (_) {}
+
+        return res.status(200).json({
+          message: 'Matrícula reaberta com sucesso.',
+          aluno: alunoReaberto
+        });
+      }
+
+      // ── TRANCAR MATRÍCULA ──────────────────────────────────────────────────
+      // Bloquear trancamento de alunos cancelados/desistentes ou já trancados
       if (aluno.statusmatricula === 'CANCELADO' || aluno.statusmatricula === 'DESISTENTE' || aluno.statusmatricula === 'TRANCADO' || aluno.statusmatricula === 'TRANCADO_COM_DEBITO') {
         return res.status(422).json({ message: `Não é possível trancar aluno com status ${aluno.statusmatricula}` });
       }
@@ -210,7 +288,6 @@ export default async function handler(req, res) {
       const temAtraso = parcelasAtrasadas && parcelasAtrasadas.length > 0;
       const novoStatusMatricula = temAtraso ? 'TRANCADO_COM_DEBITO' : 'TRANCADO';
 
-      const agora = new Date().toISOString();
       const { data: alunoAtualizado, error: updateAlunoError } = await supabase
         .from('alunos')
         .update({
@@ -225,6 +302,15 @@ export default async function handler(req, res) {
       if (updateAlunoError) {
         return res.status(500).json({ message: 'Erro ao atualizar status do aluno: ' + updateAlunoError.message });
       }
+
+      // Sincronizar status_administrativo na tabela matriculas caso exista
+      try {
+        await supabase
+          .from('matriculas')
+          .update({ status_administrativo: novoStatusMatricula })
+          .eq('aluno_id', aluno.id)
+          .eq('is_principal', true);
+      } catch (_) {}
 
       // Cancelar parcelas futuras pendentes
       const { data: parcelasCanceladas, error: cancelError } = await supabase
@@ -244,7 +330,6 @@ export default async function handler(req, res) {
       }
 
       // Registrar log em audit_logs e/ou financeiro_logs
-      const usuarioId = authUser.id ? Number(authUser.id) : null;
       try {
         await supabase.from('financeiro_logs').insert({
           aluno_id: aluno.id,

@@ -255,6 +255,50 @@ export default async function handler(req, res) {
         if (matriculaError) throw matriculaError;
       }
 
+      // Se for carnê, efetivar automaticamente aluno que estiver com status PRE_CADASTRO
+      if (tipo === 'carne') {
+        const agoraIso = new Date().toISOString();
+        const { data: alunoEfetivado, error: efetivarError } = await supabase
+          .from('alunos')
+          .update({
+            statusmatricula: 'ATIVO',
+            data_ativacao: agoraIso.slice(0, 10),
+          })
+          .eq('id', aluno_id)
+          .eq('statusmatricula', 'PRE_CADASTRO')
+          .select('id, nome, statusmatricula, instituicao_id')
+          .maybeSingle();
+
+        if (efetivarError) {
+          console.error('[ordens/create] Erro ao efetivar aluno pré-cadastrado na criação do carnê:', efetivarError);
+        } else if (alunoEfetivado) {
+          // Sincronizar status_administrativo na tabela matriculas se existir
+          try {
+            await supabase
+              .from('matriculas')
+              .update({ status_administrativo: 'ATIVO' })
+              .eq('aluno_id', aluno_id)
+              .in('status_administrativo', ['PRE_CADASTRO', 'AGUARDANDO_PAGAMENTO_MATRICULA']);
+          } catch (_) {}
+
+          // Registrar logs de auditoria
+          try {
+            await supabase.from('financeiro_logs').insert({
+              aluno_id,
+              instituicao_id: alunoEfetivado.instituicao_id || instituicaoFinal || null,
+              usuario_id: authUser.id ? Number(authUser.id) : null,
+              acao: 'efetivar_aluno_carne',
+              observacao: 'Efetivação automática de aluno pré-cadastrado ao gerar primeiro carnê de mensalidade',
+              dados_extras: {
+                status_anterior: 'PRE_CADASTRO',
+                status_novo: 'ATIVO',
+                ordem_pagamento_id: criadaOrdemId,
+              }
+            });
+          } catch (_) {}
+        }
+      }
+
       // ── Emissão imediata no gateway (somente para ordem_simples) ──────────────────
       let gatewayResult = null;
 

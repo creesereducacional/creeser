@@ -1280,12 +1280,15 @@ export default function AlunosFinanceiroPage() {
   const [loading, setLoading] = useState(true);
 
   const [filtroNome, setFiltroNome] = useState('');
-  const [filtroTurma, setFiltroTurma] = useState('');
-  const [filtroCurso, setFiltroCurso] = useState('');
-  const [filtroStatus, setFiltroStatus] = useState('ATIVO');
+  const [filtroStatus, setFiltroStatus] = useState('');
+  const [filtroInstituicao, setFiltroInstituicao] = useState('');
   const [filtroUnidade, setFiltroUnidade] = useState('');
+  const [filtroCurso, setFiltroCurso] = useState('');
+  const [filtroTurma, setFiltroTurma] = useState('');
   const [filtroAnoLetivo, setFiltroAnoLetivo] = useState('');
-  const [unidades, setUnidades] = useState([]);
+  const [instituicoes, setInstituicoes] = useState([]);
+  const [todasUnidades, setTodasUnidades] = useState([]);
+  const [todosCursos, setTodosCursos] = useState([]);
   const [todasTurmas, setTodasTurmas] = useState([]);
   const [carregouOpcoes, setCarregouOpcoes] = useState(false);
 
@@ -1298,6 +1301,7 @@ export default function AlunosFinanceiroPage() {
   const [modalRecibo, setModalRecibo] = useState(null);
   const [modalContrato, setModalContrato] = useState(null);
   const [modalTrancar, setModalTrancar] = useState(null);
+  const [modalReabrir, setModalReabrir] = useState(null);
   const [modalLote, setModalLote] = useState(false);
   const [modalCarteirinha, setModalCarteirinha] = useState(null);
   const [selectedFaturas, setSelectedFaturas] = useState(new Set());
@@ -1581,9 +1585,10 @@ export default function AlunosFinanceiroPage() {
       setLoading(true);
       const query = new URLSearchParams();
       if (filtroStatus) query.set('status', filtroStatus);
+      if (filtroInstituicao) query.set('instituicao_id', filtroInstituicao);
+      if (filtroUnidade) query.set('unidadeId', filtroUnidade);
       if (filtroCurso) query.set('cursoId', filtroCurso);
       if (filtroTurma) query.set('turmaId', filtroTurma);
-      if (filtroUnidade) query.set('unidadeId', filtroUnidade);
       if (filtroAnoLetivo) query.set('anoLetivo', filtroAnoLetivo);
       if (filtroNome) query.set('search', filtroNome);
 
@@ -1596,13 +1601,29 @@ export default function AlunosFinanceiroPage() {
       }
 
       if (!carregouOpcoes) {
-        const [resOpcoes, resTurmas] = await Promise.all([
+        const [resOpcoes, resTurmas, resInstituicoes, resCursos] = await Promise.all([
           fetch('/api/turmas/opcoes'),
-          fetch('/api/turmas')
+          fetch('/api/turmas'),
+          fetch('/api/comercial/instituicoes'),
+          fetch('/api/cursos')
         ]);
         if (resOpcoes.ok) {
           const dataOpcoes = await resOpcoes.json();
-          if (dataOpcoes.unidades) setUnidades(dataOpcoes.unidades);
+          if (dataOpcoes.unidades) setTodasUnidades(dataOpcoes.unidades);
+          if (dataOpcoes.instituicoes && dataOpcoes.instituicoes.length > 0) {
+            setInstituicoes(dataOpcoes.instituicoes);
+          }
+        }
+        if (resInstituicoes.ok) {
+          const dataInst = await resInstituicoes.json();
+          if (Array.isArray(dataInst) && dataInst.length > 0) {
+            setInstituicoes(dataInst);
+          }
+        }
+        if (resCursos.ok) {
+          const dataCursos = await resCursos.json();
+          const listC = Array.isArray(dataCursos) ? dataCursos : dataCursos.cursos || [];
+          setTodosCursos(listC);
         }
         if (resTurmas.ok) {
           const dataTurmas = await resTurmas.json();
@@ -1616,7 +1637,7 @@ export default function AlunosFinanceiroPage() {
   // Disparar busca ao mudar os filtros
   useEffect(() => {
     carregarDados();
-  }, [filtroStatus, filtroCurso, filtroTurma, filtroUnidade, filtroAnoLetivo]);
+  }, [filtroStatus, filtroInstituicao, filtroUnidade, filtroCurso, filtroTurma, filtroAnoLetivo]);
 
   // Debounce para busca por texto
   useEffect(() => {
@@ -1626,25 +1647,73 @@ export default function AlunosFinanceiroPage() {
     return () => clearTimeout(delayDebounceFn);
   }, [filtroNome]);
 
-  const limparFiltros = () => {
-    setFiltroNome('');
-    setFiltroStatus('ATIVO');
+  // Handlers hierárquicos: ao mudar um filtro superior, limpa os inferiores incompatíveis
+  const handleInstituicaoChange = (val) => {
+    setFiltroInstituicao(val);
+    setFiltroUnidade('');
     setFiltroCurso('');
     setFiltroTurma('');
+  };
+
+  const handleUnidadeChange = (val) => {
+    setFiltroUnidade(val);
+    setFiltroCurso('');
+    setFiltroTurma('');
+  };
+
+  const handleCursoChange = (val) => {
+    setFiltroCurso(val);
+    setFiltroTurma('');
+  };
+
+  const limparFiltros = () => {
+    setFiltroNome('');
+    setFiltroStatus('');
+    setFiltroInstituicao('');
     setFiltroUnidade('');
+    setFiltroCurso('');
+    setFiltroTurma('');
     setFiltroAnoLetivo('');
   };
 
-  const turmasFiltradasOpcoes = useMemo(() => {
-    let list = todasTurmas;
-    if (filtroCurso) {
-      list = list.filter(t => String(t.cursoId) === String(filtroCurso));
-    }
-    if (filtroUnidade) {
-      list = list.filter(t => String(t.unidadeId) === String(filtroUnidade));
+  // Unidades filtradas pela instituição selecionada
+  const unidadesFiltradasOpcoes = useMemo(() => {
+    let list = todasUnidades;
+    if (filtroInstituicao) {
+      list = list.filter(u => String(u.instituicao_id || u.instituicaoId) === String(filtroInstituicao));
     }
     return list;
-  }, [todasTurmas, filtroCurso, filtroUnidade]);
+  }, [todasUnidades, filtroInstituicao]);
+
+  // Cursos filtrados pela instituição e pela unidade selecionadas
+  const cursosFiltradosOpcoes = useMemo(() => {
+    let list = todosCursos.length > 0 ? todosCursos : cursos;
+    if (filtroInstituicao) {
+      list = list.filter(c => !c.instituicaoId || String(c.instituicaoId || c.instituicao_id) === String(filtroInstituicao));
+    }
+    if (filtroUnidade) {
+      list = list.filter(c => {
+        if (!c.unidadeIds || c.unidadeIds.length === 0) return true;
+        return c.unidadeIds.some(uid => String(uid) === String(filtroUnidade));
+      });
+    }
+    return list;
+  }, [todosCursos, cursos, filtroInstituicao, filtroUnidade]);
+
+  // Turmas filtradas conforme o curso selecionado (e unidade/instituição)
+  const turmasFiltradasOpcoes = useMemo(() => {
+    let list = todasTurmas;
+    if (filtroInstituicao) {
+      list = list.filter(t => !t.instituicaoId || String(t.instituicaoId || t.instituicao_id) === String(filtroInstituicao));
+    }
+    if (filtroUnidade) {
+      list = list.filter(t => String(t.unidadeId || t.unidade_id) === String(filtroUnidade));
+    }
+    if (filtroCurso) {
+      list = list.filter(t => String(t.cursoId || t.curso_id) === String(filtroCurso));
+    }
+    return list;
+  }, [todasTurmas, filtroInstituicao, filtroUnidade, filtroCurso]);
 
   const anosLetivosOpcoes = useMemo(() => {
     const anos = todasTurmas.map(t => t.anoLetivo).filter(Boolean);
@@ -1672,6 +1741,8 @@ export default function AlunosFinanceiroPage() {
       PRE_CADASTRO:                   { cls: 'bg-gray-100 text-gray-700',     label: 'Pré-Cadastro' },
       AGUARDANDO_PAGAMENTO_MATRICULA: { cls: 'bg-purple-100 text-purple-800', label: 'Ag. Pgto Matrícula' },
       AGUARDANDO_FORMACAO_TURMA:      { cls: 'bg-indigo-100 text-indigo-800', label: 'Ag. Formação Turma' },
+      TRANCADO:                       { cls: 'bg-amber-100 text-amber-800',   label: 'Trancado' },
+      TRANCADO_COM_DEBITO:            { cls: 'bg-orange-100 text-orange-800', label: 'Trancado c/ Débito' },
       DESISTENTE:                     { cls: 'bg-orange-100 text-orange-800', label: 'Desistente' },
       CANCELADO:                      { cls: 'bg-red-100 text-red-800',       label: 'Cancelado' },
     }[status] || { cls: 'bg-gray-100 text-gray-800', label: status || '—' };
@@ -1739,16 +1810,21 @@ export default function AlunosFinanceiroPage() {
             { value: "PRE_CADASTRO", label: "Pré-Cadastro" },
             { value: "AGUARDANDO_PAGAMENTO_MATRICULA", label: "Ag. Pagamento Matrícula" },
             { value: "AGUARDANDO_FORMACAO_TURMA", label: "Ag. Formação de Turma" },
+            { value: "TRANCADO", label: "Trancado" },
+            { value: "TRANCADO_COM_DEBITO", label: "Trancado c/ Débito" },
             { value: "DESISTENTE", label: "Desistente" },
             { value: "CANCELADO", label: "Cancelado" },
             { value: "INATIVO", label: "Inativo" }
           ]}
+          instituicaoValue={filtroInstituicao}
+          onInstituicaoChange={handleInstituicaoChange}
+          instituicoes={instituicoes}
           unidadeValue={filtroUnidade}
-          onUnidadeChange={setFiltroUnidade}
-          unidades={unidades}
+          onUnidadeChange={handleUnidadeChange}
+          unidades={unidadesFiltradasOpcoes}
           cursoValue={filtroCurso}
-          onCursoChange={setFiltroCurso}
-          cursos={cursos}
+          onCursoChange={handleCursoChange}
+          cursos={cursosFiltradosOpcoes}
           turmaValue={filtroTurma}
           onTurmaChange={setFiltroTurma}
           turmas={turmasFiltradasOpcoes}
@@ -1819,14 +1895,28 @@ export default function AlunosFinanceiroPage() {
                               className="p-1.5 text-indigo-650 hover:bg-indigo-50 rounded-lg transition">
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 012-2h2a2 2 0 012 2v1m-6 4h4" /></svg>
                             </button>
-                            {!['CANCELADO', 'DESISTENTE', 'TRANCADO'].includes(aluno.statusmatricula) && (
-                              <button onClick={() => setModalTrancar(aluno)} title="Trancar Matrícula"
-                                className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition">
+                            {/* Botão Dinâmico Trancar / Reabrir Matrícula */}
+                            {['TRANCADO', 'TRANCADO_COM_DEBITO'].includes(aluno.statusmatricula) ? (
+                              <button
+                                onClick={() => setModalReabrir(aluno)}
+                                title="Reabrir Matrícula"
+                                className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition cursor-pointer"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                                </svg>
+                              </button>
+                            ) : !['CANCELADO', 'DESISTENTE'].includes(aluno.statusmatricula) ? (
+                              <button
+                                onClick={() => setModalTrancar(aluno)}
+                                title="Trancar Matrícula"
+                                className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition cursor-pointer"
+                              >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                 </svg>
                               </button>
-                            )}
+                            ) : null}
                           </div>
                         </td>
                       </tr>
@@ -2269,6 +2359,13 @@ export default function AlunosFinanceiroPage() {
           onSalvo={carregarDados}
         />
       )}
+      {modalReabrir && (
+        <ModalReabrir
+          aluno={modalReabrir}
+          onClose={() => setModalReabrir(null)}
+          onSalvo={carregarDados}
+        />
+      )}
       {modalLote && (
         <ModalLote
           turmas={todasTurmas}
@@ -2374,6 +2471,103 @@ function ModalConfirmar({ titulo, mensagem, onConfirm, onClose }) {
   );
 }
 
+
+function ModalReabrir({ aluno, onClose, onSalvo }) {
+  const [observacao, setObservacao] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [erro, setErro] = useState('');
+
+  const handleConfirmar = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setErro('');
+    try {
+      const res = await fetch(`/api/admin-financeiro/alunos/${aluno.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acao: 'reabrir', observacao_reabertura: observacao }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Erro ao reabrir matrícula do aluno');
+      }
+      onSalvo();
+      onClose();
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cursoNome = aluno.cursos?.nome || aluno.curso || '-';
+  const turmaNome = aluno.turmas?.nome || aluno.turma || '-';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
+          <h3 className="text-base font-bold text-gray-800">Reabrir Matrícula</h3>
+          <button onClick={onClose} disabled={loading} className="text-gray-400 hover:text-gray-650">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <form onSubmit={handleConfirmar} className="flex flex-col flex-1 overflow-hidden">
+          <div className="p-6 overflow-y-auto space-y-4 flex-1">
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+              <p className="text-xs text-emerald-800 font-semibold">Confirmação de Reabertura</p>
+              <p className="text-xs text-emerald-700 mt-1">
+                A matrícula do aluno será reativada para o status <strong>ATIVO</strong>. O histórico financeiro, carnês e parcelas anteriores serão mantidos íntegros. Nenhuma nova matrícula duplicada será gerada.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block">Aluno</label>
+                <p className="font-semibold text-gray-800">{aluno.nome}</p>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block">Curso / Turma</label>
+                <p className="font-semibold text-gray-800">{cursoNome} · {turmaNome}</p>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
+                Observação da Reabertura (Opcional)
+              </label>
+              <textarea
+                rows={3}
+                value={observacao}
+                onChange={e => setObservacao(e.target.value)}
+                placeholder="Descreva o motivo ou detalhes da reabertura de matrícula..."
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-emerald-500 resize-none text-gray-800 bg-white"
+              />
+            </div>
+
+            {erro && <p className="text-xs text-red-650 font-semibold">{erro}</p>}
+          </div>
+
+          <div className="flex justify-end gap-3 p-4 border-t bg-gray-50 rounded-b-xl flex-shrink-0">
+            <button type="button" onClick={onClose} disabled={loading}
+              className="px-4 py-2 text-sm text-gray-650 border border-gray-300 rounded-lg hover:bg-gray-100 transition">
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-5 py-2 text-sm font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition disabled:opacity-50"
+            >
+              {loading ? 'Reabrindo...' : 'Reabrir Matrícula'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 function ModalTrancar({ aluno, onClose, onSalvo }) {
   const [observacao, setObservacao] = useState('');

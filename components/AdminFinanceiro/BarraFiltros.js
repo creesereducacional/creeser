@@ -7,6 +7,9 @@ export default function BarraFiltros({
   statusValue,
   onStatusChange,
   statusOptions = [],
+  instituicaoValue,
+  onInstituicaoChange,
+  instituicoes = [],
   unidadeValue,
   onUnidadeChange,
   unidades = [],
@@ -23,6 +26,7 @@ export default function BarraFiltros({
 }) {
   const showSearch = onSearchChange !== undefined;
   const showStatus = onStatusChange !== undefined;
+  const showInstituicao = onInstituicaoChange !== undefined;
   const showUnidade = onUnidadeChange !== undefined;
   const showCurso = onCursoChange !== undefined;
   const showTurma = onTurmaChange !== undefined;
@@ -53,6 +57,21 @@ export default function BarraFiltros({
             {statusOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {showInstituicao && (
+          <select
+            value={instituicaoValue || ''}
+            onChange={(e) => onInstituicaoChange(e.target.value)}
+            className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 text-sm bg-white"
+          >
+            <option value="">Todas as Instituições</option>
+            {instituicoes.map((inst) => (
+              <option key={inst.id} value={inst.id}>
+                {inst.nome}
               </option>
             ))}
           </select>

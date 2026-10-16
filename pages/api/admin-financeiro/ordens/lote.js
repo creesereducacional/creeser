@@ -108,6 +108,8 @@ export default async function handler(req, res) {
       });
     }
 
+    const usuarioId = authUser.id ? Number(authUser.id) : null;
+
     const report = {
       gerados: [],
       ignorados: [],
@@ -223,6 +225,44 @@ export default async function handler(req, res) {
           continue;
         }
 
+        // Efetivar aluno se estiver com status PRE_CADASTRO
+        const agoraIso = new Date().toISOString();
+        const { data: alunoEfetivado } = await supabase
+          .from('alunos')
+          .update({
+            statusmatricula: 'ATIVO',
+            data_ativacao: agoraIso.slice(0, 10),
+          })
+          .eq('id', aluno.id)
+          .eq('statusmatricula', 'PRE_CADASTRO')
+          .select('id, nome, statusmatricula, instituicao_id')
+          .maybeSingle();
+
+        if (alunoEfetivado) {
+          try {
+            await supabase
+              .from('matriculas')
+              .update({ status_administrativo: 'ATIVO' })
+              .eq('aluno_id', aluno.id)
+              .in('status_administrativo', ['PRE_CADASTRO', 'AGUARDANDO_PAGAMENTO_MATRICULA']);
+          } catch (_) {}
+
+          try {
+            await supabase.from('financeiro_logs').insert({
+              aluno_id: aluno.id,
+              instituicao_id: alunoEfetivado.instituicao_id || instFinal || null,
+              usuario_id: usuarioId,
+              acao: 'efetivar_aluno_carne_lote',
+              observacao: 'Efetivação automática de aluno pré-cadastrado ao gerar carnê em lote',
+              dados_extras: {
+                status_anterior: 'PRE_CADASTRO',
+                status_novo: 'ATIVO',
+                ordem_pagamento_id: ordem.id,
+              }
+            });
+          } catch (_) {}
+        }
+
         report.gerados.push({ alunoId: aluno.id, nome: aluno.nome, valor: totalCarnetValue });
 
       } catch (e) {
@@ -231,7 +271,6 @@ export default async function handler(req, res) {
     }
 
     // Registrar log global da ação de lote
-    const usuarioId = authUser.id ? Number(authUser.id) : null;
     try {
       await supabase.from('audit_logs').insert([{
         usuario_id: usuarioId,
