@@ -776,134 +776,141 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden">
+        {/* Cabeçalho fixo */}
+        <div className="flex items-center justify-between px-5 py-3.5 sm:px-6 sm:py-4 border-b flex-shrink-0 bg-white">
           <div>
-            <h3 className="text-lg font-bold text-purple-700">Novo Carnê</h3>
-            <p className="text-sm text-gray-500">{aluno.nome}</p>
+            <h3 className="text-base sm:text-lg font-bold text-purple-700">Novo Carnê</h3>
+            <p className="text-xs sm:text-sm text-gray-500 truncate max-w-xs sm:max-w-md">{aluno.nome}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          <button type="button" onClick={onClose} disabled={salvando} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition">
+            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-3">
-          <p className="text-xs font-semibold text-teal-600 mb-1">Lançar carnê</p>
 
-          <div className="grid grid-cols-2 gap-3">
-            {/* Valor Nominal da Parcela | Desconto */}
-            <FieldGroup label="Valor Nominal da Parcela *">
-              <input type="number" step="0.01" min="0" value={form.valor}
-                onChange={e => set('valor', e.target.value)}
-                className={inputCls} placeholder="0,00" />
-            </FieldGroup>
-            <div className="flex flex-col">
-              <span className="text-xs font-semibold text-gray-600 mb-1">Desconto por Pontualidade</span>
-              <div className="flex items-stretch rounded-lg border border-teal-300 bg-teal-50 focus-within:border-teal-500 h-[38px]">
-                <input type="number" step="0.01" min="0" max={tipoDesconto === '%' ? 100 : undefined} value={form.percentual_desconto}
-                  onChange={e => set('percentual_desconto', e.target.value)}
-                  className={inputCls} placeholder="0" />
-                <select
-                  value={tipoDesconto}
-                  onChange={e => { setTipoDesconto(e.target.value); set('percentual_desconto', ''); }}
-                  className="px-2 py-2 text-xs font-bold text-teal-700 bg-teal-100 border-l border-teal-300 rounded-r-lg flex-shrink-0 focus:outline-none cursor-pointer">
-                  <option value="%">%</option>
-                  <option value="R$">R$</option>
-                </select>
+        {/* Formulário com rolagem independente e rodapé fixo */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
+          <div className="p-4 sm:p-6 overflow-y-auto space-y-3 flex-1 min-h-0">
+            <p className="text-xs font-semibold text-teal-600 mb-1">Lançar carnê</p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Valor Nominal da Parcela | Desconto */}
+              <FieldGroup label="Valor Nominal da Parcela *">
+                <input type="number" step="0.01" min="0" value={form.valor}
+                  onChange={e => set('valor', e.target.value)}
+                  className={inputCls} placeholder="0,00" />
+              </FieldGroup>
+              <div className="flex flex-col">
+                <span className="text-xs font-semibold text-gray-600 mb-1">Desconto por Pontualidade</span>
+                <div className="flex items-stretch rounded-lg border border-teal-300 bg-teal-50 focus-within:border-teal-500 h-[38px]">
+                  <input type="number" step="0.01" min="0" max={tipoDesconto === '%' ? 100 : undefined} value={form.percentual_desconto}
+                    onChange={e => set('percentual_desconto', e.target.value)}
+                    className={inputCls} placeholder="0" />
+                  <select
+                    value={tipoDesconto}
+                    onChange={e => { setTipoDesconto(e.target.value); set('percentual_desconto', ''); }}
+                    className="px-2 py-2 text-xs font-bold text-teal-700 bg-teal-100 border-l border-teal-300 rounded-r-lg flex-shrink-0 focus:outline-none cursor-pointer">
+                    <option value="%">%</option>
+                    <option value="R$">R$</option>
+                  </select>
+                </div>
               </div>
+
+              {/* 1º Vencimento | Data limite do desconto */}
+              <FieldGroup label="1º Vencimento *">
+                <input type="date" value={form.data_vencimento}
+                  onChange={e => set('data_vencimento', e.target.value)}
+                  className={inputCls} />
+              </FieldGroup>
+              <FieldGroup label="Data limite do desconto">
+                <input type="date" value={form.vencimento_desconto}
+                  onChange={e => set('vencimento_desconto', e.target.value)}
+                  className={inputCls} />
+              </FieldGroup>
+
+              {/* Qtd. Parcelas | Intervalo */}
+              <FieldGroup label="Qtd. Parcelas">
+                <input type="number" min="1" max="60" value={form.quantidade_parcelas}
+                  onChange={e => set('quantidade_parcelas', e.target.value)}
+                  className={inputCls} placeholder="Parcelas" />
+              </FieldGroup>
+              <FieldGroup label="Período">
+                <select value={form.periodo}
+                  onChange={e => set('periodo', e.target.value)}
+                  className={inputCls + ' cursor-pointer'}>
+                  <option value="Período Único">Período Único</option>
+                  {Array.from({ length: 20 }, (_, i) => i + 1).map(n => (
+                    <option key={n} value={`${n}º Período`}>{n}º Período</option>
+                  ))}
+                </select>
+              </FieldGroup>
+
+              {/* Descrição — linha inteira */}
+              <FieldGroup label="Descrição" className="col-span-1 sm:col-span-2">
+                <textarea rows={2} value={form.descricao}
+                  onChange={e => set('descricao', e.target.value)}
+                  className={inputCls + ' resize-none'}
+                  placeholder="Caso deixe em branco, será inserido: 'MENSALIDADE'." />
+              </FieldGroup>
+              {Number(form.valor) > 0 ? (
+                <div className="col-span-1 sm:col-span-2 bg-purple-50 border border-purple-200 rounded-lg px-4 py-3 text-sm space-y-2">
+                  <div className="flex justify-between text-gray-600">
+                    <span>Valor nominal da parcela</span>
+                    <span className="font-semibold text-gray-800">R$ {(Number(form.valor) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-600">
+                    <span>Desconto concedido até {formatarData(form.vencimento_desconto)}</span>
+                    <span className="text-red-650 font-medium">- R$ {calcDescontoParcela().toLocaleString('pt-BR', { minimumFractionDigits: 2 })} {tipoDesconto === '%' ? `(${form.percentual_desconto || 0}%)` : ''}</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-green-50 border border-green-200 rounded-lg p-2 text-green-800 font-bold text-sm">
+                    <span>Valor para pagamento até a data limite</span>
+                    <span className="text-lg">R$ {calcParcelaFinal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-orange-50 border border-orange-200 rounded-lg p-2 text-orange-800 font-semibold text-sm">
+                    <span>Valor após a data limite</span>
+                    <span>R$ {(Number(form.valor) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="border-t border-purple-200 my-1" />
+                  <div className="space-y-1">
+                    <div className="text-xs font-semibold text-purple-900">Após o vencimento:</div>
+                    <div className="flex justify-between text-gray-600 text-xs pl-2">
+                      <span>• Multa</span>
+                      <span>{configFinanceira.multa.toFixed(1)}%</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600 text-xs pl-2">
+                      <span>• Juros</span>
+                      <span>{configFinanceira.juros.toFixed(3)}% ao dia</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between text-gray-600 text-xs">
+                    <span>Dias de tolerância</span>
+                    <span>{configFinanceira.tolerancia} dias</span>
+                  </div>
+                  <div className="border-t border-purple-200 my-1" />
+                  <div className="flex justify-between text-gray-600 text-xs">
+                    <span>Quantidade de parcelas</span>
+                    <span>{Number(form.quantidade_parcelas) || 1}×</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-purple-100 border border-purple-300 rounded-lg p-2 text-purple-800 font-extrabold text-base">
+                    <span>Total nominal do carnê</span>
+                    <span className="text-xl text-purple-900">R$ {calcValorTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <p className="text-[10px] text-gray-500 italic mt-2 text-center">
+                    "Este carnê será emitido com valor nominal. O desconto será aplicado automaticamente pelo gateway apenas para pagamentos realizados até a data limite."
+                  </p>
+                </div>
+              ) : <div className="col-span-1 sm:col-span-2" />}
             </div>
 
-            {/* 1º Vencimento | Data limite do desconto */}
-            <FieldGroup label="1º Vencimento *">
-              <input type="date" value={form.data_vencimento}
-                onChange={e => set('data_vencimento', e.target.value)}
-                className={inputCls} />
-            </FieldGroup>
-            <FieldGroup label="Data limite do desconto">
-              <input type="date" value={form.vencimento_desconto}
-                onChange={e => set('vencimento_desconto', e.target.value)}
-                className={inputCls} />
-            </FieldGroup>
-
-            {/* Qtd. Parcelas | Intervalo */}
-            <FieldGroup label="Qtd. Parcelas">
-              <input type="number" min="1" max="60" value={form.quantidade_parcelas}
-                onChange={e => set('quantidade_parcelas', e.target.value)}
-                className={inputCls} placeholder="Parcelas" />
-            </FieldGroup>
-            <FieldGroup label="Período">
-              <select value={form.periodo}
-                onChange={e => set('periodo', e.target.value)}
-                className={inputCls + ' cursor-pointer'}>
-                <option value="Período Único">Período Único</option>
-                {Array.from({ length: 20 }, (_, i) => i + 1).map(n => (
-                  <option key={n} value={`${n}º Período`}>{n}º Período</option>
-                ))}
-              </select>
-            </FieldGroup>
-
-            {/* Descrição — linha inteira */}
-            <FieldGroup label="Descrição" className="col-span-2">
-              <textarea rows={2} value={form.descricao}
-                onChange={e => set('descricao', e.target.value)}
-                className={inputCls + ' resize-none'}
-                placeholder="Caso deixe em branco, será inserido: 'MENSALIDADE'." />
-            </FieldGroup>
-            {Number(form.valor) > 0 ? (
-              <div className="col-span-2 bg-purple-50 border border-purple-200 rounded-lg px-4 py-3 text-sm space-y-2">
-                <div className="flex justify-between text-gray-600">
-                  <span>Valor nominal da parcela</span>
-                  <span className="font-semibold text-gray-800">R$ {(Number(form.valor) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Desconto concedido até {formatarData(form.vencimento_desconto)}</span>
-                  <span className="text-red-650 font-medium">- R$ {calcDescontoParcela().toLocaleString('pt-BR', { minimumFractionDigits: 2 })} {tipoDesconto === '%' ? `(${form.percentual_desconto || 0}%)` : ''}</span>
-                </div>
-                <div className="flex justify-between items-center bg-green-50 border border-green-200 rounded-lg p-2 text-green-800 font-bold text-sm">
-                  <span>Valor para pagamento até a data limite</span>
-                  <span className="text-lg">R$ {calcParcelaFinal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between items-center bg-orange-50 border border-orange-200 rounded-lg p-2 text-orange-800 font-semibold text-sm">
-                  <span>Valor após a data limite</span>
-                  <span>R$ {(Number(form.valor) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="border-t border-purple-200 my-1" />
-                <div className="space-y-1">
-                  <div className="text-xs font-semibold text-purple-900">Após o vencimento:</div>
-                  <div className="flex justify-between text-gray-600 text-xs pl-2">
-                    <span>• Multa</span>
-                    <span>{configFinanceira.multa.toFixed(1)}%</span>
-                  </div>
-                  <div className="flex justify-between text-gray-600 text-xs pl-2">
-                    <span>• Juros</span>
-                    <span>{configFinanceira.juros.toFixed(3)}% ao dia</span>
-                  </div>
-                </div>
-                <div className="flex justify-between text-gray-600 text-xs">
-                  <span>Dias de tolerância</span>
-                  <span>{configFinanceira.tolerancia} dias</span>
-                </div>
-                <div className="border-t border-purple-200 my-1" />
-                <div className="flex justify-between text-gray-600 text-xs">
-                  <span>Quantidade de parcelas</span>
-                  <span>{Number(form.quantidade_parcelas) || 1}×</span>
-                </div>
-                <div className="flex justify-between items-center bg-purple-100 border border-purple-300 rounded-lg p-2 text-purple-800 font-extrabold text-base">
-                  <span>Total nominal do carnê</span>
-                  <span className="text-xl text-purple-900">R$ {calcValorTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <p className="text-[10px] text-gray-500 italic mt-2 text-center">
-                  "Este carnê será emitido com valor nominal. O desconto será aplicado automaticamente pelo gateway apenas para pagamentos realizados até a data limite."
-                </p>
-              </div>
-            ) : <div className="col-span-2" />}
+            {erro && <p className="text-sm text-red-650 font-semibold">{erro}</p>}
+            {sucesso && <p className="text-sm text-green-650 font-semibold">{sucesso}</p>}
           </div>
 
-          {erro && <p className="text-sm text-red-650 font-semibold">{erro}</p>}
-          {sucesso && <p className="text-sm text-green-650 font-semibold">{sucesso}</p>}
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100">Cancelar</button>
-            <button type="submit" disabled={salvando} className="px-5 py-2 text-sm font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50">
+          {/* Rodapé fixo */}
+          <div className="flex justify-end gap-3 px-5 py-3.5 sm:px-6 sm:py-4 border-t bg-gray-50 flex-shrink-0">
+            <button type="button" onClick={onClose} disabled={salvando} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition">Cancelar</button>
+            <button type="submit" disabled={salvando} className="px-5 py-2 text-sm font-semibold bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition cursor-pointer">
               {salvando ? 'Salvando...' : 'Criar Carnê'}
             </button>
           </div>
