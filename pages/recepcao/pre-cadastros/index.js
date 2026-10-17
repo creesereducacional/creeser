@@ -231,13 +231,12 @@ export default function PreCadastrosIndex() {
     busca || filtroStatus || filtroInstituicao || filtroUnidade || filtroCurso || filtroTurma
   );
 
-  // ── Filtragem dos Dados ────────────────────────────────────────────────
-  const filtrados = useMemo(() => {
+  // Lista base filtrada pela hierarquia (Busca, Instituição, Unidade, Curso, Turma) exceto Status
+  const baseFiltradaSemStatus = useMemo(() => {
     const q = busca.toLowerCase().trim();
     const qNum = busca.replace(/\D/g, '');
 
     return lista.filter(a => {
-      // Busca textual por nome, CPF, telefone ou email
       const matchBusca =
         !busca ||
         (a.nome || '').toLowerCase().includes(q) ||
@@ -247,33 +246,32 @@ export default function PreCadastrosIndex() {
         (a.curso_nome || '').toLowerCase().includes(q) ||
         (a.turma_nome || '').toLowerCase().includes(q);
 
-      // Status
-      const matchStatus = !filtroStatus || a.statusmatricula === filtroStatus;
-
-      // Instituição
       const matchInstituicao = !filtroInstituicao || String(a.instituicao_id) === String(filtroInstituicao);
-
-      // Unidade
       const matchUnidade = !filtroUnidade || String(a.unidade_id) === String(filtroUnidade);
-
-      // Curso
       const matchCurso = !filtroCurso || String(a.cursoid) === String(filtroCurso);
-
-      // Turma
       const matchTurma = !filtroTurma || String(a.turmaid) === String(filtroTurma);
 
-      return matchBusca && matchStatus && matchInstituicao && matchUnidade && matchCurso && matchTurma;
+      return matchBusca && matchInstituicao && matchUnidade && matchCurso && matchTurma;
     });
-  }, [lista, busca, filtroStatus, filtroInstituicao, filtroUnidade, filtroCurso, filtroTurma]);
+  }, [lista, busca, filtroInstituicao, filtroUnidade, filtroCurso, filtroTurma]);
 
-  // Contagem por status para os tabs
+  // Contagem por status para os tabs respeitando os filtros de escopo aplicados
   const contagem = useMemo(() => {
     const counts = {};
-    lista.forEach(a => {
+    baseFiltradaSemStatus.forEach(a => {
       counts[a.statusmatricula] = (counts[a.statusmatricula] || 0) + 1;
     });
     return counts;
-  }, [lista]);
+  }, [baseFiltradaSemStatus]);
+
+  // Total geral filtrado pelo escopo (para o tab "Todos")
+  const totalBaseSemStatus = baseFiltradaSemStatus.length;
+
+  // ── Filtragem dos Dados (inclui Status) ─────────────────────────────────
+  const filtrados = useMemo(() => {
+    if (!filtroStatus) return baseFiltradaSemStatus;
+    return baseFiltradaSemStatus.filter(a => a.statusmatricula === filtroStatus);
+  }, [baseFiltradaSemStatus, filtroStatus]);
 
   // ── Paginação ──────────────────────────────────────────────────────────
   const totalRegistros = filtrados.length;
@@ -517,7 +515,7 @@ export default function PreCadastrosIndex() {
               <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-hide flex-1">
                 {STATUS_FILTROS.map(f => {
                   const ativo = filtroStatus === f.key;
-                  const cnt   = f.key ? (contagem[f.key] || 0) : lista.length;
+                  const cnt   = f.key ? (contagem[f.key] || 0) : totalBaseSemStatus;
                   return (
                     <button
                       key={f.key}
