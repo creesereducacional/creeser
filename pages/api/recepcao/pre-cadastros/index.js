@@ -91,6 +91,7 @@ export default async function handler(req, res) {
       let turmasQuery = supabase.from('turmas').select('id, nome, cursoid, unidadeid, turno, situacao, instituicao_id');
       let unidadesQuery = supabase.from('unidades').select('id, nome, instituicao_id');
       let cursoUnidadeQuery = supabase.from('curso_unidade').select('id, cursoid, unidadeid');
+      let instituicoesQuery = supabase.from('instituicoes').select('id, nome, ativa').order('ordem', { ascending: true }).order('nome', { ascending: true });
 
       cursosQuery = applyInstituicaoFilter(cursosQuery, instituicaoId);
       turmasQuery = applyInstituicaoFilter(turmasQuery, instituicaoId);
@@ -102,12 +103,14 @@ export default async function handler(req, res) {
         { data: turmas },
         { data: unidades },
         { data: cursoUnidade },
+        { data: instituicoesData },
       ] = await Promise.all([
         query,
         cursosQuery,
         turmasQuery,
         unidadesQuery,
         cursoUnidadeQuery,
+        instituicoesQuery,
       ]);
 
       if (errAlunos) {
@@ -140,9 +143,11 @@ export default async function handler(req, res) {
           unidadeId = Array.from(cursoUnidadesMap[a.cursoid])[0];
         }
         const unidade = unidadesMap[unidadeId];
+        const alunoInstId = a.instituicao_id || turma?.instituicao_id || unidade?.instituicao_id || curso?.instituicao_id || null;
 
         return {
           ...a,
+          instituicao_id: alunoInstId,
           curso_nome: curso?.nome || null,
           turma_nome: turma?.nome ? `${turma.nome}${turma.turno ? ' — ' + turma.turno : ''}` : null,
           unidade_id: unidadeId,
@@ -154,6 +159,7 @@ export default async function handler(req, res) {
         const opcoesCursos = (cursos || []).map(c => ({
           id: c.id,
           nome: c.nome,
+          instituicao_id: c.instituicao_id,
           unidade_ids: Array.from(cursoUnidadesMap[c.id] || []),
         }));
 
@@ -162,6 +168,7 @@ export default async function handler(req, res) {
           nome: t.nome,
           cursoid: t.cursoid,
           unidadeid: t.unidadeid,
+          instituicao_id: t.instituicao_id,
           turno: t.turno,
           situacao: t.situacao,
         }));
@@ -169,10 +176,17 @@ export default async function handler(req, res) {
         const opcoesUnidades = (unidades || []).map(u => ({
           id: u.id,
           nome: u.nome,
+          instituicao_id: u.instituicao_id,
+        }));
+
+        const opcoesInstituicoes = (instituicoesData || []).filter(inst => inst.ativa !== false).map(inst => ({
+          id: inst.id,
+          nome: inst.nome,
         }));
 
         return res.status(200).json({
           alunos: enrichedAlunos,
+          instituicoes: opcoesInstituicoes,
           unidades: opcoesUnidades,
           cursos: opcoesCursos,
           turmas: opcoesTurmas,

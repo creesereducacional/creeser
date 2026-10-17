@@ -40,18 +40,20 @@ export default function PreCadastrosIndex() {
   const router = useRouter();
 
   // Dados
-  const [lista, setLista]           = useState([]);
-  const [unidades, setUnidades]     = useState([]);
-  const [cursos, setCursos]         = useState([]);
-  const [turmas, setTurmas]         = useState([]);
-  const [carregando, setCarregando] = useState(true);
+  const [lista, setLista]                 = useState([]);
+  const [instituicoes, setInstituicoes]   = useState([]);
+  const [unidades, setUnidades]           = useState([]);
+  const [cursos, setCursos]               = useState([]);
+  const [turmas, setTurmas]               = useState([]);
+  const [carregando, setCarregando]       = useState(true);
 
   // Filtros
-  const [busca, setBusca]                 = useState('');
-  const [filtroStatus, setFiltroStatus]   = useState('');
-  const [filtroUnidade, setFiltroUnidade] = useState('');
-  const [filtroCurso, setFiltroCurso]     = useState('');
-  const [filtroTurma, setFiltroTurma]     = useState('');
+  const [busca, setBusca]                         = useState('');
+  const [filtroStatus, setFiltroStatus]           = useState('');
+  const [filtroInstituicao, setFiltroInstituicao] = useState('');
+  const [filtroUnidade, setFiltroUnidade]         = useState('');
+  const [filtroCurso, setFiltroCurso]             = useState('');
+  const [filtroTurma, setFiltroTurma]             = useState('');
 
   // Paginação
   const [paginaAtual, setPaginaAtual]         = useState(1);
@@ -70,38 +72,93 @@ export default function PreCadastrosIndex() {
   // Carregar dados e opções
   useEffect(() => {
     setCarregando(true);
-    fetch('/api/recepcao/pre-cadastros?include_options=true', { credentials: 'include' })
-      .then(r => r.json())
-      .then(data => {
+    Promise.all([
+      fetch('/api/recepcao/pre-cadastros?include_options=true', { credentials: 'include' }).then(r => r.json()).catch(() => null),
+      fetch('/api/comercial/instituicoes', { credentials: 'include' }).then(r => r.ok ? r.json() : []).catch(() => [])
+    ])
+      .then(([data, dataInst]) => {
+        let instList = Array.isArray(dataInst) ? dataInst : [];
         if (data && typeof data === 'object' && !Array.isArray(data)) {
           setLista(Array.isArray(data.alunos) ? data.alunos : []);
           setUnidades(Array.isArray(data.unidades) ? data.unidades : []);
           setCursos(Array.isArray(data.cursos) ? data.cursos : []);
           setTurmas(Array.isArray(data.turmas) ? data.turmas : []);
+          if (Array.isArray(data.instituicoes) && data.instituicoes.length > 0) {
+            instList = data.instituicoes;
+          }
         } else if (Array.isArray(data)) {
           setLista(data);
         }
+        setInstituicoes(instList);
       })
       .catch(() => {})
       .finally(() => setCarregando(false));
   }, []);
 
   // ── Dependência de Filtros em Cascata ──────────────────────────────────
-  // Cursos disponíveis respeitando a unidade selecionada
-  const cursosFiltrados = useMemo(() => {
-    if (!filtroUnidade) return cursos;
-    const unidIdNum = Number(filtroUnidade);
-    return cursos.filter(c => Array.isArray(c.unidade_ids) && c.unidade_ids.includes(unidIdNum));
-  }, [cursos, filtroUnidade]);
+  // Unidades disponíveis respeitando a instituição selecionada
+  const unidadesFiltradas = useMemo(() => {
+    if (!filtroInstituicao) return unidades;
+    return unidades.filter(u => String(u.instituicao_id) === String(filtroInstituicao));
+  }, [unidades, filtroInstituicao]);
 
-  // Turmas disponíveis respeitando unidade e curso selecionados
+  // Cursos disponíveis respeitando a instituição e a unidade selecionadas
+  const cursosFiltrados = useMemo(() => {
+    let list = cursos;
+    if (filtroInstituicao) {
+      list = list.filter(c => !c.instituicao_id || String(c.instituicao_id) === String(filtroInstituicao));
+    }
+    if (filtroUnidade) {
+      const unidIdNum = Number(filtroUnidade);
+      list = list.filter(c => Array.isArray(c.unidade_ids) && c.unidade_ids.includes(unidIdNum));
+    }
+    return list;
+  }, [cursos, filtroInstituicao, filtroUnidade]);
+
+  // Turmas disponíveis respeitando instituição, unidade e curso selecionados
   const turmasFiltradas = useMemo(() => {
     return turmas.filter(t => {
+      const matchInst = !filtroInstituicao || !t.instituicao_id || String(t.instituicao_id) === String(filtroInstituicao);
       const matchUnidade = !filtroUnidade || Number(t.unidadeid) === Number(filtroUnidade);
       const matchCurso = !filtroCurso || Number(t.cursoid) === Number(filtroCurso);
-      return matchUnidade && matchCurso;
+      return matchInst && matchUnidade && matchCurso;
     });
-  }, [turmas, filtroUnidade, filtroCurso]);
+  }, [turmas, filtroInstituicao, filtroUnidade, filtroCurso]);
+
+  // Ao mudar Instituição, limpar seleções inferiores incompatíveis
+  function handleInstituicaoChange(novaInstituicao) {
+    setFiltroInstituicao(novaInstituicao);
+    setPaginaAtual(1);
+    if (novaInstituicao) {
+      if (filtroUnidade) {
+        const unidValida = unidades.some(
+          u => String(u.id) === String(filtroUnidade) && String(u.instituicao_id) === String(novaInstituicao)
+        );
+        if (!unidValida) {
+          setFiltroUnidade('');
+          setFiltroCurso('');
+          setFiltroTurma('');
+        }
+      }
+      if (filtroCurso) {
+        const cursoValido = cursos.some(
+          c => String(c.id) === String(filtroCurso) && (!c.instituicao_id || String(c.instituicao_id) === String(novaInstituicao))
+        );
+        if (!cursoValido) {
+          setFiltroCurso('');
+          setFiltroTurma('');
+        }
+      }
+      if (filtroTurma) {
+        const turmaValida = turmas.some(
+          t => String(t.id) === String(filtroTurma) && (!t.instituicao_id || String(t.instituicao_id) === String(novaInstituicao))
+        );
+        if (!turmaValida) {
+          setFiltroTurma('');
+        }
+      }
+    }
+  }
 
   // Ao mudar Unidade, limpar Curso ou Turma caso fiquem incompatíveis
   function handleUnidadeChange(novaUnidade) {
@@ -163,6 +220,7 @@ export default function PreCadastrosIndex() {
   function handleLimparFiltros() {
     setBusca('');
     setFiltroStatus('');
+    setFiltroInstituicao('');
     setFiltroUnidade('');
     setFiltroCurso('');
     setFiltroTurma('');
@@ -170,7 +228,7 @@ export default function PreCadastrosIndex() {
   }
 
   const temFiltrosAtivos = Boolean(
-    busca || filtroStatus || filtroUnidade || filtroCurso || filtroTurma
+    busca || filtroStatus || filtroInstituicao || filtroUnidade || filtroCurso || filtroTurma
   );
 
   // ── Filtragem dos Dados ────────────────────────────────────────────────
@@ -192,6 +250,9 @@ export default function PreCadastrosIndex() {
       // Status
       const matchStatus = !filtroStatus || a.statusmatricula === filtroStatus;
 
+      // Instituição
+      const matchInstituicao = !filtroInstituicao || String(a.instituicao_id) === String(filtroInstituicao);
+
       // Unidade
       const matchUnidade = !filtroUnidade || String(a.unidade_id) === String(filtroUnidade);
 
@@ -201,9 +262,9 @@ export default function PreCadastrosIndex() {
       // Turma
       const matchTurma = !filtroTurma || String(a.turmaid) === String(filtroTurma);
 
-      return matchBusca && matchStatus && matchUnidade && matchCurso && matchTurma;
+      return matchBusca && matchStatus && matchInstituicao && matchUnidade && matchCurso && matchTurma;
     });
-  }, [lista, busca, filtroStatus, filtroUnidade, filtroCurso, filtroTurma]);
+  }, [lista, busca, filtroStatus, filtroInstituicao, filtroUnidade, filtroCurso, filtroTurma]);
 
   // Contagem por status para os tabs
   const contagem = useMemo(() => {
@@ -234,6 +295,7 @@ export default function PreCadastrosIndex() {
   }
 
   // Descrições dos filtros ativos para o cabeçalho de impressão
+  const nomeInstituicaoSel = instituicoes.find(i => String(i.id) === String(filtroInstituicao))?.nome || 'Todas';
   const nomeUnidadeSel = unidades.find(u => String(u.id) === String(filtroUnidade))?.nome || 'Todas';
   const nomeCursoSel = cursos.find(c => String(c.id) === String(filtroCurso))?.nome || 'Todos';
   const nomeTurmaSel = turmas.find(t => String(t.id) === String(filtroTurma))?.nome || 'Todas';
@@ -261,13 +323,14 @@ export default function PreCadastrosIndex() {
             </div>
 
             {/* Resumo dos Filtros Aplicados */}
-            <div className="mt-3 pt-2 border-t border-gray-200 grid grid-cols-4 gap-2 text-[11px] text-gray-600">
+            <div className="mt-3 pt-2 border-t border-gray-200 grid grid-cols-5 gap-2 text-[11px] text-gray-600">
+              <div><span className="font-semibold text-gray-800">Instituição:</span> {nomeInstituicaoSel}</div>
               <div><span className="font-semibold text-gray-800">Unidade:</span> {nomeUnidadeSel}</div>
               <div><span className="font-semibold text-gray-800">Curso:</span> {nomeCursoSel}</div>
               <div><span className="font-semibold text-gray-800">Turma:</span> {nomeTurmaSel}</div>
               <div><span className="font-semibold text-gray-800">Status:</span> {statusLabelSel}</div>
               {busca && (
-                <div className="col-span-4 mt-1"><span className="font-semibold text-gray-800">Busca textual:</span> &ldquo;{busca}&rdquo;</div>
+                <div className="col-span-5 mt-1"><span className="font-semibold text-gray-800">Busca textual:</span> &ldquo;{busca}&rdquo;</div>
               )}
             </div>
           </div>
@@ -345,8 +408,8 @@ export default function PreCadastrosIndex() {
 
           {/* ── Painel de Filtros Organizado e Responsivo ─────────────── */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3.5">
-            {/* Linha 1: Busca e Selects de Unidade, Curso e Turma */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Linha 1: Busca e Selects de Instituição, Unidade, Curso e Turma */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               {/* 1. Busca textual */}
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
@@ -371,7 +434,26 @@ export default function PreCadastrosIndex() {
                 </div>
               </div>
 
-              {/* 2. Unidade */}
+              {/* 2. Instituição */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                  🏛️ Instituição
+                </label>
+                <select
+                  value={filtroInstituicao}
+                  onChange={e => handleInstituicaoChange(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+                >
+                  <option value="">Todas as Instituições</option>
+                  {instituicoes.map(inst => (
+                    <option key={inst.id} value={inst.id}>
+                      {inst.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 3. Unidade */}
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
                   🏢 Unidade
@@ -382,7 +464,7 @@ export default function PreCadastrosIndex() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
                 >
                   <option value="">Todas as Unidades</option>
-                  {unidades.map(u => (
+                  {unidadesFiltradas.map(u => (
                     <option key={u.id} value={u.id}>
                       {u.nome}
                     </option>
@@ -390,7 +472,7 @@ export default function PreCadastrosIndex() {
                 </select>
               </div>
 
-              {/* 3. Curso */}
+              {/* 4. Curso */}
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
                   📖 Curso
@@ -409,7 +491,7 @@ export default function PreCadastrosIndex() {
                 </select>
               </div>
 
-              {/* 4. Turma */}
+              {/* 5. Turma */}
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
                   🏫 Turma
