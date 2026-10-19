@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import AdminFinanceiroLayout from '@/components/AdminFinanceiro/Layout';
-import ModalBaixaManual from '@/components/AdminFinanceiro/ModalBaixaManual';
+import ModalBaixaOrdem from '@/components/AdminFinanceiro/ModalBaixaOrdem';
 import BarraFiltros from '@/components/AdminFinanceiro/BarraFiltros';
 import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState   from '@/components/ui/EmptyState';
@@ -24,8 +24,8 @@ export default function OrdensPage() {
   const [todosCursos, setTodosCursos] = useState([]);
   const [todasTurmas, setTodasTurmas] = useState([]);
 
-  const [modalBaixaManual, setModalBaixaManual] = useState(null); // { parcela_id, valor, efi_charge_id, label }
-  const [baixandoParcela, setBaixandoParcela] = useState(false);
+  const [modalBaixaOrdem, setModalBaixaOrdem] = useState(null); // ordem selecionada para baixa manual
+  const [baixandoOrdem, setBaixandoOrdem] = useState(false);
   const [modalVerOrdem, setModalVerOrdem] = useState(null); // ordem selecionada para visualização
 
   useEffect(() => {
@@ -231,92 +231,25 @@ export default function OrdensPage() {
     }
   };
 
-  const handleAbrirBaixaManual = async (ordem) => {
-    if (!ordem) return;
-
-    const pDet = ordem.parcela_detalhes || {};
-    const valorBase = Number(pDet.valor_final ?? pDet.valor ?? ordem.valor_total ?? 0);
-
-    setModalBaixaManual({
-      ordem_id: ordem.id,
-      parcela_id: ordem.parcela_id,
-      aluno_nome: ordem.aluno_nome || 'N/A',
-      descricao: ordem.descricao || 'Ordem de Cobrança',
-      data_vencimento: ordem.data_vencimento,
-      status: ordem.status_parcela || ordem.status,
-      efi_charge_id: ordem.parcela_efi_charge_id || null,
-      parcela: {
-        id: ordem.parcela_id,
-        valor: valorBase,
-        valor_final: pDet.valor_final ?? valorBase,
-        valor_nominal: pDet.valor_nominal ?? valorBase,
-        valor_desconto: pDet.valor_desconto ?? 0,
-        status: ordem.status_parcela || ordem.status,
-      },
-      carregando: true,
-      erro: null,
-    });
-
+  const handleConfirmarBaixaOrdem = async (dadosOperacao) => {
+    if (!modalBaixaOrdem?.id) return;
+    setBaixandoOrdem(true);
     try {
-      const res = await fetch(`/api/admin-financeiro/ordens?id=${ordem.id}`);
-      if (!res.ok) throw new Error('Não foi possível verificar os dados atualizados no servidor');
-      const data = await res.json();
-      const ordemAtualizada = Array.isArray(data.ordens) ? data.ordens[0] : null;
-
-      if (!ordemAtualizada) {
-        throw new Error('Cobrança não encontrada no servidor');
-      }
-
-      const pAtualizada = ordemAtualizada.parcela_detalhes || {};
-      const valorReal = Number(pAtualizada.valor_final ?? pAtualizada.valor ?? ordemAtualizada.valor_total ?? 0);
-
-      setModalBaixaManual(prev => prev && prev.ordem_id === ordem.id ? {
-        ...prev,
-        aluno_nome: ordemAtualizada.aluno_nome || prev.aluno_nome,
-        descricao: ordemAtualizada.descricao || prev.descricao,
-        data_vencimento: ordemAtualizada.data_vencimento || prev.data_vencimento,
-        status: ordemAtualizada.status_parcela || ordemAtualizada.status,
-        efi_charge_id: ordemAtualizada.parcela_efi_charge_id || prev.efi_charge_id,
-        parcela: {
-          id: ordemAtualizada.parcela_id || prev.parcela_id,
-          valor: valorReal,
-          valor_final: pAtualizada.valor_final ?? valorReal,
-          valor_nominal: pAtualizada.valor_nominal ?? valorReal,
-          valor_desconto: pAtualizada.valor_desconto ?? 0,
-          status: ordemAtualizada.status_parcela || ordemAtualizada.status,
-        },
-        carregando: false,
-        erro: null,
-      } : prev);
-    } catch (err) {
-      console.error('Erro ao carregar dados atualizados da ordem:', err);
-      setModalBaixaManual(prev => prev && prev.ordem_id === ordem.id ? {
-        ...prev,
-        carregando: false,
-        erro: err.message,
-      } : prev);
-    }
-  };
-
-  const handleBaixarManual = async (formData) => {
-    const { parcela_id } = modalBaixaManual;
-    setBaixandoParcela(true);
-    try {
-      const res = await fetch(`/api/admin-financeiro/parcelas/${parcela_id}/pagar`, {
-        method: 'PATCH',
+      const res = await fetch(`/api/admin-financeiro/ordens/${modalBaixaOrdem.id}/baixar`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(formData),
+        body: JSON.stringify(dadosOperacao),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Erro ao registrar baixa');
-      setModalBaixaManual(null);
+      if (!res.ok) throw new Error(data.message || 'Erro ao registrar baixa da ordem');
+      setModalBaixaOrdem(null);
       if (data.aviso) alert('⚠️ ' + data.aviso);
       await carregarOrdens();
     } catch (err) {
       alert('Erro: ' + err.message);
     } finally {
-      setBaixandoParcela(false);
+      setBaixandoOrdem(false);
     }
   };
 
@@ -552,11 +485,11 @@ export default function OrdensPage() {
                           >
                             Ver
                           </button>
-                          {ordem.parcela_id && ordem.status_parcela !== 'pago' && ordem.status_parcela !== 'cancelado' && ordem.status !== 'pago' && ordem.status !== 'cancelado' && (
+                          {ordem.status !== 'pago' && ordem.status !== 'cancelado' && ordem.status_parcela !== 'pago' && ordem.status_parcela !== 'cancelado' && (
                             <button
                               type="button"
-                              onClick={() => handleAbrirBaixaManual(ordem)}
-                              title="Baixar manualmente"
+                              onClick={() => setModalBaixaOrdem(ordem)}
+                              title="Baixar fatura da ordem"
                               className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 transition text-xs font-semibold cursor-pointer"
                             >
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -585,19 +518,13 @@ export default function OrdensPage() {
         />
       )}
 
-      {modalBaixaManual && (
-        <ModalBaixaManual
-          parcela={modalBaixaManual.parcela}
-          alunoNome={modalBaixaManual.aluno_nome}
-          descricao={modalBaixaManual.descricao}
-          dataVencimento={modalBaixaManual.data_vencimento}
-          statusOrdem={modalBaixaManual.status}
-          permitirMultiplos={false}
-          carregandoDados={modalBaixaManual.carregando}
-          erroCarregamento={modalBaixaManual.erro}
-          onConfirm={handleBaixarManual}
-          onClose={() => setModalBaixaManual(null)}
-          loading={baixandoParcela}
+      {/* MODAL BAIXA MANUAL DA ORDEM (Quitação integral definitiva) */}
+      {modalBaixaOrdem && (
+        <ModalBaixaOrdem
+          ordem={modalBaixaOrdem}
+          onConfirm={handleConfirmarBaixaOrdem}
+          onClose={() => setModalBaixaOrdem(null)}
+          loading={baixandoOrdem}
         />
       )}
     </AdminFinanceiroLayout>

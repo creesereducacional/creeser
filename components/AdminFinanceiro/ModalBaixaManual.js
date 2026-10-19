@@ -433,6 +433,7 @@ export default function ModalBaixaManual({
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
