@@ -111,6 +111,10 @@ export default async function handler(req, res) {
       query = query.eq('instituicao_id', req.query.instituicao_id);
     }
 
+    if (req.query.id) {
+      query = query.eq('id', req.query.id);
+    }
+
     const { data: ordensData, error: ordensError } = await query;
 
     if (ordensError) throw ordensError;

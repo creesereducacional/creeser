@@ -109,7 +109,7 @@ export default async function handler(req, res) {
   // ── Buscar parcela ─────────────────────────────────────────────────────────
   const { data: parcela, error: findError } = await supabase
     .from('financeiro_parcelas')
-    .select('id, aluno_id, ordem_pagamento_id, status, valor, efi_charge_id, instituicao_id')
+    .select('id, aluno_id, ordem_pagamento_id, status, valor, valor_nominal, valor_desconto, valor_final, efi_charge_id, instituicao_id')
     .eq('id', id)
     .maybeSingle();
 
@@ -186,6 +186,33 @@ export default async function handler(req, res) {
     return res.status(422).json({ message: 'Não é possível dar baixa em parcela cancelada' });
   }
 
+  // ── Se vinculada a ordem de pagamento, validar status da ordem pai ────────
+  if (parcela.ordem_pagamento_id) {
+    const { data: ordemPai } = await supabase
+      .from('financeiro_ordens_pagamento')
+      .select('id, status, valor_total, tipo')
+      .eq('id', parcela.ordem_pagamento_id)
+      .maybeSingle();
+
+    if (ordemPai?.status === 'cancelado') {
+      return res.status(422).json({ message: 'Não é possível dar baixa: a ordem vinculada a esta cobrança está cancelada' });
+    }
+    if (ordemPai?.status === 'pago') {
+      return res.status(422).json({ message: 'Esta ordem já foi baixada anteriormente' });
+    }
+  }
+
+  // ── Validação do valor devido esperado (evitar baixa divergente) ───────────
+  const valorEsperado = Number(parcela.valor_final ?? parcela.valor ?? 0);
+  if (valorEsperado > 0) {
+    const diferenca = Math.abs(valorPagoNum - valorEsperado);
+    if (diferenca > 0.01) {
+      return res.status(400).json({
+        message: `Valor informado (R$ ${valorPagoNum.toFixed(2).replace('.', ',')}) diverge do valor esperado da cobrança (R$ ${valorEsperado.toFixed(2).replace('.', ',')}).`,
+      });
+    }
+  }
+
   // ── Atualizar parcela ──────────────────────────────────────────────────────
   const usuarioId = authUser.id ? Number(authUser.id) : null;
   const agora = new Date().toISOString();
@@ -228,6 +255,31 @@ export default async function handler(req, res) {
     parcelaAtualizada = resultBase;
   } else {
     parcelaAtualizada = resultFull;
+  }
+
+  // ── Atualização do status da ordem de pagamento vinculada ─────────────────
+  if (parcela.ordem_pagamento_id) {
+    try {
+      const { data: parcelasDaOrdem } = await supabase
+        .from('financeiro_parcelas')
+        .select('id, status')
+        .eq('ordem_pagamento_id', parcela.ordem_pagamento_id);
+
+      const todasPagasOrdem = (parcelasDaOrdem || []).every(p => p.status === 'pago' || p.id === id);
+      if (todasPagasOrdem) {
+        await supabase
+          .from('financeiro_ordens_pagamento')
+          .update({
+            status: 'pago',
+            data_pagamento: dataPagamentoStr,
+            valor_pago: valorPagoNum,
+            updated_at: agora,
+          })
+          .eq('id', parcela.ordem_pagamento_id);
+      }
+    } catch (_) {
+      // Falha não crítica na sincronização do status da ordem
+    }
   }
 
   // ── Transição de status de matrícula (silenciosa) ─────────────────────────
