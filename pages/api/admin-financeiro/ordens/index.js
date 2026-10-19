@@ -57,13 +57,50 @@ export default async function handler(req, res) {
         percentual_desconto,
         valor_desconto,
         quantidade_parcelas,
+        observacoes,
         status,
         efi_charge_id,
         criado_por,
         created_at,
         updated_at,
-        alunos(id, nome, cpf, email, turmaid, cursoid, ano_letivo, turmas(id, nome, unidadeid)),
-        financeiro_parcelas!ordem_pagamento_id(id, numero_parcela, valor, data_vencimento, status, boleto_numero, boleto_url, efi_charge_id)
+        instituicoes(id, nome),
+        alunos(
+          id,
+          nome,
+          cpf,
+          email,
+          turmaid,
+          cursoid,
+          ano_letivo,
+          instituicao_id,
+          turmas(
+            id,
+            nome,
+            unidadeid,
+            instituicao_id,
+            unidades(id, nome, instituicao_id),
+            cursos(id, nome, instituicao_id)
+          )
+        ),
+        financeiro_parcelas!ordem_pagamento_id(
+          id,
+          numero_parcela,
+          valor,
+          valor_nominal,
+          valor_desconto,
+          valor_final,
+          data_vencimento,
+          data_pagamento,
+          valor_pago,
+          status,
+          boleto_numero,
+          boleto_url,
+          boleto_barcode,
+          efi_charge_id,
+          metodo_pagamento,
+          observacao_baixa,
+          baixado_em
+        )
       `)
       .eq('tipo', 'ordem_simples')
       .order('created_at', { ascending: false });
@@ -97,7 +134,10 @@ export default async function handler(req, res) {
           turmas (
             id,
             nome,
-            unidadeid
+            unidadeid,
+            instituicao_id,
+            unidades (id, nome, instituicao_id),
+            cursos (id, nome, instituicao_id)
           )
         `)
         .in('aluno_id', alunoIdsCarregados);
@@ -145,20 +185,63 @@ export default async function handler(req, res) {
     // Normalizar resposta
     const ordensNormalizadas = ordensFiltradas.map(o => {
       const parcela = (o.financeiro_parcelas || [])[0] || {};
+      const turma = o.alunos?.turmas || {};
+      const unidade = turma.unidades || {};
+      const curso = turma.cursos || {};
+
+      const mats = matriculasPorAluno[o.aluno_id] || [];
+      const matAlvo = mats.find(m => m.is_principal) || mats[0] || null;
+      const turmaMat = matAlvo?.turmas;
+
+      const unidadeFinalId = turmaMat?.unidadeid ?? turma.unidadeid ?? null;
+      const unidadeFinalNome = turmaMat?.unidades?.nome || unidade.nome || null;
+      const cursoFinalId = o.alunos?.cursoid ?? turmaMat?.cursos?.id ?? curso.id ?? null;
+      const cursoFinalNome = turmaMat?.cursos?.nome || curso.nome || null;
+      const turmaFinalId = turmaMat?.id ?? turma.id ?? o.alunos?.turmaid ?? null;
+      const turmaFinalNome = turmaMat?.nome || turma.nome || null;
+      const instNome = o.instituicoes?.nome || null;
+
       return {
         ...o,
+        instituicao_nome: instNome,
         aluno_nome: o.alunos?.nome || 'N/A',
         aluno_cpf: o.alunos?.cpf || 'N/A',
         aluno_email: o.alunos?.email || 'N/A',
-        aluno_turma_id: o.alunos?.turmaid || null,
-        aluno_curso_id: o.alunos?.cursoid || null,
+        aluno_turma_id: turmaFinalId,
+        aluno_turma_nome: turmaFinalNome,
+        aluno_unidade_id: unidadeFinalId,
+        aluno_unidade_nome: unidadeFinalNome,
+        aluno_curso_id: cursoFinalId,
+        aluno_curso_nome: cursoFinalNome,
         aluno_ano_letivo: o.alunos?.ano_letivo || null,
         data_vencimento: parcela.data_vencimento || null,
+        data_pagamento: parcela.data_pagamento || null,
+        valor_pago: parcela.valor_pago || null,
         status_parcela: parcela.status || o.status,
         cobranca: parcela.boleto_numero || parcela.efi_charge_id || o.efi_charge_id || '-',
         parcela_id: parcela.id || null,
         boleto_url: parcela.boleto_url || null,
-        parcela_efi_charge_id: parcela.efi_charge_id || null
+        boleto_barcode: parcela.boleto_barcode || null,
+        parcela_efi_charge_id: parcela.efi_charge_id || null,
+        parcela_detalhes: {
+          id: parcela.id || null,
+          numero_parcela: parcela.numero_parcela || 1,
+          valor: parcela.valor ?? o.valor_total,
+          valor_nominal: parcela.valor_nominal ?? o.valor_total,
+          valor_desconto: parcela.valor_desconto ?? o.valor_desconto,
+          valor_final: parcela.valor_final ?? o.valor_total,
+          data_vencimento: parcela.data_vencimento || null,
+          data_pagamento: parcela.data_pagamento || null,
+          valor_pago: parcela.valor_pago || null,
+          status: parcela.status || o.status,
+          boleto_numero: parcela.boleto_numero || null,
+          boleto_url: parcela.boleto_url || null,
+          boleto_barcode: parcela.boleto_barcode || null,
+          efi_charge_id: parcela.efi_charge_id || o.efi_charge_id || null,
+          metodo_pagamento: parcela.metodo_pagamento || null,
+          observacao_baixa: parcela.observacao_baixa || null,
+          baixado_em: parcela.baixado_em || null,
+        }
       };
     });
 
