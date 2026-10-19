@@ -73,6 +73,7 @@ export default function PreCadastroDetalhe() {
 
   // Idade derivada da data de nascimento
   const [idade, setIdade] = useState(null);
+  const isMenor = idade !== null && idade < 18;
 
   // ── Carregar dados do pré-cadastro ─────────────────────────────────────────
   useEffect(() => {
