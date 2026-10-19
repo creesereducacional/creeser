@@ -60,6 +60,8 @@ export default function PreCadastroDetalhe() {
   const [sucesso, setSucesso]       = useState(null);
 
   // Unidades, Cursos e turmas para os selects
+  const [instituicoes, setInstituicoes]       = useState([]);
+  const [todasUnidades, setTodasUnidades]     = useState([]);
   const [unidades, setUnidades]               = useState([]);
   const [todosCursos, setTodosCursos]         = useState([]);
   const [cursos, setCursos]                   = useState([]);
@@ -87,6 +89,7 @@ export default function PreCadastroDetalhe() {
           telefone_celular:       data.telefone_celular       || '',
           observacoes_adicionais: data.observacoes_adicionais || '',
           data_nascimento:        nascFormatada,
+          instituicao_id:         data.instituicao_id         ? String(data.instituicao_id) : '',
           unidade_id:             data.unidade_id             ? String(data.unidade_id) : '',
           cursoid:                data.cursoid                ? String(data.cursoid) : '',
           turmaid:                data.turmaid                ? String(data.turmaid) : '',
@@ -97,22 +100,46 @@ export default function PreCadastroDetalhe() {
       .finally(() => setCarregando(false));
   }, [id, editarParam]);
 
-  // ── Carregar opções de unidades, cursos e turmas quando entra em modo edição ─
+  // ── Carregar opções de instituições, unidades, cursos e turmas quando entra em modo edição ─
   useEffect(() => {
     if (!editando) return;
     setCarregandoOpcoes(true);
-    fetch('/api/recepcao/pre-cadastros?include_options=true', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
+    Promise.all([
+      fetch('/api/recepcao/pre-cadastros?include_options=true', { credentials: 'include' }).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch('/api/comercial/instituicoes', { credentials: 'include' }).then(r => r.ok ? r.json() : []).catch(() => [])
+    ])
+      .then(([data, dataInst]) => {
+        let instList = Array.isArray(dataInst) ? dataInst : [];
         if (data && typeof data === 'object') {
-          if (Array.isArray(data.unidades)) setUnidades(data.unidades);
+          if (Array.isArray(data.unidades)) setTodasUnidades(data.unidades);
           if (Array.isArray(data.cursos)) setTodosCursos(data.cursos);
           if (Array.isArray(data.turmas)) setTodasTurmas(data.turmas);
+          if (Array.isArray(data.instituicoes) && data.instituicoes.length > 0 && instList.length === 0) {
+            instList = data.instituicoes;
+          }
         }
+        setInstituicoes(instList);
       })
       .catch(() => {})
       .finally(() => setCarregandoOpcoes(false));
   }, [editando]);
+
+  // ── Filtrar Unidades pela Instituição selecionada ─────────────────────────
+  useEffect(() => {
+    if (!editando) return;
+    if (!form.instituicao_id) {
+      setUnidades(todasUnidades);
+      return;
+    }
+
+    const instIdNum = Number(form.instituicao_id);
+    const unidsDaInst = todasUnidades.filter(u => {
+      if (u.instituicao_id == null) return true;
+      return Number(u.instituicao_id) === instIdNum;
+    });
+
+    setUnidades(unidsDaInst);
+  }, [form.instituicao_id, todasUnidades, editando]);
 
   // ── Filtrar Cursos pela Unidade selecionada ────────────────────────────────
   useEffect(() => {
@@ -161,6 +188,13 @@ export default function PreCadastroDetalhe() {
     setIdade(calcularIdade(val));
   }
 
+  function handleInstituicaoChange(val) {
+    set('instituicao_id', val);
+    set('unidade_id', '');
+    set('cursoid', '');
+    set('turmaid', '');
+  }
+
   function handleUnidadeChange(val) {
     set('unidade_id', val);
     set('cursoid', '');
@@ -199,6 +233,7 @@ export default function PreCadastroDetalhe() {
       email: aluno.email || '', telefone_celular: aluno.telefone_celular || '',
       observacoes_adicionais: aluno.observacoes_adicionais || '',
       data_nascimento: nascFormatada,
+      instituicao_id: aluno.instituicao_id ? String(aluno.instituicao_id) : '',
       unidade_id: aluno.unidade_id ? String(aluno.unidade_id) : '',
       cursoid: aluno.cursoid ? String(aluno.cursoid) : '',
       turmaid: aluno.turmaid ? String(aluno.turmaid) : '',
@@ -211,7 +246,8 @@ export default function PreCadastroDetalhe() {
   const tel = aluno?.telefone_celular?.replace(/\D/g, '');
   const wppLink = tel ? `https://wa.me/55${tel}?text=${encodeURIComponent('Olá ' + (aluno?.nome || '') + ', tudo bem?')}` : null;
 
-  // Nome da unidade/curso/turma para exibição no modo leitura
+  // Nome da instituição/unidade/curso/turma para exibição no modo leitura
+  const instituicaoNome = aluno?.instituicao_nome || instituicoes.find(i => String(i.id) === String(aluno?.instituicao_id))?.nome || null;
   const unidadeNome = aluno?.unidade_nome || unidades.find(u => String(u.id) === String(aluno?.unidade_id))?.nome || null;
   const cursoNome   = aluno?.curso_nome   || cursos.find(c => String(c.id) === String(aluno?.cursoid))?.nome || null;
   const turmaNome   = aluno?.turma_nome   || turmas.find(t => String(t.id) === String(aluno?.turmaid))?.nome || null;
@@ -370,11 +406,33 @@ export default function PreCadastroDetalhe() {
               </div>
             </div>
 
-            {/* ── Unidade / Curso / Turma ─────────────────────────────── */}
+            {/* ── Instituição / Unidade / Curso / Turma ─────────────────────── */}
             <div className="bg-white rounded-2xl shadow-sm p-6">
-              <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-4 pb-2 border-b">📚 Unidade, Curso & Turma</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {/* 1. Unidade */}
+              <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-4 pb-2 border-b">🎓 Dados Acadêmicos & Matrícula</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 1. Instituição */}
+                <div>
+                  <label className={labelCls}>Instituição {editando && carregandoOpcoes && <span className="font-normal normal-case text-gray-400">(carregando…)</span>}</label>
+                  {editando ? (
+                    <select
+                      className={inputCls}
+                      value={form.instituicao_id}
+                      onChange={e => handleInstituicaoChange(e.target.value)}
+                      disabled={carregandoOpcoes}
+                    >
+                      <option value="">— Selecione a instituição —</option>
+                      {instituicoes.map(i => (
+                        <option key={i.id} value={String(i.id)}>{i.nome}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-sm text-gray-800 py-1 font-medium">
+                      {instituicaoNome || '—'}
+                    </p>
+                  )}
+                </div>
+
+                {/* 2. Unidade */}
                 <div>
                   <label className={labelCls}>Unidade {editando && carregandoOpcoes && <span className="font-normal normal-case text-gray-400">(carregando…)</span>}</label>
                   {editando ? (
@@ -382,7 +440,7 @@ export default function PreCadastroDetalhe() {
                       className={inputCls}
                       value={form.unidade_id}
                       onChange={e => handleUnidadeChange(e.target.value)}
-                      disabled={carregandoOpcoes}
+                      disabled={carregandoOpcoes || !form.instituicao_id}
                     >
                       <option value="">— Selecione a unidade —</option>
                       {unidades.map(u => (

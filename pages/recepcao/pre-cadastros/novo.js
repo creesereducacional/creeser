@@ -167,6 +167,7 @@ export default function NovoPrecadastro() {
 
   // Auxiliares de carregamento de opções
   const [instituicoes, setInstituicoes] = useState([]);
+  const [todasUnidades, setTodasUnidades] = useState([]);
   const [unidades, setUnidades] = useState([]);
   const [todosCursos, setTodosCursos] = useState([]);
   const [cursos, setCursos] = useState([]);
@@ -174,6 +175,7 @@ export default function NovoPrecadastro() {
   const [turmas, setTurmas] = useState([]);
   const [anosLetivos, setAnosLetivos] = useState([]);
 
+  const [carregandoInstituicoes, setCarregandoInstituicoes] = useState(false);
   const [carregandoUnidades, setCarregandoUnidades] = useState(false);
   const [carregandoCursos, setCarregandoCursos] = useState(false);
   const [carregandoTurmas, setCarregandoTurmas] = useState(false);
@@ -191,57 +193,97 @@ export default function NovoPrecadastro() {
 
   // ── Carregar contexto do usuário & opções iniciais ───────────────────
   useEffect(() => {
-    fetch('/api/auth/me', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        const userInstId = data?.usuario?.instituicao_id;
-        if (userInstId) {
-          setForm(prev => ({
-            ...prev,
-            instituicao_id: String(userInstId)
-          }));
-          setInstituicoes([{ id: userInstId, nome: data?.usuario?.instituicao_nome || 'Instituição Atual' }]);
+    // 1. Carregar instituições autorizadas
+    setCarregandoInstituicoes(true);
+    fetch('/api/comercial/instituicoes', { credentials: 'include' })
+      .then(r => (r.ok ? r.json() : []))
+      .then(lista => {
+        let list = Array.isArray(lista) ? lista : [];
+        if (list.length > 0) {
+          setInstituicoes(list);
+          setForm(prev => {
+            if (!prev.instituicao_id) {
+              const primeira = list[0];
+              return {
+                ...prev,
+                instituicao_id: String(primeira.id),
+                instituicao: primeira.nome || '',
+              };
+            }
+            return prev;
+          });
         } else {
-          fetch('/api/comercial/instituicoes', { credentials: 'include' })
-            .then(r => r.ok ? r.json() : [])
-            .then(lista => {
-              const list = Array.isArray(lista) ? lista : [];
-              setInstituicoes(list);
-              if (list.length === 1) {
+          // Fallback para api/auth/me se /api/comercial/instituicoes retornar vazio
+          fetch('/api/auth/me', { credentials: 'include' })
+            .then(r => (r.ok ? r.json() : null))
+            .then(data => {
+              const userInstId = data?.usuario?.instituicao_id;
+              if (userInstId) {
+                const singleInst = [{ id: userInstId, nome: data?.usuario?.instituicao_nome || 'Instituição Atual' }];
+                setInstituicoes(singleInst);
                 setForm(prev => ({
                   ...prev,
-                  instituicao_id: String(list[0].id),
-                  instituicao: list[0].nome || ''
+                  instituicao_id: String(userInstId),
+                  instituicao: data?.usuario?.instituicao_nome || '',
                 }));
               }
             })
             .catch(() => {});
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setCarregandoInstituicoes(false));
 
-    // Carregar opções gerais (unidades, cursos com unidade_ids, turmas)
+    // 2. Carregar opções gerais (unidades, cursos com unidade_ids, turmas)
     setCarregandoUnidades(true);
     fetch('/api/recepcao/pre-cadastros?include_options=true', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
+      .then(r => (r.ok ? r.json() : null))
       .then(data => {
         if (data && typeof data === 'object') {
-          if (Array.isArray(data.unidades)) setUnidades(data.unidades);
+          if (Array.isArray(data.unidades)) {
+            setTodasUnidades(data.unidades);
+          }
           if (Array.isArray(data.cursos)) setTodosCursos(data.cursos);
           if (Array.isArray(data.turmas)) setTodasTurmas(data.turmas);
+          if (Array.isArray(data.instituicoes) && data.instituicoes.length > 0) {
+            setInstituicoes(prev => (prev.length > 0 ? prev : data.instituicoes));
+          }
         }
       })
       .catch(() => {})
       .finally(() => setCarregandoUnidades(false));
 
-    // Anos letivos
+    // 3. Anos letivos
     fetch('/api/configuracoes/anos-letivos', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : [])
+      .then(r => (r.ok ? r.json() : []))
       .then(data => {
         if (Array.isArray(data)) setAnosLetivos(data);
       })
       .catch(() => {});
   }, []);
+
+  // ── Filtrar Unidades disponíveis quando a Instituição é selecionada ────
+  useEffect(() => {
+    if (!form.instituicao_id) {
+      setUnidades(todasUnidades);
+      return;
+    }
+
+    const instIdNum = Number(form.instituicao_id);
+    const unidsDaInst = todasUnidades.filter(u => {
+      if (u.instituicao_id == null) return true;
+      return Number(u.instituicao_id) === instIdNum;
+    });
+
+    setUnidades(unidsDaInst);
+
+    // Se a unidade atual não pertencer à nova instituição, limpar seleções dependentes
+    if (form.unidade_id && !unidsDaInst.some(u => String(u.id) === String(form.unidade_id))) {
+      setForm(prev => ({ ...prev, unidade_id: '', cursoid: '', turmaid: '' }));
+      setCursos([]);
+      setTurmas([]);
+    }
+  }, [form.instituicao_id, todasUnidades]);
 
   // ── Filtrar Cursos disponíveis quando a Unidade é selecionada ─────────
   useEffect(() => {
@@ -510,8 +552,8 @@ export default function NovoPrecadastro() {
       }
     } else if (n === 4) {
       // Dados Acadêmicos
-      if (instituicoes.length > 1 && !form.instituicao_id) {
-        e.instituicao_id = 'Selecione a instituição de atendimento.';
+      if (!form.instituicao_id) {
+        e.instituicao_id = 'Instituição é obrigatória.';
       }
       if (!form.unidade_id) {
         e.unidade_id = 'Unidade é obrigatória.';
@@ -1376,36 +1418,41 @@ export default function NovoPrecadastro() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Seleção de Instituição (caso haja mais de uma para o usuário) */}
-                {instituicoes.length > 1 && (
-                  <div className="sm:col-span-2">
-                    <label className={labelCls}>Instituição Mantenedora *</label>
-                    <select
-                      name="instituicao_id"
-                      value={form.instituicao_id}
-                      onChange={e => {
-                        const sel = instituicoes.find(i => String(i.id) === e.target.value);
-                        setForm(prev => ({
-                          ...prev,
-                          instituicao_id: e.target.value,
-                          instituicao: sel?.nome || '',
-                          unidade_id: '',
-                          cursoid: '',
-                          turmaid: ''
-                        }));
-                      }}
-                      className={`${inputCls} ${erros.instituicao_id ? inputErr : inputOk}`}
-                    >
-                      <option value="">— Selecione a Instituição —</option>
-                      {instituicoes.map(i => (
-                        <option key={i.id} value={String(i.id)}>{i.nome}</option>
-                      ))}
-                    </select>
-                    {erros.instituicao_id && <p className="text-xs text-rose-600 mt-1">{erros.instituicao_id}</p>}
-                  </div>
-                )}
+                {/* 1. Seleção de Instituição * */}
+                <div className="sm:col-span-2">
+                  <label className={labelCls}>
+                    Instituição * {carregandoInstituicoes && <span className="font-normal normal-case text-slate-400">(Carregando instituições...)</span>}
+                  </label>
+                  <select
+                    name="instituicao_id"
+                    value={form.instituicao_id}
+                    onChange={e => {
+                      const novaInstId = e.target.value;
+                      const sel = instituicoes.find(i => String(i.id) === String(novaInstId));
+                      setForm(prev => ({
+                        ...prev,
+                        instituicao_id: novaInstId,
+                        instituicao: sel?.nome || '',
+                        unidade_id: '',
+                        cursoid: '',
+                        turmaid: ''
+                      }));
+                      if (erros.instituicao_id) {
+                        setErros(prev => ({ ...prev, instituicao_id: null }));
+                      }
+                    }}
+                    className={`${inputCls} ${erros.instituicao_id ? inputErr : inputOk}`}
+                    autoFocus
+                  >
+                    <option value="">— Selecione a Instituição —</option>
+                    {instituicoes.map(i => (
+                      <option key={i.id} value={String(i.id)}>{i.nome}</option>
+                    ))}
+                  </select>
+                  {erros.instituicao_id && <p className="text-xs text-rose-600 mt-1">{erros.instituicao_id}</p>}
+                </div>
 
-                {/* 1. Seleção de Unidade * */}
+                {/* 2. Seleção de Unidade * */}
                 <div className="sm:col-span-2">
                   <label className={labelCls}>
                     Unidade * {carregandoUnidades && <span className="font-normal normal-case text-slate-400">(Carregando unidades...)</span>}
@@ -1425,9 +1472,8 @@ export default function NovoPrecadastro() {
                         setErros(prev => ({ ...prev, unidade_id: null }));
                       }
                     }}
-                    disabled={carregandoUnidades}
-                    className={`${inputCls} ${erros.unidade_id ? inputErr : inputOk}`}
-                    autoFocus
+                    disabled={!form.instituicao_id || carregandoUnidades}
+                    className={`${inputCls} ${erros.unidade_id ? inputErr : inputOk} ${!form.instituicao_id ? 'opacity-60' : ''}`}
                   >
                     <option value="">— Selecione a Unidade —</option>
                     {unidades.map(u => (
