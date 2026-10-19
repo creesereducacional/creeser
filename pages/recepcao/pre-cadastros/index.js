@@ -74,13 +74,23 @@ export default function PreCadastrosIndex() {
     setCarregando(true);
     Promise.all([
       fetch('/api/recepcao/pre-cadastros?include_options=true', { credentials: 'include' }).then(r => r.json()).catch(() => null),
-      fetch('/api/comercial/instituicoes', { credentials: 'include' }).then(r => r.ok ? r.json() : []).catch(() => [])
+      fetch('/api/comercial/instituicoes', { credentials: 'include' }).then(r => r.ok ? r.json() : []).catch(() => []),
+      fetch('/api/unidades', { credentials: 'include' }).then(r => r.ok ? r.json() : []).catch(() => [])
     ])
-      .then(([data, dataInst]) => {
+      .then(([data, dataInst, dataUnids]) => {
         let instList = Array.isArray(dataInst) ? dataInst : [];
+        let unidsOficiais = (Array.isArray(dataUnids) ? dataUnids : [])
+          .filter(u => !u.situacao || u.situacao === 'ATIVO' || u.ativo !== false)
+          .map(u => ({
+            id: u.id,
+            nome: u.nome,
+            instituicao_id: u.instituicaoId || u.instituicao_id,
+            situacao: u.situacao,
+          }));
+
         if (data && typeof data === 'object' && !Array.isArray(data)) {
           setLista(Array.isArray(data.alunos) ? data.alunos : []);
-          setUnidades(Array.isArray(data.unidades) ? data.unidades : []);
+          setUnidades(unidsOficiais.length > 0 ? unidsOficiais : (Array.isArray(data.unidades) ? data.unidades : []));
           setCursos(Array.isArray(data.cursos) ? data.cursos : []);
           setTurmas(Array.isArray(data.turmas) ? data.turmas : []);
           if (Array.isArray(data.instituicoes) && data.instituicoes.length > 0) {
@@ -88,6 +98,7 @@ export default function PreCadastrosIndex() {
           }
         } else if (Array.isArray(data)) {
           setLista(data);
+          if (unidsOficiais.length > 0) setUnidades(unidsOficiais);
         }
         setInstituicoes(instList);
       })

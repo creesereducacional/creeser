@@ -177,6 +177,7 @@ export default function NovoPrecadastro() {
 
   const [carregandoInstituicoes, setCarregandoInstituicoes] = useState(false);
   const [carregandoUnidades, setCarregandoUnidades] = useState(false);
+  const [erroCarregarUnidades, setErroCarregarUnidades] = useState(null);
   const [carregandoCursos, setCarregandoCursos] = useState(false);
   const [carregandoTurmas, setCarregandoTurmas] = useState(false);
   const [salvando, setSalvando] = useState(false);
@@ -234,8 +235,7 @@ export default function NovoPrecadastro() {
       .catch(() => {})
       .finally(() => setCarregandoInstituicoes(false));
 
-    // 2. Carregar opções gerais (unidades, cursos com unidade_ids, turmas)
-    setCarregandoUnidades(true);
+    // 2. Carregar opções gerais (cursos com unidade_ids, turmas)
     fetch('/api/recepcao/pre-cadastros?include_options=true', { credentials: 'include' })
       .then(r => (r.ok ? r.json() : null))
       .then(data => {
@@ -250,8 +250,7 @@ export default function NovoPrecadastro() {
           }
         }
       })
-      .catch(() => {})
-      .finally(() => setCarregandoUnidades(false));
+      .catch(() => {});
 
     // 3. Anos letivos
     fetch('/api/configuracoes/anos-letivos', { credentials: 'include' })
@@ -262,27 +261,74 @@ export default function NovoPrecadastro() {
       .catch(() => {});
   }, []);
 
-  // ── Filtrar Unidades disponíveis quando a Instituição é selecionada ────
+  // ── Buscar Unidades oficiais pela Instituição selecionada ───────────
   useEffect(() => {
     if (!form.instituicao_id) {
-      setUnidades(todasUnidades);
+      setUnidades([]);
+      setErroCarregarUnidades(null);
       return;
     }
 
     const instIdStr = String(form.instituicao_id).trim();
-    const unidsDaInst = todasUnidades.filter(u => {
-      if (u.instituicao_id == null) return true;
-      return String(u.instituicao_id).trim() === instIdStr;
-    });
+    let cancelado = false;
+    setCarregandoUnidades(true);
+    setErroCarregarUnidades(null);
 
-    setUnidades(unidsDaInst);
+    // Consulta oficial via /api/unidades (mesma fonte oficial de Gerenciar Unidades)
+    fetch(`/api/unidades?instituicao_id=${encodeURIComponent(instIdStr)}`, { credentials: 'include' })
+      .then(async r => {
+        if (!r.ok) {
+          const errData = await r.json().catch(() => null);
+          throw new Error(errData?.error || `Erro HTTP ${r.status}`);
+        }
+        return r.json();
+      })
+      .then(lista => {
+        if (cancelado) return;
+        const unidsAtivas = (Array.isArray(lista) ? lista : [])
+          .filter(u => !u.situacao || u.situacao === 'ATIVO' || u.ativo !== false)
+          .map(u => ({
+            id: u.id,
+            nome: u.nome,
+            instituicao_id: u.instituicaoId || u.instituicao_id || instIdStr,
+            situacao: u.situacao,
+          }));
 
-    // Se a unidade atual não pertencer à nova instituição, limpar seleções dependentes
-    if (form.unidade_id && !unidsDaInst.some(u => String(u.id) === String(form.unidade_id))) {
-      setForm(prev => ({ ...prev, unidade_id: '', cursoid: '', turmaid: '' }));
-      setCursos([]);
-      setTurmas([]);
-    }
+        setUnidades(unidsAtivas);
+
+        // Se a unidade atual não pertencer à nova lista, limpar seleções dependentes
+        setForm(prev => {
+          if (prev.unidade_id && !unidsAtivas.some(u => String(u.id) === String(prev.unidade_id))) {
+            setCursos([]);
+            setTurmas([]);
+            return { ...prev, unidade_id: '', cursoid: '', turmaid: '' };
+          }
+          return prev;
+        });
+      })
+      .catch(err => {
+        if (cancelado) return;
+        console.warn('Falha ao carregar unidades via /api/unidades, tentando fallback de opções:', err);
+        // Fallback resiliente usando todasUnidades já carregadas se disponíveis
+        const unidsDaInst = todasUnidades.filter(u => {
+          if (u.instituicao_id == null) return true;
+          return String(u.instituicao_id).trim() === instIdStr;
+        });
+
+        if (unidsDaInst.length > 0) {
+          setUnidades(unidsDaInst);
+        } else {
+          setErroCarregarUnidades('Não foi possível consultar as unidades desta instituição.');
+          setUnidades([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelado) setCarregandoUnidades(false);
+      });
+
+    return () => {
+      cancelado = true;
+    };
   }, [form.instituicao_id, todasUnidades]);
 
   // ── Filtrar Cursos disponíveis quando a Unidade é selecionada ─────────
@@ -1480,6 +1526,8 @@ export default function NovoPrecadastro() {
                         ? '— Selecione a Instituição primeiro —'
                         : carregandoUnidades
                         ? '— Carregando unidades... —'
+                        : erroCarregarUnidades
+                        ? '— Erro ao carregar unidades da instituição —'
                         : unidades.length === 0
                         ? '— Nenhuma unidade encontrada para esta instituição —'
                         : '— Selecione a Unidade —'}
@@ -1488,7 +1536,10 @@ export default function NovoPrecadastro() {
                       <option key={u.id} value={String(u.id)}>{u.nome}</option>
                     ))}
                   </select>
-                  {form.instituicao_id && !carregandoUnidades && unidades.length === 0 && (
+                  {form.instituicao_id && !carregandoUnidades && erroCarregarUnidades && (
+                    <p className="text-xs text-rose-600 mt-1 font-medium">⚠️ {erroCarregarUnidades}</p>
+                  )}
+                  {form.instituicao_id && !carregandoUnidades && !erroCarregarUnidades && unidades.length === 0 && (
                     <p className="text-xs text-amber-600 mt-1 font-medium">⚠️ Nenhuma unidade vinculada a esta instituição.</p>
                   )}
                   {erros.unidade_id && <p className="text-xs text-rose-600 mt-1">{erros.unidade_id}</p>}

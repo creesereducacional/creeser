@@ -68,6 +68,8 @@ export default function PreCadastroDetalhe() {
   const [todasTurmas, setTodasTurmas]         = useState([]);
   const [turmas, setTurmas]                   = useState([]);
   const [carregandoOpcoes, setCarregandoOpcoes] = useState(false);
+  const [carregandoUnidades, setCarregandoUnidades] = useState(false);
+  const [erroCarregarUnidades, setErroCarregarUnidades] = useState(null);
 
   // Idade derivada da data de nascimento
   const [idade, setIdade] = useState(null);
@@ -124,21 +126,64 @@ export default function PreCadastroDetalhe() {
       .finally(() => setCarregandoOpcoes(false));
   }, [editando]);
 
-  // ── Filtrar Unidades pela Instituição selecionada ─────────────────────────
+  // ── Buscar Unidades oficiais pela Instituição selecionada ─────────────────
   useEffect(() => {
     if (!editando) return;
     if (!form.instituicao_id) {
-      setUnidades(todasUnidades);
+      setUnidades([]);
+      setErroCarregarUnidades(null);
       return;
     }
 
     const instIdStr = String(form.instituicao_id).trim();
-    const unidsDaInst = todasUnidades.filter(u => {
-      if (u.instituicao_id == null) return true;
-      return String(u.instituicao_id).trim() === instIdStr;
-    });
+    let cancelado = false;
+    setCarregandoUnidades(true);
+    setErroCarregarUnidades(null);
 
-    setUnidades(unidsDaInst);
+    // Consulta oficial via /api/unidades (mesma fonte oficial de Gerenciar Unidades)
+    fetch(`/api/unidades?instituicao_id=${encodeURIComponent(instIdStr)}`, { credentials: 'include' })
+      .then(async r => {
+        if (!r.ok) {
+          const errData = await r.json().catch(() => null);
+          throw new Error(errData?.error || `Erro HTTP ${r.status}`);
+        }
+        return r.json();
+      })
+      .then(lista => {
+        if (cancelado) return;
+        const unidsAtivas = (Array.isArray(lista) ? lista : [])
+          .filter(u => !u.situacao || u.situacao === 'ATIVO' || u.ativo !== false)
+          .map(u => ({
+            id: u.id,
+            nome: u.nome,
+            instituicao_id: u.instituicaoId || u.instituicao_id || instIdStr,
+            situacao: u.situacao,
+          }));
+
+        setUnidades(unidsAtivas);
+      })
+      .catch(err => {
+        if (cancelado) return;
+        console.warn('Falha ao carregar unidades via /api/unidades em [id].js:', err);
+        const unidsDaInst = todasUnidades.filter(u => {
+          if (u.instituicao_id == null) return true;
+          return String(u.instituicao_id).trim() === instIdStr;
+        });
+
+        if (unidsDaInst.length > 0) {
+          setUnidades(unidsDaInst);
+        } else {
+          setErroCarregarUnidades('Não foi possível consultar as unidades desta instituição.');
+          setUnidades([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelado) setCarregandoUnidades(false);
+      });
+
+    return () => {
+      cancelado = true;
+    };
   }, [form.instituicao_id, todasUnidades, editando]);
 
   // ── Filtrar Cursos pela Unidade selecionada ────────────────────────────────
@@ -434,20 +479,22 @@ export default function PreCadastroDetalhe() {
 
                 {/* 2. Unidade */}
                 <div>
-                  <label className={labelCls}>Unidade {editando && carregandoOpcoes && <span className="font-normal normal-case text-gray-400">(carregando…)</span>}</label>
+                  <label className={labelCls}>Unidade {editando && carregandoUnidades && <span className="font-normal normal-case text-gray-400">(carregando…)</span>}</label>
                   {editando ? (
                     <div>
                       <select
                         className={inputCls}
                         value={form.unidade_id}
                         onChange={e => handleUnidadeChange(e.target.value)}
-                        disabled={carregandoOpcoes || !form.instituicao_id || unidades.length === 0}
+                        disabled={carregandoUnidades || !form.instituicao_id || unidades.length === 0}
                       >
                         <option value="">
                           {!form.instituicao_id
                             ? '— Selecione a instituição primeiro —'
-                            : carregandoOpcoes
+                            : carregandoUnidades
                             ? '— Carregando unidades... —'
+                            : erroCarregarUnidades
+                            ? '— Erro ao carregar unidades da instituição —'
                             : unidades.length === 0
                             ? '— Nenhuma unidade nesta instituição —'
                             : '— Selecione a unidade —'}
@@ -456,7 +503,10 @@ export default function PreCadastroDetalhe() {
                           <option key={u.id} value={String(u.id)}>{u.nome}</option>
                         ))}
                       </select>
-                      {form.instituicao_id && !carregandoOpcoes && unidades.length === 0 && (
+                      {form.instituicao_id && !carregandoUnidades && erroCarregarUnidades && (
+                        <p className="text-xs text-rose-600 mt-1">⚠️ {erroCarregarUnidades}</p>
+                      )}
+                      {form.instituicao_id && !carregandoUnidades && !erroCarregarUnidades && unidades.length === 0 && (
                         <p className="text-xs text-amber-600 mt-1">⚠️ Nenhuma unidade vinculada a esta instituição.</p>
                       )}
                     </div>
