@@ -269,10 +269,10 @@ export default function NovoPrecadastro() {
       return;
     }
 
-    const instIdNum = Number(form.instituicao_id);
+    const instIdStr = String(form.instituicao_id).trim();
     const unidsDaInst = todasUnidades.filter(u => {
       if (u.instituicao_id == null) return true;
-      return Number(u.instituicao_id) === instIdNum;
+      return String(u.instituicao_id).trim() === instIdStr;
     });
 
     setUnidades(unidsDaInst);
@@ -1472,14 +1472,25 @@ export default function NovoPrecadastro() {
                         setErros(prev => ({ ...prev, unidade_id: null }));
                       }
                     }}
-                    disabled={!form.instituicao_id || carregandoUnidades}
+                    disabled={!form.instituicao_id || carregandoUnidades || unidades.length === 0}
                     className={`${inputCls} ${erros.unidade_id ? inputErr : inputOk} ${!form.instituicao_id ? 'opacity-60' : ''}`}
                   >
-                    <option value="">— Selecione a Unidade —</option>
+                    <option value="">
+                      {!form.instituicao_id
+                        ? '— Selecione a Instituição primeiro —'
+                        : carregandoUnidades
+                        ? '— Carregando unidades... —'
+                        : unidades.length === 0
+                        ? '— Nenhuma unidade encontrada para esta instituição —'
+                        : '— Selecione a Unidade —'}
+                    </option>
                     {unidades.map(u => (
                       <option key={u.id} value={String(u.id)}>{u.nome}</option>
                     ))}
                   </select>
+                  {form.instituicao_id && !carregandoUnidades && unidades.length === 0 && (
+                    <p className="text-xs text-amber-600 mt-1 font-medium">⚠️ Nenhuma unidade vinculada a esta instituição.</p>
+                  )}
                   {erros.unidade_id && <p className="text-xs text-rose-600 mt-1">{erros.unidade_id}</p>}
                 </div>
 
