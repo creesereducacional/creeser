@@ -180,7 +180,26 @@ export default async function handler(req, res) {
     } catch (_) {}
   }
 
-  // 7. Registro de auditoria
+  // 7. Sincronização automática com a EFI Bank
+  let resultadoEfi = null;
+  try {
+    const { sincronizarBaixaEfi } = require('../../../../../lib/efi/EfiSyncService');
+    resultadoEfi = await sincronizarBaixaEfi({
+      supabase,
+      ordemId: id,
+      usuarioId,
+    });
+  } catch (errEfi) {
+    console.error('[ordens/baixar] Falha ao sincronizar com EFI:', errEfi);
+    resultadoEfi = {
+      sucesso: false,
+      efiVinculada: true,
+      syncStatus: 'pendente',
+      mensagem: 'Falha na comunicação com a EFI: ' + errEfi.message,
+    };
+  }
+
+  // 8. Registro de auditoria
   await registrarLog({
     aluno_id: ordem.aluno_id || null,
     instituicao_id: ordem.instituicao_id || null,
@@ -194,6 +213,7 @@ export default async function handler(req, res) {
       ordem_id: ordem.id,
       valor_total: valorDevido,
       efi_charge_id: ordem.efi_charge_id || null,
+      efi_sync: resultadoEfi,
     },
   });
 
@@ -211,17 +231,15 @@ export default async function handler(req, res) {
         metodo_pagamento: metodoFinal,
         data_pagamento: dataPagamentoStr,
         observacao: observacao || null,
+        efi_sync: resultadoEfi,
       }
     }]);
   } catch (_) {}
 
-  const aviso = ordem.efi_charge_id
-    ? 'Esta baixa não cancela automaticamente cobranças ou boletos EFI existentes.'
-    : null;
-
   return res.status(200).json({
     message: 'Baixa manual da ordem registrada com sucesso',
     valor_fatura: valorDevido,
-    ...(aviso ? { aviso } : {}),
+    efi: resultadoEfi,
+    sync_status: resultadoEfi?.syncStatus || 'nao_aplicavel',
   });
 }

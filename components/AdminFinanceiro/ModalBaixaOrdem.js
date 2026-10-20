@@ -103,11 +103,21 @@ export default function ModalBaixaOrdem({ ordem, onConfirm, onClose, loading }) 
 
         {/* Avisos */}
         <div className="px-6 pt-3 space-y-2">
-          {/* Aviso EFI Obrigatório */}
-          <div className="flex gap-2 items-start p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
-            <span className="text-base leading-none flex-shrink-0">⚠️</span>
-            <span>Esta baixa manual <strong>não cancela automaticamente cobrança ou boleto EFI</strong> existente. Cancele o boleto no painel EFI separadamente, se necessário.</span>
-          </div>
+          {/* Aviso de Integração EFI */}
+          {(ordem?.tem_efi || ordem?.efi_charge_id || ordem?.parcela_efi_charge_id || ordem?.efi_carnet_id || (ordem?.cobranca && ordem?.cobranca !== '-')) ? (
+            <div className="flex gap-2.5 items-start p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900">
+              <span className="text-base leading-none flex-shrink-0">🏦</span>
+              <div>
+                <strong className="block font-bold text-blue-950 mb-0.5">Sincronização Automática EFI Bank</strong>
+                <span>Esta ordem possui cobrança bancária ativa. Ao confirmar a baixa manual, o sistema solicitará <strong>automaticamente o cancelamento e encerramento oficial da cobrança na EFI</strong> para impedir pagamentos duplicados.</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-2 items-start p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-700">
+              <span className="text-base leading-none flex-shrink-0">📄</span>
+              <span>Quitação manual de lançamento interno sem cobrança bancária EFI associada.</span>
+            </div>
+          )}
 
           {/* Bloqueio se cancelado ou já pago */}
           {isBloqueado && (

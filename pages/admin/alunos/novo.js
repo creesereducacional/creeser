@@ -3,6 +3,8 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { validarCPF } from '@/utils/validacoes';
 import ConfirmModal from '@/components/ConfirmModal';
+import { useValidacaoEmailUnico } from '@/hooks/useValidacaoEmailUnico';
+import CampoEmailValidado from '@/components/ui/CampoEmailValidado';
 
 const UF_OPTIONS = [
   'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
@@ -151,6 +153,16 @@ export default function CadastroAluno() {
 
   const [formData, setFormData] = useState(ESTADO_INICIAL_FORM);
   const [modalAlerta, setModalAlerta] = useState({ isOpen: false, title: '', message: '', type: 'error' });
+
+  // Validação em tempo real de e-mail único
+  const emailValidacao = useValidacaoEmailUnico({
+    initialEmail: formData.email,
+    alunoId: isEditando ? id : null,
+    debounceMs: 500,
+    onEmailChange: (novoEmail) => {
+      setFormData(prev => ({ ...prev, email: novoEmail }));
+    }
+  });
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -590,6 +602,16 @@ export default function CadastroAluno() {
     e.preventDefault();
     setMessage({ type: '', text: '' });
 
+    if (emailValidacao.bloqueiaAvanco) {
+      const msg = emailValidacao.status === 'duplicate'
+        ? 'Este e-mail já está cadastrado. Informe outro e-mail.'
+        : emailValidacao.status === 'checking'
+        ? 'Aguarde a validação do e-mail antes de salvar.'
+        : (emailValidacao.mensagemErro || 'E-mail inválido ou indisponível.');
+      setMessage({ type: 'error', text: msg });
+      return;
+    }
+
     if (!formData.turma || !String(formData.turma).trim()) {
       setMessage({ type: 'error', text: 'A seleção de uma Turma é obrigatória para o cadastro do aluno.' });
       return;
@@ -954,14 +976,14 @@ export default function CadastroAluno() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-teal-600 mb-1 block">Email</label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  placeholder="email@exemplo.com"
-                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                <CampoEmailValidado
+                  email={emailValidacao.email}
+                  onChange={emailValidacao.handleChange}
+                  onBlur={emailValidacao.handleBlur}
+                  status={emailValidacao.status}
+                  mensagemErro={emailValidacao.mensagemErro}
+                  label="Email"
+                  labelCls="text-xs font-medium text-teal-600 mb-1 block"
                 />
               </div>
             </div>

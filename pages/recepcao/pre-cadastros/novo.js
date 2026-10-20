@@ -5,6 +5,8 @@ import RecepcaoLayout from '@/components/RecepcaoLayout';
 import StatusBadge from '@/components/recepcao/StatusBadge';
 import ConfirmModal from '@/components/ConfirmModal';
 import { validarCPF } from '@/utils/validacoes';
+import { useValidacaoEmailUnico } from '@/hooks/useValidacaoEmailUnico';
+import CampoEmailValidado from '@/components/ui/CampoEmailValidado';
 
 // ── UF OPTIONS ────────────────────────────────────────────────────────
 const UF_OPTIONS = [
@@ -191,6 +193,18 @@ export default function NovoPrecadastro() {
 
   // Modal de Alertas/Avisos
   const [modalAlerta, setModalAlerta] = useState({ isOpen: false, title: '', message: '', type: 'error' });
+
+  // Validação em tempo real de e-mail único
+  const emailValidacao = useValidacaoEmailUnico({
+    initialEmail: form.email,
+    debounceMs: 500,
+    onEmailChange: (novoEmail) => {
+      setForm(prev => ({ ...prev, email: novoEmail }));
+      if (erros.email) {
+        setErros(prev => ({ ...prev, email: null }));
+      }
+    }
+  });
 
   // ── Carregar contexto do usuário & opções iniciais ───────────────────
   useEffect(() => {
@@ -576,6 +590,12 @@ export default function NovoPrecadastro() {
       }
       if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
         e.email = 'E-mail informado é inválido.';
+      } else if (emailValidacao.status === 'duplicate') {
+        e.email = 'Este e-mail já está cadastrado. Informe outro e-mail.';
+      } else if (emailValidacao.status === 'error') {
+        e.email = emailValidacao.mensagemErro || 'Não foi possível verificar o e-mail no momento.';
+      } else if (emailValidacao.status === 'checking') {
+        e.email = 'Aguarde a verificação do e-mail.';
       }
     } else if (n === 3) {
       // Responsáveis (se menor de 18)
@@ -615,6 +635,24 @@ export default function NovoPrecadastro() {
 
   const avancar = () => {
     if (!validarEtapa(etapa)) return;
+    if (etapa === 2 && emailValidacao.bloqueiaAvanco) {
+      if (emailValidacao.status === 'duplicate') {
+        setModalAlerta({
+          isOpen: true,
+          title: 'E-mail Já Cadastrado',
+          message: 'Este e-mail já está cadastrado no sistema. Por favor, informe outro e-mail antes de avançar.',
+          type: 'error'
+        });
+      } else if (emailValidacao.status === 'checking') {
+        setModalAlerta({
+          isOpen: true,
+          title: 'Verificação em Andamento',
+          message: 'Aguarde a validação do e-mail antes de prosseguir para a próxima etapa.',
+          type: 'info'
+        });
+      }
+      return;
+    }
     setEtapa(prev => Math.min(prev + 1, ETAPAS.length));
   };
 
@@ -793,7 +831,7 @@ export default function NovoPrecadastro() {
                   type="button"
                   onClick={() => {
                     // Permite voltar livremente para qualquer etapa já visitada
-                    if (s.n < etapa || validarEtapa(etapa)) {
+                    if (s.n < etapa || (validarEtapa(etapa) && (etapa !== 2 || !emailValidacao.bloqueiaAvanco))) {
                       setEtapa(s.n);
                     }
                   }}
@@ -1113,18 +1151,17 @@ export default function NovoPrecadastro() {
                   />
                 </div>
 
-                {/* E-mail */}
+                {/* E-mail com Validação Imediata de Unicidade */}
                 <div className="sm:col-span-2">
-                  <label className={labelCls}>E-mail</label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={form.email}
-                    onChange={handleInputChange}
-                    placeholder="email@exemplo.com"
-                    className={`${inputCls} ${erros.email ? inputErr : inputOk}`}
+                  <CampoEmailValidado
+                    email={emailValidacao.email}
+                    onChange={emailValidacao.handleChange}
+                    onBlur={emailValidacao.handleBlur}
+                    status={emailValidacao.status}
+                    mensagemErro={erros.email || emailValidacao.mensagemErro}
+                    label="E-mail"
+                    labelCls={labelCls}
                   />
-                  {erros.email && <p className="text-xs text-rose-600 mt-1">{erros.email}</p>}
                 </div>
 
                 {/* CEP */}

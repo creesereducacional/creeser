@@ -4,6 +4,8 @@ import Link from 'next/link';
 import RecepcaoLayout from '@/components/RecepcaoLayout';
 import StatusBadge from '@/components/recepcao/StatusBadge';
 import TimelineStatus from '@/components/recepcao/TimelineStatus';
+import { useValidacaoEmailUnico } from '@/hooks/useValidacaoEmailUnico';
+import CampoEmailValidado from '@/components/ui/CampoEmailValidado';
 
 const inputCls = 'w-full px-3 py-2.5 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white';
 const labelCls = 'block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1';
@@ -74,6 +76,16 @@ export default function PreCadastroDetalhe() {
   // Idade derivada da data de nascimento
   const [idade, setIdade] = useState(null);
   const isMenor = idade !== null && idade < 18;
+
+  // Validação em tempo real de e-mail único para o aluno em edição
+  const emailValidacao = useValidacaoEmailUnico({
+    initialEmail: form.email || aluno?.email || '',
+    alunoId: id,
+    debounceMs: 500,
+    onEmailChange: (novoEmail) => {
+      set('email', novoEmail);
+    }
+  });
 
   // ── Carregar dados do pré-cadastro ─────────────────────────────────────────
   useEffect(() => {
@@ -254,6 +266,16 @@ export default function PreCadastroDetalhe() {
 
   async function handleSalvar() {
     if (!form.nome?.trim()) { setErro('Nome é obrigatório.'); return; }
+    if (emailValidacao.bloqueiaAvanco) {
+      if (emailValidacao.status === 'duplicate') {
+        setErro('Este e-mail já está cadastrado. Informe outro e-mail.');
+      } else if (emailValidacao.status === 'checking') {
+        setErro('Aguarde a validação do e-mail.');
+      } else {
+        setErro(emailValidacao.mensagemErro || 'E-mail inválido ou indisponível.');
+      }
+      return;
+    }
     setSalvando(true); setErro(null); setSucesso(null);
     try {
       const res = await fetch(`/api/recepcao/pre-cadastros/${id}`, {
@@ -442,11 +464,21 @@ export default function PreCadastroDetalhe() {
                   )}
                 </div>
                 <div>
-                  <label className={labelCls}>E-mail</label>
                   {editando ? (
-                    <input type="email" className={inputCls} value={form.email} onChange={e => set('email', e.target.value)} placeholder="email@exemplo.com" />
+                    <CampoEmailValidado
+                      email={emailValidacao.email}
+                      onChange={emailValidacao.handleChange}
+                      onBlur={emailValidacao.handleBlur}
+                      status={emailValidacao.status}
+                      mensagemErro={emailValidacao.mensagemErro}
+                      label="E-mail"
+                      labelCls={labelCls}
+                    />
                   ) : (
-                    <p className="text-sm text-gray-800 py-2">{fmt(aluno.email)}</p>
+                    <div>
+                      <label className={labelCls}>E-mail</label>
+                      <p className="text-sm text-gray-800 py-2">{fmt(aluno.email)}</p>
+                    </div>
                   )}
                 </div>
               </div>

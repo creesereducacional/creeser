@@ -205,6 +205,28 @@ export default async function handler(req, res) {
       const turmaFinalNome = turmaMat?.nome || turma.nome || null;
       const instNome = o.instituicoes?.nome || null;
 
+      // Identificar se a ordem possui cobrança EFI vinculada
+      const temEfi = Boolean(
+        o.efi_charge_id ||
+        o.efi_carnet_id ||
+        parcela.efi_charge_id ||
+        (Array.isArray(o.financeiro_parcelas) && o.financeiro_parcelas.some(p => p.efi_charge_id))
+      );
+
+      // Determinar o status de sincronização da EFI
+      let syncStatusResolvido = null;
+      if (temEfi) {
+        if (o.efi_sync_status) {
+          syncStatusResolvido = o.efi_sync_status;
+        } else if (o.status === 'pago' || parcela.status === 'pago') {
+          if (o.efi_status === 'canceled' || o.efi_status === 'paid' || o.efi_status === 'settled' || o.efi_status === 'sincronizado') {
+            syncStatusResolvido = 'sincronizado';
+          } else {
+            syncStatusResolvido = 'pendente';
+          }
+        }
+      }
+
       return {
         ...o,
         instituicao_nome: instNome,
@@ -227,6 +249,9 @@ export default async function handler(req, res) {
         boleto_url: parcela.boleto_url || null,
         boleto_barcode: parcela.boleto_barcode || null,
         parcela_efi_charge_id: parcela.efi_charge_id || null,
+        tem_efi: temEfi,
+        efi_sync_status: syncStatusResolvido,
+        efi_status: o.efi_status || null,
         parcela_detalhes: {
           id: parcela.id || null,
           numero_parcela: parcela.numero_parcela || 1,

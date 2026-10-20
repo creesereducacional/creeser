@@ -26,6 +26,7 @@ export default function OrdensPage() {
 
   const [modalBaixaOrdem, setModalBaixaOrdem] = useState(null); // ordem selecionada para baixa manual
   const [baixandoOrdem, setBaixandoOrdem] = useState(false);
+  const [sincronizandoId, setSincronizandoId] = useState(null); // id da ordem com sincronizacao EFI em andamento
   const [modalVerOrdem, setModalVerOrdem] = useState(null); // ordem selecionada para visualização
 
   useEffect(() => {
@@ -244,12 +245,44 @@ export default function OrdensPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Erro ao registrar baixa da ordem');
       setModalBaixaOrdem(null);
-      if (data.aviso) alert('⚠️ ' + data.aviso);
+
+      // Feedback transparente e informativo da operação e sincronização com a EFI
+      if (data.sync_status === 'sincronizado') {
+        alert('✅ Baixa manual registrada com sucesso!\nCobrança bancária EFI sincronizada e cancelada.');
+      } else if (data.sync_status === 'pendente') {
+        alert('⚠️ Baixa manual registrada no sistema CREESER, porém a sincronização com a EFI ficou pendente.\nVocê pode clicar no botão "Sincronizar EFI" a qualquer momento para tentar novamente.');
+      } else {
+        alert('✅ ' + (data.message || 'Baixa manual registrada com sucesso.'));
+      }
+
       await carregarOrdens();
     } catch (err) {
       alert('Erro: ' + err.message);
     } finally {
       setBaixandoOrdem(false);
+    }
+  };
+
+  const handleSincronizarEfi = async (ordem) => {
+    if (!ordem?.id) return;
+    setSincronizandoId(ordem.id);
+    try {
+      const res = await fetch(`/api/admin-financeiro/ordens/${ordem.id}/sincronizar-efi`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Falha ao sincronizar com a EFI');
+      if (data.sync_status === 'sincronizado') {
+        alert('✅ Cobrança bancária EFI sincronizada e cancelada com sucesso!');
+      } else {
+        alert('⚠️ ' + (data.message || 'Sincronização EFI pendente.'));
+      }
+      await carregarOrdens();
+    } catch (err) {
+      alert('Erro ao sincronizar com a EFI: ' + err.message);
+    } finally {
+      setSincronizandoId(null);
     }
   };
 
@@ -343,7 +376,19 @@ export default function OrdensPage() {
     encerrado: { variant: 'neutral', label: 'Encerrado'  },
   };
 
-  const BadgeBoleto = ({ status }) => {
+  const BadgeBoleto = ({ status, syncStatus, temEfi }) => {
+    if (status === 'pago') {
+      if (temEfi) {
+        if (syncStatus === 'sincronizado') {
+          return <StatusBadge variant="success" label="Pago — EFI sincronizada" dot />;
+        }
+        if (syncStatus === 'pendente') {
+          return <StatusBadge variant="warning" label="Pago — Sincronização EFI pendente" dot />;
+        }
+      }
+      return <StatusBadge variant="success" label="Pago" dot />;
+    }
+
     const cfg = STATUS_VARIANTE[status] || { variant: 'neutral', label: status };
     return <StatusBadge variant={cfg.variant} label={cfg.label} dot />;
   };
@@ -462,7 +507,11 @@ export default function OrdensPage() {
                         {ordem.aluno_nome}
                       </td>
                       <td className="px-4 py-4 text-sm">
-                          <BadgeBoleto status={ordem.status_parcela || ordem.status} />
+                        <BadgeBoleto
+                          status={ordem.status_parcela || ordem.status}
+                          syncStatus={ordem.efi_sync_status}
+                          temEfi={ordem.tem_efi || (ordem.cobranca && ordem.cobranca !== '-')}
+                        />
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-650">
                         {formataData(ordem.data_vencimento)}
@@ -496,6 +545,18 @@ export default function OrdensPage() {
                               Baixar
                             </button>
                           )}
+                          {(ordem.status === 'pago' || ordem.status_parcela === 'pago') && ordem.efi_sync_status === 'pendente' && (
+                            <button
+                              type="button"
+                              onClick={() => handleSincronizarEfi(ordem)}
+                              disabled={sincronizandoId === ordem.id}
+                              title="Reprocessar sincronização na EFI"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-100 text-amber-800 rounded hover:bg-amber-200 transition text-xs font-semibold cursor-pointer disabled:opacity-50"
+                            >
+                              <span>{sincronizandoId === ordem.id ? '⏳' : '🔄'}</span>
+                              {sincronizandoId === ordem.id ? 'Sincronizando...' : 'Sincronizar EFI'}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -515,6 +576,8 @@ export default function OrdensPage() {
           formataValor={formataValor}
           formataData={formataData}
           BadgeBoleto={BadgeBoleto}
+          onSincronizarEfi={handleSincronizarEfi}
+          sincronizandoId={sincronizandoId}
         />
       )}
 
@@ -531,8 +594,7 @@ export default function OrdensPage() {
   );
 }
 
-// ── Componente de Modal com Detalhes da Ordem ─────────────────────────────────
-function ModalDetalhesOrdem({ ordem, onClose, formataValor, formataData, BadgeBoleto }) {
+function ModalDetalhesOrdem({ ordem, onClose, formataValor, formataData, BadgeBoleto, onSincronizarEfi, sincronizandoId }) {
   const [copiado, setCopiado] = useState(false);
 
   const p = ordem.parcela_detalhes || {};
@@ -545,6 +607,12 @@ function ModalDetalhesOrdem({ ordem, onClose, formataValor, formataData, BadgeBo
     setCopiado(true);
     setTimeout(() => setCopiado(false), 2500);
   };
+
+  const statusEfetivo = ordem.status_parcela || ordem.status;
+  const isPago = statusEfetivo === 'pago';
+  const syncStatus = ordem.efi_sync_status || (isPago && ordem.tem_efi ? 'sincronizado' : null);
+  const isPendenteEfi = syncStatus === 'pendente';
+  const isSincronizando = sincronizandoId === ordem.id;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-fade-in">
@@ -580,7 +648,11 @@ function ModalDetalhesOrdem({ ordem, onClose, formataValor, formataData, BadgeBo
             <div>
               <span className="text-xs text-teal-800 font-medium block">Status da Cobrança</span>
               <div className="mt-1">
-                <BadgeBoleto status={ordem.status_parcela || ordem.status} />
+                <BadgeBoleto
+                  status={statusEfetivo}
+                  syncStatus={syncStatus}
+                  temEfi={ordem.tem_efi}
+                />
               </div>
             </div>
             <div>
@@ -701,7 +773,7 @@ function ModalDetalhesOrdem({ ordem, onClose, formataValor, formataData, BadgeBo
 
         {/* Rodapé com Ações */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/90 rounded-b-2xl">
-          <div>
+          <div className="flex items-center gap-2">
             {boletoUrl ? (
               <a
                 href={boletoUrl}
@@ -716,6 +788,19 @@ function ModalDetalhesOrdem({ ordem, onClose, formataValor, formataData, BadgeBo
               <span className="text-xs text-gray-400 italic">
                 Nenhum documento/URL de boleto disponível
               </span>
+            )}
+
+            {isPago && isPendenteEfi && onSincronizarEfi && (
+              <button
+                type="button"
+                disabled={isSincronizando}
+                onClick={() => onSincronizarEfi(ordem)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition shadow-xs cursor-pointer"
+                title="Tentar novamente cancelamento da cobrança na EFI"
+              >
+                <span>🔄</span>
+                <span>{isSincronizando ? 'Sincronizando...' : 'Sincronizar EFI'}</span>
+              </button>
             )}
           </div>
 
