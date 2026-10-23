@@ -1,5 +1,6 @@
 // pages/api/admin-financeiro/acordos/create.js
-// POST — Criar Acordo Financeiro renegociando débitos em aberto
+// POST — Criar Acordo Financeiro com suporte a entrada (espécie/EFI) ou sem entrada,
+// cálculo de encargos e descontos, encerramento de originais na EFI e histórico completo.
 
 import { createClient } from '@supabase/supabase-js';
 import {
@@ -10,6 +11,11 @@ import {
   resolveInstituicaoId,
   resolveContextoUsuario,
 } from '../../../../lib/auth-server';
+import {
+  validarObservacaoOperador,
+  encerrarCobrancasOriginais,
+  registrarNegociacao,
+} from '../../../../lib/negociacoes-service';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -29,7 +35,7 @@ export default async function handler(req, res) {
 
   const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
 
-  // ── FASE 6.1.4: Resolver contexto de escopo (Instituição × Unidade) ──────────
+  // ── Contexto de escopo (Instituição × Unidade) ─────────────────────────────
   const ctx = await resolveContextoUsuario(req, authUser);
 
   if (ctx.queryError) {
@@ -42,40 +48,58 @@ export default async function handler(req, res) {
     : ctx.instituicaoId;
 
   if (!isGroupAdmin && !userInstituicaoId) {
-    return res.status(403).json({ message: 'Instituicao nao definida para o usuario atual' });
+    return res.status(403).json({ message: 'Instituição não definida para o usuário atual' });
   }
-  // ────────────────────────────────────────────────────────────────────────────
 
   try {
     const {
       aluno_id,
       descricao,
+      observacao_operador,
       parcelas_originais,
+      possui_entrada,
+      tipo_entrada, // 'sem_entrada', 'especie', 'efi'
       valor_entrada,
       data_vencimento_entrada,
       quantidade_parcelas,
       dia_vencimento_parcelas,
+      valor_encargos,
+      valor_desconto,
+      confirmacao_operador,
     } = req.body || {};
 
-    // ── Validações básicas ────────────────────────────────────────────────────
+    // ── 1. Validações básicas e Observação do Operador ───────────────────────
     if (!aluno_id) return res.status(400).json({ message: 'aluno_id é obrigatório.' });
-    if (!descricao || !descricao.trim()) return res.status(400).json({ message: 'Descrição do acordo é obrigatória.' });
+
+    // Observação do Operador obrigatória e significativa
+    const validacaoObs = validarObservacaoOperador(observacao_operador || descricao);
+    if (!validacaoObs.valido) {
+      return res.status(400).json({ message: validacaoObs.erro });
+    }
+    const obsOperadorLimpa = validacaoObs.observacao;
+
     if (!Array.isArray(parcelas_originais) || parcelas_originais.length === 0) {
-      return res.status(400).json({ message: 'Selecione ao menos uma parcela original.' });
+      return res.status(400).json({ message: 'Selecione ao menos uma parcela original para renegociação.' });
     }
 
-    const entradaNum = Number(valor_entrada) || 0;
-    if (entradaNum <= 0) {
-      return res.status(400).json({ message: 'Valor de entrada deve ser maior que zero.' });
+    // Regras de Entrada
+    const temEntrada = Boolean(possui_entrada) && Number(valor_entrada) > 0;
+    const entradaNum = temEntrada ? Number(Number(valor_entrada).toFixed(2)) : 0;
+    const modoEntrada = temEntrada ? (tipo_entrada === 'especie' ? 'especie' : 'efi') : 'sem_entrada';
+
+    if (temEntrada && !data_vencimento_entrada && modoEntrada === 'efi') {
+      return res.status(400).json({ message: 'Data de vencimento da entrada via EFI é obrigatória.' });
     }
 
-    if (!data_vencimento_entrada) {
-      return res.status(400).json({ message: 'Data de vencimento da entrada é obrigatória.' });
+    if (!temEntrada && !confirmacao_operador) {
+      return res.status(400).json({
+        message: 'Para acordos sem entrada, é necessária a confirmação formal explícita do operador para encerrar os débitos originais.'
+      });
     }
 
     const qtdParcelasNum = Math.floor(Number(quantidade_parcelas)) || 0;
     if (qtdParcelasNum <= 0) {
-      return res.status(400).json({ message: 'Quantidade de parcelas deve ser maior que zero.' });
+      return res.status(400).json({ message: 'A quantidade de parcelas do saldo deve ser ao menos 1.' });
     }
 
     const diaVencNum = Math.floor(Number(dia_vencimento_parcelas)) || 10;
@@ -83,7 +107,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Dia de vencimento das parcelas deve ser entre 1 e 31.' });
     }
 
-    // ── Carregar aluno ────────────────────────────────────────────────────────
+    // ── 2. Carregar aluno e validar escopo ─────────────────────────────────────
     let alunoQuery = supabase
       .from('alunos')
       .select('id, nome, cpf, instituicao_id, turmaid')
@@ -95,7 +119,7 @@ export default async function handler(req, res) {
 
     if (!aluno) return res.status(404).json({ message: 'Aluno não encontrado.' });
 
-    // ── Resolução da Unidade e Turma do Aluno (Fase 6.1.4) ────────────────────
+    // Resolução de Unidade
     let turmaIdResolvida = null;
     const { data: matriculasAluno } = await supabase
       .from('matriculas')
@@ -106,8 +130,6 @@ export default async function handler(req, res) {
       const matAlvo = matriculasAluno.find(m => m.is_principal) || matriculasAluno[0];
       turmaIdResolvida = matAlvo?.turma_id || null;
     }
-
-    // Fallback para coluna legada alunos.turmaid
     if (!turmaIdResolvida) {
       turmaIdResolvida = aluno.turmaid || null;
     }
@@ -128,7 +150,6 @@ export default async function handler(req, res) {
       }
     }
 
-    // Validação de isolamento por Instituição:
     if (!isGroupAdmin) {
       if (aluno.instituicao_id && userInstituicaoId && aluno.instituicao_id !== userInstituicaoId) {
         return res.status(403).json({ message: 'Acesso negado: o aluno pertence a outra instituição.' });
@@ -138,7 +159,6 @@ export default async function handler(req, res) {
       }
     }
 
-    // Validação de Escopo de Unidade (para Usuário Filial):
     if (ctx.unidadesPermitidas !== null) {
       if (unidadeIdDoAluno !== null && !ctx.unidadesPermitidas.includes(unidadeIdDoAluno)) {
         return res.status(403).json({
@@ -151,46 +171,83 @@ export default async function handler(req, res) {
       ? (aluno.instituicao_id || userInstituicaoId || null)
       : userInstituicaoId;
 
-    // ── Carregar e validar parcelas originais ──────────────────────────────────
-    let parcelasQuery = supabase
+    // ── 3. Carregar e validar parcelas originais ───────────────────────────────
+    const { data: parcelasOriginais, error: findParcelasErr } = await supabase
       .from('financeiro_parcelas')
-      .select('id, status, valor, numero_parcela, data_vencimento')
+      .select(`
+        id,
+        ordem_pagamento_id,
+        status,
+        valor,
+        numero_parcela,
+        data_vencimento,
+        efi_charge_id,
+        boleto_numero,
+        financeiro_ordens_pagamento!ordem_pagamento_id (
+          id,
+          tipo,
+          status,
+          descricao,
+          referencia,
+          efi_charge_id,
+          efi_carnet_id
+        )
+      `)
       .eq('aluno_id', aluno.id)
       .in('id', parcelas_originais);
-    const { data: parcelasOriginais, error: findParcelasErr } = await parcelasQuery;
 
     if (findParcelasErr || !parcelasOriginais || parcelasOriginais.length !== parcelas_originais.length) {
       return res.status(422).json({ message: 'Uma ou mais parcelas originais não foram encontradas no cadastro deste aluno.' });
     }
 
-    // Validar se todas as parcelas estão abertas
+    // Conferir se nenhuma parcela original já está quitada
     for (const p of parcelasOriginais) {
-      if (p.status === 'pago' || p.status === 'cancelado') {
-        return res.status(422).json({ message: `A parcela #${p.numero_parcela} está com status ${p.status} e não pode ser renegociada.` });
+      if (p.status === 'pago') {
+        return res.status(422).json({
+          message: `A parcela #${p.numero_parcela} já foi paga e não pode ser renegociada.`
+        });
+      }
+      if (p.status === 'cancelado') {
+        return res.status(422).json({
+          message: `A parcela #${p.numero_parcela} já se encontra cancelada.`
+        });
       }
     }
 
-    // Calcular débitos
-    const totalDebito = parcelasOriginais.reduce((acc, curr) => acc + Number(curr.valor), 0);
-    if (entradaNum > totalDebito) {
-      return res.status(400).json({ message: 'O valor de entrada não pode ser maior que o débito total.' });
+    // ── 4. Cálculos: Encargos, Descontos, Saldo e Parcelas ─────────────────────
+    const totalOriginal = parcelasOriginais.reduce((acc, curr) => acc + Number(curr.valor), 0);
+    const encargosNum = Math.max(0, Number(valor_encargos) || 0);
+    const descontoNum = Math.max(0, Number(valor_desconto) || 0);
+
+    const totalNegociado = Math.max(0, Number((totalOriginal + encargosNum - descontoNum).toFixed(2)));
+
+    if (entradaNum > totalNegociado) {
+      return res.status(400).json({ message: 'O valor de entrada não pode ser maior que o valor total negociado.' });
     }
 
-    const saldo = totalDebito - entradaNum;
-    const valorParcelaAcordo = saldo / qtdParcelasNum;
+    // A entrada efetivamente paga/acordada é abatida do saldo e NÃO integra as novas parcelas
+    const saldoRestante = Math.max(0, Number((totalNegociado - entradaNum).toFixed(2)));
 
-    // ── Criar Ordem do tipo ACORDO ─────────────────────────────────────────────
+    if (saldoRestante <= 0 && !temEntrada) {
+      return res.status(400).json({ message: 'O valor do acordo deve ser maior que zero.' });
+    }
+
+    const valorParcelaSaldo = saldoRestante > 0 ? Number((saldoRestante / qtdParcelasNum).toFixed(2)) : 0;
+
+    // ── 5. Criar Ordem do tipo ACORDO ──────────────────────────────────────────
+    const hojeStr = new Date().toISOString().split('T')[0];
     const { data: ordem, error: createOrdemErr } = await supabase
       .from('financeiro_ordens_pagamento')
       .insert([{
         instituicao_id: aluno.instituicao_id || instituicaoFinal,
         aluno_id: aluno.id,
         tipo: 'acordo',
-        descricao: descricao.trim(),
+        descricao: (descricao || 'Acordo Financeiro').trim(),
         referencia: 'Acordo Financeiro',
-        valor_total: totalDebito,
-        quantidade_parcelas: qtdParcelasNum + 1,
-        observacoes: descricao.trim(),
+        valor_total: totalNegociado,
+        valor_desconto: descontoNum,
+        quantidade_parcelas: temEntrada && modoEntrada === 'efi' ? qtdParcelasNum + 1 : qtdParcelasNum,
+        observacoes: obsOperadorLimpa,
         status: 'ativo',
         parcelas_origem_acordo: parcelas_originais,
         criado_por: authUser.email || authUser.id || 'financeiro'
@@ -202,37 +259,64 @@ export default async function handler(req, res) {
       throw new Error('Erro ao criar ordem do acordo: ' + (createOrdemErr?.message || 'Erro desconhecido'));
     }
 
-    // ── Gerar parcelas do acordo ────────────────────────────────────────────────
+    // ── 6. Gerar Parcelas do Acordo ────────────────────────────────────────────
     const novasParcelas = [];
+    let entradaParcelaCriada = null;
 
-    // 1. Parcela de entrada
-    novasParcelas.push({
-      instituicao_id: aluno.instituicao_id || instituicaoFinal,
-      ordem_pagamento_id: ordem.id,
-      aluno_id: aluno.id,
-      numero_parcela: 1,
-      valor: Number(entradaNum.toFixed(2)),
-      data_vencimento: data_vencimento_entrada,
-      status: 'pendente'
-    });
+    // 6.1 Tratamento da Entrada
+    if (temEntrada) {
+      if (modoEntrada === 'especie') {
+        // Recebimento imediato registrado fora da EFI
+        novasParcelas.push({
+          instituicao_id: aluno.instituicao_id || instituicaoFinal,
+          ordem_pagamento_id: ordem.id,
+          aluno_id: aluno.id,
+          numero_parcela: 1,
+          valor: entradaNum,
+          valor_pago: entradaNum,
+          data_vencimento: hojeStr,
+          data_pagamento: hojeStr,
+          status: 'pago',
+          metodo_pagamento: 'dinheiro',
+          observacao_baixa: `Entrada em espécie de R$ ${entradaNum.toFixed(2)} recebida no ato da negociação.`,
+          observacoes: 'Entrada quitada em dinheiro/espécie.'
+        });
+      } else {
+        // Entrada digital via EFI (boleto/pix pendente)
+        novasParcelas.push({
+          instituicao_id: aluno.instituicao_id || instituicaoFinal,
+          ordem_pagamento_id: ordem.id,
+          aluno_id: aluno.id,
+          numero_parcela: 1,
+          valor: entradaNum,
+          data_vencimento: data_vencimento_entrada || hojeStr,
+          status: 'pendente',
+          observacoes: 'Entrada via EFI (Boleto/PIX).'
+        });
+      }
+    }
 
-    // 2. Parcelas do saldo restante
-    let currentVenc = new Date(data_vencimento_entrada + 'T12:00:00');
-    for (let i = 1; i <= qtdParcelasNum; i++) {
-      // Incrementar mês
-      currentVenc.setMonth(currentVenc.getMonth() + 1);
-      // Ajustar dia
-      currentVenc.setDate(diaVencNum);
+    // 6.2 Parcelas do Saldo Restante
+    if (saldoRestante > 0) {
+      const dataBase = data_vencimento_entrada || hojeStr;
+      let currentVenc = new Date(dataBase + 'T12:00:00');
+      const startParcelaNum = (temEntrada && modoEntrada === 'efi') ? 2 : (temEntrada && modoEntrada === 'especie' ? 2 : 1);
 
-      novasParcelas.push({
-        instituicao_id: aluno.instituicao_id || instituicaoFinal,
-        ordem_pagamento_id: ordem.id,
-        aluno_id: aluno.id,
-        numero_parcela: i + 1,
-        valor: Number(valorParcelaAcordo.toFixed(2)),
-        data_vencimento: currentVenc.toISOString().split('T')[0],
-        status: 'pendente'
-      });
+      for (let i = 0; i < qtdParcelasNum; i++) {
+        currentVenc.setMonth(currentVenc.getMonth() + 1);
+        currentVenc.setDate(diaVencNum);
+
+        novasParcelas.push({
+          instituicao_id: aluno.instituicao_id || instituicaoFinal,
+          ordem_pagamento_id: ordem.id,
+          aluno_id: aluno.id,
+          numero_parcela: startParcelaNum + i,
+          valor: valorParcelaSaldo,
+          data_vencimento: currentVenc.toISOString().split('T')[0],
+          status: 'pendente',
+          observacoes: `Parcela ${i + 1}/${qtdParcelasNum} do saldo renegociado.`
+        });
+      }
     }
 
     const { data: parcelasCriadas, error: insertParcelasErr } = await supabase
@@ -244,37 +328,126 @@ export default async function handler(req, res) {
       throw new Error('Erro ao inserir parcelas do acordo: ' + (insertParcelasErr?.message || 'Erro desconhecido'));
     }
 
-    // Obter ID da parcela de entrada (número_parcela = 1)
-    const entradaParcela = parcelasCriadas.find(p => p.numero_parcela === 1);
-    if (entradaParcela) {
-      await supabase
-        .from('financeiro_ordens_pagamento')
-        .update({ entrada_parcela_id: entradaParcela.id })
-        .eq('id', ordem.id);
+    if (temEntrada) {
+      entradaParcelaCriada = parcelasCriadas.find(p => p.numero_parcela === 1);
+      if (entradaParcelaCriada) {
+        await supabase
+          .from('financeiro_ordens_pagamento')
+          .update({ entrada_parcela_id: entradaParcelaCriada.id })
+          .eq('id', ordem.id);
+      }
     }
 
-    // ── Logs de Auditoria ──────────────────────────────────────────────────────
-    const usuarioId = authUser.id ? Number(authUser.id) : null;
+    // ── 7. Encerramento das Cobranças Originais (Regra de Negócio 4 e 5) ────────
+    // Com entrada paga em espécie OU Sem entrada (com confirmação do operador):
+    // Inicia imediatamente o cancelamento no CREESER e a baixa bancária na EFI.
+    let resultadoCancelamento = { sucesso: true, parcelasCanceladas: [], resultadosEfi: [], pendenteEfi: false };
+    let statusNegociacao = 'concluido';
+
+    const deveCancelarOriginaisAgora = (!temEntrada) || (temEntrada && modoEntrada === 'especie');
+
+    if (deveCancelarOriginaisAgora) {
+      resultadoCancelamento = await encerrarCobrancasOriginais({
+        supabase,
+        parcelaIds: parcelas_originais,
+        ordemAcordoId: ordem.id,
+        motivo: !temEntrada
+          ? `Cancelada por formalização de Acordo sem entrada (Ordem ${ordem.id}).`
+          : `Cancelada por quitação da entrada em espécie no Acordo (Ordem ${ordem.id}).`,
+        operador: { id: authUser.id, email: authUser.email }
+      });
+
+      if (resultadoCancelamento.pendenteEfi) {
+        statusNegociacao = 'sync_pendente';
+      }
+    } else {
+      // Com entrada digital via EFI: aguarda quitação da entrada
+      statusNegociacao = 'pendente_entrada';
+    }
+
+    // Snapshot das parcelas originais para o histórico
+    const snapshotOriginais = parcelasOriginais.map(p => ({
+      id: p.id,
+      numero_parcela: p.numero_parcela,
+      valor: p.valor,
+      data_vencimento: p.data_vencimento,
+      status_anterior: p.status,
+      efi_charge_id: p.efi_charge_id || p.financeiro_ordens_pagamento?.efi_charge_id || null,
+      boleto_numero: p.boleto_numero || null,
+      descricao: p.financeiro_ordens_pagamento?.descricao || 'Fatura Original'
+    }));
+
+    // Snapshot das parcelas geradas
+    const snapshotGeradas = parcelasCriadas.map(p => ({
+      id: p.id,
+      numero_parcela: p.numero_parcela,
+      valor: p.valor,
+      data_vencimento: p.data_vencimento,
+      status: p.status,
+      eh_entrada: temEntrada && p.numero_parcela === 1
+    }));
+
+    // ── 8. Gravar Histórico Estruturado e Auditoria (Regras 6, 7 e 8) ──────────
+    const operadorObj = {
+      id: authUser.id,
+      email: authUser.email,
+      perfil: authUser.perfil || authUser.tipo || 'financeiro'
+    };
+
+    await registrarNegociacao({
+      supabase,
+      ordemId: ordem.id,
+      alunoId: aluno.id,
+      instituicaoId: aluno.instituicao_id || instituicaoFinal,
+      unidadeId: unidadeIdDoAluno,
+      operador: operadorObj,
+      valorTotalOriginal: totalOriginal,
+      valorEncargos: encargosNum,
+      valorDesconto: descontoNum,
+      valorTotalNegociado: totalNegociado,
+      possuiEntrada: temEntrada,
+      valorEntrada: entradaNum,
+      tipoEntrada: modoEntrada,
+      entradaParcelaId: entradaParcelaCriada?.id || null,
+      entradaPaga: temEntrada && modoEntrada === 'especie',
+      dataPagamentoEntrada: temEntrada && modoEntrada === 'especie' ? hojeStr : null,
+      valorSaldo: saldoRestante,
+      quantidadeParcelas: qtdParcelasNum,
+      diaVencimentoParcelas: diaVencNum,
+      status: statusNegociacao,
+      observacaoOperador: obsOperadorLimpa,
+      parcelasOriginais: snapshotOriginais,
+      parcelasGeradas: snapshotGeradas,
+      sincronizacaoEfi: resultadoCancelamento.resultadosEfi,
+      eventoInicial: deveCancelarOriginaisAgora ? 'acordo_formalizado_originais_canceladas' : 'acordo_aguardando_entrada_efi'
+    });
+
+    // Auditoria nos logs legados
     try {
       await supabase.from('financeiro_logs').insert({
         aluno_id: aluno.id,
         instituicao_id: aluno.instituicao_id || null,
-        usuario_id: usuarioId,
+        usuario_id: authUser.id ? Number(authUser.id) : null,
         acao: 'criar_acordo_financeiro',
-        observacao: descricao.trim(),
+        observacao: obsOperadorLimpa,
         dados_extras: {
           ordem_id: ordem.id,
-          valor_total: totalDebito,
+          valor_total_original: totalOriginal,
+          valor_total_negociado: totalNegociado,
+          possui_entrada: temEntrada,
+          tipo_entrada: modoEntrada,
           valor_entrada: entradaNum,
+          valor_saldo: saldoRestante,
           quantidade_parcelas: qtdParcelasNum,
-          parcelas_originais: parcelas_originais
+          parcelas_originais: parcelas_originais,
+          pendente_efi: resultadoCancelamento.pendenteEfi
         }
       });
     } catch (_) {}
 
     try {
       await supabase.from('audit_logs').insert({
-        usuario_id: usuarioId,
+        usuario_id: authUser.id ? Number(authUser.id) : null,
         usuario_email: authUser.email || null,
         perfil: authUser.perfil || authUser.tipo || null,
         acao: 'CRIAR_ACORDO_FINANCEIRO',
@@ -283,12 +456,14 @@ export default async function handler(req, res) {
         id_entidade: String(aluno.id),
         detalhes: {
           ordem_id: ordem.id,
-          valor_total: totalDebito,
+          valor_total_negociado: totalNegociado,
+          possui_entrada: temEntrada,
+          tipo_entrada: modoEntrada,
           valor_entrada: entradaNum,
-          quantidade_parcelas_acordo: qtdParcelasNum,
-          parcelas_originais_incluidas_count: parcelas_originais.length,
-          status_acordo: 'pendente_entrada',
-          observacao: descricao.trim()
+          quantidade_parcelas: qtdParcelasNum,
+          status_negociacao: statusNegociacao,
+          pendente_efi: resultadoCancelamento.pendenteEfi,
+          observacao: obsOperadorLimpa
         },
         instituicao_id: aluno.instituicao_id || null
       });
@@ -296,9 +471,13 @@ export default async function handler(req, res) {
 
     return res.status(201).json({
       sucesso: true,
-      message: 'Acordo financeiro criado com sucesso.',
+      message: 'Acordo financeiro registrado com sucesso.',
       ordem,
-      parcelas: parcelasCriadas
+      parcelas: parcelasCriadas,
+      status_negociacao: statusNegociacao,
+      entrada_parcela: entradaParcelaCriada,
+      pendente_efi: resultadoCancelamento.pendenteEfi,
+      resultados_cancelamento: resultadoCancelamento
     });
 
   } catch (err) {

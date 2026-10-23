@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import StatusBadge  from '@/components/ui/StatusBadge';
 import EmptyState   from '@/components/ui/EmptyState';
@@ -41,6 +41,15 @@ export default function RelatorioContratos() {
   const [filtroTurma,   setFiltroTurma]   = useState('');
   const [filtroNome,    setFiltroNome]    = useState('');
 
+  // Paginação (10 registros por vez)
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const itensPorPagina = 10;
+
+  // Resetar página ao alterar filtros
+  useEffect(() => {
+    setPaginaAtual(1);
+  }, [filtroStatus, filtroCurso, filtroTurma, filtroNome]);
+
   useEffect(() => {
     fetch('/api/cursos', { credentials: 'include' }).then(r => r.ok ? r.json() : []).then(d => setCursos(Array.isArray(d) ? d : [])).catch(() => {});
     fetch('/api/turmas', { credentials: 'include' }).then(r => r.ok ? r.json() : []).then(d => setTurmas(Array.isArray(d) ? d : [])).catch(() => {});
@@ -65,6 +74,28 @@ export default function RelatorioContratos() {
   const dadosFiltrados = dados.filter(a =>
     !filtroNome || a.nome.toLowerCase().includes(filtroNome.toLowerCase())
   );
+
+  const totalRegistros = dadosFiltrados.length;
+  const totalPaginas = Math.ceil(totalRegistros / itensPorPagina) || 1;
+  const indiceInicial = (paginaAtual - 1) * itensPorPagina;
+  const indiceFinal = Math.min(indiceInicial + itensPorPagina, totalRegistros);
+
+  const dadosPaginados = useMemo(() => {
+    return dadosFiltrados.slice(indiceInicial, indiceFinal);
+  }, [dadosFiltrados, indiceInicial, indiceFinal]);
+
+  const getPaginasVisiveis = () => {
+    if (totalPaginas <= 7) {
+      return Array.from({ length: totalPaginas }, (_, i) => i + 1);
+    }
+    if (paginaAtual <= 4) {
+      return [1, 2, 3, 4, 5, '...', totalPaginas];
+    }
+    if (paginaAtual >= totalPaginas - 3) {
+      return [1, '...', totalPaginas - 4, totalPaginas - 3, totalPaginas - 2, totalPaginas - 1, totalPaginas];
+    }
+    return [1, '...', paginaAtual - 1, paginaAtual, paginaAtual + 1, '...', totalPaginas];
+  };
 
   function exportarCSV() {
     const params = new URLSearchParams();
@@ -146,7 +177,7 @@ export default function RelatorioContratos() {
           <>
             {/* Cards — mobile / tablet */}
             <div className="lg:hidden space-y-3">
-              {dadosFiltrados.map(a => (
+              {dadosPaginados.map(a => (
                 <div key={a.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <div className="min-w-0">
@@ -192,6 +223,58 @@ export default function RelatorioContratos() {
               ))}
             </div>
 
+            {/* Paginação Mobile */}
+            {totalRegistros > 0 && (
+              <div className="lg:hidden px-4 py-3 bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3 text-xs select-none">
+                <span className="text-gray-500 font-normal">
+                  Mostrando <strong>{indiceInicial + 1}</strong> a <strong>{indiceFinal}</strong> de <strong>{totalRegistros}</strong> contratos
+                </span>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setPaginaAtual(p => Math.max(p - 1, 1))}
+                    disabled={paginaAtual === 1}
+                    className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 disabled:opacity-40 disabled:hover:bg-gray-100 disabled:cursor-not-allowed flex items-center justify-center font-bold transition"
+                    title="Página Anterior"
+                  >
+                    ‹
+                  </button>
+
+                  {getPaginasVisiveis().map((pag, idx) => {
+                    if (pag === '...') {
+                      return (
+                        <span key={'ellipsis-m-' + idx} className="w-8 h-8 flex items-center justify-center text-gray-400 font-semibold">
+                          ...
+                        </span>
+                      );
+                    }
+                    const isAtual = pag === paginaAtual;
+                    return (
+                      <button
+                        key={'pag-m-' + pag}
+                        type="button"
+                        onClick={() => setPaginaAtual(pag)}
+                        className={'w-8 h-8 rounded-lg flex items-center justify-center font-bold transition ' + (isAtual ? 'bg-teal-600 text-white shadow-xs' : 'bg-gray-100 hover:bg-gray-200 text-gray-700')}
+                      >
+                        {pag}
+                      </button>
+                    );
+                  })}
+
+                  <button
+                    type="button"
+                    onClick={() => setPaginaAtual(p => Math.min(p + 1, totalPaginas))}
+                    disabled={paginaAtual === totalPaginas}
+                    className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 disabled:opacity-40 disabled:hover:bg-gray-100 disabled:cursor-not-allowed flex items-center justify-center font-bold transition"
+                    title="Próxima Página"
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Tabela — desktop */}
             <div className="hidden lg:block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="overflow-x-auto">
@@ -210,7 +293,7 @@ export default function RelatorioContratos() {
                     </tr>
                   </thead>
                   <tbody>
-                    {dadosFiltrados.map(a => (
+                    {dadosPaginados.map(a => (
                       <tr key={a.id} className="border-b border-gray-100 hover:bg-teal-50/30 transition-colors">
                         <td className="px-4 py-3 font-mono text-gray-400 text-xs">#{a.id}</td>
                         <td className="px-4 py-3">
@@ -253,11 +336,58 @@ export default function RelatorioContratos() {
                   </tbody>
                 </table>
               </div>
-              <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 text-xs text-gray-500 flex items-center justify-between">
-                <span>{dadosFiltrados.length} registro(s)</span>
-                <button onClick={exportarCSV} className="text-green-600 hover:text-green-800 font-medium transition-colors">
-                  ⬇️ Exportar CSV
-                </button>
+              <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 text-xs text-gray-500 flex flex-col sm:flex-row items-center justify-between gap-3 select-none">
+                <div className="flex items-center gap-3">
+                  <span>Mostrando <strong>{totalRegistros > 0 ? indiceInicial + 1 : 0}</strong> a <strong>{indiceFinal}</strong> de <strong>{totalRegistros}</strong> contratos</span>
+                  <button onClick={exportarCSV} className="text-green-600 hover:text-green-800 font-semibold transition-colors flex items-center gap-1 cursor-pointer">
+                    ⬇️ Exportar CSV
+                  </button>
+                </div>
+
+                {totalRegistros > 0 && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setPaginaAtual(p => Math.max(p - 1, 1))}
+                      disabled={paginaAtual === 1}
+                      className="w-8 h-8 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 text-gray-600 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed flex items-center justify-center font-bold transition cursor-pointer"
+                      title="Página Anterior"
+                    >
+                      ‹
+                    </button>
+
+                    {getPaginasVisiveis().map((pag, idx) => {
+                      if (pag === '...') {
+                        return (
+                          <span key={'ellipsis-d-' + idx} className="w-8 h-8 flex items-center justify-center text-gray-400 font-semibold">
+                            ...
+                          </span>
+                        );
+                      }
+                      const isAtual = pag === paginaAtual;
+                      return (
+                        <button
+                          key={'pag-d-' + pag}
+                          type="button"
+                          onClick={() => setPaginaAtual(pag)}
+                          className={'w-8 h-8 rounded-lg flex items-center justify-center font-bold transition cursor-pointer ' + (isAtual ? 'bg-teal-600 text-white shadow-xs' : 'bg-white border border-gray-200 hover:bg-gray-100 text-gray-700')}
+                        >
+                          {pag}
+                        </button>
+                      );
+                    })}
+
+                    <button
+                      type="button"
+                      onClick={() => setPaginaAtual(p => Math.min(p + 1, totalPaginas))}
+                      disabled={paginaAtual === totalPaginas}
+                      className="w-8 h-8 rounded-lg bg-white border border-gray-200 hover:bg-gray-100 text-gray-600 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed flex items-center justify-center font-bold transition cursor-pointer"
+                      title="Próxima Página"
+                    >
+                      ›
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </>

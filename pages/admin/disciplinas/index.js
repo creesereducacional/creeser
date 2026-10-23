@@ -5,6 +5,7 @@ import CustomModal from '../../../components/CustomModal';
 
 export default function ListagemDisciplinas() {
   const [disciplinas, setDisciplinas] = useState([]);
+  const [gradesLista, setGradesLista] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Filtros
@@ -23,6 +24,7 @@ export default function ListagemDisciplinas() {
 
   useEffect(() => {
     carregarDisciplinas();
+    carregarGrades();
   }, []);
 
   // Resetar paginação ao filtrar
@@ -45,6 +47,28 @@ export default function ListagemDisciplinas() {
     }
   };
 
+  const carregarGrades = async () => {
+    try {
+      const res = await fetch('/api/grades', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setGradesLista(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar grades curriculares:', error);
+    }
+  };
+
+  // Mapa de ID -> Nome/descrição da Grade Curricular
+  const mapaGradesPorId = useMemo(() => {
+    const map = new Map();
+    gradesLista.forEach((g) => {
+      const nomeFormatado = g.ano ? `${g.nome} (${g.ano})` : g.nome;
+      map.set(String(g.id), nomeFormatado);
+    });
+    return map;
+  }, [gradesLista]);
+
   // Opções dinâmicas para os filtros
   const cursosOpcoes = useMemo(() => {
     const list = disciplinas.map((d) => d.curso).filter(Boolean);
@@ -57,9 +81,41 @@ export default function ListagemDisciplinas() {
   }, [disciplinas]);
 
   const gradesOpcoes = useMemo(() => {
-    const list = disciplinas.map((d) => d.grade).filter(Boolean);
-    return [...new Set(list)].sort();
-  }, [disciplinas]);
+    // Filtrar as disciplinas considerando o curso e o período selecionados (se houver)
+    let discFiltradas = disciplinas;
+
+    if (searchCurso) {
+      discFiltradas = discFiltradas.filter((d) =>
+        String(d.curso || '').toLowerCase().includes(searchCurso.toLowerCase())
+      );
+    }
+
+    if (searchPeriodo) {
+      discFiltradas = discFiltradas.filter((d) =>
+        String(d.periodo || '').toLowerCase().includes(searchPeriodo.toLowerCase())
+      );
+    }
+
+    // Extrair os IDs de grade únicos presentes no conjunto de disciplinas
+    const idsUnicos = Array.from(new Set(discFiltradas.map((d) => d.grade).filter(Boolean)));
+
+    // Montar a lista de opções com { id, nome }
+    const opcoes = idsUnicos.map((gradeId) => {
+      const idStr = String(gradeId);
+      const gradeObj = gradesLista.find((g) => String(g.id) === idStr);
+      const nomeDescritivo = gradeObj
+        ? (gradeObj.ano ? `${gradeObj.nome} (${gradeObj.ano})` : gradeObj.nome)
+        : (mapaGradesPorId.get(idStr) || `Grade #${idStr}`);
+
+      return {
+        id: idStr,
+        nome: nomeDescritivo,
+      };
+    });
+
+    // Ordenar alfabeticamente pelo nome descritivo da grade
+    return opcoes.sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [disciplinas, gradesLista, mapaGradesPorId, searchCurso, searchPeriodo]);
 
   // Filtragem das disciplinas
   const filtradas = useMemo(() => {
@@ -381,8 +437,8 @@ export default function ListagemDisciplinas() {
               >
                 <option value="">Todas as Grades</option>
                 {gradesOpcoes.map((g) => (
-                  <option key={g} value={g}>
-                    {g}
+                  <option key={g.id} value={g.id}>
+                    {g.nome}
                   </option>
                 ))}
               </select>
@@ -521,8 +577,8 @@ export default function ListagemDisciplinas() {
                               {disciplina.matriz ? 'Sim' : 'Não'}
                             </span>
                           </td>
-                          <td className="px-5 py-3.5 text-xs font-mono text-slate-600 whitespace-nowrap">
-                            {disciplina.grade || '—'}
+                          <td className="px-5 py-3.5 text-xs text-slate-700 whitespace-nowrap">
+                            {disciplina.grade ? (mapaGradesPorId.get(String(disciplina.grade)) || `#${disciplina.grade}`) : '—'}
                           </td>
                           <td className="px-5 py-3.5 text-center whitespace-nowrap">
                             <span

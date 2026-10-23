@@ -10,6 +10,7 @@ const UF_OPTIONS = [
 ];
 
 const CONTRATO_PLACEHOLDERS = [
+  '{{ALUNO_NMATRICULA}}',
   '{{ALUNO_NOME}}',
   '{{ALUNO_CPF}}',
   '{{ALUNO_RG}}',

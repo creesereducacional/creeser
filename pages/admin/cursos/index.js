@@ -8,7 +8,6 @@ export default function ListagemCursos() {
   const [cursos, setCursos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [instituicoes, setInstituicoes] = useState([]);
-  const [instituicaoPadraoId, setInstituicaoPadraoId] = useState('');
   const [selectedInstituicaoId, setSelectedInstituicaoId] = useState('');
   const [searchNome, setSearchNome] = useState('');
   const [searchSituacao, setSearchSituacao] = useState('');
@@ -40,18 +39,9 @@ export default function ListagemCursos() {
         const data = await res.json();
         const lista = Array.isArray(data) ? data : [];
         setInstituicoes(lista);
-
-        if (lista.length > 0) {
-          const padrao = String(lista[0].id);
-          setInstituicaoPadraoId(padrao);
-          setSelectedInstituicaoId(padrao);
-          await carregarCursos(padrao);
-        } else {
-          setLoading(false);
-        }
-      } else {
-        setLoading(false);
       }
+      setSelectedInstituicaoId('');
+      await carregarCursos('');
     } catch (error) {
       console.error('Erro ao carregar instituições:', error);
       setLoading(false);
@@ -59,15 +49,12 @@ export default function ListagemCursos() {
   };
 
   const carregarCursos = async (instId = selectedInstituicaoId) => {
-    if (!instId) {
-      setCursos([]);
-      setLoading(false);
-      return;
-    }
-
     try {
       setLoading(true);
-      const res = await fetch(`/api/cursos?instituicao_id=${encodeURIComponent(instId)}`);
+      const url = instId
+        ? `/api/cursos?instituicao_id=${encodeURIComponent(instId)}`
+        : '/api/cursos';
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setCursos(Array.isArray(data) ? data : []);
@@ -148,10 +135,8 @@ export default function ListagemCursos() {
   const limparFiltros = () => {
     setSearchNome('');
     setSearchSituacao('');
-    if (instituicaoPadraoId) {
-      setSelectedInstituicaoId(instituicaoPadraoId);
-      carregarCursos(instituicaoPadraoId);
-    }
+    setSelectedInstituicaoId('');
+    carregarCursos('');
   };
 
   const solicitarDeletar = (curso) => {
@@ -316,7 +301,7 @@ export default function ListagemCursos() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {/* 1. Instituição */}
             <div>
-              <label className="text-xs font-semibold text-slate-600 mb-1 block">Instituição *</label>
+              <label className="text-xs font-semibold text-slate-600 mb-1 block">Instituição</label>
               <select
                 value={selectedInstituicaoId}
                 onChange={(e) => {
@@ -327,7 +312,7 @@ export default function ListagemCursos() {
                 disabled={instituicoes.length <= 1}
                 className="w-full h-10 px-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 disabled:bg-slate-100 disabled:text-slate-500 cursor-pointer"
               >
-                {instituicoes.length === 0 && <option value="">Nenhuma instituição autorizada</option>}
+                <option value="">Todas as Instituições</option>
                 {instituicoes.map((inst) => (
                   <option key={inst.id} value={String(inst.id)}>
                     {inst.nome}

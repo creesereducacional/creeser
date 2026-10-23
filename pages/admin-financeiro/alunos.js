@@ -232,10 +232,16 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
     data_vencimento: vencimentoStr,
     quantidade_parcelas: 1,
     // campos para acordo
+    possui_entrada: false,
+    tipo_entrada: 'especie', // 'especie' ou 'efi'
     valor_entrada: '',
     data_vencimento_entrada: vencimentoStr,
     dia_vencimento_parcelas: diaAluno,
     quantidade_parcelas_acordo: 1,
+    valor_encargos: '',
+    valor_desconto_acordo: '',
+    observacao_operador: '',
+    confirmacao_operador: false,
   });
 
   const [parcelasAberto, setParcelasAberto] = useState([]);
@@ -354,14 +360,34 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
     if (form.categoria === 'ACORDO') {
       // Validações do Acordo
       if (selectedParcelas.size === 0) return setErro('Selecione ao menos uma parcela original.');
-      if (entrada <= 0) return setErro('O valor de entrada deve ser maior que zero.');
-      if (entrada > totalDebitoSelecionado) return setErro('O valor de entrada não pode ser maior que o débito total.');
-      if (!form.data_vencimento_entrada) return setErro('Data de vencimento da entrada é obrigatória.');
+
+      const temEntrada = Boolean(form.possui_entrada) && Number(form.valor_entrada) > 0;
+      const entradaVal = temEntrada ? Number(Number(form.valor_entrada).toFixed(2)) : 0;
+      const encargosVal = Number(form.valor_encargos) || 0;
+      const descontoVal = Number(form.valor_desconto_acordo) || 0;
+      const totalNegociadoCalc = Math.max(0, totalDebitoSelecionado + encargosVal - descontoVal);
+
+      if (temEntrada && entradaVal > totalNegociadoCalc) {
+        return setErro('O valor de entrada não pode ser maior que o total negociado.');
+      }
+
+      if (temEntrada && form.tipo_entrada === 'efi' && !form.data_vencimento_entrada) {
+        return setErro('Data de vencimento da entrada via EFI é obrigatória.');
+      }
+
+      if (!temEntrada && !form.confirmacao_operador) {
+        return setErro('Para acordos sem entrada, confirme explicitamente a formalização para encerrar os débitos originais.');
+      }
+
       if (qtdParcelasAcordo <= 0) return setErro('A quantidade de parcelas deve ser maior que zero.');
       if (!form.dia_vencimento_parcelas || Number(form.dia_vencimento_parcelas) < 1 || Number(form.dia_vencimento_parcelas) > 31) {
         return setErro('Dia de vencimento das parcelas deve ser entre 1 e 31.');
       }
-      if (!form.descricao.trim()) return setErro('Observação/Descrição é obrigatória.');
+
+      const obsTexto = (form.observacao_operador || form.descricao || '').trim();
+      if (!obsTexto || obsTexto.length < 10) {
+        return setErro('A Observação do Operador é obrigatória e deve ter ao menos 10 caracteres explicativos.');
+      }
 
       setSalvando(true); setErro('');
       try {
@@ -370,38 +396,57 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             aluno_id: aluno.id,
-            descricao: form.descricao.trim(),
+            descricao: obsTexto,
+            observacao_operador: obsTexto,
             parcelas_originais: Array.from(selectedParcelas),
-            valor_entrada: entrada,
+            possui_entrada: temEntrada,
+            tipo_entrada: temEntrada ? form.tipo_entrada : 'sem_entrada',
+            valor_entrada: entradaVal,
             data_vencimento_entrada: form.data_vencimento_entrada,
             quantidade_parcelas: qtdParcelasAcordo,
             dia_vencimento_parcelas: Number(form.dia_vencimento_parcelas),
+            valor_encargos: encargosVal,
+            valor_desconto: descontoVal,
+            confirmacao_operador: Boolean(form.confirmacao_operador),
           }),
         });
         const resBody = await res.json();
         if (!res.ok) throw new Error(resBody.message || 'Erro ao criar acordo');
 
-        // Gerar boleto no banco EFI para a parcela de entrada
-        const entradaParcelaId = resBody.parcelas?.find(p => p.numero_parcela === 1)?.id;
-        if (entradaParcelaId) {
-          setSucesso('⏳ Gerando boleto da entrada no banco EFI...');
-          const efiRes = await fetch('/api/admin-financeiro/efi/cobranca', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ parcela_id: entradaParcelaId, descricao: `Entrada - ${form.descricao.trim()}` }),
-          });
-          if (!efiRes.ok) {
-            const efiBody = await efiRes.json();
-            setSucesso('✅ Acordo criado, mas falha no boleto da entrada: ' + (efiBody.message || 'erro desconhecido'));
-            setTimeout(() => { onSalvo(); onSuccess(); onClose(); }, 2500);
+        // Se houver entrada digital via EFI, emite a cobrança bancária
+        if (temEntrada && form.tipo_entrada === 'efi' && resBody.entrada_parcela?.id) {
+          setSucesso('⏳ Emitindo cobrança da entrada no banco EFI...');
+          try {
+            const efiRes = await fetch('/api/admin-financeiro/efi/cobranca', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                parcela_id: resBody.entrada_parcela.id,
+                descricao: `Entrada Acordo - ${obsTexto.slice(0, 50)}`
+              }),
+            });
+            if (!efiRes.ok) {
+              const efiBody = await efiRes.json();
+              setSucesso('⚠️ Acordo formalizado. Falha ao gerar boleto da entrada na EFI: ' + (efiBody.message || 'erro EFI'));
+              setTimeout(() => { onSalvo(); onSuccess(); onClose(); }, 3000);
+              return;
+            }
+          } catch (efiErr) {
+            setSucesso('⚠️ Acordo formalizado. Falha de conexão com EFI para a entrada.');
+            setTimeout(() => { onSalvo(); onSuccess(); onClose(); }, 3000);
             return;
           }
         }
 
-        setSucesso('✅ Acordo financeiro criado com sucesso!');
-        setTimeout(() => { onSalvo(); onSuccess(); onClose(); }, 800);
-      } catch (err) { setErro(err.message); } finally { setSalvando(false); }
+        if (resBody.pendente_efi) {
+          setSucesso('✅ Acordo formalizado! Atenção: Uma ou mais baixas na EFI ficaram pendentes e foram registradas no histórico.');
+        } else {
+          setSucesso('✅ Acordo financeiro formalizado e registrado com sucesso!');
+        }
 
+        setTimeout(() => { onSalvo(); onSuccess(); onClose(); }, 1200);
+      } catch (err) { setErro(err.message); } finally { setSalvando(false); }
+
     } else {
       // Comportamento original
       if (!form.descricao.trim()) return setErro('Descrição é obrigatória');
@@ -479,7 +524,7 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
             </div>
 
             {form.categoria === 'ACORDO' ? (
-              // ── ÁREA DO ACORDO FINANCEIRO ─────────────────────────────────────────────
+              // ── ÁREA DO ACORDO FINANCEIRO (REGRAS APROVADAS) ─────────────────────────
               <div className="space-y-4">
                 <div className="border-t pt-3">
                   <div className="flex justify-between items-center mb-2">
@@ -517,17 +562,72 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <FieldGroup label="Valor de Entrada *">
-                    <input type="number" step="0.01" min="0.01" value={form.valor_entrada}
-                      onChange={e => set('valor_entrada', e.target.value)} required
+                {/* Encargos e Descontos */}
+                <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 border rounded-lg">
+                  <FieldGroup label="Encargos / Juros / Multa">
+                    <input type="number" step="0.01" min="0" value={form.valor_encargos}
+                      onChange={e => set('valor_encargos', e.target.value)}
                       className={inputCls} placeholder="R$ 0,00" />
                   </FieldGroup>
-                  <FieldGroup label="Vencimento Entrada *">
-                    <input type="date" value={form.data_vencimento_entrada}
-                      onChange={e => set('data_vencimento_entrada', e.target.value)} required
-                      className={inputCls} />
+                  <FieldGroup label="Desconto Negocial">
+                    <input type="number" step="0.01" min="0" value={form.valor_desconto_acordo}
+                      onChange={e => set('valor_desconto_acordo', e.target.value)}
+                      className={inputCls} placeholder="R$ 0,00" />
                   </FieldGroup>
+                </div>
+
+                {/* Opções de Entrada */}
+                <div className="p-3 bg-blue-50/60 border border-blue-200 rounded-lg space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-blue-900">
+                      <input type="checkbox"
+                        checked={form.possui_entrada}
+                        onChange={e => set('possui_entrada', e.target.checked)}
+                        className="rounded border-gray-300 text-blue-600 cursor-pointer" />
+                      Definir Pagamento de Entrada (Opcional)
+                    </label>
+                    {form.possui_entrada && (
+                      <div className="flex items-center gap-3 text-xs">
+                        <label className="flex items-center gap-1 cursor-pointer">
+                          <input type="radio" name="tipo_entrada" value="especie"
+                            checked={form.tipo_entrada === 'especie'}
+                            onChange={e => set('tipo_entrada', e.target.value)} />
+                          <span>Em Espécie (Recebido agora)</span>
+                        </label>
+                        <label className="flex items-center gap-1 cursor-pointer">
+                          <input type="radio" name="tipo_entrada" value="efi"
+                            checked={form.tipo_entrada === 'efi'}
+                            onChange={e => set('tipo_entrada', e.target.value)} />
+                          <span>Via EFI (PIX/Boleto)</span>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+
+                  {form.possui_entrada && (
+                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-blue-200/60">
+                      <FieldGroup label="Valor da Entrada *">
+                        <input type="number" step="0.01" min="0.01" value={form.valor_entrada}
+                          onChange={e => set('valor_entrada', e.target.value)} required={form.possui_entrada}
+                          className={inputCls} placeholder="R$ 0,00" />
+                      </FieldGroup>
+                      {form.tipo_entrada === 'efi' ? (
+                        <FieldGroup label="Vencimento Entrada EFI *">
+                          <input type="date" value={form.data_vencimento_entrada}
+                            onChange={e => set('data_vencimento_entrada', e.target.value)} required
+                            className={inputCls} />
+                        </FieldGroup>
+                      ) : (
+                        <div className="flex items-center text-xs text-blue-700 bg-blue-100/50 p-2 rounded">
+                          Entrada será registrada imediatamente como quitada em dinheiro.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Parcelamento do Saldo Restante */}
+                <div className="grid grid-cols-2 gap-3">
                   <FieldGroup label="Qtd. Parcelas Saldo *">
                     <input type="number" min="1" max="60" value={form.quantidade_parcelas_acordo}
                       onChange={e => set('quantidade_parcelas_acordo', e.target.value)} required
@@ -540,34 +640,72 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
                   </FieldGroup>
                 </div>
 
-                {/* Resumo do Acordo */}
-                {totalDebitoSelecionado > 0 && (
-                  <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 text-sm space-y-1">
-                    <div className="flex justify-between text-gray-700">
-                      <span>Total do Débito Selecionado:</span>
-                      <span className="font-bold">R$ {totalDebitoSelecionado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                {/* Resumo do Acordo Calculado */}
+                {totalDebitoSelecionado > 0 && (() => {
+                  const encargos = Number(form.valor_encargos) || 0;
+                  const desc = Number(form.valor_desconto_acordo) || 0;
+                  const totalNeg = Math.max(0, totalDebitoSelecionado + encargos - desc);
+                  const entradaVal = (form.possui_entrada && Number(form.valor_entrada) > 0) ? Number(form.valor_entrada) : 0;
+                  const saldoRest = Math.max(0, totalNeg - entradaVal);
+                  const qtd = Number(form.quantidade_parcelas_acordo) || 1;
+                  const valParc = qtd > 0 ? (saldoRest / qtd) : 0;
+
+                  return (
+                    <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 text-xs space-y-1">
+                      <div className="flex justify-between text-gray-700">
+                        <span>Total dos Débitos Selecionados:</span>
+                        <span className="font-bold">R$ {totalDebitoSelecionado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      {encargos > 0 && (
+                        <div className="flex justify-between text-gray-700">
+                          <span>(+) Encargos / Multa:</span>
+                          <span className="font-bold text-red-600">+ R$ {encargos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      )}
+                      {desc > 0 && (
+                        <div className="flex justify-between text-gray-700">
+                          <span>(-) Desconto Negocial:</span>
+                          <span className="font-bold text-green-700">- R$ {desc.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-gray-800 font-semibold border-t border-teal-200 pt-1">
+                        <span>(=) Total Negociado:</span>
+                        <span>R$ {totalNeg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      {entradaVal > 0 && (
+                        <div className="flex justify-between text-blue-700">
+                          <span>(-) Entrada Abatida:</span>
+                          <span className="font-bold">- R$ {entradaVal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-teal-850 font-bold text-sm pt-1 border-t border-teal-200">
+                        <span>Saldo em {qtd}x parcelas de:</span>
+                        <span>R$ {valParc.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between text-gray-700">
-                      <span>Valor de Entrada obrigatória:</span>
-                      <span className="font-bold text-blue-700">- R$ {entrada.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="flex justify-between text-gray-700">
-                      <span>Saldo Restante:</span>
-                      <span className="font-bold">R$ {saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="border-t border-teal-200 my-1" />
-                    <div className="flex justify-between text-teal-850 font-bold text-base">
-                      <span>{qtdParcelasAcordo}x parcelas de saldo de:</span>
-                      <span>R$ {valorParcelaAcordo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                    </div>
+                  );
+                })()}
+
+                {/* Confirmação para acordo sem entrada */}
+                {(!form.possui_entrada || Number(form.valor_entrada) <= 0) && (
+                  <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg text-xs">
+                    <label className="flex items-start gap-2 cursor-pointer font-medium text-amber-900">
+                      <input type="checkbox"
+                        checked={form.confirmacao_operador}
+                        onChange={e => set('confirmacao_operador', e.target.checked)}
+                        className="rounded border-amber-400 text-amber-600 cursor-pointer mt-0.5" />
+                      <span>
+                        <strong>Confirmação de Acordo sem Entrada:</strong> Confirmo que este acordo não possui entrada e que a formalização encerrará as cobranças originais selecionadas no CREESER e na EFI.
+                      </span>
+                    </label>
                   </div>
                 )}
 
-                {/* Descrição obrigatória */}
-                <FieldGroup label="Observações / Justificativa *">
-                  <textarea rows={2} value={form.descricao}
-                    onChange={e => set('descricao', e.target.value)} required
-                    className={inputCls + ' resize-none'} placeholder="Descreva os termos do acordo (obrigatório, mínimo 10 caracteres)." />
+                {/* Campo Obrigatório: Observação do Operador */}
+                <FieldGroup label="Observação do Operador * (mínimo 10 caracteres)">
+                  <textarea rows={2} value={form.observacao_operador}
+                    onChange={e => { set('observacao_operador', e.target.value); set('descricao', e.target.value); }} required
+                    className={inputCls + ' resize-none'} placeholder="Descreva os termos específicos e justificativa da negociação (obrigatório, termos genéricos não são aceitos)." />
                 </FieldGroup>
               </div>
             ) : (
@@ -1052,6 +1190,326 @@ function ModalHistorico({ ordem, onClose }) {
   );
 }
 
+
+function ModalHistoricoNegociacoes({ aluno, onClose }) {
+  const [loading, setLoading] = useState(true);
+  const [negociacoes, setNegociacoes] = useState([]);
+  const [erro, setErro] = useState('');
+  const [negociacaoSelecionada, setNegociacaoSelecionada] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    fetch(`/api/admin-financeiro/alunos/${aluno.id}/negociacoes`)
+      .then(res => res.json())
+      .then(data => {
+        if (!active) return;
+        if (data.negociacoes) {
+          setNegociacoes(data.negociacoes);
+          if (data.negociacoes.length > 0) {
+            setNegociacaoSelecionada(data.negociacoes[0]);
+          }
+        }
+      })
+      .catch(err => {
+        if (active) setErro(err.message || 'Erro ao carregar histórico');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => { active = false; };
+  }, [aluno.id]);
+
+  const imprimirResumo = (neg) => {
+    const fmtMoeda = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const fmtData = (d) => d ? new Date(String(d).split('T')[0] + 'T12:00:00').toLocaleDateString('pt-BR') : '-';
+
+    const parcelasAntigasHtml = (neg.parcelas_originais || []).map(p => `
+      <tr>
+        <td style="padding:6px;border:1px solid #ddd;font-size:12px;">#${p.numero_parcela || p.id} - ${p.descricao || 'Débito Original'}</td>
+        <td style="padding:6px;border:1px solid #ddd;font-size:12px;text-align:center;">${fmtData(p.data_vencimento)}</td>
+        <td style="padding:6px;border:1px solid #ddd;font-size:12px;text-align:right;">${fmtMoeda(p.valor)}</td>
+      </tr>
+    `).join('');
+
+    const parcelasNovasHtml = (neg.parcelas_geradas || []).map(p => `
+      <tr>
+        <td style="padding:6px;border:1px solid #ddd;font-size:12px;">Parcela #${p.numero_parcela} ${p.eh_entrada ? '(Entrada)' : ''}</td>
+        <td style="padding:6px;border:1px solid #ddd;font-size:12px;text-align:center;">${fmtData(p.data_vencimento)}</td>
+        <td style="padding:6px;border:1px solid #ddd;font-size:12px;text-align:right;">${fmtMoeda(p.valor)}</td>
+        <td style="padding:6px;border:1px solid #ddd;font-size:12px;text-align:center;text-transform:uppercase;">${p.status || 'pendente'}</td>
+      </tr>
+    `).join('');
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Resumo de Acordo Financeiro - ${aluno.nome}</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #333; margin: 30px; }
+          .header { text-align: center; border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 20px; }
+          .header h2 { margin: 0; color: #0369a1; }
+          .meta { font-size: 13px; line-height: 1.6; margin-bottom: 20px; }
+          .box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 8px; margin-bottom: 15px; }
+          th { background: #f1f5f9; padding: 8px; border: 1px solid #cbd5e1; font-size: 12px; text-align: left; }
+          .total { font-weight: bold; font-size: 14px; text-align: right; margin-top: 10px; }
+          .assinaturas { margin-top: 60px; display: flex; justify-content: space-around; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h2>CREESER — TERMO DE ACORDO FINANCEIRO</h2>
+          <p style="margin:4px 0 0;font-size:13px;color:#64748b;">Comprovante e Condições da Renegociação</p>
+        </div>
+
+        <div class="meta">
+          <strong>Aluno:</strong> ${aluno.nome} &nbsp;&nbsp;|&nbsp;&nbsp; <strong>CPF:</strong> ${aluno.cpf || 'Não informado'}<br>
+          <strong>Identificador do Acordo:</strong> ${neg.id || neg.ordem_id}<br>
+          <strong>Data da Formalização:</strong> ${fmtData(neg.created_at)} &nbsp;&nbsp;|&nbsp;&nbsp; <strong>Operador:</strong> ${neg.operador_email || 'Setor Financeiro'}
+        </div>
+
+        <div class="box">
+          <strong>Observação do Operador:</strong><br>
+          ${neg.observacao_operador || 'Renegociação financeira formalizada.'}
+        </div>
+
+        <h4 style="margin:15px 0 5px;color:#334155;">1. Dívidas Originais Renegociadas (Encerradas)</h4>
+        <table>
+          <thead>
+            <tr><th>Descrição</th><th style="text-align:center;">Vencimento Original</th><th style="text-align:right;">Valor</th></tr>
+          </thead>
+          <tbody>
+            ${parcelasAntigasHtml}
+          </tbody>
+        </table>
+
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;padding:10px;border-radius:6px;font-size:13px;margin-bottom:15px;">
+          <strong>Condições Acordadas:</strong><br>
+          • Valor Total Renegociado: <strong>${fmtMoeda(neg.valor_total_negociado)}</strong><br>
+          • Condição de Entrada: <strong>${neg.possui_entrada ? `${fmtMoeda(neg.valor_entrada)} (${neg.tipo_entrada === 'especie' ? 'Em espécie / Recebido no ato' : 'Via EFI Bank'})` : 'Sem entrada (R$ 0,00)'}</strong><br>
+          • Saldo Renegociado: <strong>${fmtMoeda(neg.valor_saldo || (Number(neg.valor_total_negociado) - (neg.possui_entrada ? Number(neg.valor_entrada) : 0)))}</strong> dividido em <strong>${neg.quantidade_parcelas} parcela(s)</strong>
+        </div>
+
+        <h4 style="margin:15px 0 5px;color:#334155;">2. Novas Parcelas do Acordo</h4>
+        <table>
+          <thead>
+            <tr><th>Parcela</th><th style="text-align:center;">Novo Vencimento</th><th style="text-align:right;">Valor</th><th style="text-align:center;">Situação</th></tr>
+          </thead>
+          <tbody>
+            ${parcelasNovasHtml}
+          </tbody>
+        </table>
+
+        <div class="assinaturas" style="margin-top:50px;">
+          <div style="text-align:center;">
+            <div style="border-top:1px solid #333;width:240px;margin-bottom:4px;"></div>
+            <span style="font-size:12px;">Responsável Financeiro / Instituição</span>
+          </div>
+          <div style="text-align:center;">
+            <div style="border-top:1px solid #333;width:240px;margin-bottom:4px;"></div>
+            <span style="font-size:12px;">Aluno / Responsável Legal</span>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const printWin = window.open('', '_blank');
+    if (printWin) {
+      printWin.document.write(html);
+      printWin.document.close();
+      printWin.focus();
+      setTimeout(() => { printWin.print(); }, 400);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <div>
+            <h3 className="text-lg font-bold text-teal-800">Histórico de Negociações e Acordos</h3>
+            <p className="text-xs text-gray-500">Aluno: {aluno.nome}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+          {/* Coluna da esquerda: Lista de acordos */}
+          <div className="w-full md:w-1/3 border-r overflow-y-auto p-4 space-y-2 bg-gray-50">
+            {loading ? (
+              <p className="text-xs text-gray-500 text-center py-6">Carregando negociações...</p>
+            ) : erro ? (
+              <p className="text-xs text-red-600 text-center py-4">{erro}</p>
+            ) : negociacoes.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-6">Nenhum acordo registrado para este aluno.</p>
+            ) : (
+              negociacoes.map(n => {
+                const ativo = negociacaoSelecionada?.id === n.id;
+                return (
+                  <div key={n.id} onClick={() => setNegociacaoSelecionada(n)}
+                    className={`p-3 rounded-lg border cursor-pointer transition text-xs ${ativo ? 'bg-teal-50 border-teal-500 shadow-sm' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="font-bold text-gray-800">Acordo #{String(n.id).slice(0, 8)}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${n.status === 'concluido' ? 'bg-green-100 text-green-800' : n.status === 'sync_pendente' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}`}>
+                        {n.status === 'sync_pendente' ? 'EFI Pendente' : n.status}
+                      </span>
+                    </div>
+                    <p className="text-gray-600 font-medium">Total: R$ {Number(n.valor_total_negociado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    <p className="text-gray-400 text-[11px] mt-1">{new Date(n.created_at).toLocaleString('pt-BR')}</p>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Coluna da direita: Detalhes do acordo selecionado */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            {negociacaoSelecionada ? (
+              <>
+                <div className="flex justify-between items-center pb-3 border-b">
+                  <div>
+                    <h4 className="font-bold text-gray-800 text-base">Detalhes da Renegociação</h4>
+                    <p className="text-xs text-gray-500">Operador: {negociacaoSelecionada.operador_email || 'financeiro'} · {new Date(negociacaoSelecionada.created_at).toLocaleString('pt-BR')}</p>
+                  </div>
+                  <button onClick={() => imprimirResumo(negociacaoSelecionada)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700 transition">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                    Imprimir Resumo
+                  </button>
+                </div>
+
+                {/* Caixa de Observação do Operador */}
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs">
+                  <span className="font-bold text-amber-900 block mb-1">Observação do Operador:</span>
+                  <p className="text-amber-800 whitespace-pre-wrap">{negociacaoSelecionada.observacao_operador || 'Nenhuma observação registrada.'}</p>
+                </div>
+
+                {/* Resumo Financeiro */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  <div className="p-2.5 bg-gray-50 rounded border">
+                    <span className="text-gray-500 block">Total Negociado</span>
+                    <strong className="text-gray-800 text-sm">R$ {Number(negociacaoSelecionada.valor_total_negociado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+                  </div>
+                  <div className="p-2.5 bg-gray-50 rounded border">
+                    <span className="text-gray-500 block">Entrada</span>
+                    <strong className="text-blue-700 text-sm">
+                      {negociacaoSelecionada.possui_entrada ? `R$ ${Number(negociacaoSelecionada.valor_entrada || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ 0,00'}
+                    </strong>
+                    <span className="text-[10px] text-gray-400 block">{negociacaoSelecionada.tipo_entrada === 'especie' ? 'Em espécie' : (negociacaoSelecionada.possui_entrada ? 'Via EFI' : 'Sem entrada')}</span>
+                  </div>
+                  <div className="p-2.5 bg-gray-50 rounded border">
+                    <span className="text-gray-500 block">Saldo Restante</span>
+                    <strong className="text-teal-800 text-sm">R$ {Number(negociacaoSelecionada.valor_saldo || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+                  </div>
+                  <div className="p-2.5 bg-gray-50 rounded border">
+                    <span className="text-gray-500 block">Parcelas do Saldo</span>
+                    <strong className="text-gray-800 text-sm">{negociacaoSelecionada.quantidade_parcelas}x</strong>
+                  </div>
+                </div>
+
+                {/* Vínculo: Parcelas Originais Encerradas */}
+                <div>
+                  <h5 className="font-bold text-xs text-gray-700 uppercase tracking-wider mb-2">1. Parcelas Originais Envolvidas (Canceladas)</h5>
+                  <div className="border rounded-lg overflow-hidden text-xs">
+                    <table className="w-full text-left">
+                      <thead className="bg-gray-100 text-gray-600 border-b">
+                        <tr>
+                          <th className="p-2">Parcela/Descrição</th>
+                          <th className="p-2">Vencimento</th>
+                          <th className="p-2 text-right">Valor</th>
+                          <th className="p-2">Situação EFI</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {(negociacaoSelecionada.parcelas_originais || []).map((p, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="p-2 font-medium text-gray-800">{p.descricao || `Parcela #${p.numero_parcela}`}</td>
+                            <td className="p-2 text-gray-500">{p.data_vencimento ? new Date(p.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}</td>
+                            <td className="p-2 text-right font-semibold text-gray-700">R$ {Number(p.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                            <td className="p-2">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-red-100 text-red-700 font-medium">Cancelada</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Vínculo: Novas Parcelas Geradas */}
+                <div>
+                  <h5 className="font-bold text-xs text-gray-700 uppercase tracking-wider mb-2">2. Novas Parcelas Geradas</h5>
+                  <div className="border rounded-lg overflow-hidden text-xs">
+                    <table className="w-full text-left">
+                      <thead className="bg-gray-100 text-gray-600 border-b">
+                        <tr>
+                          <th className="p-2">Parcela</th>
+                          <th className="p-2">Vencimento</th>
+                          <th className="p-2 text-right">Valor</th>
+                          <th className="p-2">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {(negociacaoSelecionada.parcelas_geradas || []).map((p, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="p-2 font-medium text-gray-800">
+                              Parcela #{p.numero_parcela} {p.eh_entrada ? '(Entrada)' : ''}
+                            </td>
+                            <td className="p-2 text-gray-500">{p.data_vencimento ? new Date(p.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}</td>
+                            <td className="p-2 text-right font-semibold text-gray-800">R$ {Number(p.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                            <td className="p-2">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${p.status === 'pago' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                                {p.status || 'pendente'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Trilha de Eventos Cronológicos (Append-Only) */}
+                <div>
+                  <h5 className="font-bold text-xs text-gray-700 uppercase tracking-wider mb-2">3. Trilha de Eventos e Auditoria</h5>
+                  <div className="border rounded-lg p-3 bg-gray-50 space-y-2 text-xs">
+                    {(negociacaoSelecionada.eventos_historico || []).map((ev, idx) => (
+                      <div key={idx} className="flex items-start gap-2 border-b pb-1.5 last:border-0 last:pb-0">
+                        <span className="w-2 h-2 rounded-full bg-teal-500 mt-1.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold text-gray-800 uppercase text-[11px]">{ev.tipo.replace(/_/g, ' ')}</span>
+                            <span className="text-[10px] text-gray-400">{new Date(ev.timestamp).toLocaleString('pt-BR')}</span>
+                          </div>
+                          <p className="text-gray-500 text-[11px]">Operador: {ev.operador}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-gray-400 text-center py-10">Selecione uma negociação ao lado para visualizar os detalhes.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end px-6 py-4 border-t bg-gray-50 rounded-b-xl">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100">
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 function gerarHTMLRecibo(dados) {
   const hoje = new Date().toLocaleDateString('pt-BR');
   const valorFmt = (v) => Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -1306,6 +1764,7 @@ export default function AlunosFinanceiroPage() {
   const [modal2aVia, setModal2aVia] = useState(null);
   const [modalExcluir, setModalExcluir] = useState(null);
   const [modalHistorico, setModalHistorico] = useState(null);
+  const [modalNegociacoes, setModalNegociacoes] = useState(null);
   const [modalRecibo, setModalRecibo] = useState(null);
   const [modalContrato, setModalContrato] = useState(null);
   const [modalTrancar, setModalTrancar] = useState(null);
@@ -1918,6 +2377,10 @@ export default function AlunosFinanceiroPage() {
                               className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition">
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                             </button>
+                            <button onClick={() => setModalNegociacoes(aluno)} title="Histórico de Negociações / Acordos"
+                              className="p-1.5 text-teal-700 hover:bg-teal-50 rounded-lg transition">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                            </button>
                             <button onClick={() => setModalCarne(aluno)} title="Criar Carnê"
                               className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition">
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
@@ -2375,6 +2838,9 @@ export default function AlunosFinanceiroPage() {
       )}
       {modalHistorico && (
         <ModalHistorico ordem={modalHistorico} onClose={() => setModalHistorico(null)} />
+      )}
+      {modalNegociacoes && (
+        <ModalHistoricoNegociacoes aluno={modalNegociacoes} onClose={() => setModalNegociacoes(null)} />
       )}
       {modalRecibo && (
         <ModalRecibo ordem={modalRecibo} onClose={() => setModalRecibo(null)} />
