@@ -312,16 +312,19 @@ export default function ListagemAlunos() {
       // 3. Filtro de Instituição
       if (instituicaoVal) {
         let alunoInstId = String(aluno.instituicao_id || aluno.instituicaoid || aluno.instituicaoId || '');
-        if (!alunoInstId && aluno.unidade_id) {
-          const uEncontrada = unidades.find(u => String(u.id) === String(aluno.unidade_id));
-          alunoInstId = String(uEncontrada?.instituicao_id || uEncontrada?.instituicaoid || uEncontrada?.instituicaoId || '');
-        }
-        if (!alunoInstId && aluno.turma_id) {
-          const tEncontrada = turmas.find(t => String(t.id) === String(aluno.turma_id));
+        if (!alunoInstId && (aluno.turma_id || aluno.turmaid)) {
+          const tId = aluno.turma_id || aluno.turmaid;
+          const tEncontrada = turmas.find(t => String(t.id) === String(tId));
           alunoInstId = String(tEncontrada?.instituicaoId || tEncontrada?.instituicaoid || tEncontrada?.instituicao_id || '');
         }
-        if (!alunoInstId && aluno.curso_id) {
-          const cEncontrado = cursos.find(c => String(c.id) === String(aluno.curso_id));
+        if (!alunoInstId && (aluno.unidade_id || aluno.unidadeId)) {
+          const uId = aluno.unidade_id || aluno.unidadeId;
+          const uEncontrada = unidades.find(u => String(u.id) === String(uId));
+          alunoInstId = String(uEncontrada?.instituicao_id || uEncontrada?.instituicaoid || uEncontrada?.instituicaoId || '');
+        }
+        if (!alunoInstId && (aluno.curso_id || aluno.cursoid)) {
+          const cId = aluno.curso_id || aluno.cursoid;
+          const cEncontrado = cursos.find(c => String(c.id) === String(cId));
           alunoInstId = String(cEncontrado?.instituicaoId || cEncontrado?.instituicaoid || cEncontrado?.instituicao_id || '');
         }
         if (alunoInstId && alunoInstId !== String(instituicaoVal)) {
@@ -329,10 +332,15 @@ export default function ListagemAlunos() {
         }
       }
 
-      // 4. Filtro de Unidade
+      // 4. Filtro de Unidade / Polo
       if (unidadeVal) {
-        const unidId = String(aluno.unidade_id || aluno.unidadeId || '');
-        if (unidId !== String(unidadeVal)) {
+        let unidId = aluno.unidade_id || aluno.unidadeId;
+        if (!unidId && (aluno.turma_id || aluno.turmaid)) {
+          const tId = aluno.turma_id || aluno.turmaid;
+          const tEncontrada = turmas.find(t => String(t.id) === String(tId));
+          unidId = tEncontrada?.unidadeId || tEncontrada?.unidadeid || tEncontrada?.unidade_id;
+        }
+        if (String(unidId || '') !== String(unidadeVal)) {
           return false;
         }
       }

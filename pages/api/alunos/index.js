@@ -263,6 +263,8 @@ export default async function handler(req, res) {
           turmas (
             id,
             nome,
+            unidadeid,
+            instituicao_id,
             unidades (
               id,
               nome
@@ -314,6 +316,8 @@ export default async function handler(req, res) {
               turmas (
                 id,
                 nome,
+                unidadeid,
+                instituicao_id,
                 unidades (
                   id,
                   nome
@@ -359,9 +363,9 @@ export default async function handler(req, res) {
             const unidadeObj = turmaObj.unidades || (aluno.turmas?.unidades ? aluno.turmas.unidades : null);
 
             // FILTRO DE UNIDADE (Fase 4.2):
-            // A unidade da matrícula vem de turmaObj.unidadeid (coluna legada da tabela turmas).
+            // A unidade da matrícula vem de turmaObj.unidadeid / unidadeObj.id.
             // Cada matrícula é avaliada individualmente — cursos simultâneos preservados.
-            const unidadeIdMatricula = turmaObj?.unidadeid ?? aluno.turmas?.unidadeid ?? null;
+            const unidadeIdMatricula = turmaObj?.unidadeid ?? turmaObj?.unidade_id ?? unidadeObj?.id ?? aluno.turmas?.unidadeid ?? aluno.turmas?.unidades?.id ?? null;
             if (!unidadePermitida(unidadeIdMatricula)) return; // pula esta matrícula
 
             listaAlunosFinal.push({
@@ -385,7 +389,7 @@ export default async function handler(req, res) {
               turma_nome: turmaObj?.nome || aluno.turma || null,
               turma: turmaObj?.nome || aluno.turma || null,
 
-              unidade_id: turmaObj?.unidadeid || aluno.turmas?.unidadeid || null,
+              unidade_id: unidadeIdMatricula,
               unidade_nome: unidadeObj?.nome || null,
 
               ano_letivo: mat.ano_letivo || aluno.ano_letivo,
@@ -404,7 +408,7 @@ export default async function handler(req, res) {
           const unidadeObj = turmaObj.unidades || null;
 
           // FILTRO DE UNIDADE para registros legados
-          const unidadeIdLegado = turmaObj?.unidadeid ?? null;
+          const unidadeIdLegado = turmaObj?.unidadeid ?? turmaObj?.unidade_id ?? unidadeObj?.id ?? null;
           if (!unidadePermitida(unidadeIdLegado)) return; // pula este aluno legado
 
           listaAlunosFinal.push({
@@ -421,7 +425,7 @@ export default async function handler(req, res) {
             turmaid: aluno.turmaid,
             turma_nome: turmaObj?.nome || aluno.turma || null,
             turma: turmaObj?.nome || aluno.turma || null,
-            unidade_id: turmaObj?.unidadeid || null,
+            unidade_id: unidadeIdLegado,
             unidade_nome: unidadeObj?.nome || null,
             ano_letivo: aluno.ano_letivo,
             anoLetivo: aluno.ano_letivo,
