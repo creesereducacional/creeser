@@ -19,6 +19,7 @@ export default function ListagemAlunos() {
   const [modalDelete, setModalDelete] = useState({ isOpen: false, id: null, nome: '' });
 
   // Opções para os filtros
+  const [instituicoes, setInstituicoes] = useState([]);
   const [unidades, setUnidades] = useState([]);
   const [cursos, setCursos] = useState([]);
   const [turmas, setTurmas] = useState([]);
@@ -27,6 +28,7 @@ export default function ListagemAlunos() {
   // Estados dos filtros
   const [searchVal, setSearchVal] = useState('');
   const [statusVal, setStatusVal] = useState('');
+  const [instituicaoVal, setInstituicaoVal] = useState('');
   const [unidadeVal, setUnidadeVal] = useState('');
   const [cursoVal, setCursoVal] = useState('');
   const [turmaVal, setTurmaVal] = useState('');
@@ -42,7 +44,7 @@ export default function ListagemAlunos() {
   useEffect(() => {
     setPaginaAtual(1);
     setMenuAcoesData(null);
-  }, [searchVal, statusVal, unidadeVal, cursoVal, turmaVal, anoLetivoVal]);
+  }, [searchVal, statusVal, instituicaoVal, unidadeVal, cursoVal, turmaVal, anoLetivoVal]);
 
   // Fechar menu de ações ao trocar de página
   useEffect(() => {
@@ -83,16 +85,25 @@ export default function ListagemAlunos() {
 
   const carregarOpcoesFiltros = async () => {
     try {
-      const [resOpcoes, resTurmas, resCursos, resAnos] = await Promise.all([
+      const [resInst, resOpcoes, resTurmas, resCursos, resAnos] = await Promise.all([
+        fetch('/api/instituicoes'),
         fetch('/api/turmas/opcoes'),
         fetch('/api/turmas'),
         fetch('/api/cursos'),
         fetch('/api/configuracoes/anos-letivos'),
       ]);
 
+      if (resInst.ok) {
+        const data = await resInst.json();
+        setInstituicoes(Array.isArray(data) ? data : []);
+      }
+
       if (resOpcoes.ok) {
         const data = await resOpcoes.json();
         if (Array.isArray(data.unidades)) setUnidades(data.unidades);
+        if (!resInst.ok && Array.isArray(data.instituicoes)) {
+          setInstituicoes((prev) => (prev.length > 0 ? prev : data.instituicoes));
+        }
       }
 
       if (resTurmas.ok) {
@@ -117,21 +128,152 @@ export default function ListagemAlunos() {
     }
   };
 
-  // Filtragem dinâmica de turmas baseada no curso / unidade selecionados
+  // Unidades filtradas pela instituição selecionada
+  const unidadesFiltradasOpcoes = useMemo(() => {
+    let list = unidades;
+    if (instituicaoVal) {
+      list = list.filter(u => {
+        const uInstId = String(u.instituicao_id || u.instituicaoid || u.instituicaoId || '');
+        return uInstId === String(instituicaoVal);
+      });
+    }
+    return list;
+  }, [unidades, instituicaoVal]);
+
+  // Cursos filtrados pela instituição e pela unidade selecionadas
+  const cursosFiltradosOpcoes = useMemo(() => {
+    let list = cursos;
+    if (instituicaoVal) {
+      list = list.filter(c => {
+        const cInstId = String(c.instituicaoId || c.instituicaoid || c.instituicao_id || '');
+        return !cInstId || cInstId === String(instituicaoVal);
+      });
+    }
+    if (unidadeVal) {
+      list = list.filter(c => {
+        if (Array.isArray(c.unidadeIds) && c.unidadeIds.length > 0) {
+          return c.unidadeIds.some(uid => String(uid) === String(unidadeVal));
+        }
+        if (Array.isArray(c.unidade_ids) && c.unidade_ids.length > 0) {
+          return c.unidade_ids.some(uid => String(uid) === String(unidadeVal));
+        }
+        return true;
+      });
+    }
+    return list;
+  }, [cursos, instituicaoVal, unidadeVal]);
+
+  // Filtragem dinâmica de turmas baseada em instituição / unidade / curso selecionados
   const turmasFiltradasOpcoes = useMemo(() => {
     let list = turmas;
-    if (cursoVal) {
-      list = list.filter(t => String(t.cursoId || t.cursoid || t.curso_id) === String(cursoVal));
+    if (instituicaoVal) {
+      list = list.filter(t => {
+        const tInstId = String(t.instituicaoId || t.instituicaoid || t.instituicao_id || '');
+        return !tInstId || tInstId === String(instituicaoVal);
+      });
     }
     if (unidadeVal) {
       list = list.filter(t => String(t.unidadeId || t.unidadeid || t.unidade_id) === String(unidadeVal));
     }
+    if (cursoVal) {
+      list = list.filter(t => String(t.cursoId || t.cursoid || t.curso_id) === String(cursoVal));
+    }
     return list;
-  }, [turmas, cursoVal, unidadeVal]);
+  }, [turmas, instituicaoVal, unidadeVal, cursoVal]);
+
+  // Mudança em cascata de Instituição com limpeza de dependentes incompatíveis
+  const handleInstituicaoChange = (novaInstId) => {
+    setInstituicaoVal(novaInstId);
+    if (!novaInstId) return;
+
+    if (unidadeVal) {
+      const unidValida = unidades.some(u => {
+        const uInstId = String(u.instituicao_id || u.instituicaoid || u.instituicaoId || '');
+        return String(u.id) === String(unidadeVal) && uInstId === String(novaInstId);
+      });
+      if (!unidValida) {
+        setUnidadeVal('');
+        setCursoVal('');
+        setTurmaVal('');
+        return;
+      }
+    }
+
+    if (cursoVal) {
+      const cursoValido = cursos.some(c => {
+        const cInstId = String(c.instituicaoId || c.instituicaoid || c.instituicao_id || '');
+        return String(c.id) === String(cursoVal) && (!cInstId || cInstId === String(novaInstId));
+      });
+      if (!cursoValido) {
+        setCursoVal('');
+        setTurmaVal('');
+        return;
+      }
+    }
+
+    if (turmaVal) {
+      const turmaValida = turmas.some(t => {
+        const tInstId = String(t.instituicaoId || t.instituicaoid || t.instituicao_id || '');
+        return String(t.id) === String(turmaVal) && (!tInstId || tInstId === String(novaInstId));
+      });
+      if (!turmaValida) {
+        setTurmaVal('');
+      }
+    }
+  };
+
+  // Mudança em cascata de Unidade
+  const handleUnidadeChange = (novaUnidadeId) => {
+    setUnidadeVal(novaUnidadeId);
+    if (!novaUnidadeId) return;
+
+    if (cursoVal) {
+      const cursoValido = cursos.some(c => {
+        if (String(c.id) !== String(cursoVal)) return false;
+        const uids = c.unidadeIds || c.unidade_ids;
+        if (Array.isArray(uids) && uids.length > 0) {
+          return uids.some(uid => String(uid) === String(novaUnidadeId));
+        }
+        return true;
+      });
+      if (!cursoValido) {
+        setCursoVal('');
+        setTurmaVal('');
+        return;
+      }
+    }
+
+    if (turmaVal) {
+      const turmaValida = turmas.some(t => {
+        const tUnidId = String(t.unidadeId || t.unidadeid || t.unidade_id || '');
+        return String(t.id) === String(turmaVal) && tUnidId === String(novaUnidadeId);
+      });
+      if (!turmaValida) {
+        setTurmaVal('');
+      }
+    }
+  };
+
+  // Mudança em cascata de Curso
+  const handleCursoChange = (novoCursoId) => {
+    setCursoVal(novoCursoId);
+    if (!novoCursoId) return;
+
+    if (turmaVal) {
+      const turmaValida = turmas.some(t => {
+        const tCursoId = String(t.cursoId || t.cursoid || t.curso_id || '');
+        return String(t.id) === String(turmaVal) && tCursoId === String(novoCursoId);
+      });
+      if (!turmaValida) {
+        setTurmaVal('');
+      }
+    }
+  };
 
   const limparFiltros = () => {
     setSearchVal('');
     setStatusVal('');
+    setInstituicaoVal('');
     setUnidadeVal('');
     setCursoVal('');
     setTurmaVal('');
@@ -167,7 +309,27 @@ export default function ListagemAlunos() {
         }
       }
 
-      // 3. Filtro de Unidade
+      // 3. Filtro de Instituição
+      if (instituicaoVal) {
+        let alunoInstId = String(aluno.instituicao_id || aluno.instituicaoid || aluno.instituicaoId || '');
+        if (!alunoInstId && aluno.unidade_id) {
+          const uEncontrada = unidades.find(u => String(u.id) === String(aluno.unidade_id));
+          alunoInstId = String(uEncontrada?.instituicao_id || uEncontrada?.instituicaoid || uEncontrada?.instituicaoId || '');
+        }
+        if (!alunoInstId && aluno.turma_id) {
+          const tEncontrada = turmas.find(t => String(t.id) === String(aluno.turma_id));
+          alunoInstId = String(tEncontrada?.instituicaoId || tEncontrada?.instituicaoid || tEncontrada?.instituicao_id || '');
+        }
+        if (!alunoInstId && aluno.curso_id) {
+          const cEncontrado = cursos.find(c => String(c.id) === String(aluno.curso_id));
+          alunoInstId = String(cEncontrado?.instituicaoId || cEncontrado?.instituicaoid || cEncontrado?.instituicao_id || '');
+        }
+        if (alunoInstId && alunoInstId !== String(instituicaoVal)) {
+          return false;
+        }
+      }
+
+      // 4. Filtro de Unidade
       if (unidadeVal) {
         const unidId = String(aluno.unidade_id || aluno.unidadeId || '');
         if (unidId !== String(unidadeVal)) {
@@ -175,7 +337,7 @@ export default function ListagemAlunos() {
         }
       }
 
-      // 4. Filtro de Curso
+      // 5. Filtro de Curso
       if (cursoVal) {
         const cId = String(aluno.curso_id || aluno.cursoid || aluno.cursoId || '');
         if (cId !== String(cursoVal)) {
@@ -183,7 +345,7 @@ export default function ListagemAlunos() {
         }
       }
 
-      // 5. Filtro de Turma
+      // 6. Filtro de Turma
       if (turmaVal) {
         const tId = String(aluno.turma_id || aluno.turmaid || aluno.turmaId || '');
         if (tId !== String(turmaVal)) {
@@ -191,7 +353,7 @@ export default function ListagemAlunos() {
         }
       }
 
-      // 6. Filtro de Ano Letivo
+      // 7. Filtro de Ano Letivo
       if (anoLetivoVal) {
         const aLet = String(aluno.ano_letivo ?? aluno.anoLetivo ?? aluno.ano ?? '');
         if (aLet !== String(anoLetivoVal)) {
@@ -201,7 +363,7 @@ export default function ListagemAlunos() {
 
       return true;
     });
-  }, [alunos, searchVal, statusVal, unidadeVal, cursoVal, turmaVal, anoLetivoVal]);
+  }, [alunos, searchVal, statusVal, instituicaoVal, unidadeVal, cursoVal, turmaVal, anoLetivoVal, unidades, turmas, cursos]);
 
   // Cálculos de Paginação
   const totalRegistros = filteredAlunos.length;
@@ -227,11 +389,11 @@ export default function ListagemAlunos() {
     return [1, '...', paginaAtual - 1, paginaAtual, paginaAtual + 1, '...', totalPaginas];
   };
 
-  // Métricas para os KPI Cards
-  const totalAlunosGeral = alunos.length;
-  const totalAtivos = useMemo(() => alunos.filter(a => String(a.status || a.status_administrativo).toUpperCase() === 'ATIVO').length, [alunos]);
-  const totalPre = useMemo(() => alunos.filter(a => String(a.status || a.status_administrativo).toUpperCase() === 'PRE_CADASTRO').length, [alunos]);
-  const totalEgressos = useMemo(() => alunos.filter(a => ['CONCLUIDO', 'TRANSFERIDO', 'DESISTENTE', 'CANCELADO', 'INATIVO', 'TRANCADO'].includes(String(a.status || a.status_administrativo).toUpperCase())).length, [alunos]);
+  // Métricas para os KPI Cards (refletem os filtros aplicados)
+  const totalAlunosGeral = filteredAlunos.length;
+  const totalAtivos = useMemo(() => filteredAlunos.filter(a => String(a.status || a.status_administrativo).toUpperCase() === 'ATIVO').length, [filteredAlunos]);
+  const totalPre = useMemo(() => filteredAlunos.filter(a => String(a.status || a.status_administrativo).toUpperCase() === 'PRE_CADASTRO').length, [filteredAlunos]);
+  const totalEgressos = useMemo(() => filteredAlunos.filter(a => ['CONCLUIDO', 'TRANSFERIDO', 'DESISTENTE', 'CANCELADO', 'INATIVO', 'TRANCADO'].includes(String(a.status || a.status_administrativo).toUpperCase())).length, [filteredAlunos]);
 
   const percAtivos = totalAlunosGeral > 0 ? Math.round((totalAtivos / totalAlunosGeral) * 100) : 0;
   const percPre = totalAlunosGeral > 0 ? Math.round((totalPre / totalAlunosGeral) * 100) : 0;
@@ -630,25 +792,27 @@ export default function ListagemAlunos() {
 
             {/* ── 4. FILTROS DA DASHBOARD ────────────────────────────────────── */}
             <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3.5">
-              {/* Linha 1 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              {/* Linha 1: Busca → Status → Instituição → Unidade → Curso → Turma */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-center">
+                {/* 1. Busca */}
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-sm">
                     🔍
                   </span>
                   <input
                     type="text"
-                    placeholder="Aluno, Matrícula, CPF ou Responsável..."
+                    placeholder="Aluno, Matrícula, CPF..."
                     value={searchVal}
                     onChange={(e) => setSearchVal(e.target.value)}
                     className="w-full h-10 pl-10 pr-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-slate-50/50 hover:bg-white transition-colors text-slate-700"
                   />
                 </div>
 
+                {/* 2. Status */}
                 <select
                   value={statusVal}
                   onChange={(e) => setStatusVal(e.target.value)}
-                  className="w-full h-10 px-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer"
+                  className="w-full h-10 px-3 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer truncate"
                 >
                   <option value="">Todos os Status</option>
                   <option value="ATIVO">Ativo</option>
@@ -662,43 +826,60 @@ export default function ListagemAlunos() {
                   <option value="INATIVO">Inativo</option>
                 </select>
 
+                {/* 3. Instituição */}
                 <select
-                  value={unidadeVal}
-                  onChange={(e) => setUnidadeVal(e.target.value)}
-                  className="w-full h-10 px-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer"
+                  value={instituicaoVal}
+                  onChange={(e) => handleInstituicaoChange(e.target.value)}
+                  className="w-full h-10 px-3 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer truncate"
                 >
-                  <option value="">Todas as Unidades</option>
-                  {unidades.map((u) => (
-                    <option key={u.id} value={u.id}>{u.nome}</option>
+                  <option value="">Todas as Instituições</option>
+                  {instituicoes.map((inst) => (
+                    <option key={inst.id} value={String(inst.id)}>
+                      {inst.nome}
+                    </option>
                   ))}
                 </select>
 
+                {/* 4. Unidade */}
+                <select
+                  value={unidadeVal}
+                  onChange={(e) => handleUnidadeChange(e.target.value)}
+                  className="w-full h-10 px-3 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer truncate"
+                >
+                  <option value="">Todas as Unidades</option>
+                  {unidadesFiltradasOpcoes.map((u) => (
+                    <option key={u.id} value={String(u.id)}>{u.nome}</option>
+                  ))}
+                </select>
+
+                {/* 5. Curso */}
                 <select
                   value={cursoVal}
-                  onChange={(e) => setCursoVal(e.target.value)}
-                  className="w-full h-10 px-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer"
+                  onChange={(e) => handleCursoChange(e.target.value)}
+                  className="w-full h-10 px-3 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer truncate"
                 >
                   <option value="">Todos os Cursos</option>
-                  {cursos.map((c) => (
-                    <option key={c.id} value={c.id}>{c.nome}</option>
+                  {cursosFiltradosOpcoes.map((c) => (
+                    <option key={c.id} value={String(c.id)}>{c.nome}</option>
+                  ))}
+                </select>
+
+                {/* 6. Turma */}
+                <select
+                  value={turmaVal}
+                  onChange={(e) => setTurmaVal(e.target.value)}
+                  className="w-full h-10 px-3 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer truncate"
+                >
+                  <option value="">Todas as Turmas</option>
+                  {turmasFiltradasOpcoes.map((t) => (
+                    <option key={t.id} value={String(t.id)}>{t.nome}</option>
                   ))}
                 </select>
               </div>
 
-              {/* Linha 2 */}
-              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 flex-1 max-w-xl">
-                  <select
-                    value={turmaVal}
-                    onChange={(e) => setTurmaVal(e.target.value)}
-                    className="w-full h-10 px-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer"
-                  >
-                    <option value="">Todas as Turmas</option>
-                    {turmasFiltradasOpcoes.map((t) => (
-                      <option key={t.id} value={t.id}>{t.nome}</option>
-                    ))}
-                  </select>
-
+              {/* Linha 2: Ano Letivo e botões Limpar Filtros / Aplicar Filtros */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2.5 border-t border-slate-100">
+                <div className="w-full sm:w-64">
                   <select
                     value={anoLetivoVal}
                     onChange={(e) => setAnoLetivoVal(e.target.value)}
@@ -711,7 +892,7 @@ export default function ListagemAlunos() {
                   </select>
                 </div>
 
-                <div className="flex items-center gap-2.5 self-end md:self-center">
+                <div className="flex items-center gap-2.5 self-end sm:self-center">
                   <button
                     onClick={limparFiltros}
                     className="h-10 px-4 border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5"
