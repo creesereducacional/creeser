@@ -9,7 +9,71 @@ const UF_OPTIONS = [
   'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
 ];
 
+const CONTRATO_PLACEHOLDERS_CATEGORIZADOS = [
+  {
+    categoria: 'Dados Acadêmicos e Matrícula',
+    placeholders: [
+      { token: '{{numero_matricula}}', label: 'Número da Matrícula' },
+      { token: '{{ALUNO_NMATRICULA}}', label: 'Matrícula (Legado)' },
+      { token: '{{CURSO_NOME}}', label: 'Nome do Curso' },
+      { token: '{{CURSO_CARGA_HORARIA}}', label: 'Carga Horária do Curso' },
+      { token: '{{TURMA_NOME}}', label: 'Nome da Turma' },
+      { token: '{{DATA_INICIO_CURSO}}', label: 'Data de Início' },
+      { token: '{{DATA_FIM_CURSO}}', label: 'Data de Fim' },
+    ]
+  },
+  {
+    categoria: 'Dados do Aluno',
+    placeholders: [
+      { token: '{{ALUNO_NOME}}', label: 'Nome do Aluno' },
+      { token: '{{ALUNO_CPF}}', label: 'CPF' },
+      { token: '{{ALUNO_RG}}', label: 'RG' },
+      { token: '{{ALUNO_EMAIL}}', label: 'E-mail' },
+      { token: '{{ALUNO_TELEFONE}}', label: 'Telefone' },
+      { token: '{{ALUNO_DATA_NASCIMENTO}}', label: 'Data de Nascimento' },
+      { token: '{{ALUNO_NACIONALIDADE}}', label: 'Nacionalidade' },
+      { token: '{{ALUNO_NATURALIDADE}}', label: 'Naturalidade' },
+      { token: '{{ALUNO_ESTADO_CIVIL}}', label: 'Estado Civil' },
+      { token: '{{ALUNO_PROFISSAO}}', label: 'Profissão' },
+      { token: '{{ALUNO_ENDERECO_RESIDENCIAL}}', label: 'Endereço Completo' },
+      { token: '{{ALUNO_ENDERECO}}', label: 'Logradouro' },
+      { token: '{{ALUNO_BAIRRO}}', label: 'Bairro' },
+      { token: '{{ALUNO_CIDADE}}', label: 'Cidade' },
+      { token: '{{ALUNO_CEP}}', label: 'CEP' },
+      { token: '{{ALUNO_UF}}', label: 'UF' },
+    ]
+  },
+  {
+    categoria: 'Valores e Financeiro',
+    placeholders: [
+      { token: '{{VALOR_MENSALIDADE}}', label: 'Valor da Mensalidade' },
+      { token: '{{VALOR_MATRICULA}}', label: 'Valor da Matrícula' },
+      { token: '{{QTD_PARCELAS}}', label: 'Quantidade de Parcelas' },
+      { token: '{{PERIODO_CARNE}}', label: 'Período do Carnê' },
+    ]
+  },
+  {
+    categoria: 'Instituição',
+    placeholders: [
+      { token: '{{INSTITUICAO_NOME}}', label: 'Nome da Instituição' },
+      { token: '{{INSTITUICAO_CNPJ}}', label: 'CNPJ da Instituição' },
+      { token: '{{INSTITUICAO_ENDERECO}}', label: 'Endereço da Instituição' },
+    ]
+  },
+  {
+    categoria: 'Responsável e Emissão',
+    placeholders: [
+      { token: '{{RESPONSAVEL_NOME}}', label: 'Nome do Responsável' },
+      { token: '{{RESPONSAVEL_CPF}}', label: 'CPF do Responsável' },
+      { token: '{{DATA_ASSINATURA}}', label: 'Data de Assinatura' },
+      { token: '{{DATA_GERACAO}}', label: 'Data de Geração' },
+      { token: '{{DATA_ATUAL}}', label: 'Data Atual' },
+    ]
+  }
+];
+
 const CONTRATO_PLACEHOLDERS = [
+  '{{numero_matricula}}',
   '{{ALUNO_NMATRICULA}}',
   '{{ALUNO_NOME}}',
   '{{ALUNO_CPF}}',
@@ -40,7 +104,10 @@ const CONTRATO_PLACEHOLDERS = [
   '{{INSTITUICAO_ENDERECO}}',
   '{{RESPONSAVEL_NOME}}',
   '{{RESPONSAVEL_CPF}}',
-  '{{DATA_ASSINATURA}}'
+  '{{DATA_ASSINATURA}}',
+  '{{DATA_GERACAO}}',
+  '{{DATA_ATUAL}}',
+  '{{PERIODO_CARNE}}'
 ];
 
 const createContratoInicial = () => ({
@@ -54,7 +121,7 @@ const createContratoInicial = () => ({
 });
 
 const extrairPlaceholders = (conteudo) => {
-  const matches = String(conteudo || '').match(/\{\{[A-Z0-9_]+\}\}/g) || [];
+  const matches = String(conteudo || '').match(/\{\{[A-Za-z0-9_]+\}\}/g) || [];
   return [...new Set(matches)];
 };
 
@@ -2923,20 +2990,31 @@ export default function ConfiguracaoEmpresa() {
 
                         <div className="mb-4">
                           <h4 className="text-xs font-bold text-teal-600 mb-2">⚙️ Placeholders Disponíveis</h4>
-                          <div className="flex flex-wrap gap-2">
-                            {CONTRATO_PLACEHOLDERS.map((placeholder) => (
-                              <button
-                                key={placeholder}
-                                type="button"
-                                onClick={() => inserirPlaceholderNoContrato(placeholder)}
-                                className="px-2 py-1 text-xs bg-white border border-blue-300 text-blue-700 rounded hover:bg-blue-50 transition"
-                              >
-                                {placeholder}
-                              </button>
+                          <div className="space-y-3">
+                            {CONTRATO_PLACEHOLDERS_CATEGORIZADOS.map((cat) => (
+                              <div key={cat.categoria} className="bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                                <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-1.5">
+                                  {cat.categoria}
+                                </span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {cat.placeholders.map((item) => (
+                                    <button
+                                      key={item.token}
+                                      type="button"
+                                      onClick={() => inserirPlaceholderNoContrato(item.token)}
+                                      className="px-2 py-1 text-xs bg-white border border-blue-200 hover:border-blue-400 text-blue-700 rounded-md hover:bg-blue-50 transition shadow-2xs flex items-center gap-1 cursor-pointer"
+                                      title={item.token}
+                                    >
+                                      <span className="font-semibold">{item.label}</span>
+                                      <span className="text-[10px] text-slate-400 font-mono">({item.token})</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
                             ))}
                           </div>
                           <p className="text-xs text-gray-500 mt-2">
-                            Clique em um placeholder para inseri-lo no conteúdo em edição.
+                            Clique em uma variável para inseri-la diretamente no cursor do modelo de contrato.
                           </p>
                         </div>
 

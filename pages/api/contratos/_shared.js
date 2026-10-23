@@ -6,6 +6,7 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
 export const PLACEHOLDERS_CONTRATO = [
+  '{{numero_matricula}}',
   '{{ALUNO_NMATRICULA}}',
   '{{ALUNO_NOME}}',
   '{{ALUNO_CPF}}',
