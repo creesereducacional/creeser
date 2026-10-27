@@ -66,7 +66,8 @@ export default async function handler(req, res) {
       }
     }
 
-    // Buscar alunos com dados financeiros e relações
+    // Buscar alunos base (sem filtrar aqui por curso/turma/status para permitir
+    // desdobramento correto de múltiplos cursos na tabela matriculas)
     let alunosQuery = supabase
       .from('alunos')
       .select(
@@ -86,6 +87,7 @@ export default async function handler(req, res) {
         endereco,
         ano_letivo,
         matricula,
+        numero_id,
         foto,
         instituicao_id,
         cursos (
@@ -98,6 +100,7 @@ export default async function handler(req, res) {
           unidadeid,
           mesescontrato,
           desconto,
+          instituicao_id,
           unidades (
             id,
             nome
@@ -115,32 +118,7 @@ export default async function handler(req, res) {
       alunosQuery = applyInstituicaoFilter(alunosQuery, instituicaoId);
     }
 
-    // Aplicar filtros dinâmicos
-    if (status && String(status).trim()) {
-      alunosQuery = alunosQuery.eq('statusmatricula', String(status).trim());
-    }
-
-    if (cursoId) {
-      alunosQuery = alunosQuery.eq('cursoid', Number(cursoId));
-    }
-
-    if (turmaId) {
-      alunosQuery = alunosQuery.eq('turmaid', Number(turmaId));
-    }
-
-    if (unidadeId) {
-      const { data: turmasDaUnidade } = await supabase
-        .from('turmas')
-        .select('id')
-        .eq('unidadeid', Number(unidadeId));
-      const idsTurmasUnidade = (turmasDaUnidade || []).map(t => t.id);
-      alunosQuery = alunosQuery.in('turmaid', idsTurmasUnidade.length > 0 ? idsTurmasUnidade : [-1]);
-    }
-
-    if (anoLetivo) {
-      alunosQuery = alunosQuery.eq('ano_letivo', Number(anoLetivo));
-    }
-
+    // Filtro de busca textual em alunos (nome, CPF, matrícula ou responsável)
     if (search && String(search).trim()) {
       const term = String(search).trim();
       let orFilter = `nome.ilike.%${term}%,cpf.eq.${term},matricula.ilike.%${term}%`;
@@ -170,84 +148,221 @@ export default async function handler(req, res) {
     const alunosCarregados = alunosData || [];
     const alunoIdsCarregados = alunosCarregados.map(a => a.id).filter(Boolean);
 
-    // ── Resolução de Matrículas e Unidade em Lote (evita N+1 queries) ───────────
+    // ── Resolução de Matrículas e Vínculos Acadêmicos em Lote ───────────────────
     let matriculasPorAluno = {};
+    let matriculaInstitucionalPorAluno = {};
+
     if (alunoIdsCarregados.length > 0) {
-      const { data: matriculasData } = await supabase
+      const { data: matriculasData, error: matError } = await supabase
         .from('matriculas')
         .select(`
           id,
+          codigo_matricula,
           aluno_id,
+          instituicao_id,
+          curso_id,
           turma_id,
+          ano_letivo,
+          semestre,
+          status_administrativo,
+          situacao_academica,
           is_principal,
+          tipo_origem,
+          created_at,
+          data_matricula,
+          valor_matricula,
+          valor_mensalidade,
+          percentual_desconto,
+          qtd_parcelas,
+          dia_pagamento,
+          qtd_meses_contrato,
+          cursos (
+            id,
+            nome
+          ),
           turmas (
             id,
             nome,
             unidadeid,
+            mesescontrato,
+            desconto,
+            instituicao_id,
             unidades (
               id,
               nome
             )
           )
         `)
-        .in('aluno_id', alunoIdsCarregados);
+        .in('aluno_id', alunoIdsCarregados)
+        .order('is_principal', { ascending: false })
+        .order('created_at', { ascending: false });
 
-      if (Array.isArray(matriculasData)) {
+      if (!matError && Array.isArray(matriculasData)) {
         matriculasData.forEach(mat => {
           if (!matriculasPorAluno[mat.aluno_id]) {
             matriculasPorAluno[mat.aluno_id] = [];
           }
           matriculasPorAluno[mat.aluno_id].push(mat);
         });
+
+        // Resolução canônica da Matrícula Institucional Única por Aluno
+        alunoIdsCarregados.forEach(aid => {
+          const alunoObj = alunosCarregados.find(a => a.id === aid);
+          if (alunoObj?.matricula) {
+            matriculaInstitucionalPorAluno[aid] = String(alunoObj.matricula).trim();
+            return;
+          }
+
+          const mats = matriculasPorAluno[aid] || [];
+          if (mats.length > 0) {
+            const matsCronologicas = [...mats].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+            const matInaugural = matsCronologicas.find(m => !m.tipo_origem && m.codigo_matricula) ||
+                                 matsCronologicas.find(m => m.codigo_matricula) ||
+                                 mats[0];
+            matriculaInstitucionalPorAluno[aid] = matInaugural?.codigo_matricula || null;
+          } else {
+            matriculaInstitucionalPorAluno[aid] = alunoObj?.numero_id ? String(alunoObj.numero_id) : null;
+          }
+        });
       }
     }
 
-    // Filtrar alunos conforme o escopo de unidade (para filial) e derivar unidade ativa
-    const alunos = alunosCarregados.filter(aluno => {
-      // 1. Prioriza matrícula (is_principal = true ou a primeira)
-      const mats = matriculasPorAluno[aluno.id] || [];
-      let matAlvo = mats.find(m => m.is_principal) || mats[0] || null;
+    // Helper: verificação de escopo de unidade (Fase 6.2)
+    const unidadePermitida = (uid) => {
+      if (!ctx.unidadesPermitidas) return true; // irrestrito (matriz/grupo_admin)
+      if (uid == null) return true;            // sem unidade definida -> não ocultar dado incompleto
+      return ctx.unidadesPermitidas.includes(Number(uid));
+    };
 
-      let unidadeIdDoAluno = null;
-      let unidadeNomeDoAluno = null;
+    // Desdobrar cada aluno em seus vínculos acadêmicos reais (1 linha por Matrícula / Curso)
+    const registrosDesdobrados = [];
 
-      if (matAlvo?.turmas) {
-        unidadeIdDoAluno = matAlvo.turmas.unidadeid != null ? Number(matAlvo.turmas.unidadeid) : null;
-        unidadeNomeDoAluno = matAlvo.turmas.unidades?.nome || null;
+    alunosCarregados.forEach(aluno => {
+      const matriculasDoAluno = matriculasPorAluno[aluno.id] || [];
+      const numeroMatriculaInstitucional = matriculaInstitucionalPorAluno[aluno.id] || aluno.matricula || aluno.numero_id || null;
+
+      if (matriculasDoAluno.length > 0) {
+        matriculasDoAluno.forEach(mat => {
+          const turmaObj = mat.turmas || aluno.turmas || {};
+          const cursoObj = mat.cursos || aluno.cursos || {};
+          const unidadeObj = turmaObj.unidades || (aluno.turmas?.unidades ? aluno.turmas.unidades : {});
+
+          const unidadeIdMatricula = turmaObj?.unidadeid != null
+            ? Number(turmaObj.unidadeid)
+            : (aluno.turmas?.unidadeid != null ? Number(aluno.turmas.unidadeid) : (unidadeObj.id != null ? Number(unidadeObj.id) : null));
+          const unidadeNomeMatricula = unidadeObj.nome || (aluno.turmas?.unidades?.nome || null);
+
+          // Validação de escopo de filial
+          if (!unidadePermitida(unidadeIdMatricula)) return;
+
+          registrosDesdobrados.push({
+            ...aluno,
+            // Identificador e dados da matrícula específica
+            matricula_id: mat.id,
+            is_principal: Boolean(mat.is_principal),
+            codigo_vinculo_matricula: mat.codigo_matricula,
+            // Matrícula Institucional Única para exibição consistente
+            matricula: numeroMatriculaInstitucional,
+            matricula_institucional: numeroMatriculaInstitucional,
+            // Curso da matrícula
+            cursoid: mat.curso_id || aluno.cursoid,
+            curso_id: mat.curso_id || aluno.cursoid,
+            curso: cursoObj.nome || aluno.cursos?.nome || '',
+            cursos: cursoObj,
+            // Turma da matrícula
+            turmaid: mat.turma_id || aluno.turmaid,
+            turma_id: mat.turma_id || aluno.turmaid,
+            turma: turmaObj.nome || aluno.turmas?.nome || '',
+            turmas: turmaObj,
+            // Unidade da matrícula
+            unidade_id: unidadeIdMatricula,
+            unidade: unidadeNomeMatricula || '',
+            // Status do vínculo
+            statusmatricula: mat.status_administrativo || aluno.statusmatricula || 'ATIVO',
+            ano_letivo: mat.ano_letivo || aluno.ano_letivo,
+            ano_letivo_turma: mat.ano_letivo || aluno.ano_letivo || '',
+            semestre: mat.semestre || aluno.semestre || '1',
+            // Valores financeiros específicos da matrícula com fallback para aluno/turma
+            valor_matricula: mat.valor_matricula != null ? mat.valor_matricula : aluno.valor_matricula,
+            valor_mensalidade: mat.valor_mensalidade != null ? mat.valor_mensalidade : aluno.valor_mensalidade,
+            percentual_desconto: mat.percentual_desconto != null ? mat.percentual_desconto : (aluno.percentual_desconto || turmaObj.desconto || null),
+            qtd_parcelas: mat.qtd_parcelas != null ? mat.qtd_parcelas : (aluno.qtd_parcelas || turmaObj.mesescontrato || null),
+            dia_pagamento: mat.dia_pagamento != null ? mat.dia_pagamento : aluno.dia_pagamento,
+            mesescontrato_turma: turmaObj.mesescontrato || aluno.turmas?.mesescontrato || null,
+            desconto_turma: turmaObj.desconto || aluno.turmas?.desconto || null,
+          });
+        });
+      } else {
+        // Fallback para registro legado sem linha na tabela matriculas
+        const turmaObj = aluno.turmas || {};
+        const cursoObj = aluno.cursos || {};
+        const unidadeObj = turmaObj.unidades || {};
+
+        const unidadeIdLegado = turmaObj?.unidadeid != null
+          ? Number(turmaObj.unidadeid)
+          : (unidadeObj.id != null ? Number(unidadeObj.id) : null);
+        const unidadeNomeLegado = unidadeObj.nome || null;
+
+        if (!unidadePermitida(unidadeIdLegado)) return;
+
+        registrosDesdobrados.push({
+          ...aluno,
+          matricula_id: null,
+          is_principal: true,
+          codigo_vinculo_matricula: null,
+          matricula: numeroMatriculaInstitucional,
+          matricula_institucional: numeroMatriculaInstitucional,
+          cursoid: aluno.cursoid,
+          curso_id: aluno.cursoid,
+          curso: cursoObj.nome || '',
+          cursos: cursoObj,
+          turmaid: aluno.turmaid,
+          turma_id: aluno.turmaid,
+          turma: turmaObj.nome || '',
+          turmas: turmaObj,
+          unidade_id: unidadeIdLegado,
+          unidade: unidadeNomeLegado || '',
+          statusmatricula: aluno.statusmatricula || 'ATIVO',
+          ano_letivo: aluno.ano_letivo,
+          ano_letivo_turma: aluno.ano_letivo || '',
+          mesescontrato_turma: turmaObj.mesescontrato || null,
+          desconto_turma: turmaObj.desconto || null,
+        });
       }
-
-      // 2. Fallback para alunos.turmaid (legado)
-      if (unidadeIdDoAluno === null && aluno.turmas) {
-        unidadeIdDoAluno = aluno.turmas.unidadeid != null
-          ? Number(aluno.turmas.unidadeid)
-          : (aluno.turmas.unidades?.id != null ? Number(aluno.turmas.unidades.id) : null);
-        unidadeNomeDoAluno = aluno.turmas.unidades?.nome || null;
-      }
-
-      // Guardar referências enriquecidas no objeto do aluno
-      aluno._resolvidaUnidadeId = unidadeIdDoAluno;
-      aluno._resolvidaUnidadeNome = unidadeNomeDoAluno;
-
-      // Se for Matriz ou Grupo Admin ou Legado irrestrito (ctx.unidadesPermitidas === null)
-      if (ctx.unidadesPermitidas === null) {
-        return true;
-      }
-
-      // Se for Filial, somente permitir se a unidade estiver em ctx.unidadesPermitidas
-      if (unidadeIdDoAluno !== null) {
-        return ctx.unidadesPermitidas.includes(unidadeIdDoAluno);
-      }
-
-      // Se não possui nenhuma unidade associada, permitir (dados legados incompletos)
-      return true;
     });
 
-    if (alunosError) throw alunosError;
+    // ── Aplicação de Filtros sobre os Vínculos Acadêmicos Desdobrados ────────────
+    let alunosFiltrados = registrosDesdobrados;
+
+    if (status && String(status).trim()) {
+      const s = String(status).trim();
+      alunosFiltrados = alunosFiltrados.filter(a => a.statusmatricula === s);
+    }
+
+    if (cursoId) {
+      const cid = Number(cursoId);
+      alunosFiltrados = alunosFiltrados.filter(a => Number(a.cursoid) === cid);
+    }
+
+    if (turmaId) {
+      const tid = Number(turmaId);
+      alunosFiltrados = alunosFiltrados.filter(a => Number(a.turmaid) === tid);
+    }
+
+    if (unidadeId) {
+      const uid = Number(unidadeId);
+      alunosFiltrados = alunosFiltrados.filter(a => Number(a.unidade_id) === uid);
+    }
+
+    if (anoLetivo) {
+      const ano = Number(anoLetivo);
+      alunosFiltrados = alunosFiltrados.filter(a => Number(a.ano_letivo) === ano);
+    }
 
     // Buscar responsáveis financeiros dos alunos retornados em lote
-    const alunoIds = (alunos || []).map(a => a.id);
+    const alunoIdsUnicos = [...new Set(alunosFiltrados.map(a => a.id).filter(Boolean))];
     let relacoesResponsavel = [];
-    if (alunoIds.length > 0) {
+    if (alunoIdsUnicos.length > 0) {
       const { data: relResp, error: relRespError } = await supabase
         .from('responsavel_aluno')
         .select(`
@@ -258,16 +373,16 @@ export default async function handler(req, res) {
             cpf
           )
         `)
-        .in('aluno_id', alunoIds);
+        .in('aluno_id', alunoIdsUnicos);
       if (!relRespError && relResp) {
         relacoesResponsavel = relResp;
       }
     }
 
-    // Buscar turmas
+    // Buscar turmas para os selects de filtro
     let turmasQuery = supabase
       .from('turmas')
-      .select('id, nome')
+      .select('id, nome, unidadeid, cursoid')
       .order('nome', { ascending: true });
 
     turmasQuery = applyInstituicaoFilter(turmasQuery, effectiveInstituicaoId);
@@ -275,7 +390,7 @@ export default async function handler(req, res) {
 
     if (turmasError) throw turmasError;
 
-    // Buscar cursos
+    // Buscar cursos para os selects de filtro
     let cursosQuery = supabase
       .from('cursos')
       .select('id, nome')
@@ -327,10 +442,7 @@ export default async function handler(req, res) {
       };
     };
 
-    const alunosComResumo = (alunos || []).map(a => {
-      const turmaObj = a.turmas || {};
-      const cursoObj = a.cursos || {};
-      const unidadeObj = turmaObj.unidades || {};
+    const alunosComResumo = alunosFiltrados.map(a => {
       const responsavelObj = mapResponsavel(a.id);
 
       return {
@@ -338,16 +450,11 @@ export default async function handler(req, res) {
         financeiro_aberto: resumoFinanceiro[a.id]?.aberto || 0,
         financeiro_atraso: resumoFinanceiro[a.id]?.atraso || 0,
         financeiro_pago: resumoFinanceiro[a.id]?.pago || 0,
-        unidade: a._resolvidaUnidadeNome || unidadeObj.nome || '',
-        unidade_id: a._resolvidaUnidadeId || unidadeObj.id || null,
-        curso: cursoObj.nome || '',
-        turma: turmaObj.nome || '',
-        ano_letivo_turma: a.ano_letivo || '',
-        mesescontrato_turma: turmaObj.mesescontrato || null,
-        desconto_turma: turmaObj.desconto || null,
         responsavel: responsavelObj,
       };
     });
+
+    const totalAlunosUnicos = new Set(alunosComResumo.map(a => a.id)).size;
 
     return res.status(200).json({
       alunos: alunosComResumo,
@@ -355,7 +462,9 @@ export default async function handler(req, res) {
       cursos: cursos || [],
       total: alunosComResumo.length,
       totalFiltrado: alunosComResumo.length,
-      totalGeral: totalGeralCount ?? alunosComResumo.length
+      totalAlunosUnicos,
+      totalMatriculas: alunosComResumo.length,
+      totalGeral: totalGeralCount ?? totalAlunosUnicos,
     });
   } catch (error) {
     console.error('Erro ao listar alunos:', error);

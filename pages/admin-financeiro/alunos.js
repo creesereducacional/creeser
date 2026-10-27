@@ -446,7 +446,7 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
 
         setTimeout(() => { onSalvo(); onSuccess(); onClose(); }, 1200);
       } catch (err) { setErro(err.message); } finally { setSalvando(false); }
-
+
     } else {
       // Comportamento original
       if (!form.descricao.trim()) return setErro('Descrição é obrigatória');
@@ -2024,7 +2024,8 @@ export default function AlunosFinanceiroPage() {
   };
 
   const handleRowClick = (aluno) => {
-    const novoId = expandedId === aluno.id ? null : aluno.id;
+    const rowKey = aluno.matricula_id ? String(aluno.matricula_id) : `${aluno.id}_${aluno.turmaid || 'legado'}`;
+    const novoId = expandedId === rowKey ? null : rowKey;
     setExpandedId(novoId);
     setSelectedFaturas(new Set());
     if (novoId) { setAbaAtiva('aberto'); fetchOrdensAluno(aluno.id); }
@@ -2204,12 +2205,30 @@ export default function AlunosFinanceiroPage() {
 
   const alunosFiltrados = alunos;
 
-  const resumo = useMemo(() => ({
-    totalAlunos: alunosFiltrados.length,
-    totalAberto: alunosFiltrados.reduce((acc, a) => acc + (Number(a.financeiro_aberto) || 0), 0),
-    totalAtraso: alunosFiltrados.reduce((acc, a) => acc + (Number(a.financeiro_atraso) || 0), 0),
-    totalPago: alunosFiltrados.reduce((acc, a) => acc + (Number(a.financeiro_pago) || 0), 0),
-  }), [alunosFiltrados]);
+  const resumo = useMemo(() => {
+    // Evita duplicar somatórios financeiros ao desdobrar o aluno em múltiplos vínculos acadêmicos
+    const alunosProcessados = new Set();
+    let totalAberto = 0;
+    let totalAtraso = 0;
+    let totalPago = 0;
+
+    alunosFiltrados.forEach((a) => {
+      if (!alunosProcessados.has(a.id)) {
+        alunosProcessados.add(a.id);
+        totalAberto += Number(a.financeiro_aberto) || 0;
+        totalAtraso += Number(a.financeiro_atraso) || 0;
+        totalPago += Number(a.financeiro_pago) || 0;
+      }
+    });
+
+    return {
+      totalAlunos: alunosProcessados.size,
+      totalMatriculas: alunosFiltrados.length,
+      totalAberto,
+      totalAtraso,
+      totalPago,
+    };
+  }, [alunosFiltrados]);
 
   const getNomeTurma = (id) => turmas.find(t => t.id === id)?.nome || 'Sem turma';
   const getNomeCurso = (id) => cursos.find(c => c.id === id)?.nome || 'Sem curso';
@@ -2266,16 +2285,18 @@ export default function AlunosFinanceiroPage() {
           <div className="bg-gradient-to-br from-teal-50 to-cyan-50 border border-teal-200 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-teal-700 font-semibold">Total de Alunos</p>
-              {totalGeral > 0 && totalGeral !== resumo.totalAlunos && (
+              {resumo.totalMatriculas > resumo.totalAlunos && (
                 <span className="text-xs font-medium text-teal-600 bg-teal-100/60 px-2 py-0.5 rounded-full">
-                  Geral: {totalGeral}
+                  {resumo.totalMatriculas} vínculos
                 </span>
               )}
             </div>
             <p className="text-3xl font-bold text-teal-900 mt-1">
               {resumo.totalAlunos}
               {totalGeral > 0 && totalGeral !== resumo.totalAlunos && (
-                <span className="text-sm font-normal text-teal-600 ml-1.5">filtrados</span>
+                <span className="text-sm font-normal text-teal-600 ml-1.5">
+                  de {totalGeral} alunos
+                </span>
               )}
             </p>
           </div>
@@ -2349,20 +2370,30 @@ export default function AlunosFinanceiroPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {alunosFiltrados.map(aluno => (
-                    <Fragment key={aluno.id}>
+                  {alunosFiltrados.map(aluno => {
+                    const rowKey = aluno.matricula_id ? String(aluno.matricula_id) : `${aluno.id}_${aluno.turmaid || 'legado'}`;
+                    const isExpanded = expandedId === rowKey;
+                    return (
+                    <Fragment key={rowKey}>
                       <tr
                         onClick={() => handleRowClick(aluno)}
                         className="hover:bg-gray-50 transition cursor-pointer select-none"
                       >
                         <td className="px-6 py-4 text-sm text-gray-900 font-medium">
                           <div className="flex items-center gap-2">
-                            <svg className={`w-4 h-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ${expandedId === aluno.id ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                            {aluno.nome}
+                            <svg className={`w-4 h-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                            <div>
+                              <span>{aluno.nome}</span>
+                              {aluno.matricula && (
+                                <span className="block text-xs font-mono text-gray-500 font-normal">
+                                  Matrícula: {aluno.matricula}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{getNomeTurma(aluno.turmaid)}</td>
-                        <td className="px-6 py-4 text-sm text-gray-600">{getNomeCurso(aluno.cursoid)}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{aluno.turma || getNomeTurma(aluno.turmaid)}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{aluno.curso || getNomeCurso(aluno.cursoid)}</td>
                         <td className="px-6 py-4 text-sm text-right font-semibold text-blue-700">{formataValor(aluno.financeiro_aberto)}</td>
                         <td className="px-6 py-4 text-sm text-right font-semibold text-red-600">{formataValor(aluno.financeiro_atraso)}</td>
                         <td className="px-6 py-4 text-sm text-right font-semibold text-emerald-600">{formataValor(aluno.financeiro_pago)}</td>
@@ -2420,7 +2451,7 @@ export default function AlunosFinanceiroPage() {
                       </tr>
 
                       {/* SANFONA - ordens do aluno */}
-                      {expandedId === aluno.id && (
+                      {isExpanded && (
                         <tr>
                           <td colSpan={8} className="bg-gray-50 border-b border-gray-200 px-0 py-0">
                             <div className="px-6 pt-4 pb-5">
@@ -2797,7 +2828,8 @@ export default function AlunosFinanceiroPage() {
                         </tr>
                       )}
                     </Fragment>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -2812,8 +2844,9 @@ export default function AlunosFinanceiroPage() {
         <ModalOrdem aluno={modalOrdem} onClose={() => setModalOrdem(null)} onSalvo={carregarDados}
           onSuccess={() => {
             const alunoId = modalOrdem.id;
+            const rowKey = modalOrdem.matricula_id ? String(modalOrdem.matricula_id) : `${modalOrdem.id}_${modalOrdem.turmaid || 'legado'}`;
             setOrdensCache(prev => { const n = {...prev}; delete n[alunoId]; return n; });
-            setExpandedId(alunoId);
+            setExpandedId(rowKey);
             setTimeout(() => fetchOrdensAluno(alunoId, true), 500);
           }}
         />
