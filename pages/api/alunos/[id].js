@@ -206,8 +206,35 @@ export default async function handler(req, res) {
         return res.status(404).json({ message: 'Aluno não encontrado' });
       }
 
+      // Resolver número de matrícula institucional único do aluno:
+      let matriculaInstitucional = data.matricula ? String(data.matricula).trim() : null;
+      if (!matriculaInstitucional) {
+        try {
+          const { data: mats } = await supabase
+            .from('matriculas')
+            .select('codigo_matricula, tipo_origem, created_at')
+            .eq('aluno_id', parseInt(id))
+            .order('created_at', { ascending: true });
+
+          if (Array.isArray(mats) && mats.length > 0) {
+            const matInaugural = mats.find((m) => !m.tipo_origem && m.codigo_matricula) ||
+                                 mats.find((m) => m.codigo_matricula) ||
+                                 mats[0];
+            if (matInaugural?.codigo_matricula) {
+              matriculaInstitucional = String(matInaugural.codigo_matricula).trim();
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (!matriculaInstitucional && data.numero_id) {
+        matriculaInstitucional = String(data.numero_id);
+      }
+
       const responseData = {
         ...data,
+        matricula: matriculaInstitucional,
+        matricula_institucional: matriculaInstitucional,
         gradeid: data.turmas?.gradeid || null
       };
       delete responseData.turmas;

@@ -291,6 +291,7 @@ export default async function handler(req, res) {
 
       // 2. Buscar todas as matrículas correspondentes aos alunos retornados
       let matriculasPorAluno = {};
+      let matriculaInstitucionalPorAluno = {};
       if (alunoIds.length > 0) {
         try {
           const { data: matriculasData, error: matError } = await supabase
@@ -308,6 +309,8 @@ export default async function handler(req, res) {
               status_administrativo,
               situacao_academica,
               is_principal,
+              tipo_origem,
+              created_at,
               data_matricula,
               cursos (
                 id,
@@ -335,6 +338,31 @@ export default async function handler(req, res) {
               }
               matriculasPorAluno[mat.aluno_id].push(mat);
             });
+
+            // Resolução do número de matrícula institucional único por aluno:
+            // Regra canônica:
+            // 1. Se aluno.matricula já existir, é prioritário.
+            // 2. Vínculo original/inaugural (matrícula com tipo_origem IS NULL ou menor created_at).
+            // 3. Fallback: matrícula principal ou primeiro código gerado.
+            alunoIds.forEach((aid) => {
+              const alunoObj = alunos.find((a) => a.id === aid);
+              if (alunoObj?.matricula) {
+                matriculaInstitucionalPorAluno[aid] = String(alunoObj.matricula).trim();
+                return;
+              }
+
+              const mats = matriculasPorAluno[aid] || [];
+              if (mats.length > 0) {
+                // Ordenar cronologicamente para identificar a matrícula inicial
+                const matsCronologicas = [...mats].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+                const matInaugural = matsCronologicas.find((m) => !m.tipo_origem && m.codigo_matricula) ||
+                                     matsCronologicas.find((m) => m.codigo_matricula) ||
+                                     mats[0];
+                matriculaInstitucionalPorAluno[aid] = matInaugural?.codigo_matricula || null;
+              } else {
+                matriculaInstitucionalPorAluno[aid] = alunoObj?.numero_id ? String(alunoObj.numero_id) : null;
+              }
+            });
           }
         } catch (mErr) {
           console.error('Aviso ao consultar matriculas:', mErr);
@@ -355,6 +383,7 @@ export default async function handler(req, res) {
 
       alunos.forEach((aluno) => {
         const matriculasDoAluno = matriculasPorAluno[aluno.id] || [];
+        const numeroMatriculaInstitucional = matriculaInstitucionalPorAluno[aluno.id] || aluno.matricula || aluno.numero_id || null;
 
         if (matriculasDoAluno.length > 0) {
           matriculasDoAluno.forEach((mat) => {
@@ -374,11 +403,15 @@ export default async function handler(req, res) {
               cursos: cursoObj || null,
               turmas: turmaObj || null,
 
-              // Chaves da Matrícula específica
+              // Número Institucional Único do Aluno (apresentado em todas as telas)
+              matricula: numeroMatriculaInstitucional,
+              matricula_institucional: numeroMatriculaInstitucional,
+              matricula_codigo: numeroMatriculaInstitucional,
+
+              // Identificador específico do Vínculo Acadêmico
               matricula_id: mat.id,
               matriculaId: mat.id,
-              matricula_codigo: mat.codigo_matricula || aluno.matricula || aluno.numero_id || null,
-              matricula: mat.codigo_matricula || aluno.matricula || aluno.numero_id || null,
+              codigo_vinculo_matricula: mat.codigo_matricula,
               is_principal: Boolean(mat.is_principal),
               status_administrativo: mat.status_administrativo || aluno.statusmatricula || 'ATIVO',
               situacao_academica: mat.situacao_academica || 'EM_ANDAMENTO',
@@ -429,10 +462,14 @@ export default async function handler(req, res) {
             cursos: cursoObj || null,
             turmas: turmaObj || null,
 
+            // Número Institucional Único do Aluno
+            matricula: numeroMatriculaInstitucional,
+            matricula_institucional: numeroMatriculaInstitucional,
+            matricula_codigo: numeroMatriculaInstitucional,
+
             matricula_id: null,
             matriculaId: null,
-            matricula_codigo: aluno.matricula || aluno.numero_id || null,
-            matricula: aluno.matricula || aluno.numero_id || null,
+            codigo_vinculo_matricula: null,
             is_principal: true,
             status_administrativo: aluno.statusmatricula || 'ATIVO',
             curso_id: aluno.cursoid,
