@@ -370,9 +370,15 @@ export default async function handler(req, res) {
 
             listaAlunosFinal.push({
               ...aluno,
+              // Objetos normalizados de curso e turma específicos da matrícula
+              cursos: cursoObj || null,
+              turmas: turmaObj || null,
+
               // Chaves da Matrícula específica
               matricula_id: mat.id,
+              matriculaId: mat.id,
               matricula_codigo: mat.codigo_matricula || aluno.matricula || aluno.numero_id || null,
+              matricula: mat.codigo_matricula || aluno.matricula || aluno.numero_id || null,
               is_principal: Boolean(mat.is_principal),
               status_administrativo: mat.status_administrativo || aluno.statusmatricula || 'ATIVO',
               situacao_academica: mat.situacao_academica || 'EM_ANDAMENTO',
@@ -381,16 +387,22 @@ export default async function handler(req, res) {
               // Identificadores de Curso / Turma / Período da Matrícula
               curso_id: mat.curso_id || aluno.cursoid,
               cursoid: mat.curso_id || aluno.cursoid,
+              cursoId: mat.curso_id || aluno.cursoid,
               curso_nome: cursoObj?.nome || aluno.curso || null,
+              cursoNome: cursoObj?.nome || aluno.curso || null,
               curso: cursoObj?.nome || aluno.curso || null,
 
               turma_id: mat.turma_id || aluno.turmaid,
               turmaid: mat.turma_id || aluno.turmaid,
+              turmaId: mat.turma_id || aluno.turmaid,
               turma_nome: turmaObj?.nome || aluno.turma || null,
+              turmaNome: turmaObj?.nome || aluno.turma || null,
               turma: turmaObj?.nome || aluno.turma || null,
 
               unidade_id: unidadeIdMatricula,
+              unidadeId: unidadeIdMatricula,
               unidade_nome: unidadeObj?.nome || null,
+              unidadeNome: unidadeObj?.nome || null,
 
               ano_letivo: mat.ano_letivo || aluno.ano_letivo,
               anoLetivo: mat.ano_letivo || aluno.ano_letivo,
@@ -413,20 +425,32 @@ export default async function handler(req, res) {
 
           listaAlunosFinal.push({
             ...aluno,
+            // Objetos normalizados de curso e turma
+            cursos: cursoObj || null,
+            turmas: turmaObj || null,
+
             matricula_id: null,
+            matriculaId: null,
             matricula_codigo: aluno.matricula || aluno.numero_id || null,
+            matricula: aluno.matricula || aluno.numero_id || null,
             is_principal: true,
             status_administrativo: aluno.statusmatricula || 'ATIVO',
             curso_id: aluno.cursoid,
             cursoid: aluno.cursoid,
+            cursoId: aluno.cursoid,
             curso_nome: cursoObj?.nome || aluno.curso || null,
+            cursoNome: cursoObj?.nome || aluno.curso || null,
             curso: cursoObj?.nome || aluno.curso || null,
             turma_id: aluno.turmaid,
             turmaid: aluno.turmaid,
+            turmaId: aluno.turmaid,
             turma_nome: turmaObj?.nome || aluno.turma || null,
+            turmaNome: turmaObj?.nome || aluno.turma || null,
             turma: turmaObj?.nome || aluno.turma || null,
             unidade_id: unidadeIdLegado,
+            unidadeId: unidadeIdLegado,
             unidade_nome: unidadeObj?.nome || null,
+            unidadeNome: unidadeObj?.nome || null,
             ano_letivo: aluno.ano_letivo,
             anoLetivo: aluno.ano_letivo,
             semestre: aluno.semestre || '1',

@@ -57,9 +57,10 @@ export default function RecepcaoAlunos() {
         (a.nome || '').toLowerCase().includes(b) ||
         (a.cpf || '').includes(b) ||
         (a.matricula || '').toLowerCase().includes(b) ||
+        (a.matricula_codigo || '').toLowerCase().includes(b) ||
         (a.email || '').toLowerCase().includes(b) ||
-        (a.cursoNome || '').toLowerCase().includes(b) ||
-        (a.turmaNome || '').toLowerCase().includes(b);
+        (a.curso_nome || a.curso || a.cursoNome || '').toLowerCase().includes(b) ||
+        (a.turma_nome || a.turma || a.turmaNome || '').toLowerCase().includes(b);
 
       const statusItem = a.statusmatricula || a.status || '';
       const matchStatus =
@@ -245,10 +246,10 @@ export default function RecepcaoAlunos() {
 
                         <td className="py-3.5 px-4">
                           <div className="text-xs font-semibold text-gray-800">
-                            {aluno.cursos?.nome || aluno.cursoNome || (aluno.cursoid ? `Curso ID ${aluno.cursoid}` : 'Sem curso')}
+                            {aluno.curso_nome || aluno.curso || aluno.cursos?.nome || aluno.cursoNome || (aluno.cursoid ? `Curso ID ${aluno.cursoid}` : 'Sem curso')}
                           </div>
                           <div className="text-xs text-gray-500 mt-0.5">
-                            {aluno.turmas?.nome || aluno.turmaNome || (aluno.turmaid ? `Turma ID ${aluno.turmaid}` : 'Sem turma')}
+                            {aluno.turma_nome || aluno.turma || aluno.turmas?.nome || aluno.turmaNome || (aluno.turmaid ? `Turma ID ${aluno.turmaid}` : 'Sem turma')}
                             {aluno.ano_letivo ? ` • ${aluno.ano_letivo}/${aluno.semestre || '1'}` : ''}
                           </div>
                         </td>
