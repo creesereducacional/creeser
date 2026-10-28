@@ -259,38 +259,62 @@ export default function RecepcaoTurmas() {
                         <td className="py-3.5 px-4 text-xs text-gray-600">
                           {turma.turno || '—'}
                         </td>
-                        <td className="py-3.5 px-4">
+                        <td className="py-3.5 px-4 min-w-[190px]">
                           <div className="flex items-center gap-2">
                             <span className="text-xs font-bold text-gray-800">
-                              {turma.totalAlunos}
-                              {turma.capacidadeMaxima ? ` / ${turma.capacidadeMaxima}` : ' alunos'}
+                              {turma.totalAlunos ?? 0}
+                              <span className="font-normal text-gray-500"> / {turma.qtdMinimaAlunos || 20}</span>
                             </span>
-                            {turma.taxaOcupacao !== null && (
-                              <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded ${
-                                turma.taxaOcupacao >= 90
-                                  ? 'bg-red-50 text-red-700'
-                                  : turma.taxaOcupacao >= 70
-                                  ? 'bg-yellow-50 text-yellow-700'
-                                  : 'bg-blue-50 text-blue-700'
-                              }`}>
-                                {turma.taxaOcupacao}%
-                              </span>
-                            )}
+                            <span
+                              className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
+                                turma.minimoAtingido
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-amber-50 text-amber-700 border-amber-200'
+                              }`}
+                              title={turma.minimoAtingido ? 'Mínimo de viabilidade atingido (apta para início)' : 'Aguardando atingir quantidade mínima'}
+                            >
+                              {turma.minimoAtingido ? '✓ Mínimo Atingido' : '⏳ Aguardando Mínimo'}
+                            </span>
                           </div>
-                          {turma.capacidadeMaxima && (
-                            <div className="w-28 bg-gray-100 rounded-full h-1.5 mt-1 overflow-hidden">
+
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <div className="w-24 bg-gray-100 rounded-full h-1.5 overflow-hidden">
                               <div
-                                className={`h-1.5 rounded-full ${
-                                  turma.taxaOcupacao >= 90
-                                    ? 'bg-red-500'
-                                    : turma.taxaOcupacao >= 70
-                                    ? 'bg-yellow-500'
-                                    : 'bg-blue-500'
+                                className={`h-1.5 rounded-full transition-all ${
+                                  turma.minimoAtingido ? 'bg-emerald-500' : 'bg-amber-500'
                                 }`}
-                                style={{ width: `${Math.min(turma.taxaOcupacao || 0, 100)}%` }}
+                                style={{ width: `${Math.min(turma.percentualMinimo || 0, 100)}%` }}
                               />
                             </div>
-                          )}
+                            <span className="text-[11px] font-medium text-gray-600">
+                              {turma.percentualMinimo || 0}% do mín.
+                            </span>
+                          </div>
+
+                          {/* Indicador secundário / detalhe de vagas do máximo */}
+                          <div className="text-[11px] text-gray-500 mt-1 flex items-center gap-1.5">
+                            {turma.capacidadeMaxima ? (
+                              <>
+                                <span title="Capacidade máxima de vagas da turma">
+                                  Máx: <strong className="text-gray-700">{turma.capacidadeMaxima}</strong>
+                                </span>
+                                <span>•</span>
+                                {turma.acimaDoMaximo ? (
+                                  <span className="text-rose-600 font-bold bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">
+                                    ⚠️ Lotada (+{turma.totalAlunos - turma.capacidadeMaxima})
+                                  </span>
+                                ) : turma.vagasRestantes === 0 ? (
+                                  <span className="text-rose-600 font-semibold">0 vagas</span>
+                                ) : (
+                                  <span className="text-emerald-700 font-medium">
+                                    {turma.vagasRestantes} {turma.vagasRestantes === 1 ? 'vaga restante' : 'vagas restantes'}
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-gray-400">Vagas ilimitadas</span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-3.5 px-4 text-center">
                           <span

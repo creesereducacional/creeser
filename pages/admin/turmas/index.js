@@ -515,7 +515,7 @@ export default function ListagemTurmas() {
 
           {loading ? (
             <div className="p-8">
-              <SkeletonTable rows={5} cols={6} />
+              <SkeletonTable rows={5} cols={7} />
             </div>
           ) : filtradas.length === 0 ? (
             <EmptyState
@@ -535,6 +535,7 @@ export default function ListagemTurmas() {
                       <th className="px-5 py-3.5">Unidade</th>
                       <th className="px-5 py-3.5">Curso</th>
                       <th className="px-5 py-3.5">Grade</th>
+                      <th className="px-5 py-3.5">Lotação / Alunos</th>
                       <th className="px-5 py-3.5 text-center">Status</th>
                       <th className="px-5 py-3.5 text-center">Ações</th>
                     </tr>
@@ -559,6 +560,63 @@ export default function ListagemTurmas() {
                           </td>
                           <td className="px-5 py-3.5 text-xs font-mono text-slate-600">
                             {turma.grade || '—'}
+                          </td>
+                          <td className="px-5 py-3.5 min-w-[190px]">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-slate-800">
+                                {turma.totalAlunos ?? 0}
+                                <span className="font-normal text-slate-500"> / {turma.qtdMinimaAlunos || 20}</span>
+                              </span>
+                              <span
+                                className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
+                                  turma.minimoAtingido
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                                }`}
+                                title={turma.minimoAtingido ? 'Mínimo de viabilidade atingido (apta para início)' : 'Aguardando atingir quantidade mínima'}
+                              >
+                                {turma.minimoAtingido ? '✓ Mínimo Atingido' : '⏳ Aguardando Mínimo'}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <div className="w-24 bg-slate-150 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                <div
+                                  className={`h-1.5 rounded-full transition-all ${
+                                    turma.minimoAtingido ? 'bg-emerald-500' : 'bg-amber-500'
+                                  }`}
+                                  style={{ width: `${Math.min(turma.percentualMinimo || 0, 100)}%` }}
+                                />
+                              </div>
+                              <span className="text-[11px] font-medium text-slate-600">
+                                {turma.percentualMinimo || 0}% do mín.
+                              </span>
+                            </div>
+
+                            {/* Indicador secundário / detalhe de vagas do máximo */}
+                            <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1.5">
+                              {turma.capacidadeMaxima ? (
+                                <>
+                                  <span title="Capacidade máxima de vagas da turma">
+                                    Máx: <strong className="text-slate-700">{turma.capacidadeMaxima}</strong>
+                                  </span>
+                                  <span>•</span>
+                                  {turma.acimaDoMaximo ? (
+                                    <span className="text-rose-600 font-bold bg-rose-50 px-1.5 py-0.2 rounded border border-rose-200">
+                                      ⚠️ Lotada (+{turma.totalAlunos - turma.capacidadeMaxima})
+                                    </span>
+                                  ) : turma.vagasRestantes === 0 ? (
+                                    <span className="text-rose-600 font-semibold">0 vagas</span>
+                                  ) : (
+                                    <span className="text-emerald-700 font-medium">
+                                      {turma.vagasRestantes} {turma.vagasRestantes === 1 ? 'vaga restante' : 'vagas restantes'}
+                                    </span>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="text-slate-400">Vagas ilimitadas</span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-5 py-3.5 text-center whitespace-nowrap">
                             <span

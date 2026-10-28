@@ -7,6 +7,7 @@ import {
   resolveContextoUsuario,
   resolveInstituicaoId,
 } from '../../../lib/auth-server';
+import { validarCapacidadeTurma } from '../../../lib/turma-capacity';
 import {
   validarEmailUnico,
   isDuplicateEmailError,
@@ -595,6 +596,14 @@ export default async function handler(req, res) {
 
       if (turmaError || !turmaData) {
         return res.status(400).json({ message: 'A turma selecionada não existe ou é inválida.' });
+      }
+
+      // Validar capacidade máxima de vagas da turma
+      const checagemCapacidade = await validarCapacidadeTurma(supabase, turmaIdVal, turmaData.instituicao_id || instituicaoId);
+      if (!checagemCapacidade.ok) {
+        return res.status(422).json({
+          message: checagemCapacidade.message || 'A turma selecionada atingiu a capacidade máxima de vagas.',
+        });
       }
 
       const turmaInstId = turmaData.instituicao_id || turmaData.instituicaoid;

@@ -29,6 +29,7 @@ export default function EditarTurma() {
     contaRecebimento: '',
     mesesContrato: '',
     limiteCadastroAlunos: '',
+    qtdMinimaAlunos: '20',
     iesRegistradoraDiploma: '',
     situacao: 'ATIVO',
   });
@@ -145,6 +146,12 @@ export default function EditarTurma() {
           cursoId: data.cursoId ? String(data.cursoId) : '',
           gradeId: data.gradeId ? String(data.gradeId) : '',
           contratoId: cid,
+          qtdMinimaAlunos: data.qtdMinimaAlunos !== undefined && data.qtdMinimaAlunos !== null
+            ? String(data.qtdMinimaAlunos)
+            : (data.qtd_minima_alunos !== undefined && data.qtd_minima_alunos !== null ? String(data.qtd_minima_alunos) : '20'),
+          limiteCadastroAlunos: data.capacidadeMaxima !== undefined && data.capacidadeMaxima !== null
+            ? String(data.capacidadeMaxima)
+            : (data.limiteCadastroAlunos || ''),
         }));
 
         if (data.gradeId) {
@@ -241,6 +248,21 @@ export default function EditarTurma() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const minAlunosNum = Number(formData.qtdMinimaAlunos || 20);
+    if (Number.isNaN(minAlunosNum) || minAlunosNum < 1) {
+      abrirModal('Dados inválidos', 'A quantidade mínima de alunos deve ser igual ou superior a 1.', 'error');
+      return;
+    }
+
+    if (formData.limiteCadastroAlunos) {
+      const maxAlunosNum = Number(formData.limiteCadastroAlunos);
+      if (Number.isNaN(maxAlunosNum) || maxAlunosNum < minAlunosNum) {
+        abrirModal('Dados inválidos', `A capacidade máxima de vagas (${maxAlunosNum}) não pode ser inferior à quantidade mínima de alunos (${minAlunosNum}).`, 'error');
+        return;
+      }
+    }
+
     setSaving(true);
 
     try {
@@ -581,7 +603,7 @@ export default function EditarTurma() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
               <div>
                 <label className="text-xs font-medium text-teal-600 mb-1 block">QTD. MESES CONTRATO</label>
                 <select
@@ -600,15 +622,40 @@ export default function EditarTurma() {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-teal-600 mb-1 block">LIMITE PARA CADASTRO DE ALUNOS</label>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">
+                  QTD. MÍNIMA DE ALUNOS (PARA INÍCIO) *
+                </label>
+                <input
+                  type="number"
+                  name="qtdMinimaAlunos"
+                  min="1"
+                  value={formData.qtdMinimaAlunos}
+                  onChange={handleChange}
+                  placeholder="Ex. 20"
+                  required
+                  className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
+                />
+                <span className="text-[11px] text-gray-500 mt-0.5 block">
+                  Meta mínima necessária para viabilidade da turma
+                </span>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-teal-600 mb-1 block">
+                  CAPACIDADE MÁXIMA (LIMITE DE VAGAS)
+                </label>
                 <input
                   type="number"
                   name="limiteCadastroAlunos"
+                  min={formData.qtdMinimaAlunos || 1}
                   value={formData.limiteCadastroAlunos}
                   onChange={handleChange}
-                  placeholder="Ex. 50"
+                  placeholder="Ex. 50 (opcional)"
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 />
+                <span className="text-[11px] text-gray-500 mt-0.5 block">
+                  Bloqueia novas matrículas ao atingir o limite
+                </span>
               </div>
             </div>
           </div>

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { contarVinculosValidosPorTurma } from '../../../lib/turma-capacity';
 import {
   applyInstituicaoFilter,
   hasPerfil,
@@ -44,7 +45,7 @@ const parseTurmaMeta = (descricao) => {
   }
 };
 
-const mapRowToResponse = (row) => {
+const mapRowToResponse = (row, totalAlunos = 0) => {
   const meta = parseTurmaMeta(row.descricao);
   const descricaoDireta = typeof row.descricao === 'string' && row.descricao.trim().startsWith('{')
     ? meta.descricao || meta.descricaoTexto || ''
@@ -82,6 +83,32 @@ const mapRowToResponse = (row) => {
       row.capacidademaxima !== null && row.capacidademaxima !== undefined
         ? String(row.capacidademaxima)
         : meta.limiteCadastroAlunos || '',
+    capacidadeMaxima:
+      row.capacidademaxima !== null && row.capacidademaxima !== undefined
+        ? Number(row.capacidademaxima)
+        : (meta.limiteCadastroAlunos ? Number(meta.limiteCadastroAlunos) : null),
+    qtdMinimaAlunos:
+      row.qtd_minima_alunos !== null && row.qtd_minima_alunos !== undefined
+        ? Number(row.qtd_minima_alunos)
+        : (meta.qtdMinimaAlunos ? Number(meta.qtdMinimaAlunos) : 20),
+    qtd_minima_alunos:
+      row.qtd_minima_alunos !== null && row.qtd_minima_alunos !== undefined
+        ? Number(row.qtd_minima_alunos)
+        : (meta.qtdMinimaAlunos ? Number(meta.qtdMinimaAlunos) : 20),
+    totalAlunos,
+    percentualMinimo:
+      (row.qtd_minima_alunos || 20) > 0
+        ? Math.round((totalAlunos / Number(row.qtd_minima_alunos || 20)) * 100)
+        : 100,
+    minimoAtingido: totalAlunos >= Number(row.qtd_minima_alunos || 20),
+    vagasRestantes:
+      row.capacidademaxima !== null && row.capacidademaxima !== undefined
+        ? Math.max(Number(row.capacidademaxima) - totalAlunos, 0)
+        : null,
+    acimaDoMaximo:
+      row.capacidademaxima !== null && row.capacidademaxima !== undefined
+        ? totalAlunos > Number(row.capacidademaxima)
+        : false,
     iesRegistradoraDiploma: row.iesregistradoradiploma || meta.iesRegistradoraDiploma || '',
     situacao: row.situacao || 'ATIVO',
     contratoId: row.contrato_id || row.contratoid || null,
@@ -101,6 +128,7 @@ const mapBodyToPayload = (body) => {
   const gradeId = parseInteger(body.gradeId || body.gradeid || body.grade);
   const contratoId = normalizeText(body.contratoId || body.contrato_id || body.contratoid);
   const capacidadeMaxima = parseInteger(body.limiteCadastroAlunos || body.capacidadeMaxima || body.capacidademaxima);
+  const qtdMinimaAlunos = parseInteger(body.qtdMinimaAlunos || body.qtd_minima_alunos) || 20;
   const mesesContrato = parseInteger(body.mesesContrato || body.mesescontrato);
 
   const descricaoMeta = {
@@ -121,6 +149,7 @@ const mapBodyToPayload = (body) => {
     contaRecebimento: body.contaRecebimento || '',
     mesesContrato: body.mesesContrato || '',
     limiteCadastroAlunos: body.limiteCadastroAlunos || '',
+    qtdMinimaAlunos: String(qtdMinimaAlunos),
     iesRegistradoraDiploma: body.iesRegistradoraDiploma || '',
     descricao: body.descricao || '',
   };
@@ -136,6 +165,7 @@ const mapBodyToPayload = (body) => {
     datainicio: body.processoSeletivo || body.dataInicio || null,
     datafim: body.dataFim || null,
     capacidademaxima: capacidadeMaxima,
+    qtd_minima_alunos: qtdMinimaAlunos,
   };
 
   const payloadNormalizado = {
@@ -217,7 +247,8 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'Erro ao recuperar turma', detail: error.message });
       }
 
-      return res.status(200).json(mapRowToResponse(data));
+      const vinculosMap = await contarVinculosValidosPorTurma(supabase, data.id, instituicaoId);
+      return res.status(200).json(mapRowToResponse(data, vinculosMap[data.id] || 0));
     }
 
     if (req.method === 'PUT') {
@@ -236,6 +267,20 @@ export default async function handler(req, res) {
 
       payloadNormalizado.instituicao_id = instituicaoId;
       payloadLegado.instituicao_id = instituicaoId;
+
+      const minAlunos = payloadNormalizado.qtd_minima_alunos !== null && payloadNormalizado.qtd_minima_alunos !== undefined ? Number(payloadNormalizado.qtd_minima_alunos) : 20;
+      if (Number.isNaN(minAlunos) || minAlunos < 1) {
+        return res.status(400).json({ error: 'A quantidade mínima de alunos deve ser igual ou superior a 1.' });
+      }
+      payloadNormalizado.qtd_minima_alunos = minAlunos;
+
+      if (payloadNormalizado.capacidademaxima !== null && payloadNormalizado.capacidademaxima !== undefined) {
+        const maxAlunos = Number(payloadNormalizado.capacidademaxima);
+        if (Number.isNaN(maxAlunos) || maxAlunos < minAlunos) {
+          return res.status(400).json({ error: 'A capacidade máxima de vagas não pode ser inferior à quantidade mínima de alunos (' + minAlunos + ').' });
+        }
+        payloadNormalizado.capacidademaxima = maxAlunos;
+      }
 
       if (!payloadNormalizado.nome) {
         return res.status(400).json({ error: 'Nome é obrigatório' });

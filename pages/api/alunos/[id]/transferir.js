@@ -12,6 +12,7 @@
  * }
  */
 import { createClient } from '@supabase/supabase-js';
+import { validarCapacidadeTurma } from '../../../../lib/turma-capacity';
 import {
   requireAuth,
   requirePerfil,
@@ -137,6 +138,14 @@ export default async function handler(req, res) {
 
     if (errTurma || !novaTurma) {
       return res.status(404).json({ message: 'Turma de destino não encontrada.' });
+    }
+
+    // 3.1 Validar capacidade máxima de vagas da turma de destino
+    const checagemCapacidadeDestino = await validarCapacidadeTurma(supabase, novaTurmaIdNum, novaTurma.instituicao_id || userInstituicaoId);
+    if (!checagemCapacidadeDestino.ok) {
+      return res.status(422).json({
+        message: checagemCapacidadeDestino.message || 'A turma de destino atingiu a capacidade máxima de vagas.',
+      });
     }
 
     if (!isGroupAdmin && novaTurma.instituicao_id && novaTurma.instituicao_id !== userInstituicaoId) {

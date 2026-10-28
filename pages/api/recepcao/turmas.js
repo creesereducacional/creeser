@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { contarVinculosValidosPorTurma, STATUS_DESVINCULADOS } from '../../../lib/turma-capacity';
 import {
   requireAuth,
   requirePerfil,
@@ -65,6 +66,7 @@ export default async function handler(req, res) {
           situacao,
           turno,
           capacidademaxima,
+          qtd_minima_alunos,
           instituicao_id,
           cursos (
             id,
@@ -159,6 +161,14 @@ export default async function handler(req, res) {
         (a.nome || '').localeCompare(b.nome || '')
       );
 
+      const capacidadeA = turma.capacidademaxima ? Number(turma.capacidademaxima) : null;
+      const minAlunosA = turma.qtd_minima_alunos ? Number(turma.qtd_minima_alunos) : 20;
+      const totalAlunosA = listaAlunos.length;
+      const percentualMinimoA = minAlunosA > 0 ? Math.round((totalAlunosA / minAlunosA) * 100) : 100;
+      const minimoAtingidoA = totalAlunosA >= minAlunosA;
+      const vagasRestantesA = capacidadeA !== null ? Math.max(capacidadeA - totalAlunosA, 0) : null;
+      const acimaDoMaximoA = capacidadeA !== null ? totalAlunosA > capacidadeA : false;
+
       return res.status(200).json({
         turma: {
           id: turma.id,
@@ -167,8 +177,13 @@ export default async function handler(req, res) {
           cursoId: turma.cursoid,
           situacao: turma.situacao || 'ATIVO',
           turno: turma.turno || '—',
-          capacidadeMaxima: turma.capacidademaxima || null,
-          totalAlunos: listaAlunos.length,
+          capacidadeMaxima: capacidadeA,
+          qtdMinimaAlunos: minAlunosA,
+          totalAlunos: totalAlunosA,
+          percentualMinimo: percentualMinimoA,
+          minimoAtingido: minimoAtingidoA,
+          vagasRestantes: vagasRestantesA,
+          acimaDoMaximo: acimaDoMaximoA,
         },
         alunos: listaAlunos,
       });
@@ -184,6 +199,7 @@ export default async function handler(req, res) {
         situacao,
         turno,
         capacidademaxima,
+        qtd_minima_alunos,
         datainicio,
         datafim,
         unidadeid,
@@ -206,48 +222,21 @@ export default async function handler(req, res) {
     const { data: turmas, error: turmasErr } = await turmasQuery;
     if (turmasErr) return res.status(500).json({ error: turmasErr.message });
 
-    // Buscar contagem de alunos por turma (alunos ativos)
-    let alunosContagemQuery = supabase
-      .from('alunos')
-      .select('id, turmaid')
-      .not('turmaid', 'is', null);
-
-    if (!isGroupAdmin) {
-      alunosContagemQuery = applyInstituicaoFilter(alunosContagemQuery, userInstituicaoId);
-    }
-
-    const { data: alunosData } = await alunosContagemQuery;
-
-    // Buscar também na tabela matriculas
-    let matriculasContagemQuery = supabase
-      .from('matriculas')
-      .select('id, turma_id, aluno_id')
-      .not('turma_id', 'is', null);
-
-    if (!isGroupAdmin) {
-      matriculasContagemQuery = applyInstituicaoFilter(matriculasContagemQuery, userInstituicaoId);
-    }
-
-    const { data: matriculasData } = await matriculasContagemQuery;
-
-    // Agregar contagem de alunos únicos por turma
-    const alunosPorTurma = {};
-
-    (alunosData || []).forEach((a) => {
-      if (!a.turmaid) return;
-      if (!alunosPorTurma[a.turmaid]) alunosPorTurma[a.turmaid] = new Set();
-      alunosPorTurma[a.turmaid].add(`aluno_${a.id}`);
-    });
-
-    (matriculasData || []).forEach((m) => {
-      if (!m.turma_id || !m.aluno_id) return;
-      if (!alunosPorTurma[m.turma_id]) alunosPorTurma[m.turma_id] = new Set();
-      alunosPorTurma[m.turma_id].add(`aluno_${m.aluno_id}`);
-    });
+    const ids = (turmas || []).map((t) => t.id);
+    const alunosPorTurma = await contarVinculosValidosPorTurma(
+      supabase,
+      ids,
+      !isGroupAdmin ? userInstituicaoId : null
+    );
 
     const resultado = (turmas || []).map((t) => {
-      const totalAlunos = alunosPorTurma[t.id] ? alunosPorTurma[t.id].size : 0;
+      const totalAlunos = alunosPorTurma[t.id] || 0;
       const capacidade = t.capacidademaxima ? Number(t.capacidademaxima) : null;
+      const qtdMinima = t.qtd_minima_alunos ? Number(t.qtd_minima_alunos) : 20;
+      const percentualMinimo = qtdMinima > 0 ? Math.round((totalAlunos / qtdMinima) * 100) : 100;
+      const minimoAtingido = totalAlunos >= qtdMinima;
+      const vagasRestantes = capacidade !== null ? Math.max(capacidade - totalAlunos, 0) : null;
+      const acimaDoMaximo = capacidade !== null ? totalAlunos > capacidade : false;
       const taxaOcupacao = capacidade && capacidade > 0 ? Math.round((totalAlunos / capacidade) * 100) : null;
 
       return {
@@ -262,7 +251,12 @@ export default async function handler(req, res) {
         dataInicio: t.datainicio || null,
         dataFim: t.datafim || null,
         capacidadeMaxima: capacidade,
+        qtdMinimaAlunos: qtdMinima,
         totalAlunos,
+        percentualMinimo,
+        minimoAtingido,
+        vagasRestantes,
+        acimaDoMaximo,
         taxaOcupacao,
       };
     });

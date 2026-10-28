@@ -18,6 +18,7 @@
  * Perfis permitidos: grupo_admin, instituicao_admin, admin, secretaria, coordenador
  */
 import { createClient } from '@supabase/supabase-js';
+import { validarCapacidadeTurma } from '../../../../lib/turma-capacity';
 import {
   requireAuth,
   requirePerfil,
@@ -126,6 +127,14 @@ export default async function handler(req, res) {
           message: 'Acesso negado: a turma selecionada para o novo curso pertence a uma unidade fora do seu escopo.',
         });
       }
+    }
+
+    // 1.2 Validar capacidade máxima de vagas da nova turma
+    const checagemCapacidadeNova = await validarCapacidadeTurma(supabase, turmaIdNum, turmaNova.instituicao_id || userInstituicaoId);
+    if (!checagemCapacidadeNova.ok) {
+      return res.status(422).json({
+        message: checagemCapacidadeNova.message || 'A turma selecionada atingiu a capacidade máxima de vagas.',
+      });
     }
 
     // 2. PRÉ-VERIFICAÇÃO DE DÉBITOS FINANCEIROS OPERACIONAIS ('pendente', 'vencido')
