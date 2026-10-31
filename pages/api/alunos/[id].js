@@ -12,6 +12,7 @@ import {
   MSG_EMAIL_DUPLICADO,
   normalizeEmail,
 } from '../../../lib/api-helpers';
+import { validarCPF, validarTelefone } from '../../../utils/validacoes';
 
 export const config = {
   api: {
@@ -349,6 +350,53 @@ export default async function handler(req, res) {
         }
       }
 
+      // Validação e formatação de CPF
+      let formattedCpf = null;
+      if (formData.cpf) {
+        const cpfLimpo = String(formData.cpf).replace(/\D/g, '');
+        if (cpfLimpo.length > 0) {
+          if (cpfLimpo.length !== 11 || !validarCPF(cpfLimpo)) {
+            return res.status(400).json({
+              message: 'CPF inválido. Certifique-se de informar 11 dígitos numéricos válidos.',
+              field: 'cpf',
+            });
+          }
+          formattedCpf = `${cpfLimpo.slice(0, 3)}.${cpfLimpo.slice(3, 6)}.${cpfLimpo.slice(6, 9)}-${cpfLimpo.slice(9)}`;
+        }
+      }
+
+      // Validação e formatação de Telefone / WhatsApp
+      let formattedTelefone = null;
+      if (formData.telefoneCelular) {
+        const telStr = String(formData.telefoneCelular).trim();
+        if (telStr.startsWith('+')) {
+          // Internacional
+          const telDigits = telStr.replace(/[^\d+]/g, '');
+          if (telDigits.length < 8 || telDigits.length > 16) {
+            return res.status(400).json({
+              message: 'Telefone internacional inválido. Deve conter entre 7 e 15 dígitos com código de país.',
+              field: 'telefoneCelular',
+            });
+          }
+          formattedTelefone = telDigits;
+        } else {
+          const telLimpo = telStr.replace(/\D/g, '');
+          if (telLimpo.length > 0) {
+            if (!validarTelefone(telLimpo)) {
+              return res.status(400).json({
+                message: 'Telefone celular inválido. Informe o DDD e o número completo (10 ou 11 dígitos).',
+                field: 'telefoneCelular',
+              });
+            }
+            if (telLimpo.length === 11) {
+              formattedTelefone = `(${telLimpo.slice(0, 2)}) ${telLimpo.slice(2, 7)}-${telLimpo.slice(7)}`;
+            } else {
+              formattedTelefone = `(${telLimpo.slice(0, 2)}) ${telLimpo.slice(2, 6)}-${telLimpo.slice(6)}`;
+            }
+          }
+        }
+      }
+
       const alunoData = {
         // ===== IDENTIFICAÇÃO =====
         nome: toUppercase(formData.nome) || '',
@@ -362,7 +410,7 @@ export default async function handler(req, res) {
         semestre: formData.semestre || null,
 
         // ===== DADOS PESSOAIS =====
-        cpf: formData.cpf || null,
+        cpf: formattedCpf,
         estadocivil: toUppercase(formData.estadoCivil) || null,
         sexo: toUppercase(formData.sexo) || null,
         data_nascimento: formData.dtNascimento || null,
@@ -370,7 +418,7 @@ export default async function handler(req, res) {
         data_expedicao_rg: formData.dataExpedicaoRG || null,
         orgao_expedidor_rg: toUppercase(formData.orgaoExpedidorRG) || null,
         uf_rg: toUppercase(formData.ufRG) || null,
-        telefone_celular: formData.telefoneCelular || null,
+        telefone_celular: formattedTelefone,
         email: cleanEmail,
 
         // ===== FILIAÇÃO =====
@@ -506,6 +554,12 @@ export default async function handler(req, res) {
               error: 'CPF duplicado'
             });
           }
+          if (error.code === '22001' || String(error.message || '').includes('value too long for type character varying')) {
+            return res.status(400).json({
+              message: 'Um ou mais campos ultrapassam o limite de tamanho permitido pelo sistema.',
+              error: 'TAMANHO_EXCEDIDO'
+            });
+          }
           throw error;
         }
 
@@ -513,6 +567,12 @@ export default async function handler(req, res) {
         res.status(200).json(data[0]);
       } catch (error) {
         console.error('❌ ERRO NA ATUALIZAÇÃO:', error);
+        if (error.code === '22001' || String(error.message || '').includes('value too long for type character varying')) {
+          return res.status(400).json({ 
+            message: 'Um ou mais campos ultrapassam o limite de tamanho permitido pelo sistema.', 
+            error: 'TAMANHO_EXCEDIDO' 
+          });
+        }
         return res.status(500).json({ 
           message: 'Erro ao atualizar aluno', 
           error: error.message 

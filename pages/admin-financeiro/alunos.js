@@ -1195,31 +1195,190 @@ function ModalHistoricoNegociacoes({ aluno, onClose }) {
   const [loading, setLoading] = useState(true);
   const [negociacoes, setNegociacoes] = useState([]);
   const [erro, setErro] = useState('');
+  const [feedback, setFeedback] = useState({ tipo: '', texto: '' });
   const [negociacaoSelecionada, setNegociacaoSelecionada] = useState(null);
+  const [acaoLoadingId, setAcaoLoadingId] = useState(null);
+
+  const carregarNegociacoes = async () => {
+    try {
+      setLoading(true);
+      setErro('');
+      const res = await fetch(`/api/admin-financeiro/alunos/${aluno.id}/negociacoes`);
+      if (!res.ok) throw new Error('Falha ao carregar histórico de negociações.');
+      const data = await res.json();
+      if (data.negociacoes) {
+        setNegociacoes(data.negociacoes);
+        if (data.negociacoes.length > 0) {
+          // Manter a seleção atual ou selecionar a primeira
+          setNegociacaoSelecionada(prev => {
+            if (!prev) return data.negociacoes[0];
+            const updated = data.negociacoes.find(n => n.id === prev.id);
+            return updated || data.negociacoes[0];
+          });
+        } else {
+          setNegociacaoSelecionada(null);
+        }
+      }
+    } catch (err) {
+      setErro(err.message || 'Erro ao carregar histórico');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    let active = true;
-    setLoading(true);
-    fetch(`/api/admin-financeiro/alunos/${aluno.id}/negociacoes`)
-      .then(res => res.json())
-      .then(data => {
-        if (!active) return;
-        if (data.negociacoes) {
-          setNegociacoes(data.negociacoes);
-          if (data.negociacoes.length > 0) {
-            setNegociacaoSelecionada(data.negociacoes[0]);
-          }
-        }
-      })
-      .catch(err => {
-        if (active) setErro(err.message || 'Erro ao carregar histórico');
-      })
-      .finally(() => {
-        if (active) setLoading(false);
+    carregarNegociacoes();
+  }, [aluno.id]);
+
+  const emitirCobranca = async (parcela) => {
+    if (!parcela.pode_emitir) {
+      if (parcela.motivo_bloqueio) {
+        alert(parcela.motivo_bloqueio);
+      }
+      return;
+    }
+
+    const confirma = window.confirm(
+      `Confirma a emissão da cobrança bancária (Boleto/PIX) para a Parcela #${parcela.numero_parcela} no valor de R$ ${Number(parcela.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} com vencimento em ${new Date(parcela.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}?`
+    );
+    if (!confirma) return;
+
+    setAcaoLoadingId(parcela.id);
+    setFeedback({ tipo: '', texto: '' });
+
+    try {
+      const res = await fetch('/api/admin-financeiro/efi/cobranca', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          parcela_id: parcela.id,
+          descricao: `Acordo #${String(negociacaoSelecionada?.ordem_id || '').slice(0, 8)} - Parc. ${parcela.numero_parcela}`
+        })
       });
 
-    return () => { active = false; };
-  }, [aluno.id]);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Erro ao emitir cobrança na EFI Bank.');
+      }
+
+      setFeedback({
+        tipo: 'sucesso',
+        texto: data.ja_existia
+          ? 'Cobrança já existente recuperada com sucesso.'
+          : 'Cobrança bancária emitida com sucesso na EFI Bank!'
+      });
+
+      await carregarNegociacoes();
+
+      if (data.boleto_url) {
+        window.open(data.boleto_url, '_blank');
+      }
+    } catch (err) {
+      setFeedback({ tipo: 'erro', texto: err.message });
+    } finally {
+      setAcaoLoadingId(null);
+    }
+  };
+
+  const consultarStatus = async (parcela) => {
+    setAcaoLoadingId(parcela.id);
+    setFeedback({ tipo: '', texto: '' });
+
+    try {
+      const res = await fetch(`/api/admin-financeiro/parcelas/${parcela.id}/sincronizar-efi`, {
+        method: 'POST'
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Erro ao consultar situação na EFI.');
+      }
+
+      setFeedback({
+        tipo: 'sucesso',
+        texto: data.message || 'Situação sincronizada com sucesso.'
+      });
+
+      await carregarNegociacoes();
+    } catch (err) {
+      setFeedback({ tipo: 'erro', texto: err.message });
+    } finally {
+      setAcaoLoadingId(null);
+    }
+  };
+
+  const imprimirReciboParcela = (parcela, neg) => {
+    const fmtMoeda = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const fmtData = (d) => d ? new Date(String(d).split('T')[0] + 'T12:00:00').toLocaleDateString('pt-BR') : '-';
+    const hoje = new Date().toLocaleDateString('pt-BR');
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Recibo de Pagamento - ${aluno.nome}</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #333; margin: 40px; }
+          .header { text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 12px; margin-bottom: 20px; }
+          .header h2 { margin: 0; color: #0f766e; }
+          .recibo-box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 20px; background: #f8fafc; margin-bottom: 20px; }
+          .linha { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
+          .destaque { font-size: 18px; font-weight: bold; color: #0f766e; }
+          .assinatura { margin-top: 60px; text-align: center; }
+          .linha-assinatura { border-top: 1px solid #333; width: 280px; margin: 0 auto 5px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h2>CREESER — COMPROVANTE DE QUITAÇÃO</h2>
+          <p style="margin:4px 0 0;font-size:13px;color:#64748b;">Recibo de Parcela de Acordo Financeiro</p>
+        </div>
+
+        <div class="recibo-box">
+          <div class="linha">
+            <span><strong>Aluno:</strong> ${aluno.nome}</span>
+            <span><strong>CPF:</strong> ${aluno.cpf || 'Não informado'}</span>
+          </div>
+          <div class="linha">
+            <span><strong>Acordo:</strong> #${String(neg.ordem_id || neg.id).slice(0, 8)}</span>
+            <span><strong>Data do Pagamento:</strong> ${fmtData(parcela.data_pagamento || parcela.data_vencimento)}</span>
+          </div>
+          <div class="linha">
+            <span><strong>Parcela:</strong> #${parcela.numero_parcela} ${parcela.eh_entrada ? '(Entrada)' : ''}</span>
+            <span><strong>Forma:</strong> ${parcela.eh_entrada && parcela.metodo_pagamento === 'dinheiro' ? 'Dinheiro / Espécie' : (parcela.metodo_pagamento || 'Bancário')}</span>
+          </div>
+          <hr style="border: 0; border-top: 1px dashed #cbd5e1; margin: 15px 0;">
+          <div class="linha">
+            <span style="font-size: 16px;"><strong>Valor Quitado:</strong></span>
+            <span class="destaque">${fmtMoeda(parcela.valor_pago || parcela.valor)}</span>
+          </div>
+          ${parcela.observacoes ? `<p style="font-size:12px;color:#64748b;margin-top:10px;"><em>Observação: ${parcela.observacoes}</em></p>` : ''}
+        </div>
+
+        <p style="font-size: 12px; color: #64748b; text-align: center;">
+          Declaramos para os devidos fins que a parcela acima referenciada encontra-se devidamente quitada perante o CREESER Educacional.
+        </p>
+
+        <div class="assinatura">
+          <div class="linha-assinatura"></div>
+          <span style="font-size: 12px; color: #475569;">Setor Financeiro — CREESER</span><br>
+          <span style="font-size: 11px; color: #94a3b8;">Emitido em ${hoje}</span>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const printWin = window.open('', '_blank');
+    if (printWin) {
+      printWin.document.write(html);
+      printWin.document.close();
+      printWin.focus();
+      setTimeout(() => { printWin.print(); }, 400);
+    }
+  };
 
   const imprimirResumo = (neg) => {
     const fmtMoeda = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -1327,18 +1486,57 @@ function ModalHistoricoNegociacoes({ aluno, onClose }) {
     }
   };
 
+  const getBadgeStatusAcordo = (n) => {
+    const statusDet = n.status_detalhado || n.status;
+    if (statusDet === 'cancelamento_efi_pendente' || n.tem_cancelamento_pendente) {
+      return {
+        label: 'Cancelamento EFI Pendente',
+        classe: 'bg-amber-100 text-amber-900 border border-amber-300'
+      };
+    }
+    if (statusDet === 'acordo_quitado') {
+      return {
+        label: 'Acordo Quitado',
+        classe: 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+      };
+    }
+    if (statusDet === 'cobrancas_emitidas') {
+      return {
+        label: 'Cobranças Emitidas',
+        classe: 'bg-teal-100 text-teal-800 border border-teal-300'
+      };
+    }
+    if (statusDet === 'aguardando_emissao') {
+      return {
+        label: 'Aguardando Emissão',
+        classe: 'bg-blue-100 text-blue-800 border border-blue-300'
+      };
+    }
+    return {
+      label: n.status || 'Ativo',
+      classe: 'bg-gray-100 text-gray-800'
+    };
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <div>
             <h3 className="text-lg font-bold text-teal-800">Histórico de Negociações e Acordos</h3>
-            <p className="text-xs text-gray-500">Aluno: {aluno.nome}</p>
+            <p className="text-xs text-gray-500">Aluno: {aluno.nome} · CPF: {aluno.cpf || 'Não informado'}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
+
+        {feedback.texto && (
+          <div className={`px-6 py-2.5 text-xs font-semibold flex justify-between items-center ${feedback.tipo === 'sucesso' ? 'bg-green-50 text-green-800 border-b border-green-200' : 'bg-red-50 text-red-800 border-b border-red-200'}`}>
+            <span>{feedback.texto}</span>
+            <button onClick={() => setFeedback({ tipo: '', texto: '' })} className="text-gray-400 hover:text-gray-600 text-sm">×</button>
+          </div>
+        )}
 
         <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
           {/* Coluna da esquerda: Lista de acordos */}
@@ -1352,13 +1550,14 @@ function ModalHistoricoNegociacoes({ aluno, onClose }) {
             ) : (
               negociacoes.map(n => {
                 const ativo = negociacaoSelecionada?.id === n.id;
+                const badge = getBadgeStatusAcordo(n);
                 return (
                   <div key={n.id} onClick={() => setNegociacaoSelecionada(n)}
                     className={`p-3 rounded-lg border cursor-pointer transition text-xs ${ativo ? 'bg-teal-50 border-teal-500 shadow-sm' : 'bg-white border-gray-200 hover:border-gray-300'}`}>
                     <div className="flex justify-between items-center mb-1">
-                      <span className="font-bold text-gray-800">Acordo #{String(n.id).slice(0, 8)}</span>
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${n.status === 'concluido' ? 'bg-green-100 text-green-800' : n.status === 'sync_pendente' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}`}>
-                        {n.status === 'sync_pendente' ? 'EFI Pendente' : n.status}
+                      <span className="font-bold text-gray-800">Acordo #{String(n.ordem_id || n.id).slice(0, 8)}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${badge.classe}`}>
+                        {badge.label}
                       </span>
                     </div>
                     <p className="text-gray-600 font-medium">Total: R$ {Number(n.valor_total_negociado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
@@ -1375,20 +1574,42 @@ function ModalHistoricoNegociacoes({ aluno, onClose }) {
               <>
                 <div className="flex justify-between items-center pb-3 border-b">
                   <div>
-                    <h4 className="font-bold text-gray-800 text-base">Detalhes da Renegociação</h4>
-                    <p className="text-xs text-gray-500">Operador: {negociacaoSelecionada.operador_email || 'financeiro'} · {new Date(negociacaoSelecionada.created_at).toLocaleString('pt-BR')}</p>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-gray-800 text-base">Detalhes da Renegociação</h4>
+                      <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${getBadgeStatusAcordo(negociacaoSelecionada).classe}`}>
+                        {getBadgeStatusAcordo(negociacaoSelecionada).label}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Ordem: #{String(negociacaoSelecionada.ordem_id || negociacaoSelecionada.id).slice(0, 8)} · Operador: {negociacaoSelecionada.operador_email || 'financeiro'} · {new Date(negociacaoSelecionada.created_at).toLocaleString('pt-BR')}
+                    </p>
                   </div>
                   <button onClick={() => imprimirResumo(negociacaoSelecionada)}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700 transition">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                    Imprimir Resumo
+                    Imprimir Termo
                   </button>
                 </div>
 
+                {/* Banner de Bloqueio por Risco de Duplicidade */}
+                {negociacaoSelecionada.bloqueio_duplicidade && (
+                  <div className="bg-amber-50 border-l-4 border-amber-500 p-3 rounded-r-lg text-xs space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-800">
+                      <svg className="w-4 h-4 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <span>Emissão de Novas Cobranças Temporariamente Suspensa</span>
+                    </div>
+                    <p className="text-amber-700">
+                      {negociacaoSelecionada.motivo_bloqueio || 'Existem parcelas originais com cancelamento bancário pendente na EFI Bank. Para resguardar o aluno e a instituição contra cobrança em duplicidade, a emissão de novos boletos está suspensa.'}
+                    </p>
+                  </div>
+                )}
+
                 {/* Caixa de Observação do Operador */}
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs">
-                  <span className="font-bold text-amber-900 block mb-1">Observação do Operador:</span>
-                  <p className="text-amber-800 whitespace-pre-wrap">{negociacaoSelecionada.observacao_operador || 'Nenhuma observação registrada.'}</p>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs">
+                  <span className="font-bold text-gray-700 block mb-1">Observação do Operador:</span>
+                  <p className="text-gray-600 whitespace-pre-wrap">{negociacaoSelecionada.observacao_operador || 'Nenhuma observação registrada.'}</p>
                 </div>
 
                 {/* Resumo Financeiro */}
@@ -1402,7 +1623,7 @@ function ModalHistoricoNegociacoes({ aluno, onClose }) {
                     <strong className="text-blue-700 text-sm">
                       {negociacaoSelecionada.possui_entrada ? `R$ ${Number(negociacaoSelecionada.valor_entrada || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ 0,00'}
                     </strong>
-                    <span className="text-[10px] text-gray-400 block">{negociacaoSelecionada.tipo_entrada === 'especie' ? 'Em espécie' : (negociacaoSelecionada.possui_entrada ? 'Via EFI' : 'Sem entrada')}</span>
+                    <span className="text-[10px] text-gray-400 block">{negociacaoSelecionada.tipo_entrada === 'especie' ? 'Em espécie (Quitada)' : (negociacaoSelecionada.possui_entrada ? 'Via EFI' : 'Sem entrada')}</span>
                   </div>
                   <div className="p-2.5 bg-gray-50 rounded border">
                     <span className="text-gray-500 block">Saldo Restante</span>
@@ -1416,7 +1637,7 @@ function ModalHistoricoNegociacoes({ aluno, onClose }) {
 
                 {/* Vínculo: Parcelas Originais Encerradas */}
                 <div>
-                  <h5 className="font-bold text-xs text-gray-700 uppercase tracking-wider mb-2">1. Parcelas Originais Envolvidas (Canceladas)</h5>
+                  <h5 className="font-bold text-xs text-gray-700 uppercase tracking-wider mb-2">1. Dívidas Originais Renegociadas (Canceladas)</h5>
                   <div className="border rounded-lg overflow-hidden text-xs">
                     <table className="w-full text-left">
                       <thead className="bg-gray-100 text-gray-600 border-b">
@@ -1424,28 +1645,56 @@ function ModalHistoricoNegociacoes({ aluno, onClose }) {
                           <th className="p-2">Parcela/Descrição</th>
                           <th className="p-2">Vencimento</th>
                           <th className="p-2 text-right">Valor</th>
-                          <th className="p-2">Situação EFI</th>
+                          <th className="p-2 text-center">Status Local</th>
+                          <th className="p-2 text-center">Situação Bancária EFI</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {(negociacaoSelecionada.parcelas_originais || []).map((p, idx) => (
-                          <tr key={idx} className="hover:bg-gray-50">
-                            <td className="p-2 font-medium text-gray-800">{p.descricao || `Parcela #${p.numero_parcela}`}</td>
-                            <td className="p-2 text-gray-500">{p.data_vencimento ? new Date(p.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}</td>
-                            <td className="p-2 text-right font-semibold text-gray-700">R$ {Number(p.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                            <td className="p-2">
-                              <span className="px-1.5 py-0.5 rounded text-[10px] bg-red-100 text-red-700 font-medium">Cancelada</span>
-                            </td>
-                          </tr>
-                        ))}
+                        {(negociacaoSelecionada.parcelas_originais || []).map((p, idx) => {
+                          const syncInfo = (negociacaoSelecionada.sincronizacao_efi || []).find(s => s.parcela_id === p.id);
+                          const falhouCancelamento = syncInfo && (syncInfo.status === 'falha_cancelamento_efi' || syncInfo.sucesso === false);
+                          return (
+                            <tr key={idx} className="hover:bg-gray-50">
+                              <td className="p-2 font-medium text-gray-800">{p.descricao || `Parcela #${p.numero_parcela}`}</td>
+                              <td className="p-2 text-gray-500">{p.data_vencimento ? new Date(p.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}</td>
+                              <td className="p-2 text-right font-semibold text-gray-700">R$ {Number(p.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                              <td className="p-2 text-center">
+                                <span className="px-1.5 py-0.5 rounded text-[10px] bg-red-100 text-red-700 font-medium">Cancelada</span>
+                              </td>
+                              <td className="p-2 text-center">
+                                {falhouCancelamento ? (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-800 font-semibold" title={syncInfo.erro || 'Falha ao cancelar na EFI'}>
+                                    Pendente Cancelamento EFI
+                                  </span>
+                                ) : syncInfo?.status === 'cancelado_efi_sucesso' || syncInfo?.status === 'ja_cancelada' ? (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-green-100 text-green-700 font-medium">
+                                    Baixa EFI Concluída
+                                  </span>
+                                ) : (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-500">
+                                    {syncInfo?.mensagem || 'Sem cobrança externa'}
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
                 </div>
 
-                {/* Vínculo: Novas Parcelas Geradas */}
+                {/* Vínculo: Novas Parcelas Geradas com Ações Operacionais */}
                 <div>
-                  <h5 className="font-bold text-xs text-gray-700 uppercase tracking-wider mb-2">2. Novas Parcelas Geradas</h5>
+                  <div className="flex justify-between items-center mb-2">
+                    <h5 className="font-bold text-xs text-gray-700 uppercase tracking-wider">
+                      2. Novas Parcelas do Acordo
+                    </h5>
+                    <span className="text-[11px] text-gray-500">
+                      Emitidas: {negociacaoSelecionada.parcelas_saldo_emitidas || 0} de {negociacaoSelecionada.total_parcelas_saldo || 0}
+                    </span>
+                  </div>
+
                   <div className="border rounded-lg overflow-hidden text-xs">
                     <table className="w-full text-left">
                       <thead className="bg-gray-100 text-gray-600 border-b">
@@ -1453,24 +1702,106 @@ function ModalHistoricoNegociacoes({ aluno, onClose }) {
                           <th className="p-2">Parcela</th>
                           <th className="p-2">Vencimento</th>
                           <th className="p-2 text-right">Valor</th>
-                          <th className="p-2">Status</th>
+                          <th className="p-2 text-center">Situação da Cobrança</th>
+                          <th className="p-2 text-center">Ações Operacionais</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {(negociacaoSelecionada.parcelas_geradas || []).map((p, idx) => (
-                          <tr key={idx} className="hover:bg-gray-50">
-                            <td className="p-2 font-medium text-gray-800">
-                              Parcela #{p.numero_parcela} {p.eh_entrada ? '(Entrada)' : ''}
-                            </td>
-                            <td className="p-2 text-gray-500">{p.data_vencimento ? new Date(p.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}</td>
-                            <td className="p-2 text-right font-semibold text-gray-800">R$ {Number(p.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                            <td className="p-2">
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${p.status === 'pago' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
-                                {p.status || 'pendente'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
+                        {(negociacaoSelecionada.parcelas_geradas || []).map((p, idx) => {
+                          const isLoadingAcao = acaoLoadingId === p.id;
+                          return (
+                            <tr key={idx} className="hover:bg-gray-50">
+                              <td className="p-2 font-medium text-gray-800">
+                                Parcela #{p.numero_parcela} {p.eh_entrada ? '(Entrada)' : ''}
+                              </td>
+                              <td className="p-2 text-gray-500">
+                                {p.data_vencimento ? new Date(p.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}
+                              </td>
+                              <td className="p-2 text-right font-semibold text-gray-800">
+                                R$ {Number(p.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="p-2 text-center">
+                                {p.status === 'pago' ? (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-800 uppercase">
+                                    {p.eh_entrada && p.metodo_pagamento === 'dinheiro' ? 'Entrada em Dinheiro (Paga)' : 'Paga'}
+                                  </span>
+                                ) : p.status === 'cancelado' ? (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-700 uppercase">
+                                    Cancelada
+                                  </span>
+                                ) : p.efi_charge_id ? (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 uppercase inline-flex items-center gap-1">
+                                    Boleto/PIX Emitido (EFI #{p.efi_charge_id})
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 uppercase">
+                                    Não Emitida
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-2 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  {p.status === 'pago' ? (
+                                    <button
+                                      onClick={() => imprimirReciboParcela(p, negociacaoSelecionada)}
+                                      title="Visualizar Comprovante / Recibo"
+                                      className="px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[11px] font-semibold hover:bg-emerald-100 transition inline-flex items-center gap-1"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                      Comprovante
+                                    </button>
+                                  ) : p.efi_charge_id ? (
+                                    <>
+                                      {p.boleto_url && (
+                                        <a
+                                          href={p.boleto_url}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          title="Visualizar Boleto / PIX da EFI"
+                                          className="px-2 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[11px] font-semibold hover:bg-blue-100 transition inline-flex items-center gap-1"
+                                        >
+                                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                          Boleto / PIX
+                                        </a>
+                                      )}
+                                      <button
+                                        onClick={() => consultarStatus(p)}
+                                        disabled={isLoadingAcao}
+                                        title="Consultar Situação na EFI"
+                                        className="px-2 py-1 bg-gray-50 text-gray-700 border border-gray-200 rounded text-[11px] font-semibold hover:bg-gray-100 transition inline-flex items-center gap-1"
+                                      >
+                                        {isLoadingAcao ? (
+                                          <span className="animate-spin w-3 h-3 border border-gray-500 border-t-transparent rounded-full" />
+                                        ) : (
+                                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                        )}
+                                        Status
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <button
+                                      onClick={() => emitirCobranca(p)}
+                                      disabled={isLoadingAcao || !p.pode_emitir}
+                                      title={p.motivo_bloqueio || 'Emitir Boleto Bancário / PIX para esta parcela do acordo'}
+                                      className={`px-2 py-1 rounded text-[11px] font-semibold transition inline-flex items-center gap-1 ${
+                                        !p.pode_emitir
+                                          ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
+                                          : 'bg-teal-600 text-white hover:bg-teal-700 shadow-sm'
+                                      }`}
+                                    >
+                                      {isLoadingAcao ? (
+                                        <span className="animate-spin w-3 h-3 border border-white border-t-transparent rounded-full" />
+                                      ) : (
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                                      )}
+                                      {!p.pode_emitir ? 'Emissão Bloqueada' : 'Emitir Cobrança'}
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

@@ -165,13 +165,129 @@ export default async function handler(req, res) {
       }
     }
 
+    // 4. Enriquecer negociações com parcelas em tempo real da tabela financeiro_parcelas
+    const ordensIds = negociacoes.map(n => n.ordem_id).filter(Boolean);
+    let parcelasReaisPorOrdem = {};
+
+    if (ordensIds.length > 0) {
+      const { data: todasParcelas } = await supabase
+        .from('financeiro_parcelas')
+        .select(`
+          id,
+          ordem_pagamento_id,
+          numero_parcela,
+          valor,
+          valor_nominal,
+          valor_pago,
+          data_vencimento,
+          data_pagamento,
+          status,
+          metodo_pagamento,
+          boleto_numero,
+          boleto_url,
+          boleto_barcode,
+          efi_charge_id,
+          observacoes,
+          observacao_baixa
+        `)
+        .in('ordem_pagamento_id', ordensIds)
+        .order('numero_parcela', { ascending: true });
+
+      if (Array.isArray(todasParcelas)) {
+        todasParcelas.forEach(p => {
+          if (!parcelasReaisPorOrdem[p.ordem_pagamento_id]) {
+            parcelasReaisPorOrdem[p.ordem_pagamento_id] = [];
+          }
+          parcelasReaisPorOrdem[p.ordem_pagamento_id].push(p);
+        });
+      }
+    }
+
+    const negociacoesEnriquecidas = negociacoes.map(neg => {
+      const parcelasReais = parcelasReaisPorOrdem[neg.ordem_id] || [];
+      
+      // Avaliar pendências de cancelamento bancário nas parcelas originais
+      const syncList = Array.isArray(neg.sincronizacao_efi) ? neg.sincronizacao_efi : [];
+      const falhasEfi = syncList.filter(s => s.status === 'falha_cancelamento_efi' || s.sucesso === false);
+      const temCancelamentoPendente = falhasEfi.length > 0;
+      const motivoBloqueioDuplicidade = temCancelamentoPendente
+        ? `Existem ${falhasEfi.length} cobrança(s) original(is) com falha de cancelamento na EFI Bank. Emissão de novas cobranças suspensa para evitar duplicidade de boletos contra o aluno.`
+        : null;
+
+      // Montar parcelas geradas atualizadas em tempo real
+      const parcelasGeradas = parcelasReais.map(p => {
+        const ehEntrada = p.id === neg.entrada_parcela_id || p.numero_parcela === 1;
+        const isPago = p.status === 'pago';
+        const isCancelado = p.status === 'cancelado';
+        const temCobrancaEfi = Boolean(p.efi_charge_id);
+
+        let situacaoCobranca = 'pendente_emissao';
+        if (isPago) {
+          situacaoCobranca = (ehEntrada && p.metodo_pagamento === 'dinheiro') ? 'entrada_paga_especie' : 'paga';
+        } else if (isCancelado) {
+          situacaoCobranca = 'cancelada';
+        } else if (temCobrancaEfi) {
+          situacaoCobranca = 'cobranca_emitida';
+        }
+
+        return {
+          id: p.id,
+          ordem_id: neg.ordem_id,
+          numero_parcela: p.numero_parcela,
+          valor: Number(p.valor || 0),
+          valor_pago: p.valor_pago ? Number(p.valor_pago) : null,
+          data_vencimento: p.data_vencimento,
+          data_pagamento: p.data_pagamento,
+          status: p.status,
+          metodo_pagamento: p.metodo_pagamento,
+          eh_entrada: ehEntrada,
+          efi_charge_id: p.efi_charge_id,
+          boleto_url: p.boleto_url,
+          boleto_barcode: p.boleto_barcode,
+          boleto_numero: p.boleto_numero,
+          observacoes: p.observacoes,
+          situacao_cobranca: situacaoCobranca,
+          pode_emitir: !isPago && !isCancelado && !temCobrancaEfi && !temCancelamentoPendente,
+          pode_visualizar: Boolean(p.boleto_url),
+          pode_consultar: temCobrancaEfi,
+          tem_comprovante: isPago,
+          motivo_bloqueio: (!temCobrancaEfi && !isPago && temCancelamentoPendente) ? motivoBloqueioDuplicidade : null
+        };
+      });
+
+      // Status detalhado da negociação
+      const todasPagas = parcelasGeradas.length > 0 && parcelasGeradas.every(p => p.status === 'pago');
+      const algumaEmitida = parcelasGeradas.some(p => p.efi_charge_id);
+      
+      let statusDetalhado = 'aguardando_emissao';
+      if (temCancelamentoPendente) {
+        statusDetalhado = 'cancelamento_efi_pendente';
+      } else if (todasPagas) {
+        statusDetalhado = 'acordo_quitado';
+      } else if (algumaEmitida) {
+        statusDetalhado = 'cobrancas_emitidas';
+      }
+
+      return {
+        ...neg,
+        parcelas_geradas: parcelasGeradas,
+        tem_cancelamento_pendente: temCancelamentoPendente,
+        bloqueio_duplicidade: temCancelamentoPendente,
+        motivo_bloqueio: motivoBloqueioDuplicidade,
+        status_detalhado: statusDetalhado,
+        total_parcelas_saldo: parcelasGeradas.filter(p => !p.eh_entrada).length,
+        parcelas_saldo_emitidas: parcelasGeradas.filter(p => !p.eh_entrada && p.efi_charge_id).length,
+        parcelas_saldo_pagas: parcelasGeradas.filter(p => !p.eh_entrada && p.status === 'pago').length
+      };
+    });
+
     return res.status(200).json({
       aluno: {
         id: aluno.id,
         nome: aluno.nome,
         cpf: aluno.cpf
       },
-      negociacoes
+      negociacoes: negociacoesEnriquecidas
     });
   } catch (err) {
     console.error('[aluno/negociacoes] Erro:', err);

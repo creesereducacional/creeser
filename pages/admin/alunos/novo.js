@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import { validarCPF } from '@/utils/validacoes';
+import { validarCPF, validarTelefone } from '@/utils/validacoes';
 import ConfirmModal from '@/components/ConfirmModal';
 import { useValidacaoEmailUnico } from '@/hooks/useValidacaoEmailUnico';
 import CampoEmailValidado from '@/components/ui/CampoEmailValidado';
@@ -26,25 +26,34 @@ const normalizeInstitutionName = (value = '') =>
     .trim()
     .toUpperCase();
 
-const maskCPF = (v) => {
-  const d = v.replace(/\D/g, '').slice(0, 11);
+const maskCPF = (v = '') => {
+  const d = String(v || '').replace(/\D/g, '').slice(0, 11);
+  if (!d.length) return '';
   if (d.length <= 3) return d;
-  if (d.length <= 6) return `${d.slice(0,3)}.${d.slice(3)}`;
-  if (d.length <= 9) return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6)}`;
-  return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`;
+  if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
+  if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
 };
 
-const maskTelefone = (v) => {
-  const d = v.replace(/\D/g, '').slice(0, 11);
-  if (d.length <= 2) return d.length ? `(${d}` : '';
-  if (d.length <= 6) return `(${d.slice(0,2)}) ${d.slice(2)}`;
-  if (d.length <= 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
-  return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+const maskTelefone = (v = '') => {
+  if (!v) return '';
+  const str = String(v).trim();
+  // Preserva números internacionais iniciados com '+'
+  if (str.startsWith('+')) {
+    const raw = '+' + str.slice(1).replace(/\D/g, '');
+    return raw.slice(0, 16);
+  }
+  const d = str.replace(/\D/g, '').slice(0, 11);
+  if (!d.length) return '';
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 };
 
-const maskRG = (v) => v.replace(/\D/g, '').slice(0, 14);
+const maskRG = (v = '') => String(v || '').replace(/\D/g, '').slice(0, 14);
 
-const maskAno = (v) => v.replace(/\D/g, '').slice(0, 4);
+const maskAno = (v = '') => String(v || '').replace(/\D/g, '').slice(0, 4);
 
 export default function CadastroAluno() {
   const router = useRouter();
@@ -337,7 +346,7 @@ export default function CadastroAluno() {
           nome: data.nome || '',
           nomeSocial: data.nome_social || false,
           apelido: data.apelido || '',
-          cpf: data.cpf || '',
+          cpf: maskCPF(data.cpf || ''),
           estadoCivil: data.estadocivil || '',
           sexo: data.sexo || '',
           dtNascimento: data.data_nascimento || '',
@@ -345,7 +354,7 @@ export default function CadastroAluno() {
           dataExpedicaoRG: data.data_expedicao_rg || '',
           orgaoExpedidorRG: data.orgao_expedidor_rg || '',
           ufRG: data.uf_rg || '',
-          telefoneCelular: data.telefone_celular || '',
+          telefoneCelular: maskTelefone(data.telefone_celular || ''),
           
           // FILIAÇÃO
           pai: data.pai || '',
@@ -460,7 +469,6 @@ export default function CadastroAluno() {
           message: 'O número de CPF informado não é válido. Por favor, verifique os dígitos digitados.',
           type: 'error'
         });
-        setFormData(prev => ({ ...prev, cpf: '' }));
         return;
       }
 
@@ -493,7 +501,6 @@ export default function CadastroAluno() {
         message: 'O CPF precisa conter 11 dígitos.',
         type: 'error'
       });
-      setFormData(prev => ({ ...prev, cpf: '' }));
     }
   };
 
@@ -615,6 +622,36 @@ export default function CadastroAluno() {
     if (!formData.turma || !String(formData.turma).trim()) {
       setMessage({ type: 'error', text: 'A seleção de uma Turma é obrigatória para o cadastro do aluno.' });
       return;
+    }
+
+    // Validação de formato e dígitos verificadores do CPF
+    if (formData.cpf) {
+      const cleanCpf = String(formData.cpf).replace(/\D/g, '');
+      if (cleanCpf.length > 0) {
+        if (cleanCpf.length !== 11 || !validarCPF(cleanCpf)) {
+          setMessage({ type: 'error', text: 'O CPF informado é inválido. Verifique os dígitos digitados.' });
+          return;
+        }
+      }
+    }
+
+    // Validação do formato do telefone celular
+    if (formData.telefoneCelular) {
+      const telStr = String(formData.telefoneCelular).trim();
+      const isInter = telStr.startsWith('+');
+      if (isInter) {
+        const rawInter = telStr.replace(/[^\d]/g, '');
+        if (rawInter.length < 8 || rawInter.length > 15) {
+          setMessage({ type: 'error', text: 'Número de telefone internacional inválido.' });
+          return;
+        }
+      } else {
+        const d = telStr.replace(/\D/g, '');
+        if (d.length > 0 && !validarTelefone(telStr)) {
+          setMessage({ type: 'error', text: 'O telefone deve conter 10 ou 11 dígitos no formato (DD) 0000-0000 ou (DD) 00000-0000.' });
+          return;
+        }
+      }
     }
 
     setLoading(true);
@@ -939,6 +976,7 @@ export default function CadastroAluno() {
                   onChange={handleInputChange}
                   onBlur={handleCpfBlur}
                   placeholder="000.000.000-00"
+                  maxLength="14"
                   inputMode="numeric"
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 />
@@ -1009,6 +1047,7 @@ export default function CadastroAluno() {
                   value={formData.rg}
                   onChange={handleInputChange}
                   placeholder="Somente números"
+                  maxLength="14"
                   inputMode="numeric"
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 />
@@ -1064,6 +1103,7 @@ export default function CadastroAluno() {
                   value={formData.telefoneCelular}
                   onChange={handleInputChange}
                   placeholder="(00) 00000-0000"
+                  maxLength="16"
                   inputMode="numeric"
                   className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-teal-50"
                 />

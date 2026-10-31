@@ -22,6 +22,7 @@ import {
   resolveContextoUsuario,
 } from '../../../../lib/auth-server';
 import { emitirBoletoEfi } from '../../../../lib/efi/EfiBillingService';
+import { anexarEventoNegociacao } from '../../../../lib/negociacoes-service';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -152,15 +153,57 @@ async function criarCobranca(req, res) {
       return res.status(422).json({ message: 'Parcela já está cancelada.' });
     }
 
-    if (parcela.ordem.tipo !== 'ordem_simples') {
+    if (parcela.status === 'pago') {
+      return res.status(422).json({ message: 'Esta parcela já consta como paga. Emissão de nova cobrança não permitida.' });
+    }
+
+    if (parcela.ordem.tipo !== 'ordem_simples' && parcela.ordem.tipo !== 'acordo') {
       return res.status(422).json({ message: 'Use o endpoint /efi/carne para carnês.' });
     }
 
-    if (parcela.ordem.efi_charge_id) {
+    // Se a parcela individual já possui cobrança emitida na EFI, recuperar os dados existentes (Idempotência)
+    if (parcela.efi_charge_id) {
+      const { data: bolExistente } = await supabase
+        .from('financeiro_boletos')
+        .select('boleto_id_gateway, boleto_url, boleto_barcode')
+        .eq('parcela_id', parcela.id)
+        .maybeSingle();
+
+      return res.status(200).json({
+        message: 'Cobrança bancária já existente recuperada com sucesso.',
+        charge_id: parcela.efi_charge_id,
+        boleto_url: parcela.boleto_url || bolExistente?.boleto_url || null,
+        barcode: parcela.boleto_barcode || bolExistente?.boleto_barcode || null,
+        vencimento: parcela.data_vencimento,
+        ja_existia: true
+      });
+    }
+
+    if (parcela.ordem.tipo === 'ordem_simples' && parcela.ordem.efi_charge_id) {
       return res.status(422).json({
         message: 'Cobrança EFI já criada para esta ordem.',
         efi_charge_id: parcela.ordem.efi_charge_id,
       });
+    }
+
+    // Para Acordo Financeiro: validar se há pendência de cancelamento bancário das parcelas originais
+    if (parcela.ordem.tipo === 'acordo') {
+      const { data: negData } = await supabase
+        .from('financeiro_negociacoes')
+        .select('status, sincronizacao_efi, parcelas_originais')
+        .eq('ordem_id', parcela.ordem.id)
+        .maybeSingle();
+
+      const temFalhaEfiOriginais = (negData?.sincronizacao_efi || []).some(
+        s => s.status === 'falha_cancelamento_efi' || s.sucesso === false
+      );
+
+      if (temFalhaEfiOriginais) {
+        return res.status(422).json({
+          message: 'Emissão bloqueada: Existem parcelas originais deste acordo com pendência de cancelamento bancário na EFI Bank. É necessário concluir o cancelamento bancário das dívidas anteriores para evitar cobrança em duplicidade contra o aluno.',
+          bloqueio_duplicidade: true
+        });
+      }
     }
 
     const cpfLimpo = (aluno.cpf || '').replace(/\D/g, '');
@@ -182,7 +225,7 @@ async function criarCobranca(req, res) {
       process.env.EFI_WEBHOOK_URL ||
       `${process.env.NEXT_PUBLIC_URL}/api/admin-financeiro/efi/webhook`;
 
-    // 3. Delegar emissão ao EfiBillingService (sem lógica de rollback de ERP aqui)
+    // 3. Delegar emissão ao EfiBillingService
     const resultado = await emitirBoletoEfi({
       parcela: { ...parcela, ordem_pagamento_id: parcela.ordem_pagamento_id },
       aluno,
@@ -192,6 +235,23 @@ async function criarCobranca(req, res) {
       instituicaoId,
       notificationUrl,
     });
+
+    // Se for parcela de Acordo, anexar evento na auditoria append-only da negociação
+    if (parcela.ordem.tipo === 'acordo') {
+      try {
+        await anexarEventoNegociacao({
+          supabase,
+          ordemId: parcela.ordem.id,
+          tipoEvento: 'emissao_cobranca_parcela',
+          operadorEmail: req.authUser?.email,
+          detalhes: {
+            parcela_id: parcela.id,
+            numero_parcela: parcela.numero_parcela,
+            charge_id: resultado.charge_id
+          }
+        });
+      } catch (_) {}
+    }
 
     return res.status(201).json({
       message: 'Boleto criado com sucesso.',

@@ -120,7 +120,11 @@ export default async function handler(req, res) {
     }
     // ────────────────────────────────────────────────────────────────────────────
 
-    const [{ data: ordens, error }, { data: carnesData, error: carnesError }] = await Promise.all([
+    const [
+      { data: ordens, error },
+      { data: carnesData, error: carnesError },
+      { data: acordosData, error: acordosError }
+    ] = await Promise.all([
       (async () => {
         let query = supabase
           .from('financeiro_ordens_pagamento')
@@ -168,10 +172,37 @@ export default async function handler(req, res) {
         query = applyInstituicaoFilter(query, instituicaoId);
         return query;
       })(),
+      (async () => {
+        let query = supabase
+          .from('financeiro_ordens_pagamento')
+          .select(`
+            id,
+            tipo,
+            descricao,
+            referencia,
+            valor_total,
+            percentual_desconto,
+            valor_desconto,
+            quantidade_parcelas,
+            status,
+            efi_charge_id,
+            observacoes,
+            created_at,
+            updated_at,
+            financeiro_parcelas!ordem_pagamento_id(id, numero_parcela, valor, data_vencimento, status, boleto_numero, boleto_url, efi_charge_id, metodo_pagamento, valor_pago, data_pagamento, observacoes)
+          `)
+          .eq('aluno_id', id)
+          .eq('tipo', 'acordo')
+          .order('created_at', { ascending: false });
+
+        query = applyInstituicaoFilter(query, instituicaoId);
+        return query;
+      })(),
     ]);
 
     if (error) throw error;
     if (carnesError) throw carnesError;
+    if (acordosError) throw acordosError;
 
     const resultado = (ordens || []).map(o => {
       const parcela = (o.financeiro_parcelas || [])[0] || {};
@@ -187,6 +218,33 @@ export default async function handler(req, res) {
       };
     });
 
+    // Mapear parcelas individuais dos Acordos Financeiros no fluxo normal de faturas
+    (acordosData || []).forEach(acordo => {
+      const parcelas = (acordo.financeiro_parcelas || []).sort((a, b) => a.numero_parcela - b.numero_parcela);
+      parcelas.forEach(p => {
+        resultado.push({
+          id: p.id,
+          ordem_id: acordo.id,
+          tipo: 'acordo',
+          is_acordo: true,
+          descricao: `Acordo Financeiro #${String(acordo.id).slice(0, 8)}`,
+          referencia: `Acordo #${String(acordo.id).slice(0, 8)} - Parc. ${p.numero_parcela}/${acordo.quantidade_parcelas || parcelas.length}`,
+          valor_total: p.valor,
+          numero_parcela: p.numero_parcela,
+          data_vencimento: p.data_vencimento || null,
+          status_parcela: p.status,
+          status: p.status,
+          cobranca: p.boleto_numero || p.efi_charge_id || null,
+          parcela_id: p.id,
+          boleto_url: p.boleto_url || null,
+          observacoes: p.observacoes || acordo.observacoes || null,
+          created_at: acordo.created_at,
+          updated_at: acordo.updated_at || null,
+          financeiro_parcelas: [p]
+        });
+      });
+    });
+
     const carnes = (carnesData || []).map(c => {
       const parcelas = (c.financeiro_parcelas || []).sort((a, b) => a.numero_parcela - b.numero_parcela);
       const { financeiro_parcelas: _, ...carne } = c;
@@ -199,7 +257,27 @@ export default async function handler(req, res) {
       };
     });
 
-    return res.status(200).json({ ordens: resultado, carnes });
+    // Mapear também os Acordos como agrupamentos na aba de carnês/parcelamentos
+    (acordosData || []).forEach(acordo => {
+      const parcelas = (acordo.financeiro_parcelas || []).sort((a, b) => a.numero_parcela - b.numero_parcela);
+      carnes.push({
+        id: acordo.id,
+        is_acordo: true,
+        tipo: 'acordo',
+        descricao: `Acordo Financeiro #${String(acordo.id).slice(0, 8)}`,
+        referencia: acordo.referencia || `Acordo #${String(acordo.id).slice(0, 8)}`,
+        valor_total: acordo.valor_total,
+        quantidade_parcelas: acordo.quantidade_parcelas || parcelas.length,
+        status: acordo.status,
+        created_at: acordo.created_at,
+        parcelas,
+        parcelas_total: parcelas.length || acordo.quantidade_parcelas,
+        parcelas_pagas: parcelas.filter(p => p.status === 'pago').length,
+        parcelas_canceladas: parcelas.filter(p => p.status === 'cancelado').length,
+      });
+    });
+
+    return res.status(200).json({ ordens: resultado, carnes, acordos: acordosData || [] });
   } catch (error) {
     console.error('Erro ao buscar ordens do aluno:', error?.message || error, error?.details || error?.hint || '');
     return res.status(500).json({ message: 'Erro ao buscar ordens', error: error?.message || String(error) });
