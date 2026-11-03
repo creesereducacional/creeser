@@ -478,7 +478,7 @@ async function cancelarParcela(req, res) {
 
     let parcelaQuery = supabase
       .from('financeiro_parcelas')
-      .select('id, numero_parcela, status')
+      .select('id, numero_parcela, status, efi_charge_id')
       .eq('id', parcela_id);
 
     parcelaQuery = applyInstituicaoFilter(parcelaQuery, req.instituicaoId);
@@ -492,6 +492,13 @@ async function cancelarParcela(req, res) {
     if (ordem?.efi_carnet_id) {
       try {
         await efi.cancelCarnetParcel(Number(ordem.efi_carnet_id), parcela.numero_parcela);
+      } catch (efiErr) {
+        const ignorable = efiErr.statusCode === 422 || efiErr.efiResponse?.error === 'invalid_operation';
+        if (!ignorable) throw efiErr;
+      }
+    } else if (parcela.efi_charge_id) {
+      try {
+        await efi.cancelCharge(Number(parcela.efi_charge_id));
       } catch (efiErr) {
         const ignorable = efiErr.statusCode === 422 || efiErr.efiResponse?.error === 'invalid_operation';
         if (!ignorable) throw efiErr;

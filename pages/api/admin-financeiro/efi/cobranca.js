@@ -275,21 +275,51 @@ async function criarCobranca(req, res) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DELETE — Cancelar cobrança
+// DELETE — Cancelar cobrança (Ordem Simples ou Parcela Individual de Acordo)
 // ─────────────────────────────────────────────────────────────────────────────
 async function cancelarCobranca(req, res) {
   try {
-    const { ordem_id, motivo } = req.body;
+    const { ordem_id, parcela_id, motivo } = req.body;
 
-    if (!ordem_id) {
-      return res.status(400).json({ message: 'ordem_id é obrigatório.' });
+    if (!ordem_id && !parcela_id) {
+      return res.status(400).json({ message: 'ordem_id ou parcela_id é obrigatório.' });
+    }
+
+    // Se informado parcela_id, verificar se pertence a uma ordem de tipo 'acordo' ou ordem_simples
+    let parcelaAlvo = null;
+    let resolvedOrdemId = ordem_id;
+
+    if (parcela_id) {
+      let pQuery = supabase
+        .from('financeiro_parcelas')
+        .select(`
+          id,
+          numero_parcela,
+          status,
+          efi_charge_id,
+          ordem_pagamento_id,
+          ordem:financeiro_ordens_pagamento!ordem_pagamento_id (
+            id, tipo, status, efi_charge_id, instituicao_id, aluno_id,
+            aluno:alunos ( id, turmaid, instituicao_id )
+          )
+        `)
+        .eq('id', parcela_id);
+
+      pQuery = applyInstituicaoFilter(pQuery, req.instituicaoId);
+      const { data: pData, error: pErr } = await pQuery.maybeSingle();
+
+      if (pErr || !pData) {
+        return res.status(404).json({ message: 'Parcela não encontrada.' });
+      }
+      parcelaAlvo = pData;
+      resolvedOrdemId = pData.ordem_pagamento_id;
     }
 
     // 1. Buscar ordem
     let ordemQuery = supabase
       .from('financeiro_ordens_pagamento')
       .select('id, tipo, status, efi_charge_id, instituicao_id, aluno_id, aluno:alunos ( id, turmaid, instituicao_id )')
-      .eq('id', ordem_id);
+      .eq('id', resolvedOrdemId);
 
     ordemQuery = applyInstituicaoFilter(ordemQuery, req.instituicaoId);
     const { data: ordem, error: ordemErr } = await ordemQuery.single();
@@ -321,6 +351,107 @@ async function cancelarCobranca(req, res) {
     }
     // ──────────────────────────────────────────────────────────────────────────
 
+    // CENÁRIO A: Cancelamento pontual de uma Parcela de Acordo
+    if (ordem.tipo === 'acordo' || parcelaAlvo) {
+      if (!parcelaAlvo) {
+        return res.status(422).json({
+          message: 'Para ordens de acordo, informe o parcela_id para cancelar a parcela específica sem desfazer o acordo todo.'
+        });
+      }
+
+      if (parcelaAlvo.status === 'cancelado') {
+        return res.status(422).json({ message: 'Esta parcela já está cancelada.' });
+      }
+      if (parcelaAlvo.status === 'pago') {
+        return res.status(422).json({ message: 'Parcela já liquidada/paga não pode ser cancelada.' });
+      }
+
+      // Cancelar no EFI se a parcela possuir charge_id emitido
+      let efiCancelado = false;
+      const chargeIdParaCancelar = parcelaAlvo.efi_charge_id;
+      if (chargeIdParaCancelar) {
+        try {
+          await efi.cancelCharge(Number(chargeIdParaCancelar));
+          efiCancelado = true;
+        } catch (efiErr) {
+          console.warn('[EFI cancelCharge Parcela] ignorando erro EFI, cancelando localmente:', efiErr.message, efiErr.efiResponse);
+        }
+      }
+
+      // Atualizar status da parcela no banco
+      const updateParcela = {
+        status: 'cancelado',
+        observacoes: motivo ? `Cancelamento: ${motivo}` : 'Cancelado pelo operador financeiro'
+      };
+
+      await supabase
+        .from('financeiro_parcelas')
+        .update(updateParcela)
+        .eq('id', parcelaAlvo.id);
+
+      // Registrar auditoria centralizada
+      try {
+        const authUser = req.authUser || {};
+        const usuarioId = authUser.id ? Number(authUser.id) : null;
+        await supabase.from('audit_logs').insert([{
+          usuario_id: usuarioId,
+          usuario_email: authUser.email || null,
+          perfil: authUser.perfil || authUser.tipo || null,
+          acao: 'CANCELAR_PARCELA_ACORDO',
+          modulo: 'financeiro',
+          entidade: 'parcela',
+          id_entidade: String(parcelaAlvo.id),
+          detalhes: {
+            numero_parcela: parcelaAlvo.numero_parcela,
+            ordem_id: ordem.id,
+            tipo_ordem: ordem.tipo,
+            charge_id: chargeIdParaCancelar || null,
+            cancelado_na_efi: efiCancelado,
+            motivo: motivo || 'Cancelamento individual de parcela de acordo'
+          },
+          instituicao_id: ordem.instituicao_id || null
+        }]);
+      } catch (logErr) {
+        console.error('[audit-log] Falha ao registrar log de cancelamento:', logErr?.message || logErr);
+      }
+
+      // Anexar evento na trilha da negociação se existir
+      try {
+        await anexarEventoNegociacao({
+          supabase,
+          ordemId: ordem.id,
+          tipoEvento: 'cancelamento_cobranca_parcela',
+          operadorEmail: req.authUser?.email,
+          detalhes: {
+            parcela_id: parcelaAlvo.id,
+            numero_parcela: parcelaAlvo.numero_parcela,
+            motivo: motivo || null,
+            cancelado_na_efi: efiCancelado
+          }
+        });
+      } catch (_) {}
+
+      // Se todas as parcelas do acordo agora estiverem canceladas ou pagas, atualizar ordem se pertinente
+      const { data: todasParcelas } = await supabase
+        .from('financeiro_parcelas')
+        .select('status')
+        .eq('ordem_pagamento_id', ordem.id);
+
+      if (todasParcelas && todasParcelas.every(p => p.status === 'cancelado')) {
+        await supabase
+          .from('financeiro_ordens_pagamento')
+          .update({ status: 'cancelado', observacoes: motivo ? `Todas parcelas canceladas: ${motivo}` : 'Todas parcelas canceladas' })
+          .eq('id', ordem.id);
+      }
+
+      return res.status(200).json({
+        message: 'Parcela cancelada com sucesso.',
+        cancelado_na_efi: efiCancelado,
+        parcela_id: parcelaAlvo.id
+      });
+    }
+
+    // CENÁRIO B: Cancelamento de Ordem Simples completa
     if (ordem.status === 'cancelado') {
       return res.status(422).json({ message: 'Ordem já está cancelada.' });
     }
@@ -346,12 +477,12 @@ async function cancelarCobranca(req, res) {
     await supabase
       .from('financeiro_ordens_pagamento')
       .update(updateOrdem)
-      .eq('id', ordem_id);
+      .eq('id', resolvedOrdemId);
 
     await supabase
       .from('financeiro_parcelas')
       .update({ status: 'cancelado' })
-      .eq('ordem_pagamento_id', ordem_id);
+      .eq('ordem_pagamento_id', resolvedOrdemId);
 
     return res.status(200).json({
       message: 'Cobrança cancelada.',

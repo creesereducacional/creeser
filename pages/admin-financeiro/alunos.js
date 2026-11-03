@@ -1058,9 +1058,42 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
   );
 }
 
-function Modal2aVia({ ordem, onClose }) {
+function Modal2aVia({ ordem, onClose, onEmitido }) {
   const [email, setEmail] = useState('');
   const [msg, setMsg] = useState('');
+  const [gerando, setGerando] = useState(false);
+  const [erroGeracao, setErroGeracao] = useState('');
+  const [dadosEmitidos, setDadosEmitidos] = useState(null);
+
+  const boletoFinalUrl = dadosEmitidos?.boleto_url || ordem.boleto_url;
+  const barcodeFinal = dadosEmitidos?.barcode || ordem.boleto_barcode;
+
+  const handleGerarCobranca = async () => {
+    setGerando(true);
+    setErroGeracao('');
+    try {
+      const res = await fetch('/api/admin-financeiro/efi/cobranca', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          parcela_id: ordem.parcela_id || (ordem.financeiro_parcelas && ordem.financeiro_parcelas[0]?.id) || ordem.id,
+          descricao: ordem.referencia || ordem.descricao || 'Cobrança Bancária'
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Erro ao gerar cobrança');
+      setDadosEmitidos(data);
+      if (onEmitido) onEmitido(data);
+      if (data.boleto_url) {
+        window.open(data.boleto_url, '_blank');
+      }
+    } catch (err) {
+      setErroGeracao(err.message);
+    } finally {
+      setGerando(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
@@ -1074,14 +1107,47 @@ function Modal2aVia({ ordem, onClose }) {
           </button>
         </div>
         <div className="px-6 py-5 space-y-4">
-          {ordem.boleto_url ? (
-            <a href={ordem.boleto_url} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-3 w-full px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm font-semibold hover:bg-blue-100 transition">
-              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-              Imprimir / Abrir Boleto
-            </a>
+          {boletoFinalUrl ? (
+            <div className="space-y-3">
+              <a href={boletoFinalUrl} target="_blank" rel="noopener noreferrer"
+                className="flex items-center justify-center gap-3 w-full px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm font-semibold hover:bg-blue-100 transition">
+                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                Imprimir / Abrir Boleto (2ª Via)
+              </a>
+              {barcodeFinal && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-700 space-y-1">
+                  <div className="font-bold text-gray-600">Linha Digitável / Código de Barras:</div>
+                  <div className="font-mono break-all text-[11px] select-all bg-white p-1.5 border rounded">{barcodeFinal}</div>
+                </div>
+              )}
+            </div>
           ) : (
-            <p className="text-xs text-gray-400 italic text-center py-2">Boleto não disponível para esta fatura.</p>
+            <div className="space-y-3 text-center py-2">
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-left text-xs text-amber-800 space-y-1">
+                <div className="font-semibold flex items-center gap-1.5">
+                  <svg className="w-4 h-4 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  Cobrança Bancária Pendente de Emissão
+                </div>
+                <p className="text-amber-700">Esta parcela ainda não possui cobrança registrada no gateway bancário EFI.</p>
+              </div>
+              <button
+                onClick={handleGerarCobranca}
+                disabled={gerando}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition shadow-sm">
+                {gerando ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    Gerando Cobrança na EFI...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                    Gerar Cobrança Bancária (Boleto/PIX)
+                  </>
+                )}
+              </button>
+              {erroGeracao && <p className="text-xs text-red-600 mt-1 text-left">{erroGeracao}</p>}
+            </div>
           )}
           <div className="border-t pt-4">
             <label className="text-xs font-medium text-gray-600 mb-1 block">Enviar por e-mail</label>
@@ -3117,9 +3183,17 @@ export default function AlunosFinanceiroPage() {
                                             <td className="px-4 py-2">
                                               <div className="flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
                                                 {abaAtiva === 'aberto' && (<>
-                                                  <button title="2ª Via da Fatura" onClick={e => { e.stopPropagation(); setModal2aVia(ordem); }}
-                                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition">
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                                                  {/* 2ª Via / Gerar Cobrança */}
+                                                  <button
+                                                    title={ordem.boleto_url ? "Visualizar / Imprimir 2ª Via" : "Gerar Cobrança Bancária (Boleto/PIX)"}
+                                                    onClick={e => { e.stopPropagation(); setModal2aVia({ ...ordem, aluno_id: aluno.id }); }}
+                                                    className={`p-1.5 rounded transition ${ordem.boleto_url ? "text-blue-600 hover:bg-blue-50" : "text-amber-600 hover:bg-amber-50 bg-amber-50/50"}`}
+                                                  >
+                                                    {ordem.boleto_url ? (
+                                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                                                    ) : (
+                                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                                                    )}
                                                   </button>
                                                   {ordem.boleto_url && (
                                                     <button title="Copiar Link do Boleto" onClick={e => { e.stopPropagation(); handleCopyBoletoUrl(ordem.boleto_url); }}
@@ -3127,7 +3201,40 @@ export default function AlunosFinanceiroPage() {
                                                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
                                                     </button>
                                                   )}
-                                                  <button title="Excluir Fatura" onClick={e => { e.stopPropagation(); setModalExcluir({ ordem, aluno }); }}
+                                                  {/* Baixa Manual de Fatura / Parcela */}
+                                                  <button
+                                                    title="Registrar Baixa Manual"
+                                                    onClick={e => {
+                                                      e.stopPropagation();
+                                                      setModalBaixaManual({
+                                                        parcela: {
+                                                          id: ordem.parcela_id || (ordem.financeiro_parcelas && ordem.financeiro_parcelas[0]?.id) || ordem.id,
+                                                          numero_parcela: ordem.numero_parcela || 1,
+                                                          valor: ordem.valor_total,
+                                                          data_vencimento: ordem.data_vencimento
+                                                        },
+                                                        carne: { id: ordem.ordem_id || ordem.id },
+                                                        aluno
+                                                      });
+                                                    }}
+                                                    className="p-1.5 text-green-700 hover:bg-green-50 rounded transition">
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                  </button>
+                                                  {/* Cancelar Fatura ou Parcela de Acordo */}
+                                                  <button
+                                                    title={ordem.is_acordo ? "Cancelar Parcela do Acordo" : "Excluir / Cancelar Fatura"}
+                                                    onClick={e => {
+                                                      e.stopPropagation();
+                                                      if (ordem.is_acordo) {
+                                                        handleCancelarParcelaAluno(
+                                                          { id: ordem.ordem_id || ordem.id },
+                                                          { id: ordem.parcela_id || ordem.id, numero_parcela: ordem.numero_parcela || 1, valor: ordem.valor_total, data_vencimento: ordem.data_vencimento },
+                                                          aluno.id
+                                                        );
+                                                      } else {
+                                                        setModalExcluir({ ordem, aluno });
+                                                      }
+                                                    }}
                                                     className="p-1.5 text-red-500 hover:bg-red-50 rounded transition">
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                                   </button>
@@ -3186,7 +3293,17 @@ export default function AlunosFinanceiroPage() {
         <ModalCarne aluno={modalCarne} onClose={() => setModalCarne(null)} onSalvo={carregarDados} onSuccess={() => router.push('/admin-financeiro/carnes')} />
       )}
       {modal2aVia && (
-        <Modal2aVia ordem={modal2aVia} onClose={() => setModal2aVia(null)} />
+        <Modal2aVia
+          ordem={modal2aVia}
+          onClose={() => setModal2aVia(null)}
+          onEmitido={() => {
+            if (modal2aVia.aluno_id) {
+              setOrdensCache(prev => { const n = { ...prev }; delete n[modal2aVia.aluno_id]; return n; });
+              setCarnesCache(prev => { const n = { ...prev }; delete n[modal2aVia.aluno_id]; return n; });
+              fetchOrdensAluno(modal2aVia.aluno_id, true);
+            }
+          }}
+        />
       )}
       {modalExcluir && (
         <ModalExcluirFatura
