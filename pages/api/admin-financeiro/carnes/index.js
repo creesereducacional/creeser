@@ -70,7 +70,7 @@ export default async function handler(req, res) {
           turmas(id, nome, unidadeid)
         )
       `)
-      .eq('tipo', 'carne')
+      .in('tipo', ['carne', 'acordo'])
       .order('created_at', { ascending: false });
 
     if (!isGroupAdmin) {
@@ -168,7 +168,7 @@ export default async function handler(req, res) {
     const carneIdsFiltrados = carnesFiltrados.map((c) => c.id);
     const { data: todasParcelas, error: parcelasError } = await supabase
       .from('financeiro_parcelas')
-      .select('id, ordem_pagamento_id, numero_parcela, valor, data_vencimento, status, boleto_numero, boleto_url, efi_charge_id, metodo_pagamento, baixado_em, observacao_baixa')
+      .select('id, ordem_pagamento_id, numero_parcela, valor, data_vencimento, status, boleto_numero, boleto_url, boleto_barcode, efi_charge_id, metodo_pagamento, baixado_em, observacao_baixa')
       .in('ordem_pagamento_id', carneIdsFiltrados)
       .order('numero_parcela', { ascending: true });
 

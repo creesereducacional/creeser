@@ -88,7 +88,7 @@ export default async function handler(req, res) {
     // 1. Buscar a parcela
     const { data: parcela, error: parcelaError } = await supabase
       .from('financeiro_parcelas')
-      .select('id, numero_parcela, valor, data_vencimento, status, boleto_url, boleto_barcode, efi_charge_id, ordem_pagamento_id, instituicao_id, aluno_id')
+      .select('id, numero_parcela, valor, data_vencimento, status, boleto_url, boleto_barcode, boleto_numero, efi_charge_id, ordem_pagamento_id, instituicao_id, aluno_id')
       .eq('id', id)
       .maybeSingle();
 
@@ -152,37 +152,75 @@ export default async function handler(req, res) {
     // ── Autorização concluída: efeitos externos e recuperação inteligente ─────
     let finalPaymentUrl = parcela.boleto_url || null;
 
-    // Se a URL do boleto estiver vazia e houver um efi_charge_id, tentamos a recuperação inteligente
-    if (!finalPaymentUrl && parcela.efi_charge_id) {
+    let finalBarcode = parcela.boleto_barcode || null;
+    let finalPixCode = null;
+    let finalPixImage = null;
+
+    // Se houver registro existente em financeiro_boletos, recuperar dados complementares (PIX/Barcode/URL)
+    const { data: boletoExistente } = await supabase
+      .from('financeiro_boletos')
+      .select('boleto_url, boleto_barcode, resposta_json')
+      .eq('parcela_id', parcela.id)
+      .maybeSingle();
+
+    if (boletoExistente) {
+      if (!finalPaymentUrl && boletoExistente.boleto_url) {
+        finalPaymentUrl = boletoExistente.boleto_url;
+      }
+      if (!finalBarcode && boletoExistente.boleto_barcode) {
+        finalBarcode = boletoExistente.boleto_barcode;
+      }
+      const resp = boletoExistente.resposta_json || {};
+      if (resp.pix) {
+        finalPixCode = resp.pix.qrcode || null;
+        finalPixImage = resp.pix.qrcode_image || null;
+      }
+      if (!finalPaymentUrl && (resp.url || resp.parcel_link || resp.pdf?.charge)) {
+        finalPaymentUrl = resp.url || resp.parcel_link || resp.pdf?.charge;
+      }
+      if (!finalBarcode && resp.barcode) {
+        finalBarcode = resp.barcode;
+      }
+    }
+
+    // Se a URL ou dados do boleto estiverem vazios e houver um efi_charge_id, recuperação via API EFI
+    if ((!finalPaymentUrl || !finalBarcode) && parcela.efi_charge_id) {
       console.log(`[RECOVERY REQUEST] Timestamp: ${new Date().toISOString()} | Parcela ID: ${parcela.id} | EFI Charge ID: ${parcela.efi_charge_id}`);
       try {
-        const efi = require('../../../../../lib/efi-client').default;
+        const efi = require('../../../../../lib/efi-client').default || require('../../../../../lib/efi-client');
         const efiData = await efi.getCharge(Number(parcela.efi_charge_id));
         
-        // A EFI retorna dados da transação. Buscamos o link/pdf do boleto.
+        // A EFI retorna dados da transação. Buscamos link/pdf/pix/barcode
         const billet = efiData?.data?.payment || efiData?.data || {};
-        const recoveredUrl = billet.link || billet.pdf?.charge || billet.billet_link || null;
+        const recoveredUrl = billet.link || billet.url || billet.pdf?.charge || billet.billet_link || billet.parcel_link || null;
         const barcode = billet.barcode || billet.identifications?.barcode || null;
+        if (billet.pix) {
+          finalPixCode = billet.pix.qrcode || null;
+          finalPixImage = billet.pix.qrcode_image || null;
+        }
+
+        if (barcode && !finalBarcode) {
+          finalBarcode = barcode;
+        }
 
         if (recoveredUrl) {
           finalPaymentUrl = recoveredUrl;
           
-          // Atualiza automaticamente o campo boleto_url na tabela financeiro_parcelas
           await supabase
             .from('financeiro_parcelas')
             .update({ 
               boleto_url: recoveredUrl,
-              boleto_barcode: barcode || parcela.boleto_barcode
+              boleto_barcode: finalBarcode
             })
             .eq('id', parcela.id);
 
-          // Atualiza também a tabela financeiro_boletos
           await supabase
             .from('financeiro_boletos')
             .update({ 
               boleto_url: recoveredUrl,
-              boleto_numero: barcode,
-              boleto_barcode: barcode
+              boleto_numero: finalBarcode,
+              boleto_barcode: finalBarcode,
+              resposta_json: billet
             })
             .eq('parcela_id', parcela.id);
 
@@ -232,7 +270,12 @@ export default async function handler(req, res) {
       numero_parcela: parcela.numero_parcela,
       valor: parcela.valor,
       data_vencimento: parcela.data_vencimento,
-      payment_url: finalPaymentUrl
+      payment_url: finalPaymentUrl,
+      barcode: finalBarcode,
+      pix_code: finalPixCode,
+      pix_image: finalPixImage,
+      efi_charge_id: parcela.efi_charge_id || null,
+      tem_cobranca: Boolean(finalPaymentUrl || parcela.efi_charge_id || finalBarcode)
     });
 
   } catch (error) {

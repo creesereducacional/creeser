@@ -15,7 +15,9 @@ import {
   validarObservacaoOperador,
   encerrarCobrancasOriginais,
   registrarNegociacao,
+  emitirCobrancasSaldoAcordo,
 } from '../../../../lib/negociacoes-service';
+import { emitirBoletoEfi } from '../../../../lib/efi/EfiBillingService';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -110,7 +112,7 @@ export default async function handler(req, res) {
     // ── 2. Carregar aluno e validar escopo ─────────────────────────────────────
     let alunoQuery = supabase
       .from('alunos')
-      .select('id, nome, cpf, instituicao_id, turmaid')
+      .select('id, nome, cpf, email, data_nascimento, telefone_celular, instituicao_id, turmaid')
       .eq('id', Number(aluno_id));
     if (!isGroupAdmin) {
       alunoQuery = applyInstituicaoFilter(alunoQuery, userInstituicaoId);
@@ -338,11 +340,25 @@ export default async function handler(req, res) {
       }
     }
 
-    // ── 7. Encerramento das Cobranças Originais (Regra de Negócio 4 e 5) ────────
+    // ── 7. Encerramento das Cobranças Originais e Emissão Automática EFI ───────
     // Com entrada paga em espécie OU Sem entrada (com confirmação do operador):
     // Inicia imediatamente o cancelamento no CREESER e a baixa bancária na EFI.
     let resultadoCancelamento = { sucesso: true, parcelasCanceladas: [], resultadosEfi: [], pendenteEfi: false };
     let statusNegociacao = 'concluido';
+    let resultadoEmissaoSaldo = { sucesso: true, totalEmitidas: 0, totalFalhas: 0, parcelasEmitidas: [] };
+    let resultadoEmissaoEntrada = null;
+
+    // Buscar configurações financeiras da instituição para emissão da entrada ou saldo
+    const { data: configEmpresa } = await supabase
+      .from('configuracoes_empresa')
+      .select('financeiro')
+      .eq('instituicao_id', aluno.instituicao_id || instituicaoFinal)
+      .maybeSingle();
+    const configFinanceiro = configEmpresa?.financeiro || {};
+
+    const notificationUrl =
+      process.env.EFI_WEBHOOK_URL ||
+      `${process.env.NEXT_PUBLIC_URL}/api/admin-financeiro/efi/webhook`;
 
     const deveCancelarOriginaisAgora = (!temEntrada) || (temEntrada && modoEntrada === 'especie');
 
@@ -360,9 +376,54 @@ export default async function handler(req, res) {
       if (resultadoCancelamento.pendenteEfi) {
         statusNegociacao = 'sync_pendente';
       }
+
+      // Emissão AUTOMÁTICA das parcelas de saldo na EFI
+      // Condição: cancelamento das originais executado e não pendente de falha crítica
+      if (saldoRestante > 0) {
+        resultadoEmissaoSaldo = await emitirCobrancasSaldoAcordo({
+          supabase,
+          ordemId: ordem.id,
+          aluno,
+          instituicaoId: aluno.instituicao_id || instituicaoFinal,
+          operadorEmail: authUser.email || 'operador'
+        });
+
+        if (resultadoEmissaoSaldo.totalFalhas > 0) {
+          statusNegociacao = 'sync_pendente';
+        }
+      }
     } else {
-      // Com entrada digital via EFI: aguarda quitação da entrada
+      // Com entrada digital via EFI: emite AUTOMATICAMENTE a cobrança da entrada no banco EFI
       statusNegociacao = 'pendente_entrada';
+
+      if (entradaParcelaCriada) {
+        try {
+          const descEntrada = `Entrada Acordo #${String(ordem.id).slice(0, 8)} - ${aluno.nome}`;
+          const emissaoEntrada = await emitirBoletoEfi({
+            parcela: { ...entradaParcelaCriada, ordem_pagamento_id: ordem.id },
+            aluno,
+            descricao: descEntrada,
+            configFinanceiro,
+            supabase,
+            instituicaoId: aluno.instituicao_id || instituicaoFinal,
+            notificationUrl
+          });
+
+          resultadoEmissaoEntrada = {
+            sucesso: true,
+            charge_id: emissaoEntrada.charge_id,
+            boleto_url: emissaoEntrada.boleto_url,
+            barcode: emissaoEntrada.barcode
+          };
+        } catch (errEntrada) {
+          console.error('[ACORDOS CREATE] Falha ao emitir cobrança da entrada na EFI:', errEntrada.message);
+          resultadoEmissaoEntrada = {
+            sucesso: false,
+            erro: errEntrada.message || 'Falha ao emitir boleto da entrada na EFI'
+          };
+          statusNegociacao = 'sync_pendente';
+        }
+      }
     }
 
     // Snapshot das parcelas originais para o histórico
@@ -469,14 +530,23 @@ export default async function handler(req, res) {
       });
     } catch (_) {}
 
+    // ── 9. Buscar lista atualizada de parcelas do acordo com boletos/links ───
+    const { data: parcelasAtualizadas } = await supabase
+      .from('financeiro_parcelas')
+      .select('id, ordem_pagamento_id, numero_parcela, valor, data_vencimento, status, efi_charge_id, boleto_url, boleto_barcode')
+      .eq('ordem_pagamento_id', ordem.id)
+      .order('numero_parcela', { ascending: true });
+
     return res.status(201).json({
       sucesso: true,
       message: 'Acordo financeiro registrado com sucesso.',
       ordem,
-      parcelas: parcelasCriadas,
+      parcelas: parcelasAtualizadas || parcelasCriadas,
       status_negociacao: statusNegociacao,
       entrada_parcela: entradaParcelaCriada,
-      pendente_efi: resultadoCancelamento.pendenteEfi,
+      emissao_entrada: resultadoEmissaoEntrada,
+      emissao_saldo: resultadoEmissaoSaldo,
+      pendente_efi: resultadoCancelamento.pendenteEfi || (resultadoEmissaoSaldo.totalFalhas > 0),
       resultados_cancelamento: resultadoCancelamento
     });
 

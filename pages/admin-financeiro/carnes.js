@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import AdminFinanceiroLayout from '@/components/AdminFinanceiro/Layout';
 import ModalBaixaManual from '@/components/AdminFinanceiro/ModalBaixaManual';
+import ModalVisualizarCobranca from '@/components/AdminFinanceiro/ModalVisualizarCobranca';
 import BarraFiltros from '@/components/AdminFinanceiro/BarraFiltros';
 import { FinanceEngine } from '../../lib/financeiro/FinanceEngine';
 
@@ -27,6 +28,8 @@ export default function CarnesPage() {
   const [modalBaixaManual, setModalBaixaManual] = useState(null); // { parcela, carne }
   const [baixandoParcela, setBaixandoParcela] = useState(false);
   const [modalWhatsapp, setModalWhatsapp] = useState(null);
+  const [modalCobranca, setModalCobranca] = useState(null); // { parcela, carne, alunoNome, paymentUrl, barcode, pixCode, pixImage, podeEmitir }
+  const [gerandoCobrancaId, setGerandoCobrancaId] = useState(null);
 
   const toggleParcela = (carneId, parcelaId) => {
     setSelectedParcelas(prev => {
@@ -761,6 +764,16 @@ export default function CarnesPage() {
           onConfirm={handleBaixarManual}
           onClose={() => setModalBaixaManual(null)}
           loading={baixandoParcela}
+        />
+      )}
+      {modalCobranca && (
+        <ModalVisualizarCobranca
+          cobranca={modalCobranca}
+          onClose={() => setModalCobranca(null)}
+          onGerarCobranca={handleGerarCobrancaModal}
+          gerando={gerandoCobrancaId === modalCobranca.parcela?.id}
+          formatData={formataData}
+          formatValor={formataValor}
         />
       )}
       {modalWhatsapp && (

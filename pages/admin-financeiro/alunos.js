@@ -413,38 +413,15 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
         const resBody = await res.json();
         if (!res.ok) throw new Error(resBody.message || 'Erro ao criar acordo');
 
-        // Se houver entrada digital via EFI, emite a cobrança bancária
-        if (temEntrada && form.tipo_entrada === 'efi' && resBody.entrada_parcela?.id) {
-          setSucesso('⏳ Emitindo cobrança da entrada no banco EFI...');
-          try {
-            const efiRes = await fetch('/api/admin-financeiro/efi/cobranca', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                parcela_id: resBody.entrada_parcela.id,
-                descricao: `Entrada Acordo - ${obsTexto.slice(0, 50)}`
-              }),
-            });
-            if (!efiRes.ok) {
-              const efiBody = await efiRes.json();
-              setSucesso('⚠️ Acordo formalizado. Falha ao gerar boleto da entrada na EFI: ' + (efiBody.message || 'erro EFI'));
-              setTimeout(() => { onSalvo(); onSuccess(); onClose(); }, 3000);
-              return;
-            }
-          } catch (efiErr) {
-            setSucesso('⚠️ Acordo formalizado. Falha de conexão com EFI para a entrada.');
-            setTimeout(() => { onSalvo(); onSuccess(); onClose(); }, 3000);
-            return;
-          }
-        }
-
         if (resBody.pendente_efi) {
-          setSucesso('✅ Acordo formalizado! Atenção: Uma ou mais baixas na EFI ficaram pendentes e foram registradas no histórico.');
+          setSucesso('⚠️ Acordo formalizado com ressalvas! Uma ou mais emissões/baixas bancárias na EFI ficaram pendentes e foram registradas no histórico.');
+        } else if (temEntrada && form.tipo_entrada === 'efi') {
+          setSucesso('✅ Acordo formalizado! Cobrança da entrada emitida na EFI. O saldo será emitido após a confirmação do pagamento da entrada.');
         } else {
-          setSucesso('✅ Acordo financeiro formalizado e registrado com sucesso!');
+          setSucesso(`✅ Acordo formalizado com sucesso! ${resBody.emissao_saldo?.totalEmitidas || 0} cobranças emitidas automaticamente na EFI.`);
         }
 
-        setTimeout(() => { onSalvo(); onSuccess(); onClose(); }, 1200);
+        setTimeout(() => { onSalvo(); onSuccess(); onClose(); }, 1500);
       } catch (err) { setErro(err.message); } finally { setSalvando(false); }
 
     } else {
