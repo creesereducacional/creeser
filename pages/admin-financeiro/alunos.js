@@ -1035,6 +1035,25 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
   );
 }
 
+// Funções utilitárias seguras para exibição e formatação
+function formatarDataSegura(data) {
+  if (!data) return '—';
+  try {
+    const raw = String(data).split('T')[0];
+    const [ano, mes, dia] = raw.split('-');
+    if (!ano || !mes || !dia) return String(data);
+    return `${dia}/${mes}/${ano}`;
+  } catch {
+    return String(data);
+  }
+}
+
+function formatarValorSeguro(valor) {
+  const num = Number(valor || 0);
+  if (isNaN(num)) return 'R$ 0,00';
+  return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
 function Modal2aVia({ ordem, onClose, onEmitido }) {
   const [email, setEmail] = useState('');
   const [msg, setMsg] = useState('');
@@ -1106,11 +1125,11 @@ function Modal2aVia({ ordem, onClose, onEmitido }) {
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs text-gray-700">
             <div>
               <span className="text-gray-400 block font-medium">Vencimento</span>
-              <span className="font-semibold text-gray-900">{ordem.data_vencimento ? formataData(ordem.data_vencimento) : '—'}</span>
+              <span className="font-semibold text-gray-900">{formatarDataSegura(ordem.data_vencimento)}</span>
             </div>
             <div>
               <span className="text-gray-400 block font-medium">Valor</span>
-              <span className="font-bold text-emerald-700 text-sm">{formataValor(ordem.valor_total || ordem.valor)}</span>
+              <span className="font-bold text-emerald-700 text-sm">{formatarValorSeguro(ordem.valor_total || ordem.valor)}</span>
             </div>
             <div>
               <span className="text-gray-400 block font-medium">Situação</span>
@@ -1710,11 +1729,30 @@ function ModalHistoricoNegociacoes({ aluno, onClose }) {
                       Ordem: #{String(negociacaoSelecionada.ordem_id || negociacaoSelecionada.id).slice(0, 8)} · Operador: {negociacaoSelecionada.operador_email || 'financeiro'} · {new Date(negociacaoSelecionada.created_at).toLocaleString('pt-BR')}
                     </p>
                   </div>
-                  <button onClick={() => imprimirResumo(negociacaoSelecionada)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700 transition">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                    Imprimir Termo
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {negociacaoSelecionada.efi_carnet_id && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            const res = await fetch(`/api/admin-financeiro/efi/carne?ordem_id=${negociacaoSelecionada.ordem_id || negociacaoSelecionada.id}`);
+                            const data = await res.json();
+                            if (data.link) window.open(data.link, '_blank');
+                            else alert('Link do carnê não disponível na EFI.');
+                          } catch (e) { alert('Erro ao abrir carnê: ' + e.message); }
+                        }}
+                        title="Visualizar Carnê Completo da EFI (Todas as Parcelas)"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition shadow-sm"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        Abrir Carnê Completo (PDF)
+                      </button>
+                    )}
+                    <button onClick={() => imprimirResumo(negociacaoSelecionada)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700 transition">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                      Imprimir Termo
+                    </button>
+                  </div>
                 </div>
 
                 {/* Banner de Bloqueio por Risco de Duplicidade */}

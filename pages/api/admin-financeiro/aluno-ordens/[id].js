@@ -221,14 +221,24 @@ export default async function handler(req, res) {
     // Mapear parcelas individuais dos Acordos Financeiros no fluxo normal de faturas
     (acordosData || []).forEach(acordo => {
       const parcelas = (acordo.financeiro_parcelas || []).sort((a, b) => a.numero_parcela - b.numero_parcela);
+      const maxParcelaNum = parcelas.reduce((max, p) => Math.max(max, Number(p.numero_parcela) || 0), 0);
+      const totalParcelasAcordo = Math.max(
+        parcelas.length,
+        Number(acordo.quantidade_parcelas) || 0,
+        maxParcelaNum
+      );
+
       parcelas.forEach(p => {
+        const numP = Number(p.numero_parcela) || 1;
+        const refTexto = `Acordo #${String(acordo.id).slice(0, 8)} - Parc. ${numP}/${totalParcelasAcordo || parcelas.length}`;
+
         resultado.push({
           id: p.id,
           ordem_id: acordo.id,
           tipo: 'acordo',
           is_acordo: true,
           descricao: `Acordo Financeiro #${String(acordo.id).slice(0, 8)}`,
-          referencia: `Acordo #${String(acordo.id).slice(0, 8)} - Parc. ${p.numero_parcela}/${acordo.quantidade_parcelas || parcelas.length}`,
+          referencia: refTexto,
           valor_total: p.valor,
           numero_parcela: p.numero_parcela,
           data_vencimento: p.data_vencimento || null,

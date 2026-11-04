@@ -186,7 +186,7 @@ async function criarCarne(req, res) {
     }
     // ──────────────────────────────────────────────────────────────────────────
 
-    if (ordemSelecionada.tipo !== 'carne') {
+    if (ordemSelecionada.tipo !== 'carne' && ordemSelecionada.tipo !== 'acordo') {
       return res.status(422).json({ message: 'Use /efi/cobranca para ordens simples.' });
     }
 
@@ -592,7 +592,7 @@ async function cancelarCarne(req, res) {
       return res.status(422).json({ message: 'Ordem já está cancelada.' });
     }
 
-    if (ordem.tipo !== 'carne') {
+    if (ordem.tipo !== 'carne' && ordem.tipo !== 'acordo') {
       return res.status(422).json({ message: 'Use /efi/cobranca para cancelar ordens simples.' });
     }
 

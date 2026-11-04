@@ -94,6 +94,8 @@ export default async function handler(req, res) {
           valor_desconto,
           quantidade_parcelas,
           status,
+          efi_carnet_id,
+          efi_status,
           observacoes,
           parcelas_origem_acordo,
           entrada_parcela_id,
@@ -270,6 +272,7 @@ export default async function handler(req, res) {
 
       return {
         ...neg,
+        efi_carnet_id: neg.efi_carnet_id || ordensAcordo?.find(o => o.id === neg.ordem_id)?.efi_carnet_id || null,
         parcelas_geradas: parcelasGeradas,
         tem_cancelamento_pendente: temCancelamentoPendente,
         bloqueio_duplicidade: temCancelamentoPendente,

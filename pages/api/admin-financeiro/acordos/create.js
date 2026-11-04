@@ -248,7 +248,7 @@ export default async function handler(req, res) {
         referencia: 'Acordo Financeiro',
         valor_total: totalNegociado,
         valor_desconto: descontoNum,
-        quantidade_parcelas: temEntrada && modoEntrada === 'efi' ? qtdParcelasNum + 1 : qtdParcelasNum,
+        quantidade_parcelas: temEntrada ? qtdParcelasNum + 1 : qtdParcelasNum,
         observacoes: obsOperadorLimpa,
         status: 'ativo',
         parcelas_origem_acordo: parcelas_originais,
