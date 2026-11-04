@@ -113,8 +113,8 @@ async function criarCobranca(req, res) {
     let parcelaQuery = supabase
       .from('financeiro_parcelas')
       .select(`
-        id, ordem_pagamento_id, numero_parcela, valor, valor_nominal, valor_desconto, valor_final, data_limite_desconto, data_vencimento, status,
-        ordem:financeiro_ordens_pagamento!inner ( id, tipo, efi_charge_id, instituicao_id ),
+        id, ordem_pagamento_id, numero_parcela, valor, valor_nominal, valor_desconto, valor_final, data_limite_desconto, data_vencimento, status, efi_charge_id, boleto_url, boleto_barcode,
+        ordem:financeiro_ordens_pagamento!ordem_pagamento_id ( id, tipo, efi_charge_id, instituicao_id, descricao ),
         aluno:alunos!inner ( id, nome, cpf, email, data_nascimento, telefone_celular, turmaid, instituicao_id )
       `)
       .eq('id', parcela_id);
@@ -165,15 +165,22 @@ async function criarCobranca(req, res) {
     if (parcela.efi_charge_id) {
       const { data: bolExistente } = await supabase
         .from('financeiro_boletos')
-        .select('boleto_id_gateway, boleto_url, boleto_barcode')
+        .select('boleto_id_gateway, boleto_url, boleto_barcode, resposta_json')
         .eq('parcela_id', parcela.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
+
+      const respJson = bolExistente?.resposta_json || {};
+      const pixObj = respJson.pix || {};
 
       return res.status(200).json({
         message: 'Cobrança bancária já existente recuperada com sucesso.',
         charge_id: parcela.efi_charge_id,
-        boleto_url: parcela.boleto_url || bolExistente?.boleto_url || null,
-        barcode: parcela.boleto_barcode || bolExistente?.boleto_barcode || null,
+        boleto_url: parcela.boleto_url || bolExistente?.boleto_url || respJson.url || null,
+        barcode: parcela.boleto_barcode || bolExistente?.boleto_barcode || respJson.barcode || null,
+        pix_code: pixObj.qrcode || null,
+        pix_image: pixObj.qrcode_image || null,
         vencimento: parcela.data_vencimento,
         ja_existia: true
       });
@@ -253,11 +260,31 @@ async function criarCobranca(req, res) {
       } catch (_) {}
     }
 
+    // 4. Buscar boleto gerado para extrair possíveis dados PIX
+    let pixCode = null;
+    let pixImage = null;
+    try {
+      const { data: bolGerado } = await supabase
+        .from('financeiro_boletos')
+        .select('resposta_json')
+        .eq('parcela_id', parcela.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const respJson = bolGerado?.resposta_json || {};
+      const pixObj = respJson.pix || {};
+      pixCode = pixObj.qrcode || null;
+      pixImage = pixObj.qrcode_image || null;
+    } catch (_) {}
+
     return res.status(201).json({
       message: 'Boleto criado com sucesso.',
       charge_id: resultado.charge_id,
       boleto_url: resultado.boleto_url,
       barcode: resultado.barcode,
+      pix_code: pixCode,
+      pix_image: pixImage,
       vencimento: parcela.data_vencimento,
     });
   } catch (err) {

@@ -1044,6 +1044,20 @@ function Modal2aVia({ ordem, onClose, onEmitido }) {
 
   const boletoFinalUrl = dadosEmitidos?.boleto_url || ordem.boleto_url;
   const barcodeFinal = dadosEmitidos?.barcode || ordem.boleto_barcode;
+  const pixFinalCode = dadosEmitidos?.pix_code || ordem.pix_code;
+  const pixFinalImage = dadosEmitidos?.pix_image || ordem.pix_image;
+  const [copiadoTipo, setCopiadoTipo] = useState('');
+
+  const handleCopiarTexto = async (texto, tipo) => {
+    if (!texto) return;
+    try {
+      await navigator.clipboard.writeText(texto);
+      setCopiadoTipo(tipo);
+      setTimeout(() => setCopiadoTipo(''), 2500);
+    } catch (e) {
+      alert(`${tipo}: ${texto}`);
+    }
+  };
 
   const handleGerarCobranca = async () => {
     setGerando(true);
@@ -1072,75 +1086,144 @@ function Modal2aVia({ ordem, onClose, onEmitido }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
           <div>
-            <h3 className="text-lg font-bold text-blue-700">2ª Via da Fatura</h3>
-            <p className="text-sm text-gray-500">{ordem.descricao}</p>
+            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+              2ª Via da Fatura {ordem.numero_parcela ? `(Parc. #${ordem.numero_parcela})` : ''}
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">{ordem.referencia || ordem.descricao}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 hover:bg-white/80 transition">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
-        <div className="px-6 py-5 space-y-4">
-          {boletoFinalUrl ? (
-            <div className="space-y-3">
-              <a href={boletoFinalUrl} target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-center gap-3 w-full px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm font-semibold hover:bg-blue-100 transition">
-                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                Imprimir / Abrir Boleto (2ª Via)
-              </a>
+
+        <div className="p-6 overflow-y-auto space-y-4">
+          {/* Card Resumo da Fatura */}
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs text-gray-700">
+            <div>
+              <span className="text-gray-400 block font-medium">Vencimento</span>
+              <span className="font-semibold text-gray-900">{ordem.data_vencimento ? formataData(ordem.data_vencimento) : '—'}</span>
+            </div>
+            <div>
+              <span className="text-gray-400 block font-medium">Valor</span>
+              <span className="font-bold text-emerald-700 text-sm">{formataValor(ordem.valor_total || ordem.valor)}</span>
+            </div>
+            <div>
+              <span className="text-gray-400 block font-medium">Situação</span>
+              <span className="font-semibold text-gray-900 capitalize">{ordem.status_parcela || ordem.status || 'Pendente'}</span>
+            </div>
+          </div>
+
+          {boletoFinalUrl || barcodeFinal || pixFinalCode ? (
+            <div className="space-y-4">
+              {boletoFinalUrl && (
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <a href={boletoFinalUrl} target="_blank" rel="noopener noreferrer"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition shadow-sm">
+                    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                    Imprimir / Abrir Boleto (2ª Via)
+                  </a>
+                  <button
+                    onClick={() => handleCopiarTexto(boletoFinalUrl, 'Link')}
+                    className="flex items-center justify-center gap-1.5 px-4 py-2.5 border border-blue-200 bg-blue-50 text-blue-700 rounded-xl text-xs font-semibold hover:bg-blue-100 transition cursor-pointer"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                    {copiadoTipo === 'Link' ? 'Copiado!' : 'Copiar Link'}
+                  </button>
+                </div>
+              )}
+
               {barcodeFinal && (
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-700 space-y-1">
-                  <div className="font-bold text-gray-600">Linha Digitável / Código de Barras:</div>
-                  <div className="font-mono break-all text-[11px] select-all bg-white p-1.5 border rounded">{barcodeFinal}</div>
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">Linha Digitável / Código de Barras</span>
+                    <button
+                      onClick={() => handleCopiarTexto(barcodeFinal, 'Código de Barras')}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+                    >
+                      {copiadoTipo === 'Código de Barras' ? '✓ Copiado' : 'Copiar código'}
+                    </button>
+                  </div>
+                  <div className="p-2 bg-white border rounded font-mono text-[11px] text-gray-800 break-all select-all">
+                    {barcodeFinal}
+                  </div>
+                </div>
+              )}
+
+              {pixFinalCode && (
+                <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      PIX Dinâmico Integrado
+                    </span>
+                    <button
+                      onClick={() => handleCopiarTexto(pixFinalCode, 'Código PIX')}
+                      className="text-xs font-semibold text-emerald-700 hover:text-emerald-900 flex items-center gap-1 cursor-pointer"
+                    >
+                      {copiadoTipo === 'Código PIX' ? '✓ Copiado' : 'Copiar chave PIX'}
+                    </button>
+                  </div>
+                  {pixFinalImage && (
+                    <div className="flex justify-center py-1">
+                      <img src={pixFinalImage} alt="QR Code PIX" className="w-36 h-36 border border-emerald-200 bg-white p-1 rounded-lg shadow-sm" />
+                    </div>
+                  )}
+                  <div className="p-2 bg-white border border-emerald-200 rounded font-mono text-[10px] text-gray-800 break-all select-all max-h-20 overflow-y-auto">
+                    {pixFinalCode}
+                  </div>
                 </div>
               )}
             </div>
           ) : (
             <div className="space-y-3 text-center py-2">
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-left text-xs text-amber-800 space-y-1">
-                <div className="font-semibold flex items-center gap-1.5">
-                  <svg className="w-4 h-4 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-left text-xs text-amber-800 space-y-1.5">
+                <div className="font-bold flex items-center gap-2 text-amber-900 text-sm">
+                  <svg className="w-5 h-5 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.07 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
                   Cobrança Bancária Pendente de Emissão
                 </div>
-                <p className="text-amber-700">Esta parcela ainda não possui cobrança registrada no gateway bancário EFI.</p>
+                <p className="text-amber-700 leading-relaxed">Esta parcela ainda não possui cobrança registrada no gateway bancário EFI Bank. Clique abaixo para gerar a cobrança oficial.</p>
               </div>
               <button
                 onClick={handleGerarCobranca}
                 disabled={gerando}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition shadow-sm">
+                className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 active:scale-[0.99] disabled:opacity-50 transition shadow-sm cursor-pointer">
                 {gerando ? (
                   <>
-                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    Gerando Cobrança na EFI...
+                    <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    Gerando Cobrança na EFI Bank...
                   </>
                 ) : (
                   <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-                    Gerar Cobrança Bancária (Boleto/PIX)
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                    Gerar Cobrança Bancária (Boleto / PIX)
                   </>
                 )}
               </button>
               {erroGeracao && <p className="text-xs text-red-600 mt-1 text-left">{erroGeracao}</p>}
             </div>
           )}
+
           <div className="border-t pt-4">
             <label className="text-xs font-medium text-gray-600 mb-1 block">Enviar por e-mail</label>
             <div className="flex gap-2">
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@exemplo.com"
-                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-400" />
+                className="flex-1 px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:border-blue-400" />
               <button disabled={!email} onClick={() => setMsg('Funcionalidade em breve.')}
-                className="px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition">
+                className="px-4 py-2 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition">
                 Enviar
               </button>
             </div>
             {msg && <p className="text-xs text-emerald-600 mt-1">{msg}</p>}
           </div>
         </div>
-        <div className="flex justify-end px-6 py-4 border-t bg-gray-50 rounded-b-xl">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100">Fechar</button>
+
+        <div className="flex justify-end px-6 py-3.5 border-t bg-gray-50">
+          <button onClick={onClose} className="px-4 py-2 text-xs font-semibold text-gray-650 border border-gray-300 rounded-xl hover:bg-gray-100 transition">Fechar</button>
         </div>
       </div>
     </div>

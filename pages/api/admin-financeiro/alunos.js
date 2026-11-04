@@ -405,7 +405,7 @@ export default async function handler(req, res) {
     const hoje = new Date().toISOString().split('T')[0];
     let parcelasQuery = supabase
       .from('financeiro_parcelas')
-      .select('valor, status, data_vencimento, financeiro_ordens_pagamento!inner(aluno_id)');
+      .select('valor, status, data_vencimento, financeiro_ordens_pagamento!ordem_pagamento_id(aluno_id)');
 
     parcelasQuery = applyInstituicaoFilter(parcelasQuery, effectiveInstituicaoId);
     const { data: parcelas } = await parcelasQuery;
