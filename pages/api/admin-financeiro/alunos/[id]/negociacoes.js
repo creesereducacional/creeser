@@ -167,33 +167,49 @@ export default async function handler(req, res) {
       }
     }
 
-    // 4. Enriquecer negociações com parcelas em tempo real da tabela financeiro_parcelas
-    const ordensIds = negociacoes.map(n => n.ordem_id).filter(Boolean);
+    // 4. Enriquecer negociações com parcelas em tempo real da tabela financeiro_parcelas e dados da ordem
+    const ordensIds = Array.from(new Set(negociacoes.map(n => n.ordem_id).filter(Boolean)));
     let parcelasReaisPorOrdem = {};
+    let ordensMap = {};
 
     if (ordensIds.length > 0) {
-      const { data: todasParcelas } = await supabase
-        .from('financeiro_parcelas')
-        .select(`
-          id,
-          ordem_pagamento_id,
-          numero_parcela,
-          valor,
-          valor_nominal,
-          valor_pago,
-          data_vencimento,
-          data_pagamento,
-          status,
-          metodo_pagamento,
-          boleto_numero,
-          boleto_url,
-          boleto_barcode,
-          efi_charge_id,
-          observacoes,
-          observacao_baixa
-        `)
-        .in('ordem_pagamento_id', ordensIds)
-        .order('numero_parcela', { ascending: true });
+      const [
+        { data: todasParcelas },
+        { data: ordensInfo }
+      ] = await Promise.all([
+        supabase
+          .from('financeiro_parcelas')
+          .select(`
+            id,
+            ordem_pagamento_id,
+            numero_parcela,
+            valor,
+            valor_nominal,
+            valor_pago,
+            data_vencimento,
+            data_pagamento,
+            status,
+            metodo_pagamento,
+            boleto_numero,
+            boleto_url,
+            boleto_barcode,
+            efi_charge_id,
+            observacoes,
+            observacao_baixa
+          `)
+          .in('ordem_pagamento_id', ordensIds)
+          .order('numero_parcela', { ascending: true }),
+        supabase
+          .from('financeiro_ordens_pagamento')
+          .select('id, efi_carnet_id, status, descricao, referencia')
+          .in('id', ordensIds)
+      ]);
+
+      if (Array.isArray(ordensInfo)) {
+        ordensInfo.forEach(o => {
+          ordensMap[o.id] = o;
+        });
+      }
 
       if (Array.isArray(todasParcelas)) {
         todasParcelas.forEach(p => {
@@ -207,6 +223,7 @@ export default async function handler(req, res) {
 
     const negociacoesEnriquecidas = negociacoes.map(neg => {
       const parcelasReais = parcelasReaisPorOrdem[neg.ordem_id] || [];
+      const ordemRelacionada = ordensMap[neg.ordem_id] || {};
       
       // Avaliar pendências de cancelamento bancário nas parcelas originais
       const syncList = Array.isArray(neg.sincronizacao_efi) ? neg.sincronizacao_efi : [];
@@ -272,7 +289,7 @@ export default async function handler(req, res) {
 
       return {
         ...neg,
-        efi_carnet_id: neg.efi_carnet_id || ordensAcordo?.find(o => o.id === neg.ordem_id)?.efi_carnet_id || null,
+        efi_carnet_id: neg.efi_carnet_id || ordemRelacionada.efi_carnet_id || null,
         parcelas_geradas: parcelasGeradas,
         tem_cancelamento_pendente: temCancelamentoPendente,
         bloqueio_duplicidade: temCancelamentoPendente,

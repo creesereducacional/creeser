@@ -264,45 +264,50 @@ function ModalOrdem({ aluno, onClose, onSalvo, onSuccess }) {
         .then(res => res.json())
         .then(data => {
           // Extrair parcelas não pagas e não canceladas das ordens e dos carnês
-          const parcelasOriginais = [];
+          // Usando Map para garantir idempotência estrita (id único) e evitar linhas repetidas
+          const parcelasMap = new Map();
 
-          // Das ordens simples
+          // Das ordens simples (e acordos individuais retornados em ordens)
           (data.ordens || []).forEach(o => {
-            // Em aluno-ordens/[id].js, as ordens vêm agregadas com dados da parcela
-            // e os detalhes completos vêm no array financeiro_parcelas
             const parcList = o.financeiro_parcelas || [];
             parcList.forEach(p => {
-              if (p.status !== 'pago' && p.status !== 'cancelado') {
-                parcelasOriginais.push({
-                  id: p.id,
-                  descricao: o.descricao || 'Fatura',
-                  referencia: o.referencia || 'Ordem Simples',
-                  data_vencimento: p.data_vencimento,
-                  valor: Number(p.valor) || 0,
-                  numero_parcela: p.numero_parcela,
-                  cobranca: p.boleto_numero || p.efi_charge_id || o.efi_charge_id
-                });
+              if (p && p.id && p.status !== 'pago' && p.status !== 'cancelado') {
+                if (!parcelasMap.has(p.id)) {
+                  parcelasMap.set(p.id, {
+                    id: p.id,
+                    descricao: o.descricao || 'Fatura',
+                    referencia: o.referencia || 'Ordem Simples',
+                    data_vencimento: p.data_vencimento,
+                    valor: Number(p.valor) || 0,
+                    numero_parcela: p.numero_parcela,
+                    cobranca: p.boleto_numero || p.efi_charge_id || o.efi_charge_id
+                  });
+                }
               }
             });
           });
 
-          // Dos carnês
+          // Dos carnês e acordos agrupados
           (data.carnes || []).forEach(c => {
             const parcList = c.parcelas || [];
             parcList.forEach(p => {
-              if (p.status !== 'pago' && p.status !== 'cancelado') {
-                parcelasOriginais.push({
-                  id: p.id,
-                  descricao: c.descricao || 'Carnê',
-                  referencia: c.referencia || 'Carnê',
-                  data_vencimento: p.data_vencimento,
-                  valor: Number(p.valor) || 0,
-                  numero_parcela: p.numero_parcela,
-                  cobranca: p.boleto_numero || p.efi_charge_id
-                });
+              if (p && p.id && p.status !== 'pago' && p.status !== 'cancelado') {
+                if (!parcelasMap.has(p.id)) {
+                  parcelasMap.set(p.id, {
+                    id: p.id,
+                    descricao: c.descricao || 'Carnê',
+                    referencia: c.referencia || 'Carnê',
+                    data_vencimento: p.data_vencimento,
+                    valor: Number(p.valor) || 0,
+                    numero_parcela: p.numero_parcela,
+                    cobranca: p.boleto_numero || p.efi_charge_id
+                  });
+                }
               }
             });
           });
+
+          const parcelasOriginais = Array.from(parcelasMap.values());
 
           // Ordenar por data de vencimento
           parcelasOriginais.sort((a, b) => new Date(a.data_vencimento) - new Date(b.data_vencimento));
