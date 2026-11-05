@@ -9,6 +9,14 @@ import {
 } from './_shared';
 import { hasPerfil, requireAuth, requirePerfil } from '../../../lib/auth-server';
 
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+  },
+};
+
 const fetchContrato = async (id) => {
   const { data, error } = await supabase
     .from('contratos_instituicao')

@@ -1,3 +1,28 @@
+
+export const sanitizarHtmlContrato = (html) => {
+  if (!html || typeof html !== 'string') return '';
+
+  let cleaned = html;
+
+  // 1. Remover spans id="docs-internal-guid-..." gerados pelo Google Docs sem alterar os nós filhos
+  cleaned = cleaned.replace(/<span\s+id=["']docs-internal-guid-[^"']*["']>([\s\S]*?)<\/span>/gi, '$1');
+
+  // 2. Remover atributos redundantes injetados por office/docs que não alteram renderização
+  cleaned = cleaned.replace(/\s*(?:dir=["']ltr["']|align=["']left["'])/gi, '');
+
+  // 3. Limpar propriedades repetitivas de estilos inline que inflam o payload
+  cleaned = cleaned.replace(/background-color:\s*(?:transparent|rgba\(0,\s*0,\s*0,\s*0\));?/gi, '');
+  cleaned = cleaned.replace(/font-variant(?:-alternates|-caps|-east-asian|-ligatures|-numeric|-position)?:\s*normal;?/gi, '');
+  cleaned = cleaned.replace(/vertical-align:\s*baseline;?/gi, '');
+  cleaned = cleaned.replace(/text-decoration:\s*none;?/gi, '');
+
+  // 4. Limpar atributos style vazios
+  cleaned = cleaned.replace(/style=["']\s*["']/gi, '');
+  cleaned = cleaned.replace(/style=["']\s*;\s*["']/gi, '');
+
+  return cleaned;
+};
+
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -105,7 +130,8 @@ export const parseContratoPayload = (body, existing = null) => {
     Object.prototype.hasOwnProperty.call(body, 'conteudo_html');
 
   if (!existing || conteudoRecebido) {
-    payload.conteudo_html = String(body?.conteudoHtml ?? body?.conteudo_html ?? existing?.conteudo_html ?? '');
+    const htmlBruto = String(body?.conteudoHtml ?? body?.conteudo_html ?? existing?.conteudo_html ?? '');
+    payload.conteudo_html = sanitizarHtmlContrato(htmlBruto);
   }
 
   if (!existing || Object.prototype.hasOwnProperty.call(body, 'placeholders')) {

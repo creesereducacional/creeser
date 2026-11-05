@@ -441,6 +441,39 @@ export default function ConfiguracaoEmpresa() {
     });
   };
 
+  
+  const sanitizarHtmlContrato = (html) => {
+    if (!html || typeof html !== 'string') return '';
+    let cleaned = html;
+    cleaned = cleaned.replace(/<span\s+id=["']docs-internal-guid-[^"']*["']>([\s\S]*?)<\/span>/gi, '$1');
+    cleaned = cleaned.replace(/\s*(?:dir=["']ltr["']|align=["']left["'])/gi, '');
+    cleaned = cleaned.replace(/background-color:\s*(?:transparent|rgba\(0,\s*0,\s*0,\s*0\));?/gi, '');
+    cleaned = cleaned.replace(/font-variant(?:-alternates|-caps|-east-asian|-ligatures|-numeric|-position)?:\s*normal;?/gi, '');
+    cleaned = cleaned.replace(/vertical-align:\s*baseline;?/gi, '');
+    cleaned = cleaned.replace(/text-decoration:\s*none;?/gi, '');
+    cleaned = cleaned.replace(/style=["']\s*["']/gi, '');
+    cleaned = cleaned.replace(/style=["']\s*;\s*["']/gi, '');
+    return cleaned;
+  };
+
+  const duplicarContrato = (contrato) => {
+    setEditandoContrato(null);
+    setFormContrato({
+      nome: `${contrato?.nome || 'Modelo'} (Cópia)`,
+      descricao: contrato?.descricao ? `Cópia de: ${contrato.descricao}` : 'Cópia de modelo existente',
+      conteudoHtml: sanitizarHtmlContrato(contrato?.conteudoHtml || contrato?.conteudo_html || ''),
+      ativo: true,
+      padrao: false,
+      ordem: Number.isFinite(Number(contrato?.ordem)) ? Number(contrato.ordem) + 1 : 1,
+      placeholders: Array.isArray(contrato?.placeholders) ? [...contrato.placeholders] : []
+    });
+    mostrarFeedback(
+      `Modelo "${contrato?.nome}" carregado para cópia como novo contrato. Selecione a instituição de destino acima, ajuste se desejar e clique em Salvar Modelo.`,
+      'info',
+      'Cópia de Modelo'
+    );
+  };
+
   const editarContrato = (contrato) => {
     setEditandoContrato(contrato);
     setFormContrato({
@@ -467,14 +500,16 @@ export default function ConfiguracaoEmpresa() {
 
     setSalvandoContrato(true);
     try {
+      const conteudoSanitizado = sanitizarHtmlContrato(formContrato.conteudoHtml || '');
+
       const payload = {
         nome: String(formContrato.nome || '').trim(),
         descricao: String(formContrato.descricao || '').trim() || null,
-        conteudoHtml: formContrato.conteudoHtml || '',
+        conteudoHtml: conteudoSanitizado,
         ativo: formContrato.ativo !== false,
         padrao: formContrato.padrao === true,
         ordem: Number.isFinite(Number(formContrato.ordem)) ? Number(formContrato.ordem) : 0,
-        placeholders: extrairPlaceholders(formContrato.conteudoHtml || '')
+        placeholders: extrairPlaceholders(conteudoSanitizado)
       };
 
       const url = editandoContrato
@@ -490,6 +525,15 @@ export default function ConfiguracaoEmpresa() {
       });
 
       if (!res.ok) {
+        if (res.status === 413) {
+          throw new Error('O conteúdo do contrato excede o limite máximo permitido para envio (413 Payload Too Large). Reduza formatações redundantes ou divida o documento.');
+        }
+        if (res.status === 401) {
+          throw new Error('Sua sessão expirou ou não está autenticada (401 Não Autorizado). Por favor, faça login novamente.');
+        }
+        if (res.status === 403) {
+          throw new Error('Você não tem permissão para salvar ou alterar modelos de contrato nesta instituição (403 Acesso Negado).');
+        }
         const erro = await res.json().catch(() => ({}));
         throw new Error(erro?.error || 'Falha ao salvar modelo de contrato');
       }
@@ -3077,8 +3121,18 @@ export default function ConfiguracaoEmpresa() {
                                     type="button"
                                     onClick={() => editarContrato(contrato)}
                                     className="flex-1 px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded font-semibold transition"
+                                    title="Editar este modelo existente"
                                   >
                                     ✏️ Editar
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => duplicarContrato(contrato)}
+                                    className="flex-1 px-2 py-1 bg-teal-600 hover:bg-teal-700 text-white text-xs rounded font-semibold transition"
+                                    title="Copiar conteúdo deste modelo para cadastrar como novo (inclusive em outra instituição)"
+                                  >
+                                    📋 Copiar
                                   </button>
 
                                   {!contrato.padrao && (

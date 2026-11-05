@@ -5,7 +5,7 @@ import {
   supabase,
   unsetDefaultFromInstitution
 } from '../_shared';
-import { requireAuth, requirePerfil } from '../../../../lib/auth-server';
+import { requireAuth, requirePerfil, hasPerfil } from '../../../../lib/auth-server';
 
 export default async function handler(req, res) {
   const authUser = requireAuth(req, res);
@@ -32,6 +32,14 @@ export default async function handler(req, res) {
     if (contratoError) throw contratoError;
     if (!contrato) {
       return res.status(404).json({ error: 'Modelo de contrato não encontrado' });
+    }
+
+    const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+    if (!isGroupAdmin) {
+      const userInstituicao = authUser.instituicao_id || authUser.instituicaoId || null;
+      if (userInstituicao && contrato.instituicao_id && contrato.instituicao_id !== userInstituicao) {
+        return res.status(403).json({ error: 'Acesso negado a este contrato' });
+      }
     }
 
     await unsetDefaultFromInstitution(contrato.instituicao_id, id);

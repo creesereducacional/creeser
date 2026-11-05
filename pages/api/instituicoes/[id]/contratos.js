@@ -7,7 +7,15 @@ import {
   toBoolean,
   unsetDefaultFromInstitution
 } from '../../contratos/_shared';
-import { requireAuth, requirePerfil } from '../../../../lib/auth-server';
+import { requireAuth, requirePerfil, hasPerfil } from '../../../../lib/auth-server';
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+  },
+};
 
 const getBodyPadrao = (body) => {
   if (!Object.prototype.hasOwnProperty.call(body || {}, 'padrao')) return null;
@@ -30,6 +38,14 @@ export default async function handler(req, res) {
 
   if (!instituicaoId) {
     return res.status(400).json({ error: 'Instituição não informada' });
+  }
+
+  const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
+  if (!isGroupAdmin) {
+    const userInstituicao = authUser.instituicao_id || authUser.instituicaoId || null;
+    if (userInstituicao && instituicaoId !== userInstituicao) {
+      return res.status(403).json({ error: 'Acesso negado a esta instituição' });
+    }
   }
 
   try {
