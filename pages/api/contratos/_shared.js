@@ -1,4 +1,21 @@
 
+export const descompactarConteudoContrato = (input) => {
+  if (!input || typeof input !== 'string') return '';
+  if (input.startsWith('gzip:base64:')) {
+    try {
+      const b64 = input.slice(12);
+      const buffer = Buffer.from(b64, 'base64');
+      return zlib.gunzipSync(buffer).toString('utf8');
+    } catch (err) {
+      console.error('[descompactarConteudoContrato] Falha ao descompactar payload gzip:', err.message);
+      return '';
+    }
+  }
+  return input;
+};
+
+import zlib from 'zlib';
+
 export const sanitizarHtmlContrato = (html) => {
   if (!html || typeof html !== 'string') return '';
 
@@ -126,11 +143,18 @@ export const parseContratoPayload = (body, existing = null) => {
   }
 
   const conteudoRecebido =
+    Object.prototype.hasOwnProperty.call(body, 'conteudoGzipB64') ||
     Object.prototype.hasOwnProperty.call(body, 'conteudoHtml') ||
     Object.prototype.hasOwnProperty.call(body, 'conteudo_html');
 
   if (!existing || conteudoRecebido) {
-    const htmlBruto = String(body?.conteudoHtml ?? body?.conteudo_html ?? existing?.conteudo_html ?? '');
+    let htmlBruto = '';
+    if (body?.conteudoGzipB64) {
+      htmlBruto = descompactarConteudoContrato(`gzip:base64:${body.conteudoGzipB64}`);
+    } else {
+      const inputRaw = String(body?.conteudoHtml ?? body?.conteudo_html ?? existing?.conteudo_html ?? '');
+      htmlBruto = descompactarConteudoContrato(inputRaw);
+    }
     payload.conteudo_html = sanitizarHtmlContrato(htmlBruto);
   }
 

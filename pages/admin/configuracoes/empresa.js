@@ -1,3 +1,4 @@
+import pako from 'pako';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import RichTextEditor from '../../../components/RichTextEditor';
@@ -442,6 +443,24 @@ export default function ConfiguracaoEmpresa() {
   };
 
   
+  
+  const compactarHtmlParaEnvio = (html) => {
+    if (!html || typeof html !== 'string') return '';
+    try {
+      const compressed = pako.gzip(html);
+      let binary = '';
+      const bytes = new Uint8Array(compressed);
+      const len = bytes.byteLength;
+      for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
+    } catch (err) {
+      console.warn('[compactarHtmlParaEnvio] Falha ao comprimir com pako, enviando original:', err.message);
+      return null;
+    }
+  };
+
   const sanitizarHtmlContrato = (html) => {
     if (!html || typeof html !== 'string') return '';
     let cleaned = html;
@@ -501,11 +520,13 @@ export default function ConfiguracaoEmpresa() {
     setSalvandoContrato(true);
     try {
       const conteudoSanitizado = sanitizarHtmlContrato(formContrato.conteudoHtml || '');
+      const conteudoComprimidoB64 = compactarHtmlParaEnvio(conteudoSanitizado);
 
       const payload = {
         nome: String(formContrato.nome || '').trim(),
         descricao: String(formContrato.descricao || '').trim() || null,
-        conteudoHtml: conteudoSanitizado,
+        conteudoHtml: conteudoComprimidoB64 ? undefined : conteudoSanitizado,
+        conteudoGzipB64: conteudoComprimidoB64 || undefined,
         ativo: formContrato.ativo !== false,
         padrao: formContrato.padrao === true,
         ordem: Number.isFinite(Number(formContrato.ordem)) ? Number(formContrato.ordem) : 0,
