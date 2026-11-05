@@ -488,20 +488,67 @@ async function cancelarParcela(req, res) {
     if (parcela.status === 'cancelado') return res.status(422).json({ message: 'Parcela já cancelada.' });
     if (parcela.status === 'pago') return res.status(422).json({ message: 'Parcela já paga, não pode ser cancelada.' });
 
-    // Cancelar na EFI se houver carnet_id
+    // Verificar status bancário real antes de cancelar e sincronizar com segurança
+    let efiCanceladoSucesso = false;
+    let syncPendente = false;
+    let syncErroMsg = null;
+
     if (ordem?.efi_carnet_id) {
+      // 1. Cancelamento de parcela específica de carnê EFI
       try {
         await efi.cancelCarnetParcel(Number(ordem.efi_carnet_id), parcela.numero_parcela);
+        efiCanceladoSucesso = true;
       } catch (efiErr) {
-        const ignorable = efiErr.statusCode === 422 || efiErr.efiResponse?.error === 'invalid_operation';
-        if (!ignorable) throw efiErr;
+        const isJaCancelado = efiErr.statusCode === 422 || efiErr.efiResponse?.error === 'invalid_operation';
+        if (isJaCancelado) {
+          efiCanceladoSucesso = true;
+        } else {
+          console.error('[cancelarParcela] Falha ao cancelar parcela no carnê EFI:', efiErr.message);
+          syncPendente = true;
+          syncErroMsg = efiErr.message || 'Falha na comunicação com EFI';
+          // Se for erro de rede/gateway 5xx ou indisponibilidade bancária, interromper para evitar divergência
+          if (efiErr.statusCode >= 500) {
+            return res.status(502).json({
+              message: 'Não foi possível cancelar na EFI Bank por instabilidade temporária. Nenhuma alteração foi realizada.',
+              erro: efiErr.message
+            });
+          }
+        }
       }
     } else if (parcela.efi_charge_id) {
+      // 2. Cancelamento de cobrança avulsa (ex: acordo antigo ou mensalidade simples)
       try {
-        await efi.cancelCharge(Number(parcela.efi_charge_id));
+        // Verificar status real na EFI antes de cancelar
+        try {
+          const chargeReal = await efi.getCharge(Number(parcela.efi_charge_id));
+          const statusChargeReal = chargeReal?.data?.status;
+          if (statusChargeReal === 'paid' || statusChargeReal === 'settled') {
+            return res.status(422).json({ message: 'A cobrança já se encontra PAGA na EFI Bank e não pode ser cancelada.' });
+          }
+          if (statusChargeReal === 'canceled') {
+            efiCanceladoSucesso = true;
+          }
+        } catch (_) {}
+
+        if (!efiCanceladoSucesso) {
+          await efi.cancelCharge(Number(parcela.efi_charge_id));
+          efiCanceladoSucesso = true;
+        }
       } catch (efiErr) {
-        const ignorable = efiErr.statusCode === 422 || efiErr.efiResponse?.error === 'invalid_operation';
-        if (!ignorable) throw efiErr;
+        const isJaCancelado = efiErr.statusCode === 422 || efiErr.efiResponse?.error === 'invalid_operation';
+        if (isJaCancelado) {
+          efiCanceladoSucesso = true;
+        } else {
+          console.error('[cancelarParcela] Falha ao cancelar cobrança avulsa na EFI:', efiErr.message);
+          syncPendente = true;
+          syncErroMsg = efiErr.message || 'Falha ao cancelar na EFI';
+          if (efiErr.statusCode >= 500) {
+            return res.status(502).json({
+              message: 'Não foi possível cancelar a cobrança na EFI Bank por instabilidade do gateway. Nenhuma alteração foi realizada.',
+              erro: efiErr.message
+            });
+          }
+        }
       }
     }
 

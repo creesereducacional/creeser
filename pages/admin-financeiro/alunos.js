@@ -2440,26 +2440,39 @@ export default function AlunosFinanceiroPage() {
     const { type, carne, parcela, ids, alunoId } = modalCancelarParcelaAluno;
     try {
       if (type === 'single') {
-        await fetch('/api/admin-financeiro/efi/carne', {
+        const res = await fetch('/api/admin-financeiro/efi/carne', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ordem_id: carne.id, parcela_id: parcela.id, observacao }),
         });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          alert(data.message || 'Erro ao cancelar parcela.');
+          return;
+        }
       } else if (type === 'multiple') {
+        let errosCount = 0;
         for (const parcela_id of ids) {
-          await fetch('/api/admin-financeiro/efi/carne', {
+          const res = await fetch('/api/admin-financeiro/efi/carne', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ordem_id: carne.id, parcela_id, observacao }),
           });
+          if (!res.ok) errosCount++;
+        }
+        if (errosCount > 0) {
+          alert(`Atenção: ${errosCount} parcela(s) não puderam ser canceladas.`);
         }
         setSelectedParcelasAluno(prev => ({ ...prev, [carne.id]: new Set() }));
       }
       setCarnesCache(prev => { const n = {...prev}; delete n[alunoId]; return n; });
-      fetchOrdensAluno(alunoId, true);
+      setOrdensCache(prev => { const n = {...prev}; delete n[alunoId]; return n; });
+      await fetchOrdensAluno(alunoId, true);
+      await carregarDados();
       setModalCancelarParcelaAluno(null);
     } catch (e) {
       console.error(e);
+      alert('Erro inesperado ao cancelar parcela: ' + e.message);
     } finally {
       setCancelandoParcelaAluno(false);
     }
@@ -3474,8 +3487,8 @@ export default function AlunosFinanceiroPage() {
           onConfirm={handleConfirmarCancelarParcelaAluno}
           onClose={() => setModalCancelarParcelaAluno(null)}
           loading={cancelandoParcelaAluno}
-          formatData={fmtD}
-          formatValor={fmtV}
+          formatData={formatarDataSegura}
+          formatValor={formatarValorSeguro}
         />
       )}
       {modalCancelarParcelaAluno && modalCancelarParcelaAluno.type === 'multiple' && (
