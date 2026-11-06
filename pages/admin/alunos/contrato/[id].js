@@ -145,7 +145,7 @@ export default function ContratoAlunoImpressao() {
 
       <style jsx global>{`
         .contrato-html {
-          font-family: Arial, Helvetica, sans-serif;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
           color: #1a1a1a;
           line-height: 1.5;
         }
@@ -174,27 +174,20 @@ export default function ContratoAlunoImpressao() {
         }
 
         .contrato-html p {
-          margin-bottom: 0.5rem;
-          orphans: 3;
-          widows: 3;
+          margin-bottom: 0.45rem;
+          orphans: 2;
+          widows: 2;
         }
 
         .contrato-html table {
           width: 100%;
           border-collapse: collapse;
-          margin: 0.5rem 0;
-          break-inside: avoid;
-          page-break-inside: avoid;
-        }
-
-        .contrato-html tr {
-          break-inside: avoid;
-          page-break-inside: avoid;
+          margin: 0.4rem 0;
         }
 
         @page {
-          size: A4;
-          margin: 12mm 15mm 12mm 15mm;
+          size: A4 portrait;
+          margin: 10mm 12mm 10mm 12mm;
         }
 
         @media print {
@@ -203,29 +196,113 @@ export default function ContratoAlunoImpressao() {
             background: #fff !important;
             margin: 0 !important;
             padding: 0 !important;
-            font-size: 13px !important;
+            font-size: 11.5pt !important;
+            color: #000 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
 
           .contrato-paper {
             width: 100% !important;
+            max-width: 100% !important;
             margin: 0 !important;
             padding: 0 !important;
             box-shadow: none !important;
+            border: none !important;
           }
 
           .contrato-html {
-            font-size: 12.5px !important;
-            line-height: 1.45 !important;
+            font-size: 10pt !important;
+            line-height: 1.35 !important;
+            color: #000 !important;
           }
 
-          .contrato-html p {
-            margin-bottom: 0.4rem !important;
-          }
-
+          /* Fluididade de containers: permite que quebrem naturalmente */
           .contrato-html div,
           .contrato-html section,
+          .contrato-html article,
+          .contrato-html span {
+            break-inside: auto !important;
+            page-break-inside: auto !important;
+          }
+
+          /* Neutraliza alturas fixas herdadas de Google Docs / Word */
+          .contrato-html div,
+          .contrato-html section {
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+          }
+
+          /* Tabelas: quebra fluida entre linhas, sem forçar página em branco */
           .contrato-html table {
-            break-inside: auto;
+            width: 100% !important;
+            max-width: 100% !important;
+            border-collapse: collapse !important;
+            margin: 0.25rem 0 !important;
+            break-inside: auto !important;
+            page-break-inside: auto !important;
+          }
+
+          /* Linhas: nunca cortam a esmo no meio do texto, mas permitem divisão natural */
+          .contrato-html tr {
+            break-inside: auto !important;
+            page-break-inside: auto !important;
+            height: auto !important;
+            min-height: 0 !important;
+          }
+
+          /* Células: remove limites rígidos de altura que estouram a folha */
+          .contrato-html td,
+          .contrato-html th {
+            break-inside: auto !important;
+            page-break-inside: auto !important;
+            height: auto !important;
+            min-height: 0 !important;
+            padding: 2px 4px !important;
+          }
+
+          /* Parágrafos e cabeçalhos */
+          .contrato-html p {
+            margin-top: 0 !important;
+            margin-bottom: 0.35rem !important;
+            orphans: 2 !important;
+            widows: 2 !important;
+            break-inside: auto !important;
+            page-break-inside: auto !important;
+          }
+
+          .contrato-html h1,
+          .contrato-html h2,
+          .contrato-html h3,
+          .contrato-html h4 {
+            break-after: avoid !important;
+            page-break-after: avoid !important;
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+            margin-top: 0.6rem !important;
+            margin-bottom: 0.25rem !important;
+          }
+
+          /* Neutraliza quebras artificiais de linhas vazias e <br> múltiplos gerados por editores */
+          .contrato-html br + br {
+            display: none !important;
+          }
+
+          /* Linhas de tabela vazias (resíduos de Word) não ocupam espaço na impressão */
+          .contrato-html tr:empty {
+            display: none !important;
+          }
+
+          /* Bloco de assinaturas: mantém agrupado para não separar linhas de assinatura */
+          .contrato-html .bloco-assinaturas,
+          .contrato-html .assinaturas,
+          .contrato-html .assinatura,
+          .contrato-html [data-assinatura],
+          .contrato-html [class*="assinatura"] {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+            margin-top: 1.5rem !important;
           }
         }
       `}</style>
