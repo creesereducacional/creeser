@@ -2,6 +2,7 @@ import pako from 'pako';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import RichTextEditor from '../../../components/RichTextEditor';
+import ModalCabecalhoRodape from '../../../components/ModalCabecalhoRodape';
 import ConfirmModal from '../../../components/ConfirmModal';
 
 const UF_OPTIONS = [
@@ -118,7 +119,15 @@ const createContratoInicial = () => ({
   ativo: true,
   padrao: false,
   ordem: 0,
-  placeholders: []
+  placeholders: [],
+  cabecalhoHtml: '',
+  cabecalhoAtivo: false,
+  cabecalhoPrimeiraPagina: true,
+  cabecalhoRepetirDemais: true,
+  rodapeHtml: '',
+  rodapeAtivo: false,
+  rodapePrimeiraPagina: true,
+  rodapeRepetirDemais: true
 });
 
 const extrairPlaceholders = (conteudo) => {
@@ -272,6 +281,7 @@ export default function ConfiguracaoEmpresa() {
   const [salvandoContrato, setSalvandoContrato] = useState(false);
   const [formContrato, setFormContrato] = useState(createContratoInicial());
   const [editandoContrato, setEditandoContrato] = useState(null);
+  const [modalCabecalhoRodapeOpen, setModalCabecalhoRodapeOpen] = useState(false);
   const editorContratoRef = useRef(null);
   const confirmActionRef = useRef(null);
   const [feedbackModal, setFeedbackModal] = useState({
@@ -484,7 +494,15 @@ export default function ConfiguracaoEmpresa() {
       ativo: true,
       padrao: false,
       ordem: Number.isFinite(Number(contrato?.ordem)) ? Number(contrato.ordem) + 1 : 1,
-      placeholders: Array.isArray(contrato?.placeholders) ? [...contrato.placeholders] : []
+      placeholders: Array.isArray(contrato?.placeholders) ? [...contrato.placeholders] : [],
+      cabecalhoHtml: contrato?.cabecalhoHtml || contrato?.cabecalho_html || '',
+      cabecalhoAtivo: contrato?.cabecalhoAtivo === true || contrato?.cabecalho_ativo === true,
+      cabecalhoPrimeiraPagina: contrato?.cabecalhoPrimeiraPagina !== false && contrato?.cabecalho_primeira_pagina !== false,
+      cabecalhoRepetirDemais: contrato?.cabecalhoRepetirDemais !== false && contrato?.cabecalho_repetir_demais !== false,
+      rodapeHtml: contrato?.rodapeHtml || contrato?.rodape_html || '',
+      rodapeAtivo: contrato?.rodapeAtivo === true || contrato?.rodape_ativo === true,
+      rodapePrimeiraPagina: contrato?.rodapePrimeiraPagina !== false && contrato?.rodape_primeira_pagina !== false,
+      rodapeRepetirDemais: contrato?.rodapeRepetirDemais !== false && contrato?.rodape_repetir_demais !== false
     });
     mostrarFeedback(
       `Modelo "${contrato?.nome}" carregado para cópia como novo contrato. Selecione a instituição de destino acima, ajuste se desejar e clique em Salvar Modelo.`,
@@ -502,7 +520,15 @@ export default function ConfiguracaoEmpresa() {
       ativo: contrato?.ativo !== false,
       padrao: contrato?.padrao === true,
       ordem: Number.isFinite(Number(contrato?.ordem)) ? Number(contrato.ordem) : 0,
-      placeholders: Array.isArray(contrato?.placeholders) ? contrato.placeholders : []
+      placeholders: Array.isArray(contrato?.placeholders) ? contrato.placeholders : [],
+      cabecalhoHtml: contrato?.cabecalhoHtml || contrato?.cabecalho_html || '',
+      cabecalhoAtivo: contrato?.cabecalhoAtivo === true || contrato?.cabecalho_ativo === true,
+      cabecalhoPrimeiraPagina: contrato?.cabecalhoPrimeiraPagina !== false && contrato?.cabecalho_primeira_pagina !== false,
+      cabecalhoRepetirDemais: contrato?.cabecalhoRepetirDemais !== false && contrato?.cabecalho_repetir_demais !== false,
+      rodapeHtml: contrato?.rodapeHtml || contrato?.rodape_html || '',
+      rodapeAtivo: contrato?.rodapeAtivo === true || contrato?.rodape_ativo === true,
+      rodapePrimeiraPagina: contrato?.rodapePrimeiraPagina !== false && contrato?.rodape_primeira_pagina !== false,
+      rodapeRepetirDemais: contrato?.rodapeRepetirDemais !== false && contrato?.rodape_repetir_demais !== false
     });
   };
 
@@ -530,7 +556,15 @@ export default function ConfiguracaoEmpresa() {
         ativo: formContrato.ativo !== false,
         padrao: formContrato.padrao === true,
         ordem: Number.isFinite(Number(formContrato.ordem)) ? Number(formContrato.ordem) : 0,
-        placeholders: extrairPlaceholders(conteudoSanitizado)
+        placeholders: extrairPlaceholders(conteudoSanitizado),
+        cabecalhoHtml: formContrato.cabecalhoHtml || '',
+        cabecalhoAtivo: formContrato.cabecalhoAtivo === true,
+        cabecalhoPrimeiraPagina: formContrato.cabecalhoPrimeiraPagina !== false,
+        cabecalhoRepetirDemais: formContrato.cabecalhoRepetirDemais !== false,
+        rodapeHtml: formContrato.rodapeHtml || '',
+        rodapeAtivo: formContrato.rodapeAtivo === true,
+        rodapePrimeiraPagina: formContrato.rodapePrimeiraPagina !== false,
+        rodapeRepetirDemais: formContrato.rodapeRepetirDemais !== false
       };
 
       const url = editandoContrato
@@ -3042,7 +3076,20 @@ export default function ConfiguracaoEmpresa() {
                         </div>
 
                         <div className="mb-4">
-                          <label className="text-xs font-medium text-teal-600 mb-2 block">CONTEÚDO DO CONTRATO</label>
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="text-xs font-medium text-teal-600 block">CONTEÚDO DO CONTRATO</label>
+                            <button
+                              type="button"
+                              onClick={() => setModalCabecalhoRodapeOpen(true)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-teal-500 bg-white text-teal-700 hover:bg-teal-50 shadow-xs transition cursor-pointer"
+                            >
+                              <span>📑</span>
+                              <span>Cabeçalho e Rodapé</span>
+                              {(formContrato.cabecalhoAtivo || formContrato.rodapeAtivo) && (
+                                <span className="ml-1 inline-block w-2 h-2 rounded-full bg-teal-500" title="Configuração ativa" />
+                              )}
+                            </button>
+                          </div>
                           <RichTextEditor
                             ref={editorContratoRef}
                             value={formContrato.conteudoHtml}
@@ -3184,6 +3231,14 @@ export default function ConfiguracaoEmpresa() {
                           </div>
                         )}
                       </div>
+
+                      <ModalCabecalhoRodape
+                        open={modalCabecalhoRodapeOpen}
+                        onClose={() => setModalCabecalhoRodapeOpen(false)}
+                        formContrato={formContrato}
+                        setFormContrato={setFormContrato}
+                        placeholders={CONTRATO_PLACEHOLDERS_CATEGORIZADOS.flatMap(c => c.placeholders.map(p => p.token))}
+                      />
                     </>
                   )}
                 </div>

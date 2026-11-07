@@ -170,6 +170,34 @@ export const parseContratoPayload = (body, existing = null) => {
     payload.ordem = parseOrder(body?.ordem, existing?.ordem ?? 0);
   }
 
+  // Configurações de Cabeçalho
+  if (!existing || Object.prototype.hasOwnProperty.call(body, 'cabecalhoHtml') || Object.prototype.hasOwnProperty.call(body, 'cabecalho_html')) {
+    payload.cabecalho_html = sanitizarHtmlContrato(String(body?.cabecalhoHtml ?? body?.cabecalho_html ?? existing?.cabecalho_html ?? ''));
+  }
+  if (!existing || Object.prototype.hasOwnProperty.call(body, 'cabecalhoAtivo') || Object.prototype.hasOwnProperty.call(body, 'cabecalho_ativo')) {
+    payload.cabecalho_ativo = toBoolean(body?.cabecalhoAtivo ?? body?.cabecalho_ativo, existing?.cabecalho_ativo ?? false);
+  }
+  if (!existing || Object.prototype.hasOwnProperty.call(body, 'cabecalhoPrimeiraPagina') || Object.prototype.hasOwnProperty.call(body, 'cabecalho_primeira_pagina')) {
+    payload.cabecalho_primeira_pagina = toBoolean(body?.cabecalhoPrimeiraPagina ?? body?.cabecalho_primeira_pagina, existing?.cabecalho_primeira_pagina ?? true);
+  }
+  if (!existing || Object.prototype.hasOwnProperty.call(body, 'cabecalhoRepetirDemais') || Object.prototype.hasOwnProperty.call(body, 'cabecalho_repetir_demais')) {
+    payload.cabecalho_repetir_demais = toBoolean(body?.cabecalhoRepetirDemais ?? body?.cabecalho_repetir_demais, existing?.cabecalho_repetir_demais ?? true);
+  }
+
+  // Configurações de Rodapé
+  if (!existing || Object.prototype.hasOwnProperty.call(body, 'rodapeHtml') || Object.prototype.hasOwnProperty.call(body, 'rodape_html')) {
+    payload.rodape_html = sanitizarHtmlContrato(String(body?.rodapeHtml ?? body?.rodape_html ?? existing?.rodape_html ?? ''));
+  }
+  if (!existing || Object.prototype.hasOwnProperty.call(body, 'rodapeAtivo') || Object.prototype.hasOwnProperty.call(body, 'rodape_ativo')) {
+    payload.rodape_ativo = toBoolean(body?.rodapeAtivo ?? body?.rodape_ativo, existing?.rodape_ativo ?? false);
+  }
+  if (!existing || Object.prototype.hasOwnProperty.call(body, 'rodapePrimeiraPagina') || Object.prototype.hasOwnProperty.call(body, 'rodape_primeira_pagina')) {
+    payload.rodape_primeira_pagina = toBoolean(body?.rodapePrimeiraPagina ?? body?.rodape_primeira_pagina, existing?.rodape_primeira_pagina ?? true);
+  }
+  if (!existing || Object.prototype.hasOwnProperty.call(body, 'rodapeRepetirDemais') || Object.prototype.hasOwnProperty.call(body, 'rodape_repetir_demais')) {
+    payload.rodape_repetir_demais = toBoolean(body?.rodapeRepetirDemais ?? body?.rodape_repetir_demais, existing?.rodape_repetir_demais ?? true);
+  }
+
   return payload;
 };
 
@@ -188,6 +216,27 @@ export const mapContratoRow = (row) => {
     ativo: Boolean(row.ativo),
     padrao: Boolean(row.padrao),
     ordem: Number.isFinite(Number(row.ordem)) ? Number(row.ordem) : 0,
+
+    // Cabeçalho
+    cabecalhoHtml: row.cabecalho_html || '',
+    cabecalho_html: row.cabecalho_html || '',
+    cabecalhoAtivo: Boolean(row.cabecalho_ativo),
+    cabecalho_ativo: Boolean(row.cabecalho_ativo),
+    cabecalhoPrimeiraPagina: row.cabecalho_primeira_pagina !== false,
+    cabecalho_primeira_pagina: row.cabecalho_primeira_pagina !== false,
+    cabecalhoRepetirDemais: row.cabecalho_repetir_demais !== false,
+    cabecalho_repetir_demais: row.cabecalho_repetir_demais !== false,
+
+    // Rodapé
+    rodapeHtml: row.rodape_html || '',
+    rodape_html: row.rodape_html || '',
+    rodapeAtivo: Boolean(row.rodape_ativo),
+    rodape_ativo: Boolean(row.rodape_ativo),
+    rodapePrimeiraPagina: row.rodape_primeira_pagina !== false,
+    rodape_primeira_pagina: row.rodape_primeira_pagina !== false,
+    rodapeRepetirDemais: row.rodape_repetir_demais !== false,
+    rodape_repetir_demais: row.rodape_repetir_demais !== false,
+
     createdAt: row.created_at,
     created_at: row.created_at,
     updatedAt: row.updated_at,

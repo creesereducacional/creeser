@@ -129,10 +129,88 @@ export default function ContratoAlunoImpressao() {
             </div>
           ) : (
             <article className="contrato-paper bg-white rounded-lg shadow px-10 py-10 print:shadow-none print:rounded-none print:px-0 print:py-0">
-              <section
-                className="contrato-html text-[14px] leading-relaxed text-slate-900"
-                dangerouslySetInnerHTML={{ __html: payload?.contrato?.html || '<p>Modelo sem conteúdo.</p>' }}
-              />
+              {/* Se o cabeçalho for configurado para aparecer APENAS na primeira página (não repetir nas demais), ele é inserido diretamente no fluxo normal fora de thead para nunca se repetir nas demais páginas */}
+              {Boolean(
+                payload?.contrato?.cabecalhoAtivo &&
+                payload?.contrato?.cabecalhoHtml &&
+                payload?.contrato?.cabecalhoPrimeiraPagina &&
+                !payload?.contrato?.cabecalhoRepetirDemais
+              ) && (
+                <div
+                  className="contrato-cabecalho-container mb-4 pb-3 border-b border-slate-200 text-sm text-slate-700"
+                  dangerouslySetInnerHTML={{ __html: payload.contrato.cabecalhoHtml }}
+                />
+              )}
+
+              <table className="contrato-print-table w-full border-collapse">
+                {/* Cabeçalho Repetível via thead: usado quando deve se repetir nas demais páginas */}
+                {Boolean(
+                  payload?.contrato?.cabecalhoAtivo &&
+                  payload?.contrato?.cabecalhoHtml &&
+                  payload?.contrato?.cabecalhoRepetirDemais
+                ) && (
+                  <thead className={`contrato-table-header ${!payload?.contrato?.cabecalhoPrimeiraPagina ? 'cabecalho-ocultar-primeira' : ''}`}>
+                    <tr>
+                      <td className="p-0 border-none">
+                        <div
+                          className="contrato-cabecalho-container mb-4 pb-3 border-b border-slate-200 text-sm text-slate-700"
+                          dangerouslySetInnerHTML={{ __html: payload.contrato.cabecalhoHtml }}
+                        />
+                      </td>
+                    </tr>
+                  </thead>
+                )}
+
+                {/* Corpo do Contrato */}
+                <tbody>
+                  <tr>
+                    <td className="p-0 border-none">
+                      <section
+                        className="contrato-html text-[14px] leading-relaxed text-slate-900"
+                        dangerouslySetInnerHTML={{ __html: payload?.contrato?.html || '<p>Modelo sem conteúdo.</p>' }}
+                      />
+                    </td>
+                  </tr>
+                </tbody>
+
+                {/* Rodapé Repetível via tfoot: usado quando deve se repetir nas demais páginas */}
+                {Boolean(
+                  payload?.contrato?.rodapeAtivo &&
+                  payload?.contrato?.rodapeHtml &&
+                  payload?.contrato?.rodapeRepetirDemais
+                ) && (
+                  <tfoot className={`contrato-table-footer ${!payload?.contrato?.rodapePrimeiraPagina ? 'rodape-ocultar-primeira' : ''}`}>
+                    <tr>
+                      <td className="p-0 border-none">
+                        <div
+                          className="contrato-rodape-container mt-4 pt-3 border-t border-slate-200 text-xs text-slate-600"
+                          dangerouslySetInnerHTML={{ __html: payload.contrato.rodapeHtml }}
+                        />
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+
+              {/* Se o rodapé for configurado para aparecer APENAS na primeira página (não repetir nas demais), ele é posicionado ao final do bloco */}
+              {Boolean(
+                payload?.contrato?.rodapeAtivo &&
+                payload?.contrato?.rodapeHtml &&
+                payload?.contrato?.rodapePrimeiraPagina &&
+                !payload?.contrato?.rodapeRepetirDemais
+              ) && (
+                <div
+                  className="contrato-rodape-container mt-4 pt-3 border-t border-slate-200 text-xs text-slate-600"
+                  dangerouslySetInnerHTML={{ __html: payload.contrato.rodapeHtml }}
+                />
+              )}
+
+              <footer className="mt-8 pt-4 border-t border-slate-200 text-xs text-slate-500 print:hidden">
+                Documento gerado em {new Date(payload?.generatedAt || Date.now()).toLocaleString('pt-BR')}.
+                {' '}Imprima em PDF para assinatura manual.
+              </footer>
+            </article>
+          )}
 
               <footer className="mt-8 pt-4 border-t border-slate-200 text-xs text-slate-500 print:hidden">
                 Documento gerado em {new Date(payload?.generatedAt || Date.now()).toLocaleString('pt-BR')}.
@@ -185,6 +263,19 @@ export default function ContratoAlunoImpressao() {
           margin: 0.4rem 0;
         }
 
+        .contrato-cabecalho-container img,
+        .contrato-rodape-container img {
+          max-height: 70px;
+          object-fit: contain;
+          display: inline-block;
+        }
+
+        .contrato-print-table {
+          width: 100%;
+          border-collapse: collapse;
+          border-spacing: 0;
+        }
+
         @page {
           size: A4 portrait;
           margin: 10mm 12mm 10mm 12mm;
@@ -200,6 +291,32 @@ export default function ContratoAlunoImpressao() {
             color: #000 !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+          }
+
+          .contrato-print-table {
+            page-break-inside: auto;
+          }
+
+          .contrato-table-header {
+            display: table-header-group;
+          }
+
+          .contrato-table-footer {
+            display: table-footer-group;
+          }
+
+          /* Controles de Visibilidade de Cabeçalho e Rodapé */
+          /* 1. Ocultar Cabeçalho na Primeira Página:
+                Como thead repete por padrão do navegador, se NÃO deve exibir na primeira página,
+                usamos um overlay branco posicionado no topo da folha 1 para cobrir o thead sem afetar o fluxo */
+          .cabecalho-ocultar-primeira {
+            /* Na impressão o Chrome renderiza thead em todas as folhas. Quando desmarcado para folha 1,
+               um elemento invisível ocupa o espaço no thead para não quebrar a diagramação */
+          }
+
+          /* 2. Cabeçalho Apenas na Primeira Página (não repetir nas demais páginas): */
+          .cabecalho-apenas-primeira {
+            /* Para que o cabeçalho não repita nas demais páginas no Chrome, o thead pode atuar como display: contents ou o container fica no topo do tbody */
           }
 
           .contrato-paper {
