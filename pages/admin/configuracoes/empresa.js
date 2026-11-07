@@ -3076,17 +3076,26 @@ export default function ConfiguracaoEmpresa() {
                         </div>
 
                         <div className="mb-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <label className="text-xs font-medium text-teal-600 block">CONTEÚDO DO CONTRATO</label>
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                            <label className="text-xs font-bold text-teal-700 tracking-wide block uppercase">
+                              CONTEÚDO DO CONTRATO
+                            </label>
                             <button
                               type="button"
                               onClick={() => setModalCabecalhoRodapeOpen(true)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-teal-500 bg-white text-teal-700 hover:bg-teal-50 shadow-xs transition cursor-pointer"
+                              className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-teal-600 bg-teal-50 text-teal-800 hover:bg-teal-100 shadow-sm transition cursor-pointer"
+                              title="Configurar cabeçalho e rodapé institucional deste modelo"
                             >
-                              <span>📑</span>
-                              <span>Cabeçalho e Rodapé</span>
-                              {(formContrato.cabecalhoAtivo || formContrato.rodapeAtivo) && (
-                                <span className="ml-1 inline-block w-2 h-2 rounded-full bg-teal-500" title="Configuração ativa" />
+                              <span>⚙️</span>
+                              <span>Configurar Cabeçalho e Rodapé</span>
+                              {(formContrato.cabecalhoAtivo || formContrato.rodapeAtivo) ? (
+                                <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-600 text-white">
+                                  Ativo
+                                </span>
+                              ) : (
+                                <span className="ml-1 text-[10px] text-gray-500 font-normal">
+                                  (Opcional)
+                                </span>
                               )}
                             </button>
                           </div>

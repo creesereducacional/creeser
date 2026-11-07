@@ -211,13 +211,6 @@ export default function ContratoAlunoImpressao() {
               </footer>
             </article>
           )}
-
-              <footer className="mt-8 pt-4 border-t border-slate-200 text-xs text-slate-500 print:hidden">
-                Documento gerado em {new Date(payload?.generatedAt || Date.now()).toLocaleString('pt-BR')}.
-                {' '}Imprima em PDF para assinatura manual.
-              </footer>
-            </article>
-          )}
         </div>
       </div>
 
