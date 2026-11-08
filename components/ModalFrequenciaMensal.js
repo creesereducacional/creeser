@@ -74,7 +74,7 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
   const instituicao = dadosTurma?.instituicao || null;
   const alunos = dadosTurma?.alunos || [];
 
-  // Dividir alunos em páginas (ex: 18 alunos por página no A4 paisagem)
+  // Dividir alunos em páginas (18 alunos por página no A4 paisagem)
   const ALUNOS_POR_PAGINA = 18;
   const paginasAlunos = [];
   if (alunos.length === 0) {
@@ -86,10 +86,6 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
   }
 
   const nomeMesExtenso = MESES.find((m) => m.valor === Number(mes))?.nome || mes;
-
-  const handleImprimirNativo = () => {
-    window.print();
-  };
 
   const handleBaixarPdf = async () => {
     if (!printAreaRef.current || gerandoPdf) return;
@@ -108,7 +104,6 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
       await html2pdf().set(opt).from(element).save();
     } catch (err) {
       console.error('Erro ao gerar PDF via html2pdf:', err);
-      // Fallback para impressão nativa do navegador
       window.print();
     } finally {
       setGerandoPdf(false);
@@ -128,11 +123,8 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold text-white tracking-tight">
-                  Gerar Ficha de Frequência Mensal
+                  Ficha de Frequência Mensal
                 </h3>
-                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-200 border border-teal-400/30">
-                  Provisória
-                </span>
               </div>
               <p className="text-xs text-teal-100/90 mt-0.5">
                 Turma: <strong className="text-white">{turma.nome}</strong> • {turma.curso || dadosTurma?.turma?.curso || '—'}
@@ -145,7 +137,7 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
               <button
                 type="button"
                 onClick={() => setAbaAtiva('config')}
-                className={`px-3 py-1.5 rounded-md font-semibold transition ${
+                className={`px-3 py-1.5 rounded-md font-semibold transition cursor-pointer ${
                   abaAtiva === 'config'
                     ? 'bg-white text-teal-900 shadow-sm'
                     : 'text-teal-100 hover:text-white'
@@ -156,7 +148,7 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
               <button
                 type="button"
                 onClick={() => setAbaAtiva('preview')}
-                className={`px-3 py-1.5 rounded-md font-semibold transition ${
+                className={`px-3 py-1.5 rounded-md font-semibold transition cursor-pointer ${
                   abaAtiva === 'preview'
                     ? 'bg-white text-teal-900 shadow-sm'
                     : 'text-teal-100 hover:text-white'
@@ -168,7 +160,7 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
 
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm font-bold transition ml-2"
+              className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm font-bold transition ml-2 cursor-pointer"
               title="Fechar"
             >
               ✕
@@ -193,9 +185,9 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
               
               {/* Card de Identificação Institucional Resolvida */}
               <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-xs flex items-center gap-4">
-                <div className="w-16 h-16 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                <div className="w-20 h-16 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0 p-1">
                   {instituicao?.logo ? (
-                    <img src={instituicao.logo} alt={instituicao.nome} className="max-h-full max-w-full object-contain p-1" />
+                    <img src={instituicao.logo} alt={instituicao.nome} className="max-h-full max-w-full object-contain" />
                   ) : (
                     <span className="text-2xl font-bold text-teal-700">
                       {instituicao?.nome ? instituicao.nome.charAt(0) : '🏛️'}
@@ -204,7 +196,7 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                    Instituição Vinculada (Isolamento Obrigatório)
+                    Instituição Vinculada à Turma
                   </div>
                   <div className="text-sm sm:text-base font-bold text-slate-800 truncate">
                     {instituicao?.nome || 'Instituição Vinculada à Turma'}
@@ -213,6 +205,11 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                     {instituicao?.cnpj && <span>CNPJ: {instituicao.cnpj}</span>}
                     {instituicao?.email && <span>Email: {instituicao.email}</span>}
                     {instituicao?.cidade && <span>Local: {instituicao.cidade} - {instituicao.estado}</span>}
+                    {instituicao?.pendenciaLogo && (
+                      <span className="text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                        ⚠️ Logomarca não cadastrada no perfil desta instituição (identificação textual preservada)
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="text-right shrink-0">
@@ -225,7 +222,7 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
               {/* Formulário de Parâmetros */}
               <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
                 <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider pb-2 border-b border-slate-100 flex items-center gap-2">
-                  <span>📅</span> Parâmetros da Ficha Mensal
+                  <span>📅</span> Parâmetros da Ficha de Frequência
                 </h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -306,14 +303,6 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                     />
                   </div>
                 </div>
-
-                {/* Aviso Provisório */}
-                <div className="p-3.5 bg-amber-50/80 border border-amber-200/80 rounded-xl text-xs text-amber-900 flex items-start gap-2.5">
-                  <span className="text-base shrink-0">📌</span>
-                  <div>
-                    <strong>Documento de Coleta Manual Provisória:</strong> Esta ficha destina-se ao controle operacional e coleta manual de presença em início de curso. Nenhuma presença ou nota será gravada no banco de dados nesta etapa. O registro oficial definitivo será efetuado posteriormente pelo módulo Pedagógico.
-                  </div>
-                </div>
               </div>
 
               {/* Resumo de Alunos com Matrícula Ativa */}
@@ -355,7 +344,7 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                   onClick={() => setAbaAtiva('preview')}
                   className="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs sm:text-sm shadow-sm transition flex items-center gap-2 cursor-pointer"
                 >
-                  <span>👁️</span> Visualizar Ficha A4 e Gerar PDF
+                  <span>👁️</span> Visualizar Ficha A4 e Salvar PDF
                 </button>
               </div>
 
@@ -373,26 +362,9 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setAbaAtiva('config')}
-                    className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs rounded-xl transition cursor-pointer"
-                  >
-                    ✏️ Ajustar Parâmetros
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleImprimirNativo}
-                    className="px-4 py-2 border border-teal-600 text-teal-700 hover:bg-teal-50 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer"
-                    title="Imprimir diretamente pelo navegador"
-                  >
-                    <span>🖨️</span> Imprimir
-                  </button>
-
-                  <button
-                    type="button"
                     onClick={handleBaixarPdf}
                     disabled={gerandoPdf}
-                    className="px-5 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                    className="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
                   >
                     {gerandoPdf ? (
                       <>
@@ -400,14 +372,14 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                       </>
                     ) : (
                       <>
-                        <span>📥</span> Salvar PDF Oficial
+                        <span>📥</span> Salvar PDF
                       </>
                     )}
                   </button>
                 </div>
               </div>
 
-              {/* Área Imprimível (A4 Paisagem: ~297mm x 210mm) */}
+              {/* Área Imprimível (A4 Paisagem: ~290mm x 200mm) */}
               <div className="overflow-x-auto pb-6">
                 <div
                   ref={printAreaRef}
@@ -446,10 +418,10 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                     >
                       {/* Topo Oficial Timbrado */}
                       <div>
-                        <div className="flex items-center justify-between pb-2 border-b-2 border-slate-800">
+                        <div className="flex items-center justify-between pb-2 border-b-2 border-slate-800 gap-4">
                           {/* Logo e Nome da Instituição */}
-                          <div className="flex items-center gap-3">
-                            <div className="w-24 h-12 flex items-center justify-center border border-slate-200 rounded p-1 bg-white">
+                          <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                            <div className="w-28 h-14 flex items-center justify-center border border-slate-200 rounded p-1 bg-white shrink-0">
                               {instituicao?.logo ? (
                                 <img
                                   src={instituicao.logo}
@@ -457,16 +429,21 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                                   className="max-h-full max-w-full object-contain"
                                 />
                               ) : (
-                                <span className="text-xs font-extrabold text-teal-800 tracking-wider">
-                                  {instituicao?.nome ? instituicao.nome.slice(0, 15) : 'CREESER'}
-                                </span>
+                                <div className="text-center px-1">
+                                  <span className="text-[10px] font-black text-slate-800 tracking-wider uppercase block leading-tight">
+                                    {instituicao?.nome ? instituicao.nome.slice(0, 18) : 'INSTITUIÇÃO'}
+                                  </span>
+                                  <span className="text-[7.5px] text-amber-700 font-bold block mt-0.5">
+                                    [Sem logo oficial]
+                                  </span>
+                                </div>
                               )}
                             </div>
-                            <div>
-                              <h1 className="text-sm font-black text-slate-900 uppercase tracking-tight">
+                            <div className="min-w-0 flex-1">
+                              <h1 className="text-sm font-black text-slate-900 uppercase tracking-tight leading-tight">
                                 {instituicao?.nome || 'GRUPO CREESER EDUCACIONAL'}
                               </h1>
-                              <p className="text-[9px] text-slate-500 font-medium">
+                              <p className="text-[9.5px] text-slate-600 font-medium leading-normal mt-0.5">
                                 {instituicao?.cnpj ? `CNPJ: ${instituicao.cnpj}` : ''}
                                 {instituicao?.cidade ? ` • ${instituicao.cidade} - ${instituicao.estado}` : ''}
                                 {instituicao?.telefone ? ` • Tel: ${instituicao.telefone}` : ''}
@@ -475,55 +452,55 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                           </div>
 
                           {/* Título do Documento */}
-                          <div className="text-right">
+                          <div className="text-right shrink-0">
                             <div className="text-base font-black text-slate-900 tracking-wider uppercase">
                               FREQUÊNCIA
                             </div>
-                            <div className="text-[9px] font-semibold text-slate-500 italic uppercase">
-                              Ficha provisória de frequência
+                            <div className="text-[10px] font-bold text-slate-600 uppercase">
+                              Ficha de Frequência
                             </div>
-                            <div className="text-[8px] text-slate-400 mt-0.5">
+                            <div className="text-[8.5px] text-slate-400 mt-0.5">
                               Pág. {pagIndex + 1} de {paginasAlunos.length}
                             </div>
                           </div>
                         </div>
 
-                        {/* Grade de Metadados da Turma e Disciplina */}
-                        <div className="grid grid-cols-4 gap-2 my-2.5 p-2 bg-slate-50 border border-slate-200 rounded text-[10px]">
+                        {/* Grade de Metadados da Turma e Disciplina (sem corte de texto) */}
+                        <div className="grid grid-cols-4 gap-2 my-2.5 p-2.5 bg-slate-50 border border-slate-200 rounded text-[10px]">
                           <div>
-                            <span className="font-bold text-slate-500 uppercase block text-[8px]">Curso:</span>
-                            <span className="font-bold text-slate-900 truncate block">
+                            <span className="font-bold text-slate-500 uppercase block text-[8px] mb-0.5">Curso:</span>
+                            <span className="font-bold text-slate-900 leading-snug break-words block">
                               {turma.curso || dadosTurma?.turma?.curso || '—'}
                             </span>
                           </div>
                           <div>
-                            <span className="font-bold text-slate-500 uppercase block text-[8px]">Turma:</span>
-                            <span className="font-bold text-slate-900 truncate block">
+                            <span className="font-bold text-slate-500 uppercase block text-[8px] mb-0.5">Turma:</span>
+                            <span className="font-bold text-slate-900 leading-snug break-words block">
                               {turma.nome} {turma.turno ? `(${turma.turno})` : ''}
                             </span>
                           </div>
                           <div>
-                            <span className="font-bold text-slate-500 uppercase block text-[8px]">Disciplina:</span>
-                            <span className="font-bold text-slate-900 truncate block">
+                            <span className="font-bold text-slate-500 uppercase block text-[8px] mb-0.5">Disciplina:</span>
+                            <span className="font-bold text-slate-900 leading-snug break-words block">
                               {disciplinaSelecionada || '—'}
                             </span>
                           </div>
                           <div>
-                            <span className="font-bold text-slate-500 uppercase block text-[8px]">Mês / Ano:</span>
-                            <span className="font-bold text-teal-800 uppercase block">
+                            <span className="font-bold text-slate-500 uppercase block text-[8px] mb-0.5">Mês / Ano:</span>
+                            <span className="font-bold text-teal-800 uppercase block leading-snug">
                               {nomeMesExtenso} / {ano}
                             </span>
                           </div>
 
-                          <div className="col-span-2 pt-1 border-t border-slate-200/60">
-                            <span className="font-bold text-slate-500 uppercase block text-[8px]">Professor(a):</span>
-                            <span className="font-medium text-slate-800">
+                          <div className="col-span-2 pt-1.5 border-t border-slate-200/60 mt-1">
+                            <span className="font-bold text-slate-500 uppercase block text-[8px] mb-0.5">Professor(a):</span>
+                            <span className="font-medium text-slate-800 leading-snug block">
                               {professorManual.trim() || '__________________________________________________'}
                             </span>
                           </div>
-                          <div className="col-span-2 pt-1 border-t border-slate-200/60">
-                            <span className="font-bold text-slate-500 uppercase block text-[8px]">Horário / Carga Horária:</span>
-                            <span className="font-medium text-slate-800">
+                          <div className="col-span-2 pt-1.5 border-t border-slate-200/60 mt-1">
+                            <span className="font-bold text-slate-500 uppercase block text-[8px] mb-0.5">Horário / Carga Horária:</span>
+                            <span className="font-medium text-slate-800 leading-snug block">
                               Turno {turma.turno || 'Regular'} • Conforme cronograma pedagógico
                             </span>
                           </div>
@@ -636,9 +613,6 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                             <div className="mt-0.5">Emitido em: {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div>
                           </div>
                         </div>
-                        <div className="text-center text-[7.5px] text-slate-400 italic pt-1 border-t border-slate-100">
-                          Documento provisório destinado exclusivamente à coleta manual de frequência em sala. A escrituração acadêmica oficial ocorrerá no módulo Pedagógico.
-                        </div>
                       </div>
 
                     </div>
@@ -661,7 +635,7 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
           </div>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition"
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer"
           >
             Fechar
           </button>

@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
+import fs from 'fs';
+import path from 'path';
 import {
   requireAuth,
   requirePerfil,
@@ -20,6 +22,22 @@ const PERFIS_PERMITIDOS = [
   'recepcao',
   'professor',
 ];
+
+// Helper para converter imagem local para Base64 Data URL (para renderização garantida no PDF sem bloqueio CORS)
+function getLocalImageAsDataUrl(relativePath) {
+  try {
+    const fullPath = path.join(process.cwd(), 'public', relativePath.replace(/^\//, ''));
+    if (fs.existsSync(fullPath)) {
+      const ext = path.extname(fullPath).replace('.', '').toLowerCase();
+      const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'image/png';
+      const fileBuffer = fs.readFileSync(fullPath);
+      return `data:${mime};base64,${fileBuffer.toString('base64')}`;
+    }
+  } catch (err) {
+    console.warn('[frequencia-mensal] Falha ao ler imagem local:', err.message);
+  }
+  return null;
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -110,6 +128,16 @@ export default async function handler(req, res) {
 
     // Resolver instituição vinculada (prioridade: turma.instituicoes -> turma.cursos.instituicoes)
     const instituicaoVinculada = turma.instituicoes || turma.cursos?.instituicoes || null;
+
+    // Resolver logotipo:
+    // Estrita regra institucional: usar SOMENTE a logomarca da instituição vinculada.
+    // Nunca utilizar fallback para outra instituição ou empresa caso a instituição não tenha logo próprio.
+    let resolvedLogo = instituicaoVinculada?.logo || null;
+    let pendenciaLogo = false;
+
+    if (!resolvedLogo) {
+      pendenciaLogo = true;
+    }
 
     // 2. Buscar Disciplinas disponíveis para a turma (via gradeid ou cursoid)
     let disciplinas = [];
@@ -211,7 +239,8 @@ export default async function handler(req, res) {
             email: instituicaoVinculada.email || '',
             cidade: instituicaoVinculada.cidade || '',
             estado: instituicaoVinculada.estado || '',
-            logo: instituicaoVinculada.logo || null,
+            logo: resolvedLogo,
+            pendenciaLogo,
           }
         : null,
       disciplinas,
