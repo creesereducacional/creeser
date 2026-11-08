@@ -75,7 +75,7 @@ export default async function handler(req, res) {
 
     // POST - Criar nova instituição
     if (method === 'POST') {
-      const { nome, cnpj, email, telefone, endereco, cidade, estado, cep, website, ativa, descricao } = req.body;
+      const { nome, cnpj, email, telefone, endereco, cidade, estado, cep, website, ativa, descricao, logo } = req.body;
       const codMec = req.body?.codMec || req.body?.cod_mec || null;
       const tipoInstituicao = req.body?.tipo_instituicao || req.body?.tipoInstituicao || null;
 
@@ -100,6 +100,7 @@ export default async function handler(req, res) {
             website: website || null,
             ativa: ativa !== undefined ? ativa : true,
             descricao: descricao || null,
+            logo: typeof logo === 'string' && logo.trim() ? logo.trim() : null,
             ordem: 0
           }
         ])

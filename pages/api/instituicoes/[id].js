@@ -42,7 +42,7 @@ export default async function handler(req, res) {
 
     // PUT - Atualizar instituição
     if (method === 'PUT') {
-      const { nome, cnpj, email, telefone, endereco, cidade, estado, cep, website, ativa, descricao } = req.body;
+      const { nome, cnpj, email, telefone, endereco, cidade, estado, cep, website, ativa, descricao, logo } = req.body;
       const codMec = req.body?.codMec || req.body?.cod_mec || null;
       const tipoInstituicao = req.body?.tipo_instituicao || req.body?.tipoInstituicao || null;
 
@@ -65,7 +65,8 @@ export default async function handler(req, res) {
           cep: cep || null,
           website: website || null,
           ativa: ativa !== undefined ? ativa : true,
-          descricao: descricao || null
+          descricao: descricao || null,
+          ...(logo !== undefined ? { logo: typeof logo === 'string' && logo.trim() ? logo.trim() : null } : {})
         })
         .eq('id', id)
         .select();

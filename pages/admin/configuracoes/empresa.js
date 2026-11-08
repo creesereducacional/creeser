@@ -272,7 +272,8 @@ export default function ConfiguracaoEmpresa() {
     cep: '',
     website: '',
     ativa: true,
-    descricao: ''
+    descricao: '',
+    logo: null
   });
   const [editandoInstituicao, setEditandoInstituicao] = useState(null);
   const [instituicaoContratoId, setInstituicaoContratoId] = useState('');
@@ -700,7 +701,8 @@ export default function ConfiguracaoEmpresa() {
           cep: '',
           website: '',
           ativa: true,
-          descricao: ''
+          descricao: '',
+          logo: null
         });
         setEditandoInstituicao(null);
         carregarInstituicoes();
@@ -716,7 +718,8 @@ export default function ConfiguracaoEmpresa() {
   const editarInstituicao = (instituicao) => {
     setFormInstituicao({
       ...instituicao,
-      codMec: instituicao.codMec || instituicao.cod_mec || ''
+      codMec: instituicao.codMec || instituicao.cod_mec || '',
+      logo: instituicao.logo || null
     });
     setEditandoInstituicao(instituicao);
   };
@@ -3050,6 +3053,68 @@ export default function ConfiguracaoEmpresa() {
                             className="w-full px-3 py-2 text-sm border border-teal-300 rounded-lg focus:outline-none focus:border-teal-500 bg-white"
                           />
                         </div>
+
+                    {/* Campo de Upload da Logomarca da Instituicao */}
+                    <div className="mb-4 p-4 bg-white border border-teal-200 rounded-lg">
+                      <label className="text-xs font-bold text-teal-700 mb-2 block flex items-center gap-1.5">
+                        <span>🖼️</span> LOGOMARCA DA INSTITUIÇÃO
+                        <span className="text-[11px] font-normal text-gray-500">(PNG, JPG ou WEBP - Máx: 2MB)</span>
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                        <div>
+                          <input
+                            type="file"
+                            accept="image/png, image/jpeg, image/jpg, image/webp"
+                            className="w-full text-xs text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-teal-600 file:text-white hover:file:bg-teal-700 cursor-pointer"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const formatos = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+                              if (!formatos.includes(file.type.toLowerCase())) {
+                                mostrarFeedback("Formato inválido. Use imagem PNG, JPG ou WEBP.", "alert", "Atenção");
+                                e.target.value = "";
+                                return;
+                              }
+                              if (file.size > 2 * 1024 * 1024) {
+                                mostrarFeedback("Arquivo muito grande. O limite máximo é de 2MB.", "alert", "Atenção");
+                                e.target.value = "";
+                                return;
+                              }
+                              const reader = new FileReader();
+                              reader.onload = (ev) => {
+                                setFormInstituicao(prev => ({ ...prev, logo: ev.target.result }));
+                              };
+                              reader.readAsDataURL(file);
+                            }}
+                          />
+                          <p className="text-[11px] text-gray-500 mt-1.5 leading-relaxed">
+                            Esta marca será impressa nas fichas de frequência e documentos desta instituição específica.
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-teal-200 rounded-lg bg-teal-50/40 min-h-[90px]">
+                          {formInstituicao.logo ? (
+                            <div className="flex flex-col items-center gap-2">
+                              <img
+                                src={formInstituicao.logo}
+                                alt="Logo da instituição"
+                                className="max-h-16 max-w-[200px] object-contain"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setFormInstituicao(prev => ({ ...prev, logo: null }))}
+                                className="text-[11px] text-red-600 hover:text-red-800 font-bold flex items-center gap-1 transition cursor-pointer"
+                              >
+                                ✕ Remover Logomarca
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400 italic text-center">
+                              Nenhuma logomarca cadastrada para esta instituição
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                           <label className="flex items-center gap-3 p-3 bg-green-50 border border-green-300 rounded-lg cursor-pointer hover:bg-green-100 transition">
