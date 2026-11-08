@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import RecepcaoLayout from '@/components/RecepcaoLayout';
 import EmptyState from '@/components/recepcao/EmptyState';
 import StatusBadge from '@/components/recepcao/StatusBadge';
+import ModalFrequenciaMensal from '@/components/ModalFrequenciaMensal';
 
 export default function RecepcaoTurmas() {
   const [turmas, setTurmas] = useState([]);
@@ -18,6 +19,12 @@ export default function RecepcaoTurmas() {
   const [alunosTurma, setAlunosTurma] = useState([]);
   const [carregandoAlunos, setCarregandoAlunos] = useState(false);
   const [buscaAlunoModal, setBuscaAlunoModal] = useState('');
+
+  // Modal de Frequência Mensal
+  const [modalFrequencia, setModalFrequencia] = useState({
+    isOpen: false,
+    turma: null,
+  });
 
   useEffect(() => {
     carregarTurmas();
@@ -328,12 +335,21 @@ export default function RecepcaoTurmas() {
                           </span>
                         </td>
                         <td className="py-3.5 px-4 text-right">
-                          <button
-                            onClick={() => abrirAlunosTurma(turma)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-semibold transition"
-                          >
-                            👥 Ver Alunos ({turma.totalAlunos})
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => setModalFrequencia({ isOpen: true, turma })}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white rounded-xl text-xs font-bold shadow-xs transition"
+                              title="Gerar Ficha Provisória de Frequência Mensal (PDF)"
+                            >
+                              📋 Frequência PDF
+                            </button>
+                            <button
+                              onClick={() => abrirAlunosTurma(turma)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-semibold transition"
+                            >
+                              👥 Ver Alunos ({turma.totalAlunos})
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -433,7 +449,17 @@ export default function RecepcaoTurmas() {
               </div>
 
               {/* Rodapé do Modal */}
-              <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end">
+              <div className="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
+                <button
+                  onClick={() => {
+                    const t = modalTurma;
+                    fecharModal();
+                    setModalFrequencia({ isOpen: true, turma: t });
+                  }}
+                  className="px-3.5 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-semibold transition flex items-center gap-1.5"
+                >
+                  📋 Gerar Frequência PDF desta Turma
+                </button>
                 <button
                   onClick={fecharModal}
                   className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl text-xs font-semibold transition"
@@ -445,6 +471,13 @@ export default function RecepcaoTurmas() {
             </div>
           </div>
         )}
+
+        {/* Modal de Frequência Mensal (PDF) */}
+        <ModalFrequenciaMensal
+          isOpen={modalFrequencia.isOpen}
+          onClose={() => setModalFrequencia({ isOpen: false, turma: null })}
+          turma={modalFrequencia.turma}
+        />
 
       </div>
     </RecepcaoLayout>

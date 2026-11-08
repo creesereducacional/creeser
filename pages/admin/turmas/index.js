@@ -4,6 +4,7 @@ import PageHeader from '@/components/ui/PageHeader';
 import EmptyState from '@/components/ui/EmptyState';
 import { SkeletonTable } from '@/components/ui/LoadingSkeleton';
 import ConfirmModal from '@/components/ConfirmModal';
+import ModalFrequenciaMensal from '@/components/ModalFrequenciaMensal';
 
 export default function ListagemTurmas() {
   const [turmas, setTurmas] = useState([]);
@@ -27,6 +28,12 @@ export default function ListagemTurmas() {
     isOpen: false,
     idTurma: null,
     nomeTurma: '',
+  });
+
+  // Modal de Frequência Mensal em PDF
+  const [modalFrequencia, setModalFrequencia] = useState({
+    isOpen: false,
+    turma: null,
   });
 
   useEffect(() => {
@@ -632,11 +639,12 @@ export default function ListagemTurmas() {
                           <td className="px-5 py-3.5 text-center whitespace-nowrap">
                             <div className="flex items-center justify-center gap-1.5">
                               <button
-                                onClick={() => window.print()}
-                                className="p-1.5 text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition cursor-pointer"
-                                title="Imprimir Ficha"
+                                onClick={() => setModalFrequencia({ isOpen: true, turma })}
+                                className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-xs whitespace-nowrap"
+                                title="Gerar Ficha Provisória de Frequência Mensal (PDF)"
                               >
-                                🖨️
+                                <span>📋</span>
+                                <span>Frequência PDF</span>
                               </button>
                               <Link href={`/admin/turmas/${turma.id}`}>
                                 <button
@@ -734,6 +742,13 @@ export default function ListagemTurmas() {
           title="Excluir Turma"
           message={`Tem certeza que deseja deletar a turma "${modalConfirm.nomeTurma}"? Esta ação não poderá ser desfeita.`}
           type="delete"
+        />
+
+        {/* Modal de Frequência Mensal (PDF) */}
+        <ModalFrequenciaMensal
+          isOpen={modalFrequencia.isOpen}
+          onClose={() => setModalFrequencia({ isOpen: false, turma: null })}
+          turma={modalFrequencia.turma}
         />
       </div>
     </>
