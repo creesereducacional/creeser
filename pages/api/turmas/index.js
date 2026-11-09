@@ -209,9 +209,9 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Professor só tem permissão de leitura (GET)
-  if (hasPerfil(authUser, ['professor']) && req.method !== 'GET') {
-    return res.status(403).json({ error: 'Acesso negado: Professor possui acesso apenas para leitura.' });
+  // Secretaria, Coordenador e Professor: restrições na criação de turmas
+  if (hasPerfil(authUser, ['secretaria', 'coordenador', 'professor']) && req.method !== 'GET') {
+    return res.status(403).json({ error: 'Acesso negado: Perfil não possui permissão para cadastrar novas turmas.' });
   }
 
   const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);

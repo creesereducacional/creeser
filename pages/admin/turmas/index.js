@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useAuthContext } from '@/context/AuthContext';
 import Link from 'next/link';
 import PageHeader from '@/components/ui/PageHeader';
 import EmptyState from '@/components/ui/EmptyState';
@@ -7,6 +8,13 @@ import ConfirmModal from '@/components/ConfirmModal';
 import ModalFrequenciaMensal from '@/components/ModalFrequenciaMensal';
 
 export default function ListagemTurmas() {
+  const { usuario } = useAuthContext();
+  const perfil = String(usuario?.perfil || usuario?.tipo || '').toLowerCase();
+  const isSecretaria = perfil === 'secretaria';
+  const isCoordenador = perfil === 'coordenador';
+  const canCreate = !isSecretaria && !isCoordenador;
+  const canEdit = !isSecretaria;
+  const canDelete = !isSecretaria && !isCoordenador;
   const [turmas, setTurmas] = useState([]);
   const [instituicoes, setInstituicoes] = useState([]);
   const [todasUnidades, setTodasUnidades] = useState([]);
@@ -280,12 +288,14 @@ export default function ListagemTurmas() {
             </div>
           </div>
 
-          <Link href="/admin/turmas/novo">
-            <button className="inline-flex items-center justify-center gap-2 bg-[#009688] hover:bg-[#00796B] active:bg-[#00695C] text-white font-semibold px-5 py-2.5 rounded-xl text-sm shadow-xs transition cursor-pointer self-start sm:self-auto">
-              <span className="text-lg leading-none">+</span>
-              <span>Nova Turma</span>
-            </button>
-          </Link>
+          {canCreate && (
+            <Link href="/admin/turmas/novo">
+              <button className="inline-flex items-center justify-center gap-2 bg-[#009688] hover:bg-[#00796B] active:bg-[#00695C] text-white font-semibold px-5 py-2.5 rounded-xl text-sm shadow-xs transition cursor-pointer self-start sm:self-auto">
+                <span className="text-lg leading-none">+</span>
+                <span>Nova Turma</span>
+              </button>
+            </Link>
+          )}
         </div>
 
         {/* ── 2. ABAS (Listar, Inserir) ───────────────────────────────────────── */}
@@ -293,11 +303,13 @@ export default function ListagemTurmas() {
           <button className="px-5 py-2.5 font-bold text-sm flex items-center gap-2 text-[#009688] border-b-2 border-[#009688] transition cursor-pointer">
             📋 Listar
           </button>
-          <Link href="/admin/turmas/novo">
-            <button className="px-5 py-2.5 text-slate-500 hover:text-slate-800 font-semibold text-sm flex items-center gap-2 transition cursor-pointer">
-              ➕ Inserir
-            </button>
-          </Link>
+          {canCreate && (
+            <Link href="/admin/turmas/novo">
+              <button className="px-5 py-2.5 text-slate-500 hover:text-slate-800 font-semibold text-sm flex items-center gap-2 transition cursor-pointer">
+                ➕ Inserir
+              </button>
+            </Link>
+          )}
         </div>
 
         {/* ── 3. KPI METRIC CARDS ────────────────────────────────────────────── */}
@@ -646,21 +658,25 @@ export default function ListagemTurmas() {
                                 <span>📋</span>
                                 <span>Frequência PDF</span>
                               </button>
-                              <Link href={`/admin/turmas/${turma.id}`}>
+                              {canEdit && (
+                                <Link href={`/admin/turmas/${turma.id}`}>
+                                  <button
+                                    className="p-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition cursor-pointer"
+                                    title="Editar Turma"
+                                  >
+                                    ✏️
+                                  </button>
+                                </Link>
+                              )}
+                              {canDelete && (
                                 <button
-                                  className="p-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition cursor-pointer"
-                                  title="Editar Turma"
+                                  onClick={() => solicitarDeletar(turma)}
+                                  className="p-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                                  title="Excluir Turma"
                                 >
-                                  ✏️
+                                  ❌
                                 </button>
-                              </Link>
-                              <button
-                                onClick={() => solicitarDeletar(turma)}
-                                className="p-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                                title="Excluir Turma"
-                              >
-                                ❌
-                              </button>
+                              )}
                             </div>
                           </td>
                         </tr>

@@ -137,6 +137,14 @@ export default async function handler(req, res) {
     return;
   }
 
+  // Secretaria: apenas leitura. Coordenador: pode PUT (editar cadastral), mas não DELETE (excluir).
+  if (hasPerfil(authUser, ['secretaria']) && req.method !== 'GET') {
+    return res.status(403).json({ error: 'Acesso negado: Secretaria possui acesso apenas de visualização para alunos.' });
+  }
+  if (hasPerfil(authUser, ['coordenador']) && req.method === 'DELETE') {
+    return res.status(403).json({ error: 'Acesso negado: Coordenação não possui permissão para excluir alunos.' });
+  }
+
   const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);
 
   try {

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useAuthContext } from '@/context/AuthContext';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
@@ -9,6 +10,13 @@ import ModalRematricula from '@/components/ModalRematricula';
 import ConfirmModal from '@/components/ConfirmModal';
 
 export default function ListagemAlunos() {
+  const { usuario } = useAuthContext();
+  const perfil = String(usuario?.perfil || usuario?.tipo || '').toLowerCase();
+  const isSecretaria = perfil === 'secretaria';
+  const isCoordenador = perfil === 'coordenador';
+  const canCreate = !isSecretaria && !isCoordenador;
+  const canEdit = !isSecretaria;
+  const canDelete = !isSecretaria && !isCoordenador;
   const router = useRouter();
   const currentYear = new Date().getFullYear().toString();
   const [abaAtiva, setAbaAtiva] = useState('listar');
@@ -672,12 +680,14 @@ export default function ListagemAlunos() {
             </div>
           </div>
 
-          <Link href="/admin/alunos/novo">
-            <button className="inline-flex items-center justify-center gap-2 bg-[#009688] hover:bg-[#00796B] active:bg-[#00695C] text-white font-semibold px-5 py-2.5 rounded-xl text-sm shadow-xs transition cursor-pointer self-start sm:self-auto">
-              <span className="text-lg leading-none">+</span>
-              <span>Novo Aluno</span>
-            </button>
-          </Link>
+          {canCreate && (
+            <Link href="/admin/alunos/novo">
+              <button className="inline-flex items-center justify-center gap-2 bg-[#009688] hover:bg-[#00796B] active:bg-[#00695C] text-white font-semibold px-5 py-2.5 rounded-xl text-sm shadow-xs transition cursor-pointer self-start sm:self-auto">
+                <span className="text-lg leading-none">+</span>
+                <span>Novo Aluno</span>
+              </button>
+            </Link>
+          )}
         </div>
 
         {/* ── 2. ABAS (Listar, Inserir, Importação) ─────────────────────────── */}
@@ -692,21 +702,25 @@ export default function ListagemAlunos() {
           >
             📋 Listar
           </button>
-          <Link href="/admin/alunos/novo">
-            <button className="px-5 py-2.5 text-slate-500 hover:text-slate-800 font-semibold text-sm flex items-center gap-2 transition cursor-pointer">
-              ➕ Inserir
+          {canCreate && (
+            <Link href="/admin/alunos/novo">
+              <button className="px-5 py-2.5 text-slate-500 hover:text-slate-800 font-semibold text-sm flex items-center gap-2 transition cursor-pointer">
+                ➕ Inserir
+              </button>
+            </Link>
+          )}
+          {canCreate && (
+            <button 
+              onClick={() => setAbaAtiva('importacao')}
+              className={`px-5 py-2.5 font-semibold text-sm flex items-center gap-2 transition cursor-pointer ${
+                abaAtiva === 'importacao' 
+                  ? 'text-[#009688] border-b-2 border-[#009688]' 
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              📥 Importação
             </button>
-          </Link>
-          <button 
-            onClick={() => setAbaAtiva('importacao')}
-            className={`px-5 py-2.5 font-semibold text-sm flex items-center gap-2 transition cursor-pointer ${
-              abaAtiva === 'importacao' 
-                ? 'text-[#009688] border-b-2 border-[#009688]' 
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            📥 Importação
-          </button>
+          )}
         </div>
 
         {/* ── ABA LISTAR ─────────────────────────────────────────────────────── */}
@@ -1065,14 +1079,16 @@ export default function ListagemAlunos() {
                               </td>
                               <td className="px-4 py-3.5 text-center whitespace-nowrap">
                                 <div className="flex items-center justify-center gap-1.5">
-                                  <Link href={`/admin/alunos/${aluno.id}`}>
-                                    <button
-                                      className="p-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition cursor-pointer"
-                                      title="Editar Aluno"
-                                    >
-                                      ✏️
-                                    </button>
-                                  </Link>
+                                  {canEdit && (
+                                    <Link href={`/admin/alunos/${aluno.id}`}>
+                                      <button
+                                        className="p-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition cursor-pointer"
+                                        title="Editar Aluno"
+                                      >
+                                        ✏️
+                                      </button>
+                                    </Link>
+                                  )}
                                   <Link href={`/admin/alunos/historico?id=${aluno.id}`}>
                                     <button
                                       className="p-1.5 text-sky-600 hover:text-sky-700 hover:bg-sky-50 rounded-lg transition cursor-pointer"
@@ -1280,6 +1296,8 @@ export default function ListagemAlunos() {
           consultarAssinaturaDigital={consultarAssinaturaDigital}
           setModalRematricula={setModalRematricula}
           solicitarDeletar={solicitarDeletar}
+          canCreate={canCreate}
+          canDelete={canDelete}
         />
       )}
     </>
@@ -1301,6 +1319,8 @@ function MenuAcoesFlutuante({
   consultarAssinaturaDigital,
   setModalRematricula,
   solicitarDeletar,
+  canCreate,
+  canDelete,
 }) {
   const [style, setStyle] = useState({});
   const [isReady, setIsReady] = useState(false);
@@ -1465,29 +1485,34 @@ function MenuAcoesFlutuante({
         </div>
       </Link>
 
-      <button
-        onClick={() => {
-          onClose();
-          setModalRematricula(aluno);
-        }}
-        className="w-full px-3.5 py-2.5 text-teal-700 hover:bg-teal-50 flex items-center gap-2.5 font-semibold cursor-pointer transition-colors text-left"
-      >
-        <span className="text-sm">🔄</span>
-        <span>Rematrícula / Novo Curso</span>
-      </button>
+      {canCreate && (
+        <button
+          onClick={() => {
+            onClose();
+            setModalRematricula(aluno);
+          }}
+          className="w-full px-3.5 py-2.5 text-teal-700 hover:bg-teal-50 flex items-center gap-2.5 font-semibold cursor-pointer transition-colors text-left"
+        >
+          <span className="text-sm">🔄</span>
+          <span>Rematrícula / Novo Curso</span>
+        </button>
+      )}
 
-      <div className="h-px bg-slate-100 my-1" />
-
-      <button
-        onClick={() => {
-          onClose();
-          solicitarDeletar(aluno);
-        }}
-        className="w-full px-3.5 py-2.5 text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 font-semibold cursor-pointer transition-colors text-left"
-      >
-        <span className="text-sm">❌</span>
-        <span>Excluir Aluno</span>
-      </button>
+      {canDelete && (
+        <>
+          <div className="h-px bg-slate-100 my-1" />
+          <button
+            onClick={() => {
+              onClose();
+              solicitarDeletar(aluno);
+            }}
+            className="w-full px-3.5 py-2.5 text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 font-semibold cursor-pointer transition-colors text-left"
+          >
+            <span className="text-sm">❌</span>
+            <span>Excluir Aluno</span>
+          </button>
+        </>
+      )}
     </div>,
     document.body
   );

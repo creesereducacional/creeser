@@ -30,7 +30,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const PERFIS_PERMITIDOS = ['grupo_admin', 'instituicao_admin', 'admin', 'secretaria', 'coordenador'];
+const PERFIS_PERMITIDOS = ['grupo_admin', 'instituicao_admin', 'admin'];
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

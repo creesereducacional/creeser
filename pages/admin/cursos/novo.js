@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useAuthContext } from '@/context/AuthContext';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 
@@ -29,6 +30,10 @@ const formatarMoedaBRL = (val) => {
 };
 
 export default function CadastroCurso() {
+  const { usuario } = useAuthContext();
+  const perfil = String(usuario?.perfil || usuario?.tipo || '').toLowerCase();
+  const isSecretaria = perfil === 'secretaria';
+  const isCoordenador = perfil === 'coordenador';
   const router = useRouter();
   const { id } = router.query;
   const isEditando = id && id !== 'novo';
@@ -859,13 +864,15 @@ export default function CadastroCurso() {
 
           {/* Botões */}
           <div className="flex gap-4">
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-8 py-2 bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 transition disabled:opacity-50 text-sm"
-            >
-              {loading ? 'Salvando...' : isEditando ? 'Atualizar' : 'Cadastrar'}
-            </button>
+            {!isSecretaria && (
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-8 py-2 bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 transition disabled:opacity-50 text-sm cursor-pointer"
+              >
+                {loading ? 'Salvando...' : isEditando ? 'Atualizar' : 'Cadastrar'}
+              </button>
+            )}
             <Link href="/admin/cursos">
               <button type="button" className="px-8 py-2 bg-gray-400 text-white rounded-lg font-semibold hover:bg-gray-500 transition text-sm">
                 Cancelar

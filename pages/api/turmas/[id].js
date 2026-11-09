@@ -210,9 +210,12 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Professor só tem permissão de leitura (GET)
-  if (hasPerfil(authUser, ['professor']) && req.method !== 'GET') {
-    return res.status(403).json({ error: 'Acesso negado: Professor possui acesso apenas para leitura.' });
+  // Secretaria e Professor: apenas leitura. Coordenador: pode PUT (editar), mas não DELETE (excluir).
+  if (hasPerfil(authUser, ['secretaria', 'professor']) && req.method !== 'GET') {
+    return res.status(403).json({ error: 'Acesso negado: Perfil não possui permissão de escrita em turmas.' });
+  }
+  if (hasPerfil(authUser, ['coordenador']) && req.method === 'DELETE') {
+    return res.status(403).json({ error: 'Acesso negado: Coordenação não possui permissão para excluir turmas.' });
   }
 
   const isGroupAdmin = hasPerfil(authUser, ['grupo_admin']);

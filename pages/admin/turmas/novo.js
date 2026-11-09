@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react';
+import { useAuthContext } from '@/context/AuthContext';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import CustomModal from '../../../components/CustomModal';
 import ModalPreviewContrato from '@/components/ModalPreviewContrato';
 
 export default function NovoTurma() {
+  const { usuario } = useAuthContext();
+  const perfil = String(usuario?.perfil || usuario?.tipo || '').toLowerCase();
+  const isSecretaria = perfil === 'secretaria';
+  const isCoordenador = perfil === 'coordenador';
   const router = useRouter();
   const [opcoes, setOpcoes] = useState({ instituicoes: [], unidades: [], cursos: [], grades: [], contratos: [] });
   const [loadingOpcoes, setLoadingOpcoes] = useState(true);

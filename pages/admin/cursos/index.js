@@ -1,10 +1,18 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useAuthContext } from '@/context/AuthContext';
 import Link from 'next/link';
 import EmptyState from '@/components/ui/EmptyState';
 import { SkeletonTable } from '@/components/ui/LoadingSkeleton';
 import ConfirmModal from '@/components/ConfirmModal';
 
 export default function ListagemCursos() {
+  const { usuario } = useAuthContext();
+  const perfil = String(usuario?.perfil || usuario?.tipo || '').toLowerCase();
+  const isSecretaria = perfil === 'secretaria';
+  const isCoordenador = perfil === 'coordenador';
+  const canCreate = !isSecretaria && !isCoordenador;
+  const canEdit = !isSecretaria;
+  const canDelete = !isSecretaria && !isCoordenador;
   const [cursos, setCursos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [instituicoes, setInstituicoes] = useState([]);
@@ -193,12 +201,14 @@ export default function ListagemCursos() {
             </div>
           </div>
 
-          <Link href="/admin/cursos/novo">
-            <button className="inline-flex items-center justify-center gap-2 bg-[#009688] hover:bg-[#00796B] active:bg-[#00695C] text-white font-semibold px-5 py-2.5 rounded-xl text-sm shadow-xs transition cursor-pointer self-start sm:self-auto">
-              <span className="text-lg leading-none">+</span>
-              <span>Novo Curso</span>
-            </button>
-          </Link>
+          {canCreate && (
+            <Link href="/admin/cursos/novo">
+              <button className="inline-flex items-center justify-center gap-2 bg-[#009688] hover:bg-[#00796B] active:bg-[#00695C] text-white font-semibold px-5 py-2.5 rounded-xl text-sm shadow-xs transition cursor-pointer self-start sm:self-auto">
+                <span className="text-lg leading-none">+</span>
+                <span>Novo Curso</span>
+              </button>
+            </Link>
+          )}
         </div>
 
         {/* ── 2. ABAS (Listar, Inserir) ───────────────────────────────────────── */}
@@ -206,11 +216,13 @@ export default function ListagemCursos() {
           <button className="px-5 py-2.5 font-bold text-sm flex items-center gap-2 text-[#009688] border-b-2 border-[#009688] transition cursor-pointer">
             📋 Listar
           </button>
-          <Link href="/admin/cursos/novo">
-            <button className="px-5 py-2.5 text-slate-500 hover:text-slate-800 font-semibold text-sm flex items-center gap-2 transition cursor-pointer">
-              ➕ Inserir
-            </button>
-          </Link>
+          {canCreate && (
+            <Link href="/admin/cursos/novo">
+              <button className="px-5 py-2.5 text-slate-500 hover:text-slate-800 font-semibold text-sm flex items-center gap-2 transition cursor-pointer">
+                ➕ Inserir
+              </button>
+            </Link>
+          )}
         </div>
 
         {/* ── 3. KPI METRIC CARDS ────────────────────────────────────────────── */}
@@ -462,21 +474,34 @@ export default function ListagemCursos() {
                           </td>
                           <td className="px-5 py-3.5 text-center whitespace-nowrap">
                             <div className="flex items-center justify-center gap-1.5">
-                              <Link href={`/admin/cursos/${curso.id}`}>
+                              {canEdit ? (
+                                <Link href={`/admin/cursos/${curso.id}`}>
+                                  <button
+                                    className="p-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition cursor-pointer"
+                                    title="Editar Curso"
+                                  >
+                                    ✏️
+                                  </button>
+                                </Link>
+                              ) : (
+                                <Link href={`/admin/cursos/${curso.id}`}>
+                                  <button
+                                    className="p-1.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                                    title="Visualizar Curso"
+                                  >
+                                    👁️
+                                  </button>
+                                </Link>
+                              )}
+                              {canDelete && (
                                 <button
-                                  className="p-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 rounded-lg transition cursor-pointer"
-                                  title="Editar Curso"
+                                  onClick={() => solicitarDeletar(curso)}
+                                  className="p-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                                  title="Excluir Curso"
                                 >
-                                  ✏️
+                                  ❌
                                 </button>
-                              </Link>
-                              <button
-                                onClick={() => solicitarDeletar(curso)}
-                                className="p-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                                title="Excluir Curso"
-                              >
-                                ❌
-                              </button>
+                              )}
                             </div>
                           </td>
                         </tr>

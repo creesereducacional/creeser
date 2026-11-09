@@ -192,14 +192,14 @@ export default function DashboardLayout({ children }) {
         { id: 'ped-cursos', nome: 'Cursos', icon: '▪', url: '/admin/cursos', em_breve: false, completed: true },
         { id: 'ped-turmas', nome: 'Turmas', icon: '▪', url: '/admin/turmas', em_breve: false, completed: true },
         { id: 'ped-alunos', nome: 'Alunos', icon: '▪', url: '/admin/alunos', em_breve: false, completed: true },
-        { id: 'ped-responsaveis', nome: 'Responsáveis', icon: '▪', url: '/admin/responsaveis', em_breve: false, completed: true },
-        { id: 'ped-componente-curricular', nome: 'Componente Curricular', icon: '▪', url: '/admin/disciplinas/grades', em_breve: false, completed: true },
-        { id: 'ped-disciplinas', nome: 'Disciplinas', icon: '▪', url: '/admin/disciplinas', em_breve: false, completed: true },
-        { id: 'ped-professores', nome: 'Professores', icon: '▪', url: '/admin/professores', em_breve: false, completed: true },
-        { id: 'ped-notas', nome: 'Notas e Faltas', icon: '▪', url: '/admin/notas-faltas', em_breve: false, completed: true },
-        { id: 'ped-planejamento', nome: 'Planejamento Diário', icon: '▪', url: '/admin/planejamento-diario', em_breve: false, completed: true },
-        { id: 'ped-livro-registro', nome: 'Livro de Registros', icon: '▪', url: '/admin/livro-registro', em_breve: false, completed: true },
-        { id: 'ped-atividades', nome: 'Atividades Complementares', icon: '▪', url: '/admin/atividades-complementares', em_breve: false, completed: true },
+        { id: 'ped-responsaveis', nome: 'Responsáveis', icon: '▪', url: '/admin/responsaveis', em_breve: false, completed: true, perfis: ['grupo_admin', 'instituicao_admin'] },
+        { id: 'ped-componente-curricular', nome: 'Componente Curricular', icon: '▪', url: '/admin/disciplinas/grades', em_breve: false, completed: true, perfis: ['grupo_admin', 'instituicao_admin'] },
+        { id: 'ped-disciplinas', nome: 'Disciplinas', icon: '▪', url: '/admin/disciplinas', em_breve: false, completed: true, perfis: ['grupo_admin', 'instituicao_admin'] },
+        { id: 'ped-professores', nome: 'Professores', icon: '▪', url: '/admin/professores', em_breve: false, completed: true, perfis: ['grupo_admin', 'instituicao_admin'] },
+        { id: 'ped-notas', nome: 'Notas e Faltas', icon: '▪', url: '/admin/notas-faltas', em_breve: false, completed: true, perfis: ['grupo_admin', 'instituicao_admin'] },
+        { id: 'ped-planejamento', nome: 'Planejamento Diário', icon: '▪', url: '/admin/planejamento-diario', em_breve: false, completed: true, perfis: ['grupo_admin', 'instituicao_admin'] },
+        { id: 'ped-livro-registro', nome: 'Livro de Registros', icon: '▪', url: '/admin/livro-registro', em_breve: false, completed: true, perfis: ['grupo_admin', 'instituicao_admin'] },
+        { id: 'ped-atividades', nome: 'Atividades Complementares', icon: '▪', url: '/admin/atividades-complementares', em_breve: false, completed: true, perfis: ['grupo_admin', 'instituicao_admin'] },
       ]
     },
 
@@ -406,7 +406,7 @@ export default function DashboardLayout({ children }) {
       icon: '⚙️',
       em_breve: false,
       secao: 'Sistema',
-      perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
+      perfis: ['grupo_admin', 'instituicao_admin'],
       submenu: [
         { id: 'config-operacionais', nome: 'Configurações Operacionais', icon: '▪', url: '/admin/configuracoes', em_breve: false, completed: true },
         { id: 'config-tecnica', nome: 'Configuração Técnica', icon: '▪', url: '/admin/configuracoes/empresa', em_breve: false, completed: true }

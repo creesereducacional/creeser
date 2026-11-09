@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
+import { useAuthContext } from '@/context/AuthContext';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import CustomModal from '../../../components/CustomModal';
 import ModalPreviewContrato from '@/components/ModalPreviewContrato';
 
 export default function EditarTurma() {
+  const { usuario } = useAuthContext();
+  const perfil = String(usuario?.perfil || usuario?.tipo || '').toLowerCase();
+  const isSecretaria = perfil === 'secretaria';
   const router = useRouter();
   const { id } = router.query;
   const [opcoes, setOpcoes] = useState({ instituicoes: [], unidades: [], cursos: [], grades: [], contratos: [] });
@@ -780,13 +784,15 @@ export default function EditarTurma() {
 
           {/* Botões de Ação */}
           <div className="flex gap-4 justify-start">
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-8 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold transition text-sm disabled:opacity-50"
-            >
-              {saving ? 'SALVANDO...' : 'SALVAR'}
-            </button>
+            {!isSecretaria && (
+              <button
+                type="submit"
+                disabled={saving}
+                className="px-8 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold transition text-sm disabled:opacity-50 cursor-pointer"
+              >
+                {saving ? 'SALVANDO...' : 'SALVAR'}
+              </button>
+            )}
             <Link href="/admin/turmas">
               <button
                 type="button"

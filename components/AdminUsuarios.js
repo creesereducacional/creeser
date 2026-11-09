@@ -18,6 +18,7 @@ const formatarWhatsapp = (value) => {
 const PERFIS = [
   { value: 'grupo_admin',       label: 'Admin Geral (Grupo)' },
   { value: 'instituicao_admin', label: 'Admin Instituicao' },
+  { value: 'coordenador',       label: 'Coordenação Pedagógica' },
   { value: 'financeiro',        label: 'Financeiro' },
   { value: 'secretaria',        label: 'Secretaria' },
   { value: 'recepcao',          label: 'Recepcao' },

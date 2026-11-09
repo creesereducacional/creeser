@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuthContext } from '@/context/AuthContext';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { validarCPF, validarTelefone } from '@/utils/validacoes';
@@ -56,6 +57,10 @@ const maskRG = (v = '') => String(v || '').replace(/\D/g, '').slice(0, 14);
 const maskAno = (v = '') => String(v || '').replace(/\D/g, '').slice(0, 4);
 
 export default function CadastroAluno() {
+  const { usuario } = useAuthContext();
+  const perfil = String(usuario?.perfil || usuario?.tipo || '').toLowerCase();
+  const isSecretaria = perfil === 'secretaria';
+  const isCoordenador = perfil === 'coordenador';
   const router = useRouter();
   const { id } = router.query;
   const isEditando = id && id !== 'novo';
@@ -241,6 +246,10 @@ export default function CadastroAluno() {
   });
 
   useEffect(() => {
+    if (!isEditando && (isSecretaria || isCoordenador)) {
+      router.replace('/admin/alunos');
+      return;
+    }
     carregarInstituicoes();
     carregarCursos();
     carregarTurmas();
@@ -1630,13 +1639,15 @@ export default function CadastroAluno() {
 
           {/* Botões */}
           <div className="flex gap-3 justify-center">
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-12 py-3 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-lg transition-all duration-200 disabled:opacity-50"
-            >
-              {loading ? 'Salvando...' : isEditando ? 'Atualizar' : 'Cadastrar'}
-            </button>
+            {!isSecretaria && (
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-12 py-3 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 cursor-pointer"
+              >
+                {loading ? 'Salvando...' : isEditando ? 'Atualizar' : 'Cadastrar'}
+              </button>
+            )}
             <Link href="/admin/alunos">
               <button
                 type="button"
