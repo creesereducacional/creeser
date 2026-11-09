@@ -85,6 +85,17 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
     }
   }
 
+  // Dividir alunos para a Página 3 (Controle de Notas - 16 por página para acomodar linha de reposição e assinaturas)
+  const ALUNOS_POR_PAGINA_NOTAS = 16;
+  const paginasAlunosNotas = [];
+  if (alunos.length === 0) {
+    paginasAlunosNotas.push([]);
+  } else {
+    for (let i = 0; i < alunos.length; i += ALUNOS_POR_PAGINA_NOTAS) {
+      paginasAlunosNotas.push(alunos.slice(i, i + ALUNOS_POR_PAGINA_NOTAS));
+    }
+  }
+
   const nomeMesExtenso = MESES.find((m) => m.valor === Number(mes))?.nome || mes;
 
   const handleBaixarPdf = async () => {
@@ -356,7 +367,7 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
               {/* Barra de Ações do Preview */}
               <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
                 <div className="text-xs text-slate-600">
-                  Exibindo pré-visualização em formato <strong>A4 Paisagem (Landscape)</strong> • {paginasAlunos.length} página(s)
+                  Exibindo pré-visualização em formato <strong>A4 Paisagem (Landscape)</strong> • {paginasAlunos.length + 1 + paginasAlunosNotas.length} páginas (Frequência, Conteúdo e Atividades, Controle de Notas)
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -409,11 +420,11 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
 
                   {paginasAlunos.map((grupoAlunos, pagIndex) => (
                     <div
-                      key={pagIndex}
+                      key={`freq-${pagIndex}`}
                       className="pagina-frequencia p-5 sm:p-6 text-slate-900 flex flex-col justify-between"
                       style={{
                         minHeight: '200mm',
-                        pageBreakAfter: pagIndex < paginasAlunos.length - 1 ? 'always' : 'auto',
+                        pageBreakAfter: 'always',
                       }}
                     >
                       {/* Topo Oficial Timbrado */}
@@ -460,7 +471,9 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                               Ficha de Frequência
                             </div>
                             <div className="text-[8.5px] text-slate-400 mt-0.5">
-                              Pág. {pagIndex + 1} de {paginasAlunos.length}
+                              {paginasAlunos.length > 1
+                                ? `Página 1.${pagIndex + 1} de 1.${paginasAlunos.length}`
+                                : 'Página 1 de 3'}
                             </div>
                           </div>
                         </div>
@@ -513,7 +526,7 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                               <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-300">
                                 <th className="p-1 border-r border-slate-300 w-6 text-center">Nº</th>
                                 <th className="p-1 border-r border-slate-300 text-left min-w-[150px] max-w-[200px]">
-                                  Nome do Aluno
+                                    Nome do Aluno
                                 </th>
                                 <th className="p-1 border-r border-slate-300 text-center w-20">
                                   Matrícula
@@ -597,7 +610,7 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                         </div>
                       </div>
 
-                      {/* Rodapé da Página: Assinaturas e Legenda */}
+                      {/* Rodapé da Página 1: Assinaturas e Legenda */}
                       <div className="pt-3 border-t border-slate-300 mt-2 text-[9px] text-slate-600">
                         <div className="grid grid-cols-3 gap-6 items-end pb-2">
                           <div className="text-center">
@@ -615,6 +628,391 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                         </div>
                       </div>
 
+                    </div>
+                  ))}
+
+                  {/* ══════════════════════════════════════════════════════════════════ */}
+                  {/* PÁGINA 2 — CONTEÚDO E ATIVIDADES                                    */}
+                  {/* ══════════════════════════════════════════════════════════════════ */}
+                  <div
+                    className="pagina-frequencia p-5 sm:p-6 text-slate-900 flex flex-col justify-between"
+                    style={{
+                      minHeight: '200mm',
+                      pageBreakAfter: 'always',
+                    }}
+                  >
+                    <div>
+                      {/* Topo Oficial Timbrado */}
+                      <div className="flex items-center justify-between pb-2 border-b-2 border-slate-800 gap-4">
+                        <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                          <div className="w-28 h-14 flex items-center justify-center border border-slate-200 rounded p-1 bg-white shrink-0">
+                            {instituicao?.logo ? (
+                              <img
+                                src={instituicao.logo}
+                                alt={instituicao.nome}
+                                className="max-h-full max-w-full object-contain"
+                              />
+                            ) : (
+                              <div className="text-center px-1">
+                                <span className="text-[10px] font-black text-slate-800 tracking-wider uppercase block leading-tight">
+                                  {instituicao?.nome ? instituicao.nome.slice(0, 18) : 'INSTITUIÇÃO'}
+                                </span>
+                                <span className="text-[7.5px] text-amber-700 font-bold block mt-0.5">
+                                  [Sem logo oficial]
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h1 className="text-sm font-black text-slate-900 uppercase tracking-tight leading-tight">
+                              {instituicao?.nome || 'GRUPO CREESER EDUCACIONAL'}
+                            </h1>
+                            <p className="text-[9.5px] text-slate-600 font-medium leading-normal mt-0.5">
+                              {instituicao?.cnpj ? `CNPJ: ${instituicao.cnpj}` : ''}
+                              {instituicao?.cidade ? ` • ${instituicao.cidade} - ${instituicao.estado}` : ''}
+                              {instituicao?.telefone ? ` • Tel: ${instituicao.telefone}` : ''}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Título do Documento */}
+                        <div className="text-right shrink-0">
+                          <div className="text-base font-black text-slate-900 tracking-wider uppercase">
+                            CONTEÚDO E ATIVIDADES
+                          </div>
+                          <div className="text-[10px] font-bold text-slate-600 uppercase">
+                            Registro Pedagógico
+                          </div>
+                          <div className="text-[8.5px] text-slate-400 mt-0.5">
+                            Página 2 de 3
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Metadados: Turma, Disciplina e Professor(a) */}
+                      <div className="grid grid-cols-4 gap-2 my-2.5 p-2.5 bg-slate-50 border border-slate-200 rounded text-[10px]">
+                        <div>
+                          <span className="font-bold text-slate-500 uppercase block text-[8px] mb-0.5">Curso:</span>
+                          <span className="font-bold text-slate-900 leading-snug break-words block">
+                            {turma.curso || dadosTurma?.turma?.curso || '—'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="font-bold text-slate-500 uppercase block text-[8px] mb-0.5">Turma:</span>
+                          <span className="font-bold text-slate-900 leading-snug break-words block">
+                            {turma.nome} {turma.turno ? `(${turma.turno})` : ''}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="font-bold text-slate-500 uppercase block text-[8px] mb-0.5">Disciplina:</span>
+                          <span className="font-bold text-slate-900 leading-snug break-words block">
+                            {disciplinaSelecionada || '—'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="font-bold text-slate-500 uppercase block text-[8px] mb-0.5">Mês / Ano:</span>
+                          <span className="font-bold text-teal-800 uppercase block leading-snug">
+                            {nomeMesExtenso} / {ano}
+                          </span>
+                        </div>
+
+                        <div className="col-span-4 pt-1.5 border-t border-slate-200/60 mt-1">
+                          <span className="font-bold text-slate-500 uppercase block text-[8px] mb-0.5">Professor(a):</span>
+                          <span className="font-medium text-slate-800 leading-snug block">
+                            {professorManual.trim() || '__________________________________________________'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Tabela de Conteúdo e Atividades */}
+                      <div className="overflow-hidden border border-slate-300 rounded">
+                        <table className="w-full border-collapse text-[9px]">
+                          <thead>
+                            <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-300">
+                              <th className="p-1.5 border-r border-slate-300 w-20 text-center uppercase">
+                                DATA
+                              </th>
+                              <th className="p-1.5 border-r border-slate-300 w-14 text-center uppercase">
+                                CH
+                              </th>
+                              <th className="p-1.5 border-r border-slate-300 text-left uppercase">
+                                REGISTRO DO CONTEÚDO E ATIVIDADES PEDAGÓGICAS DESENVOLVIDAS
+                              </th>
+                              <th className="p-1.5 text-center w-52 uppercase">
+                                ASSINATURA DO PROFESSOR(A)
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {Array.from({ length: 14 }).map((_, idx) => (
+                              <tr
+                                key={`conteudo-row-${idx}`}
+                                className={`border-b border-slate-200 ${
+                                  idx % 2 === 1 ? 'bg-slate-50/40' : 'bg-white'
+                                }`}
+                                style={{ height: '31px' }}
+                              >
+                                <td className="p-1 border-r border-slate-300 text-center text-slate-400">
+                                  &nbsp;
+                                </td>
+                                <td className="p-1 border-r border-slate-300 text-center text-slate-400">
+                                  &nbsp;
+                                </td>
+                                <td className="p-1 border-r border-slate-300 text-left">
+                                  &nbsp;
+                                </td>
+                                <td className="p-1 text-center">
+                                  &nbsp;
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Rodapé da Página 2: Observações e Assinaturas */}
+                    <div className="pt-3 border-t border-slate-300 mt-2 text-[9px] text-slate-600">
+                      <div className="grid grid-cols-3 gap-6 items-end pb-2">
+                        <div className="text-center">
+                          <div className="border-b border-slate-400 mb-1 h-6"></div>
+                          <span className="font-semibold text-slate-700 block">Assinatura do(a) Professor(a)</span>
+                        </div>
+                        <div className="text-center">
+                          <div className="border-b border-slate-400 mb-1 h-6"></div>
+                          <span className="font-semibold text-slate-700 block">Visto da Coordenação Pedagógica</span>
+                        </div>
+                        <div className="text-right text-[8px] text-slate-400">
+                          <div>Registro oficial de cumprimento de conteúdo e carga horária</div>
+                          <div className="mt-0.5">Emitido em: {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ══════════════════════════════════════════════════════════════════ */}
+                  {/* PÁGINA 3 — CONTROLE DE NOTAS DA DISCIPLINA                          */}
+                  {/* ══════════════════════════════════════════════════════════════════ */}
+                  {paginasAlunosNotas.map((grupoAlunosNotas, pagNotasIndex) => (
+                    <div
+                      key={`notas-${pagNotasIndex}`}
+                      className="pagina-frequencia p-5 sm:p-6 text-slate-900 flex flex-col justify-between"
+                      style={{
+                        minHeight: '200mm',
+                        pageBreakAfter: pagNotasIndex < paginasAlunosNotas.length - 1 ? 'always' : 'avoid',
+                      }}
+                    >
+                      <div>
+                        {/* Topo Oficial Timbrado */}
+                        <div className="flex items-center justify-between pb-2 border-b-2 border-slate-800 gap-4">
+                          <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                            <div className="w-28 h-14 flex items-center justify-center border border-slate-200 rounded p-1 bg-white shrink-0">
+                              {instituicao?.logo ? (
+                                <img
+                                  src={instituicao.logo}
+                                  alt={instituicao.nome}
+                                  className="max-h-full max-w-full object-contain"
+                                />
+                              ) : (
+                                <div className="text-center px-1">
+                                  <span className="text-[10px] font-black text-slate-800 tracking-wider uppercase block leading-tight">
+                                    {instituicao?.nome ? instituicao.nome.slice(0, 18) : 'INSTITUIÇÃO'}
+                                  </span>
+                                  <span className="text-[7.5px] text-amber-700 font-bold block mt-0.5">
+                                    [Sem logo oficial]
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h1 className="text-sm font-black text-slate-900 uppercase tracking-tight leading-tight">
+                                {instituicao?.nome || 'GRUPO CREESER EDUCACIONAL'}
+                              </h1>
+                              <p className="text-[9.5px] text-slate-600 font-medium leading-normal mt-0.5">
+                                {instituicao?.cnpj ? `CNPJ: ${instituicao.cnpj}` : ''}
+                                {instituicao?.cidade ? ` • ${instituicao.cidade} - ${instituicao.estado}` : ''}
+                                {instituicao?.telefone ? ` • Tel: ${instituicao.telefone}` : ''}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Título do Documento */}
+                          <div className="text-right shrink-0">
+                            <div className="text-base font-black text-slate-900 tracking-wider uppercase">
+                              CONTROLE DE NOTAS
+                            </div>
+                            <div className="text-[10px] font-bold text-slate-600 uppercase">
+                              Controle de Notas da Disciplina
+                            </div>
+                            <div className="text-[8.5px] text-slate-400 mt-0.5">
+                              {paginasAlunosNotas.length > 1
+                                ? `Página 3.${pagNotasIndex + 1} de 3.${paginasAlunosNotas.length}`
+                                : 'Página 3 de 3'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Metadados: Turma, Disciplina e Professor(a) */}
+                        <div className="grid grid-cols-4 gap-2 my-2.5 p-2.5 bg-slate-50 border border-slate-200 rounded text-[10px]">
+                          <div>
+                            <span className="font-bold text-slate-500 uppercase block text-[8px] mb-0.5">Curso:</span>
+                            <span className="font-bold text-slate-900 leading-snug break-words block">
+                              {turma.curso || dadosTurma?.turma?.curso || '—'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-bold text-slate-500 uppercase block text-[8px] mb-0.5">Turma:</span>
+                            <span className="font-bold text-slate-900 leading-snug break-words block">
+                              {turma.nome} {turma.turno ? `(${turma.turno})` : ''}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-bold text-slate-500 uppercase block text-[8px] mb-0.5">Disciplina:</span>
+                            <span className="font-bold text-slate-900 leading-snug break-words block">
+                              {disciplinaSelecionada || '—'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-bold text-slate-500 uppercase block text-[8px] mb-0.5">Mês / Ano:</span>
+                            <span className="font-bold text-teal-800 uppercase block leading-snug">
+                              {nomeMesExtenso} / {ano}
+                            </span>
+                          </div>
+
+                          <div className="col-span-4 pt-1.5 border-t border-slate-200/60 mt-1">
+                            <span className="font-bold text-slate-500 uppercase block text-[8px] mb-0.5">Professor(a):</span>
+                            <span className="font-medium text-slate-800 leading-snug block">
+                              {professorManual.trim() || '__________________________________________________'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Tabela de Notas */}
+                        <div className="overflow-hidden border border-slate-300 rounded">
+                          <table className="w-full border-collapse text-[9px]">
+                            <thead>
+                              <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-300">
+                                <th className="p-1 border-r border-slate-300 w-7 text-center">Nº</th>
+                                <th className="p-1 border-r border-slate-300 text-left min-w-[220px]">
+                                  ALUNO
+                                </th>
+                                <th className="p-1 border-r border-slate-300 text-center w-28 uppercase text-[8px]">
+                                  TRABALHO INDIVIDUAL
+                                </th>
+                                <th className="p-1 border-r border-slate-300 text-center w-28 uppercase text-[8px]">
+                                  TRABALHO EM GRUPO
+                                </th>
+                                <th className="p-1 border-r border-slate-300 text-center w-24 uppercase text-[8px]">
+                                  1ª AVALIAÇÃO
+                                </th>
+                                <th className="p-1 border-r border-slate-300 text-center w-24 uppercase text-[8px]">
+                                  2ª AVALIAÇÃO
+                                </th>
+                                <th className="p-1 border-r border-slate-300 text-center w-24 uppercase text-[8px]">
+                                  RECUPERAÇÃO
+                                </th>
+                                <th className="p-1 text-center w-24 uppercase text-[8px] bg-slate-200/60 font-black">
+                                  NOTA FINAL
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {grupoAlunosNotas.length === 0 ? (
+                                <tr>
+                                  <td colSpan={8} className="p-6 text-center text-slate-400 italic text-xs">
+                                    Nenhum aluno com matrícula ativa nesta turma.
+                                  </td>
+                                </tr>
+                              ) : (
+                                grupoAlunosNotas.map((aluno, idxAluno) => {
+                                  const numGlobal = pagNotasIndex * ALUNOS_POR_PAGINA_NOTAS + idxAluno + 1;
+                                  return (
+                                    <tr
+                                      key={`nota-aluno-${aluno.id}`}
+                                      className={`border-b border-slate-200 ${
+                                        idxAluno % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'
+                                      }`}
+                                      style={{ height: '24px' }}
+                                    >
+                                      <td className="p-1 border-r border-slate-300 text-center font-bold text-slate-500">
+                                        {numGlobal}
+                                      </td>
+                                      <td className="p-1 border-r border-slate-300 font-bold text-slate-800 uppercase truncate">
+                                        {aluno.nome}
+                                      </td>
+                                      <td className="border-r border-slate-200 text-center">&nbsp;</td>
+                                      <td className="border-r border-slate-200 text-center">&nbsp;</td>
+                                      <td className="border-r border-slate-200 text-center">&nbsp;</td>
+                                      <td className="border-r border-slate-200 text-center">&nbsp;</td>
+                                      <td className="border-r border-slate-200 text-center">&nbsp;</td>
+                                      <td className="text-center bg-slate-50 font-bold">&nbsp;</td>
+                                    </tr>
+                                  );
+                                })
+                              )}
+
+                              {/* Linha de Reposição / Reoferta na última página de notas */}
+                              {pagNotasIndex === paginasAlunosNotas.length - 1 && (
+                                <tr className="border-b border-slate-300 bg-amber-50/40" style={{ height: '24px' }}>
+                                  <td className="p-1 border-r border-slate-300 text-center font-bold text-amber-900">
+                                    ★
+                                  </td>
+                                  <td className="p-1 border-r border-slate-300 font-black text-amber-900 uppercase">
+                                    REPOSIÇÃO / REOFERTA
+                                  </td>
+                                  <td className="border-r border-slate-200 text-center">&nbsp;</td>
+                                  <td className="border-r border-slate-200 text-center">&nbsp;</td>
+                                  <td className="border-r border-slate-200 text-center">&nbsp;</td>
+                                  <td className="border-r border-slate-200 text-center">&nbsp;</td>
+                                  <td className="border-r border-slate-200 text-center">&nbsp;</td>
+                                  <td className="text-center bg-amber-100/30 font-bold">&nbsp;</td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Rodapé da Página 3: Três Blocos de Entrega / Assinatura */}
+                      <div className="pt-3 border-t border-slate-300 mt-2 text-[9px] text-slate-700">
+                        <div className="grid grid-cols-3 gap-6 items-end pb-2">
+                          {/* Bloco 1: ENTREGUE EM / ASS. PROFESSOR */}
+                          <div className="text-center p-2 bg-slate-50 border border-slate-200 rounded">
+                            <div className="flex justify-between items-center text-[8.5px] font-bold text-slate-600 mb-2">
+                              <span>ENTREGUE EM:</span>
+                              <span className="font-mono">___/___/______</span>
+                            </div>
+                            <div className="border-b border-slate-400 mb-1 h-6"></div>
+                            <span className="font-bold text-slate-800 block text-[8.5px] uppercase">
+                              Assinatura do(a) Professor(a)
+                            </span>
+                          </div>
+
+                          {/* Bloco 2: RECEBIDO EM / ASS. COORDENAÇÃO */}
+                          <div className="text-center p-2 bg-slate-50 border border-slate-200 rounded">
+                            <div className="flex justify-between items-center text-[8.5px] font-bold text-slate-600 mb-2">
+                              <span>RECEBIDO EM:</span>
+                              <span className="font-mono">___/___/______</span>
+                            </div>
+                            <div className="border-b border-slate-400 mb-1 h-6"></div>
+                            <span className="font-bold text-slate-800 block text-[8.5px] uppercase">
+                              Assinatura da Coordenação
+                            </span>
+                          </div>
+
+                          {/* Bloco 3: LANÇADO EM / ASS. COORDENAÇÃO */}
+                          <div className="text-center p-2 bg-slate-50 border border-slate-200 rounded">
+                            <div className="flex justify-between items-center text-[8.5px] font-bold text-slate-600 mb-2">
+                              <span>LANÇADO EM:</span>
+                              <span className="font-mono">___/___/______</span>
+                            </div>
+                            <div className="border-b border-slate-400 mb-1 h-6"></div>
+                            <span className="font-bold text-slate-800 block text-[8.5px] uppercase">
+                              Assinatura da Coordenação
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
