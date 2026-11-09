@@ -105,7 +105,8 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
       const html2pdf = (await import('html2pdf.js')).default;
       const element = printAreaRef.current;
       const opt = {
-        margin: [4, 4, 4, 4],
+        // Margens padrão A4 Paisagem requeridas: [superior, esquerda, inferior, direita] = 15mm, 12mm, 15mm, 12mm
+        margin: [15, 12, 15, 12],
         filename: `frequencia_${turma.nome?.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${nomeMesExtenso.toLowerCase()}_${ano}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false },
@@ -390,18 +391,18 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                 </div>
               </div>
 
-              {/* Área Imprimível (A4 Paisagem: ~290mm x 200mm) */}
+              {/* Área Imprimível (A4 Paisagem: largura útil de 273mm após margens de 12mm) */}
               <div className="overflow-x-auto pb-6">
                 <div
                   ref={printAreaRef}
                   className="bg-white mx-auto shadow-md border border-slate-300 print:shadow-none print:border-0 print:m-0"
-                  style={{ width: '290mm', minHeight: '200mm' }}
+                  style={{ width: '273mm', minHeight: '180mm', boxSizing: 'border-box' }}
                 >
                   <style orientation="landscape">{`
                     @media print {
                       @page {
                         size: A4 landscape;
-                        margin: 6mm;
+                        margin: 15mm 12mm 15mm 12mm;
                       }
                       body {
                         -webkit-print-color-adjust: exact !important;
@@ -410,6 +411,8 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                       .pagina-frequencia {
                         page-break-after: always;
                         break-after: page;
+                        padding: 0 !important;
+                        margin: 0 !important;
                       }
                       .pagina-frequencia:last-child {
                         page-break-after: avoid;
@@ -421,10 +424,11 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                   {paginasAlunos.map((grupoAlunos, pagIndex) => (
                     <div
                       key={`freq-${pagIndex}`}
-                      className="pagina-frequencia p-5 sm:p-6 text-slate-900 flex flex-col justify-between"
+                      className="pagina-frequencia p-3 sm:p-4 text-slate-900 flex flex-col justify-between"
                       style={{
-                        minHeight: '200mm',
+                        minHeight: '180mm',
                         pageBreakAfter: 'always',
+                        boxSizing: 'border-box',
                       }}
                     >
                       {/* Topo Oficial Timbrado */}
@@ -635,10 +639,11 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                   {/* PÁGINA 2 — CONTEÚDO E ATIVIDADES                                    */}
                   {/* ══════════════════════════════════════════════════════════════════ */}
                   <div
-                    className="pagina-frequencia p-5 sm:p-6 text-slate-900 flex flex-col justify-between"
+                    className="pagina-frequencia p-3 sm:p-4 text-slate-900 flex flex-col justify-between"
                     style={{
-                      minHeight: '200mm',
+                      minHeight: '180mm',
                       pageBreakAfter: 'always',
+                      boxSizing: 'border-box',
                     }}
                   >
                     <div>
@@ -796,10 +801,11 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                   {paginasAlunosNotas.map((grupoAlunosNotas, pagNotasIndex) => (
                     <div
                       key={`notas-${pagNotasIndex}`}
-                      className="pagina-frequencia p-5 sm:p-6 text-slate-900 flex flex-col justify-between"
+                      className="pagina-frequencia p-3 sm:p-4 text-slate-900 flex flex-col justify-between"
                       style={{
-                        minHeight: '200mm',
+                        minHeight: '180mm',
                         pageBreakAfter: pagNotasIndex < paginasAlunosNotas.length - 1 ? 'always' : 'avoid',
+                        boxSizing: 'border-box',
                       }}
                     >
                       <div>
