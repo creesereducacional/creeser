@@ -785,7 +785,7 @@ function ModalCarne({ aluno, onClose, onSalvo, onSuccess }) {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
   const [sucesso, setSucesso] = useState('');
-  const [tipoDesconto, setTipoDesconto] = useState('%');
+  const [tipoDesconto, setTipoDesconto] = useState('R$');
 
   // Configurações carregadas da empresa
   const [configFinanceira, setConfigFinanceira] = useState({

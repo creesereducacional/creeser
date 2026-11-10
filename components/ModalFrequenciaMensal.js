@@ -75,7 +75,7 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
   const alunos = dadosTurma?.alunos || [];
 
   // Dividir alunos em páginas (18 alunos por página no A4 paisagem)
-  const ALUNOS_POR_PAGINA = 18;
+  const ALUNOS_POR_PAGINA = 16;
   const paginasAlunos = [];
   if (alunos.length === 0) {
     paginasAlunos.push([]);
@@ -86,7 +86,7 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
   }
 
   // Dividir alunos para a Página 3 (Controle de Notas - 16 por página para acomodar linha de reposição e assinaturas)
-  const ALUNOS_POR_PAGINA_NOTAS = 16;
+  const ALUNOS_POR_PAGINA_NOTAS = 15;
   const paginasAlunosNotas = [];
   if (alunos.length === 0) {
     paginasAlunosNotas.push([]);
@@ -111,7 +111,7 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-        pagebreak: { mode: ['css', 'legacy'] },
+        pagebreak: { mode: ['css'], avoid: ['.pagina-frequencia'] },
       };
       await html2pdf().set(opt).from(element).save();
     } catch (err) {
@@ -396,7 +396,7 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                 <div
                   ref={printAreaRef}
                   className="bg-white mx-auto shadow-md border border-slate-300 print:shadow-none print:border-0 print:m-0"
-                  style={{ width: '273mm', minHeight: '180mm', boxSizing: 'border-box' }}
+                  style={{ width: '273mm', minHeight: '180mm', height: '180mm', maxHeight: '180mm', boxSizing: 'border-box' }}
                 >
                   <style orientation="landscape">{`
                     @media print {
@@ -407,16 +407,23 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                       body {
                         -webkit-print-color-adjust: exact !important;
                         print-color-adjust: exact !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
                       }
                       .pagina-frequencia {
-                        page-break-after: always;
-                        break-after: page;
+                        page-break-after: always !important;
+                        break-after: page !important;
+                        page-break-inside: avoid !important;
+                        break-inside: avoid !important;
                         padding: 0 !important;
                         margin: 0 !important;
+                        height: 180mm !important;
+                        max-height: 180mm !important;
+                        box-sizing: border-box !important;
                       }
                       .pagina-frequencia:last-child {
-                        page-break-after: avoid;
-                        break-after: avoid;
+                        page-break-after: avoid !important;
+                        break-after: avoid !important;
                       }
                     }
                   `}</style>
@@ -426,7 +433,7 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                       key={`freq-${pagIndex}`}
                       className="pagina-frequencia p-3 sm:p-4 text-slate-900 flex flex-col justify-between"
                       style={{
-                        minHeight: '180mm',
+                        minHeight: '180mm', height: '180mm', maxHeight: '180mm',
                         pageBreakAfter: 'always',
                         boxSizing: 'border-box',
                       }}
@@ -641,7 +648,7 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                   <div
                     className="pagina-frequencia p-3 sm:p-4 text-slate-900 flex flex-col justify-between"
                     style={{
-                      minHeight: '180mm',
+                      minHeight: '180mm', height: '180mm', maxHeight: '180mm',
                       pageBreakAfter: 'always',
                       boxSizing: 'border-box',
                     }}
@@ -749,13 +756,13 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                             </tr>
                           </thead>
                           <tbody>
-                            {Array.from({ length: 14 }).map((_, idx) => (
+                            {Array.from({ length: 11 }).map((_, idx) => (
                               <tr
                                 key={`conteudo-row-${idx}`}
                                 className={`border-b border-slate-200 ${
                                   idx % 2 === 1 ? 'bg-slate-50/40' : 'bg-white'
                                 }`}
-                                style={{ height: '31px' }}
+                                style={{ height: '24px' }}
                               >
                                 <td className="p-1 border-r border-slate-300 text-center text-slate-400">
                                   &nbsp;
@@ -803,7 +810,7 @@ export default function ModalFrequenciaMensal({ isOpen, onClose, turma }) {
                       key={`notas-${pagNotasIndex}`}
                       className="pagina-frequencia p-3 sm:p-4 text-slate-900 flex flex-col justify-between"
                       style={{
-                        minHeight: '180mm',
+                        minHeight: '180mm', height: '180mm', maxHeight: '180mm',
                         pageBreakAfter: pagNotasIndex < paginasAlunosNotas.length - 1 ? 'always' : 'avoid',
                         boxSizing: 'border-box',
                       }}

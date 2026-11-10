@@ -23,8 +23,10 @@ function runTests() {
   console.log('1. Validando regras @page e dimensões A4...');
   assert.strictEqual(code.includes('@page {'), true, 'Deve conter bloco @page');
   assert.strictEqual(code.includes('size: A4 portrait;'), true, 'Deve definir tamanho A4 portrait');
-  assert.strictEqual(code.includes('margin: 10mm 12mm 10mm 12mm;'), true, 'Deve ter margens padronizadas de 10mm/12mm');
-  console.log('✓ @page configurado para A4 portrait com margens otimizadas.\n');
+  assert.strictEqual(code.includes('margin: 20mm 15mm 20mm 15mm;'), true, 'Deve ter margens padronizadas de 20mm superior/inferior e 15mm laterais');
+  assert.strictEqual(code.includes('.contrato-table-header td'), true, 'Deve conter padding de segurança no thead');
+  assert.strictEqual(code.includes('.contrato-table-footer td'), true, 'Deve conter padding de segurança no tfoot');
+  console.log('✓ @page configurado para A4 portrait com margens 20mm/15mm e cabeçalho/rodapé protegidos.\n');
 
   console.log('2. Validando regras de fluidez em tabelas e containers...');
   assert.strictEqual(code.includes('break-inside: auto !important'), true, 'Deve permitir quebra livre de tabelas/containers');

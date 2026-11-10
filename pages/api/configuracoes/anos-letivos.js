@@ -68,7 +68,7 @@ const mapRowToResponse = (row) => {
 export default async function handler(req, res) {
   const authUser = requireAuth(req, res);
   if (!authUser) return;
-  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'coordenador', 'secretaria', 'admin'])) return;
+  if (!requirePerfil(authUser, res, ['grupo_admin', 'instituicao_admin', 'secretaria', 'admin'])) return;
   try {
     if (req.method === 'GET') {
       const { data, error } = await supabase

@@ -271,7 +271,7 @@ export default function ContratoAlunoImpressao() {
 
         @page {
           size: A4 portrait;
-          margin: 10mm 12mm 10mm 12mm;
+          margin: 20mm 15mm 20mm 15mm;
         }
 
         @media print {
@@ -296,6 +296,27 @@ export default function ContratoAlunoImpressao() {
 
           .contrato-table-footer {
             display: table-footer-group;
+          }
+
+          /* Reserva de espaço e isolamento seguro de cabeçalho e rodapé em todas as páginas */
+          .contrato-table-header td {
+            padding: 0 0 12px 0 !important;
+            border: none !important;
+          }
+
+          .contrato-table-footer td {
+            padding: 12px 0 0 0 !important;
+            border: none !important;
+          }
+
+          .contrato-cabecalho-container {
+            padding-bottom: 8px !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+          }
+
+          .contrato-rodape-container {
+            padding-top: 8px !important;
+            border-top: 1px solid #e2e8f0 !important;
           }
 
           /* Controles de Visibilidade de Cabeçalho e Rodapé */
@@ -392,6 +413,17 @@ export default function ContratoAlunoImpressao() {
             page-break-inside: avoid !important;
             margin-top: 0.6rem !important;
             margin-bottom: 0.25rem !important;
+          }
+
+          /* Impedir separação entre títulos de cláusulas e seu texto/parágrafo */
+          .contrato-html [data-clausula],
+          .contrato-html [class*="clausula"],
+          .contrato-html p:has(strong:only-child),
+          .contrato-html tr:has(p > strong:only-child) {
+            break-after: avoid !important;
+            page-break-after: avoid !important;
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
           }
 
           /* Neutraliza quebras artificiais de linhas vazias e <br> múltiplos gerados por editores */

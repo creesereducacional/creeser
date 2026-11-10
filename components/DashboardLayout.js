@@ -129,6 +129,21 @@ export default function DashboardLayout({ children }) {
         return;
       }
     }
+
+    // 6. Validar Rotas Administrativas de Unidades, Anos Letivos e Solicitações
+    const rotasAdminRestritas = [
+      '/admin/unidades',
+      '/admin/anos-letivos',
+      '/admin/configuracoes/solicitacoes',
+      '/admin/solicitacoes'
+    ];
+    if (rotasAdminRestritas.some(rota => path.startsWith(rota))) {
+      const permitidos = ['instituicao_admin'];
+      if (!permitidos.includes(perfil)) {
+        router.replace('/admin/dashboard');
+        return;
+      }
+    }
   }, [user, authCarregando, router]);
 
 
@@ -153,7 +168,7 @@ export default function DashboardLayout({ children }) {
       icon: '👔',
       em_breve: false,
       secao: 'Gestão Acadêmica',
-      perfis: ['grupo_admin', 'instituicao_admin', 'coordenador'],
+      perfis: ['grupo_admin', 'instituicao_admin'],
       submenu: [
         { id: 'solicitacoes', nome: 'Solicitações', icon: '▪', url: '/admin/configuracoes/solicitacoes', em_breve: false, completed: true },
         { id: 'unidades', nome: 'Unidades', icon: '▪', url: '/admin/unidades', em_breve: false, completed: true },
