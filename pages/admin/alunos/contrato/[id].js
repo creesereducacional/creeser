@@ -183,7 +183,7 @@ export default function ContratoAlunoImpressao() {
                     <tr>
                       <td className="p-0 border-none">
                         <div
-                          className="contrato-rodape-container mt-4 pt-3 border-t border-slate-200 text-xs text-slate-600"
+                          className="contrato-rodape-container pt-2 border-t border-slate-200 text-xs text-slate-600 print:mt-0"
                           dangerouslySetInnerHTML={{ __html: payload.contrato.rodapeHtml }}
                         />
                       </td>
@@ -339,22 +339,24 @@ export default function ContratoAlunoImpressao() {
 
           /* Reserva de espaço e isolamento seguro de cabeçalho e rodapé em todas as páginas */
           .contrato-table-header td {
-            padding: 0 0 12px 0 !important;
+            padding: 0 0 10px 0 !important;
             border: none !important;
           }
 
           .contrato-table-footer td {
-            padding: 12px 0 0 0 !important;
+            padding: 6px 0 0 0 !important;
             border: none !important;
           }
 
           .contrato-cabecalho-container {
-            padding-bottom: 8px !important;
+            padding-bottom: 6px !important;
             border-bottom: 1px solid #e2e8f0 !important;
           }
 
           .contrato-rodape-container {
-            padding-top: 8px !important;
+            padding-top: 4px !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
             border-top: 1px solid #e2e8f0 !important;
             width: 100% !important;
             display: flex !important;
@@ -511,6 +513,11 @@ export default function ContratoAlunoImpressao() {
             display: none !important;
           }
 
+          /* Linhas de tabela residuais contendo apenas tags vazias ou quebras <br> */
+          .contrato-html tr:not(:has(p:not(:empty), strong, span:not(:empty), table, img, [data-assinatura])) {
+            display: none !important;
+          }
+
           /* Bloco de assinaturas: mantém agrupado para não separar linhas de assinatura */
           .contrato-html .bloco-assinaturas,
           .contrato-html .assinaturas,
@@ -519,7 +526,7 @@ export default function ContratoAlunoImpressao() {
           .contrato-html [class*="assinatura"] {
             break-inside: avoid !important;
             page-break-inside: avoid !important;
-            margin-top: 1.5rem !important;
+            margin-top: 0.8rem !important;
           }
         }
       `}</style>

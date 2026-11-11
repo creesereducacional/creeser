@@ -2247,6 +2247,7 @@ export default function AlunosFinanceiroPage() {
 
   const [filtroNome, setFiltroNome] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('');
+  const [paginaAtual, setPaginaAtual] = useState(1);
   const [filtroInstituicao, setFiltroInstituicao] = useState('');
   const [filtroUnidade, setFiltroUnidade] = useState('');
   const [filtroCurso, setFiltroCurso] = useState('');
@@ -2632,12 +2633,14 @@ export default function AlunosFinanceiroPage() {
 
   // Disparar busca ao mudar os filtros
   useEffect(() => {
+    setPaginaAtual(1);
     carregarDados();
   }, [filtroStatus, filtroInstituicao, filtroUnidade, filtroCurso, filtroTurma, filtroAnoLetivo]);
 
   // Debounce para busca por texto
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
+      setPaginaAtual(1);
       carregarDados();
     }, 400);
     return () => clearTimeout(delayDebounceFn);
@@ -2645,6 +2648,7 @@ export default function AlunosFinanceiroPage() {
 
   // Handlers hierárquicos: ao mudar um filtro superior, limpa os inferiores incompatíveis
   const handleInstituicaoChange = (val) => {
+    setPaginaAtual(1);
     setFiltroInstituicao(val);
     setFiltroUnidade('');
     setFiltroCurso('');
@@ -2652,17 +2656,20 @@ export default function AlunosFinanceiroPage() {
   };
 
   const handleUnidadeChange = (val) => {
+    setPaginaAtual(1);
     setFiltroUnidade(val);
     setFiltroCurso('');
     setFiltroTurma('');
   };
 
   const handleCursoChange = (val) => {
+    setPaginaAtual(1);
     setFiltroCurso(val);
     setFiltroTurma('');
   };
 
   const limparFiltros = () => {
+    setPaginaAtual(1);
     setFiltroNome('');
     setFiltroStatus('');
     setFiltroInstituicao('');
@@ -2716,7 +2723,31 @@ export default function AlunosFinanceiroPage() {
     return [...new Set(anos)].sort();
   }, [todasTurmas]);
 
+  const ITENS_POR_PAGINA = 10;
   const alunosFiltrados = alunos;
+
+  // Cálculos de Paginação
+  const totalRegistros = alunosFiltrados.length;
+  const totalPaginas = Math.ceil(totalRegistros / ITENS_POR_PAGINA) || 1;
+  const indiceInicial = (paginaAtual - 1) * ITENS_POR_PAGINA;
+  const indiceFinal = Math.min(indiceInicial + ITENS_POR_PAGINA, totalRegistros);
+
+  const alunosPaginados = useMemo(() => {
+    return alunosFiltrados.slice(indiceInicial, indiceFinal);
+  }, [alunosFiltrados, indiceInicial, indiceFinal]);
+
+  const getPaginasVisiveis = () => {
+    if (totalPaginas <= 7) {
+      return Array.from({ length: totalPaginas }, (_, i) => i + 1);
+    }
+    if (paginaAtual <= 4) {
+      return [1, 2, 3, 4, 5, '...', totalPaginas];
+    }
+    if (paginaAtual >= totalPaginas - 3) {
+      return [1, '...', totalPaginas - 4, totalPaginas - 3, totalPaginas - 2, totalPaginas - 1, totalPaginas];
+    }
+    return [1, '...', paginaAtual - 1, paginaAtual, paginaAtual + 1, '...', totalPaginas];
+  };
 
   const resumo = useMemo(() => {
     // Evita duplicar somatórios financeiros ao desdobrar o aluno em múltiplos vínculos acadêmicos
@@ -2879,11 +2910,11 @@ export default function AlunosFinanceiroPage() {
                     <th className="px-6 py-3 text-right text-xs font-semibold text-red-700">Atraso</th>
                     <th className="px-6 py-3 text-right text-xs font-semibold text-emerald-700">Pago</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Status</th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 whitespace-nowrap min-w-[280px]">Ações</th>
+                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 whitespace-nowrap min-w-[320px]">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {alunosFiltrados.map(aluno => {
+                  {alunosPaginados.map(aluno => {
                     const rowKey = aluno.matricula_id ? String(aluno.matricula_id) : `${aluno.id}_${aluno.turmaid || 'legado'}`;
                     const isExpanded = expandedId === rowKey;
                     return (
@@ -2911,15 +2942,15 @@ export default function AlunosFinanceiroPage() {
                         <td className="px-6 py-4 text-sm text-right font-semibold text-red-600">{formataValor(aluno.financeiro_atraso)}</td>
                         <td className="px-6 py-4 text-sm text-right font-semibold text-emerald-600">{formataValor(aluno.financeiro_pago)}</td>
                         <td className="px-6 py-4"><StatusBadge status={aluno.statusmatricula} /></td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center justify-center gap-1.5" onClick={e => e.stopPropagation()}>
+                        <td className="px-6 py-4 whitespace-nowrap min-w-[320px] text-center align-middle">
+                          <div className="flex items-center justify-center gap-2 flex-nowrap" onClick={e => e.stopPropagation()}>
                             {/* Dados Financeiros */}
-                            <div className="relative group flex items-center justify-center">
+                            <div className="relative group flex items-center justify-center flex-shrink-0">
                               <button
                                 onClick={() => setModalFinanceiro(aluno)}
                                 title="Dados Financeiros"
                                 aria-label="Dados Financeiros"
-                                className="w-8 h-8 flex items-center justify-center text-teal-600 bg-teal-50/50 hover:bg-teal-100 hover:text-teal-700 rounded-lg transition-all duration-150 cursor-pointer shadow-xs"
+                                className="w-8 h-8 flex-shrink-0 flex items-center justify-center text-teal-600 bg-teal-50/70 hover:bg-teal-100 hover:text-teal-700 rounded-lg transition-all duration-150 cursor-pointer shadow-xs border border-teal-200/50"
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                               </button>
@@ -2932,12 +2963,12 @@ export default function AlunosFinanceiroPage() {
                             </div>
 
                             {/* Criar Ordem de Pagamento */}
-                            <div className="relative group flex items-center justify-center">
+                            <div className="relative group flex items-center justify-center flex-shrink-0">
                               <button
                                 onClick={() => setModalOrdem(aluno)}
                                 title="Criar Ordem de Pagamento"
                                 aria-label="Criar Ordem de Pagamento"
-                                className="w-8 h-8 flex items-center justify-center text-blue-600 bg-blue-50/50 hover:bg-blue-100 hover:text-blue-700 rounded-lg transition-all duration-150 cursor-pointer shadow-xs"
+                                className="w-8 h-8 flex-shrink-0 flex items-center justify-center text-blue-600 bg-blue-50/70 hover:bg-blue-100 hover:text-blue-700 rounded-lg transition-all duration-150 cursor-pointer shadow-xs border border-blue-200/50"
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                               </button>
@@ -2950,12 +2981,12 @@ export default function AlunosFinanceiroPage() {
                             </div>
 
                             {/* Histórico de Negociações / Acordos */}
-                            <div className="relative group flex items-center justify-center">
+                            <div className="relative group flex items-center justify-center flex-shrink-0">
                               <button
                                 onClick={() => setModalNegociacoes(aluno)}
                                 title="Histórico de Negociações / Acordos"
                                 aria-label="Histórico de Negociações / Acordos"
-                                className="w-8 h-8 flex items-center justify-center text-teal-700 bg-teal-50/50 hover:bg-teal-100 hover:text-teal-800 rounded-lg transition-all duration-150 cursor-pointer shadow-xs"
+                                className="w-8 h-8 flex-shrink-0 flex items-center justify-center text-teal-700 bg-teal-50/70 hover:bg-teal-100 hover:text-teal-800 rounded-lg transition-all duration-150 cursor-pointer shadow-xs border border-teal-200/50"
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
                               </button>
@@ -2968,12 +2999,12 @@ export default function AlunosFinanceiroPage() {
                             </div>
 
                             {/* Criar Carnê */}
-                            <div className="relative group flex items-center justify-center">
+                            <div className="relative group flex items-center justify-center flex-shrink-0">
                               <button
                                 onClick={() => setModalCarne(aluno)}
                                 title="Criar Carnê"
                                 aria-label="Criar Carnê"
-                                className="w-8 h-8 flex items-center justify-center text-purple-600 bg-purple-50/50 hover:bg-purple-100 hover:text-purple-700 rounded-lg transition-all duration-150 cursor-pointer shadow-xs"
+                                className="w-8 h-8 flex-shrink-0 flex items-center justify-center text-purple-600 bg-purple-50/70 hover:bg-purple-100 hover:text-purple-700 rounded-lg transition-all duration-150 cursor-pointer shadow-xs border border-purple-200/50"
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
                               </button>
@@ -2986,12 +3017,12 @@ export default function AlunosFinanceiroPage() {
                             </div>
 
                             {/* Contrato */}
-                            <div className="relative group flex items-center justify-center">
+                            <div className="relative group flex items-center justify-center flex-shrink-0">
                               <button
                                 onClick={() => setModalContrato(aluno)}
                                 title="Contrato"
                                 aria-label="Contrato"
-                                className="w-8 h-8 flex items-center justify-center text-gray-600 bg-gray-50/60 hover:bg-gray-100 hover:text-gray-800 rounded-lg transition-all duration-150 cursor-pointer shadow-xs"
+                                className="w-8 h-8 flex-shrink-0 flex items-center justify-center text-gray-600 bg-gray-50/80 hover:bg-gray-100 hover:text-gray-800 rounded-lg transition-all duration-150 cursor-pointer shadow-xs border border-gray-200/60"
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                               </button>
@@ -3004,12 +3035,12 @@ export default function AlunosFinanceiroPage() {
                             </div>
 
                             {/* Carteirinha */}
-                            <div className="relative group flex items-center justify-center">
+                            <div className="relative group flex items-center justify-center flex-shrink-0">
                               <button
                                 onClick={() => setModalCarteirinha(aluno)}
                                 title="Carteirinha"
                                 aria-label="Carteirinha"
-                                className="w-8 h-8 flex items-center justify-center text-indigo-600 bg-indigo-50/50 hover:bg-indigo-100 hover:text-indigo-700 rounded-lg transition-all duration-150 cursor-pointer shadow-xs"
+                                className="w-8 h-8 flex-shrink-0 flex items-center justify-center text-indigo-600 bg-indigo-50/70 hover:bg-indigo-100 hover:text-indigo-700 rounded-lg transition-all duration-150 cursor-pointer shadow-xs border border-indigo-200/50"
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 012-2h2a2 2 0 012 2v1m-6 4h4" /></svg>
                               </button>
@@ -3023,12 +3054,12 @@ export default function AlunosFinanceiroPage() {
 
                             {/* Botão Dinâmico Trancar / Reabrir Matrícula */}
                             {['TRANCADO', 'TRANCADO_COM_DEBITO'].includes(aluno.statusmatricula) ? (
-                              <div className="relative group flex items-center justify-center">
+                              <div className="relative group flex items-center justify-center flex-shrink-0">
                                 <button
                                   onClick={() => setModalReabrir(aluno)}
                                   title="Reabrir Matrícula"
                                   aria-label="Reabrir Matrícula"
-                                  className="w-8 h-8 flex items-center justify-center text-emerald-600 bg-emerald-50/50 hover:bg-emerald-100 hover:text-emerald-700 rounded-lg transition-all duration-150 cursor-pointer shadow-xs"
+                                  className="w-8 h-8 flex-shrink-0 flex items-center justify-center text-emerald-600 bg-emerald-50/70 hover:bg-emerald-100 hover:text-emerald-700 rounded-lg transition-all duration-150 cursor-pointer shadow-xs border border-emerald-200/50"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
@@ -3042,12 +3073,12 @@ export default function AlunosFinanceiroPage() {
                                 </div>
                               </div>
                             ) : !['CANCELADO', 'DESISTENTE'].includes(aluno.statusmatricula) ? (
-                              <div className="relative group flex items-center justify-center">
+                              <div className="relative group flex items-center justify-center flex-shrink-0">
                                 <button
                                   onClick={() => setModalTrancar(aluno)}
                                   title="Trancar Matrícula"
                                   aria-label="Trancar Matrícula"
-                                  className="w-8 h-8 flex items-center justify-center text-amber-600 bg-amber-50/50 hover:bg-amber-100 hover:text-amber-700 rounded-lg transition-all duration-150 cursor-pointer shadow-xs"
+                                  className="w-8 h-8 flex-shrink-0 flex items-center justify-center text-amber-600 bg-amber-50/70 hover:bg-amber-100 hover:text-amber-700 rounded-lg transition-all duration-150 cursor-pointer shadow-xs border border-amber-200/50"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -3488,6 +3519,55 @@ export default function AlunosFinanceiroPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* Barra de Paginação */}
+          {totalRegistros > 0 && (
+            <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white select-none">
+              <div className="text-xs sm:text-sm text-gray-500 font-normal">
+                Mostrando {totalRegistros > 0 ? indiceInicial + 1 : 0}–{indiceFinal} de {totalRegistros} registros
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
+                  disabled={paginaAtual === 1}
+                  className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition disabled:opacity-40 disabled:hover:bg-gray-100 disabled:cursor-not-allowed text-xs font-semibold cursor-pointer"
+                >
+                  Anterior
+                </button>
+
+                {getPaginasVisiveis().map((pag, idx) => {
+                  if (pag === '...') {
+                    return (
+                      <span key={`ellipsis-${idx}`} className="w-8 h-8 flex items-center justify-center text-gray-400 text-xs font-semibold">
+                        ...
+                      </span>
+                    );
+                  }
+                  const isCurrent = pag === paginaAtual;
+                  return (
+                    <button
+                      key={`pag-${pag}`}
+                      onClick={() => setPaginaAtual(pag)}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold transition cursor-pointer ${
+                        isCurrent ? 'bg-teal-600 text-white shadow-xs' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                      }`}
+                    >
+                      {pag}
+                    </button>
+                  );
+                })}
+
+                <button
+                  onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))}
+                  disabled={paginaAtual === totalPaginas}
+                  className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition disabled:opacity-40 disabled:hover:bg-gray-100 disabled:cursor-not-allowed text-xs font-semibold cursor-pointer"
+                >
+                  Próxima
+                </button>
+              </div>
             </div>
           )}
         </div>
