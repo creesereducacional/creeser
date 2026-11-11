@@ -263,6 +263,45 @@ export default function ContratoAlunoImpressao() {
           display: inline-block;
         }
 
+        .contrato-rodape-container {
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          text-align: right;
+        }
+
+        .contrato-rodape-container > * {
+          margin-left: auto !important;
+          margin-right: 0 !important;
+          text-align: right !important;
+        }
+
+        .contrato-rodape-container table {
+          width: auto !important;
+          max-width: 100% !important;
+          margin-left: auto !important;
+          margin-right: 0 !important;
+          border-collapse: collapse !important;
+          text-align: right !important;
+        }
+
+        .contrato-rodape-container tr,
+        .contrato-rodape-container td,
+        .contrato-rodape-container p,
+        .contrato-rodape-container span,
+        .contrato-rodape-container div {
+          text-align: right !important;
+        }
+
+        .contrato-rodape-container td:empty {
+          display: none !important;
+        }
+
+        .contrato-rodape-container td:has(> br:only-child) {
+          display: none !important;
+        }
+
         .contrato-print-table {
           width: 100%;
           border-collapse: collapse;
@@ -317,6 +356,42 @@ export default function ContratoAlunoImpressao() {
           .contrato-rodape-container {
             padding-top: 8px !important;
             border-top: 1px solid #e2e8f0 !important;
+            width: 100% !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: flex-end !important;
+            text-align: right !important;
+          }
+
+          .contrato-rodape-container > * {
+            margin-left: auto !important;
+            margin-right: 0 !important;
+            text-align: right !important;
+          }
+
+          .contrato-rodape-container table {
+            width: auto !important;
+            max-width: 100% !important;
+            margin-left: auto !important;
+            margin-right: 0 !important;
+            border-collapse: collapse !important;
+            text-align: right !important;
+          }
+
+          .contrato-rodape-container tr,
+          .contrato-rodape-container td,
+          .contrato-rodape-container p,
+          .contrato-rodape-container span,
+          .contrato-rodape-container div {
+            text-align: right !important;
+          }
+
+          .contrato-rodape-container td:empty {
+            display: none !important;
+          }
+
+          .contrato-rodape-container td:has(> br:only-child) {
+            display: none !important;
           }
 
           /* Controles de Visibilidade de Cabeçalho e Rodapé */

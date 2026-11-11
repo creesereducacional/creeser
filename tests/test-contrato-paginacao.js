@@ -45,6 +45,12 @@ function runTests() {
   assert.strictEqual(code.includes('dangerouslySetInnerHTML={{ __html: payload?.contrato?.html'), true, 'Deve renderizar HTML do contrato sem truncamento');
   console.log('✓ Conteúdo do contrato e placeholders preservados 100%.\n');
 
+  console.log('5. Validando alinhamento do bloco do rodapé à direita...');
+  assert.strictEqual(code.includes('align-items: flex-end'), true, 'Contêiner do rodapé deve alinhar itens ao final (direita)');
+  assert.strictEqual(code.includes('margin-left: auto !important;'), true, 'Filhos e tabelas do rodapé devem ter margem esquerda auto para encostar na margem direita');
+  assert.strictEqual(code.includes('.contrato-rodape-container table'), true, 'Tabelas do rodapé devem ser tratadas para alinhamento à direita');
+  console.log('✓ Bloco do rodapé alinhado à extrema direita da área útil.\n');
+
   console.log('=== TODOS OS TESTES DE PAGINAÇÃO PASSARAM COM SUCESSO! ===\n');
 }
 

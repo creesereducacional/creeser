@@ -2879,7 +2879,7 @@ export default function AlunosFinanceiroPage() {
                     <th className="px-6 py-3 text-right text-xs font-semibold text-red-700">Atraso</th>
                     <th className="px-6 py-3 text-right text-xs font-semibold text-emerald-700">Pago</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Status</th>
-                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700">Ações</th>
+                    <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 whitespace-nowrap min-w-[280px]">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -2911,53 +2911,155 @@ export default function AlunosFinanceiroPage() {
                         <td className="px-6 py-4 text-sm text-right font-semibold text-red-600">{formataValor(aluno.financeiro_atraso)}</td>
                         <td className="px-6 py-4 text-sm text-right font-semibold text-emerald-600">{formataValor(aluno.financeiro_pago)}</td>
                         <td className="px-6 py-4"><StatusBadge status={aluno.statusmatricula} /></td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-center gap-1" onClick={e => e.stopPropagation()}>
-                            <button onClick={() => setModalFinanceiro(aluno)} title="Dados Financeiros"
-                              className="p-1.5 text-teal-600 hover:bg-teal-50 rounded-lg transition">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                            </button>
-                            <button onClick={() => setModalOrdem(aluno)} title="Criar Ordem de Pagamento"
-                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                            </button>
-                            <button onClick={() => setModalNegociacoes(aluno)} title="Histórico de Negociações / Acordos"
-                              className="p-1.5 text-teal-700 hover:bg-teal-50 rounded-lg transition">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
-                            </button>
-                            <button onClick={() => setModalCarne(aluno)} title="Criar Carnê"
-                              className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-                            </button>
-                            <button onClick={() => setModalContrato(aluno)} title="Contrato"
-                              className="p-1.5 text-gray-600 hover:bg-gray-100 rounded-lg transition">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                            </button>
-                            <button onClick={() => setModalCarteirinha(aluno)} title="Carteirinha"
-                              className="p-1.5 text-indigo-650 hover:bg-indigo-50 rounded-lg transition">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 012-2h2a2 2 0 012 2v1m-6 4h4" /></svg>
-                            </button>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-1.5" onClick={e => e.stopPropagation()}>
+                            {/* Dados Financeiros */}
+                            <div className="relative group flex items-center justify-center">
+                              <button
+                                onClick={() => setModalFinanceiro(aluno)}
+                                title="Dados Financeiros"
+                                aria-label="Dados Financeiros"
+                                className="w-8 h-8 flex items-center justify-center text-teal-600 bg-teal-50/50 hover:bg-teal-100 hover:text-teal-700 rounded-lg transition-all duration-150 cursor-pointer shadow-xs"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                              </button>
+                              <div className="absolute bottom-full mb-1.5 hidden group-hover:flex flex-col items-center pointer-events-none z-30">
+                                <span className="bg-slate-900 text-white text-[11px] font-medium py-1 px-2 rounded-md shadow-lg whitespace-nowrap">
+                                  Dados Financeiros
+                                </span>
+                                <span className="w-1.5 h-1.5 bg-slate-900 rotate-45 -mt-0.5"></span>
+                              </div>
+                            </div>
+
+                            {/* Criar Ordem de Pagamento */}
+                            <div className="relative group flex items-center justify-center">
+                              <button
+                                onClick={() => setModalOrdem(aluno)}
+                                title="Criar Ordem de Pagamento"
+                                aria-label="Criar Ordem de Pagamento"
+                                className="w-8 h-8 flex items-center justify-center text-blue-600 bg-blue-50/50 hover:bg-blue-100 hover:text-blue-700 rounded-lg transition-all duration-150 cursor-pointer shadow-xs"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                              </button>
+                              <div className="absolute bottom-full mb-1.5 hidden group-hover:flex flex-col items-center pointer-events-none z-30">
+                                <span className="bg-slate-900 text-white text-[11px] font-medium py-1 px-2 rounded-md shadow-lg whitespace-nowrap">
+                                  Criar Ordem de Pagamento
+                                </span>
+                                <span className="w-1.5 h-1.5 bg-slate-900 rotate-45 -mt-0.5"></span>
+                              </div>
+                            </div>
+
+                            {/* Histórico de Negociações / Acordos */}
+                            <div className="relative group flex items-center justify-center">
+                              <button
+                                onClick={() => setModalNegociacoes(aluno)}
+                                title="Histórico de Negociações / Acordos"
+                                aria-label="Histórico de Negociações / Acordos"
+                                className="w-8 h-8 flex items-center justify-center text-teal-700 bg-teal-50/50 hover:bg-teal-100 hover:text-teal-800 rounded-lg transition-all duration-150 cursor-pointer shadow-xs"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                              </button>
+                              <div className="absolute bottom-full mb-1.5 hidden group-hover:flex flex-col items-center pointer-events-none z-30">
+                                <span className="bg-slate-900 text-white text-[11px] font-medium py-1 px-2 rounded-md shadow-lg whitespace-nowrap">
+                                  Histórico de Negociações / Acordos
+                                </span>
+                                <span className="w-1.5 h-1.5 bg-slate-900 rotate-45 -mt-0.5"></span>
+                              </div>
+                            </div>
+
+                            {/* Criar Carnê */}
+                            <div className="relative group flex items-center justify-center">
+                              <button
+                                onClick={() => setModalCarne(aluno)}
+                                title="Criar Carnê"
+                                aria-label="Criar Carnê"
+                                className="w-8 h-8 flex items-center justify-center text-purple-600 bg-purple-50/50 hover:bg-purple-100 hover:text-purple-700 rounded-lg transition-all duration-150 cursor-pointer shadow-xs"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                              </button>
+                              <div className="absolute bottom-full mb-1.5 hidden group-hover:flex flex-col items-center pointer-events-none z-30">
+                                <span className="bg-slate-900 text-white text-[11px] font-medium py-1 px-2 rounded-md shadow-lg whitespace-nowrap">
+                                  Criar Carnê
+                                </span>
+                                <span className="w-1.5 h-1.5 bg-slate-900 rotate-45 -mt-0.5"></span>
+                              </div>
+                            </div>
+
+                            {/* Contrato */}
+                            <div className="relative group flex items-center justify-center">
+                              <button
+                                onClick={() => setModalContrato(aluno)}
+                                title="Contrato"
+                                aria-label="Contrato"
+                                className="w-8 h-8 flex items-center justify-center text-gray-600 bg-gray-50/60 hover:bg-gray-100 hover:text-gray-800 rounded-lg transition-all duration-150 cursor-pointer shadow-xs"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                              </button>
+                              <div className="absolute bottom-full mb-1.5 hidden group-hover:flex flex-col items-center pointer-events-none z-30">
+                                <span className="bg-slate-900 text-white text-[11px] font-medium py-1 px-2 rounded-md shadow-lg whitespace-nowrap">
+                                  Contrato
+                                </span>
+                                <span className="w-1.5 h-1.5 bg-slate-900 rotate-45 -mt-0.5"></span>
+                              </div>
+                            </div>
+
+                            {/* Carteirinha */}
+                            <div className="relative group flex items-center justify-center">
+                              <button
+                                onClick={() => setModalCarteirinha(aluno)}
+                                title="Carteirinha"
+                                aria-label="Carteirinha"
+                                className="w-8 h-8 flex items-center justify-center text-indigo-600 bg-indigo-50/50 hover:bg-indigo-100 hover:text-indigo-700 rounded-lg transition-all duration-150 cursor-pointer shadow-xs"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 012-2h2a2 2 0 012 2v1m-6 4h4" /></svg>
+                              </button>
+                              <div className="absolute bottom-full mb-1.5 hidden group-hover:flex flex-col items-center pointer-events-none z-30">
+                                <span className="bg-slate-900 text-white text-[11px] font-medium py-1 px-2 rounded-md shadow-lg whitespace-nowrap">
+                                  Carteirinha
+                                </span>
+                                <span className="w-1.5 h-1.5 bg-slate-900 rotate-45 -mt-0.5"></span>
+                              </div>
+                            </div>
+
                             {/* Botão Dinâmico Trancar / Reabrir Matrícula */}
                             {['TRANCADO', 'TRANCADO_COM_DEBITO'].includes(aluno.statusmatricula) ? (
-                              <button
-                                onClick={() => setModalReabrir(aluno)}
-                                title="Reabrir Matrícula"
-                                className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition cursor-pointer"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
-                                </svg>
-                              </button>
+                              <div className="relative group flex items-center justify-center">
+                                <button
+                                  onClick={() => setModalReabrir(aluno)}
+                                  title="Reabrir Matrícula"
+                                  aria-label="Reabrir Matrícula"
+                                  className="w-8 h-8 flex items-center justify-center text-emerald-600 bg-emerald-50/50 hover:bg-emerald-100 hover:text-emerald-700 rounded-lg transition-all duration-150 cursor-pointer shadow-xs"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                                  </svg>
+                                </button>
+                                <div className="absolute bottom-full mb-1.5 hidden group-hover:flex flex-col items-center pointer-events-none z-30">
+                                  <span className="bg-slate-900 text-white text-[11px] font-medium py-1 px-2 rounded-md shadow-lg whitespace-nowrap">
+                                    Reabrir Matrícula
+                                  </span>
+                                  <span className="w-1.5 h-1.5 bg-slate-900 rotate-45 -mt-0.5"></span>
+                                </div>
+                              </div>
                             ) : !['CANCELADO', 'DESISTENTE'].includes(aluno.statusmatricula) ? (
-                              <button
-                                onClick={() => setModalTrancar(aluno)}
-                                title="Trancar Matrícula"
-                                className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition cursor-pointer"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                </svg>
-                              </button>
+                              <div className="relative group flex items-center justify-center">
+                                <button
+                                  onClick={() => setModalTrancar(aluno)}
+                                  title="Trancar Matrícula"
+                                  aria-label="Trancar Matrícula"
+                                  className="w-8 h-8 flex items-center justify-center text-amber-600 bg-amber-50/50 hover:bg-amber-100 hover:text-amber-700 rounded-lg transition-all duration-150 cursor-pointer shadow-xs"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                  </svg>
+                                </button>
+                                <div className="absolute bottom-full mb-1.5 hidden group-hover:flex flex-col items-center pointer-events-none z-30">
+                                  <span className="bg-slate-900 text-white text-[11px] font-medium py-1 px-2 rounded-md shadow-lg whitespace-nowrap">
+                                    Trancar Matrícula
+                                  </span>
+                                  <span className="w-1.5 h-1.5 bg-slate-900 rotate-45 -mt-0.5"></span>
+                                </div>
+                              </div>
                             ) : null}
                           </div>
                         </td>
