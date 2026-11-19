@@ -35,12 +35,21 @@ export default function ListagemAlunos() {
 
   // Estados dos filtros
   const [searchVal, setSearchVal] = useState('');
+  const [debouncedSearchVal, setDebouncedSearchVal] = useState('');
   const [statusVal, setStatusVal] = useState('');
   const [instituicaoVal, setInstituicaoVal] = useState('');
   const [unidadeVal, setUnidadeVal] = useState('');
   const [cursoVal, setCursoVal] = useState('');
   const [turmaVal, setTurmaVal] = useState('');
   const [anoLetivoVal, setAnoLetivoVal] = useState('');
+
+  // Debounce para busca textual (300ms)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchVal(searchVal);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchVal]);
 
   // Estados da Paginação
   const [paginaAtual, setPaginaAtual] = useState(1);
@@ -52,24 +61,26 @@ export default function ListagemAlunos() {
   useEffect(() => {
     setPaginaAtual(1);
     setMenuAcoesData(null);
-  }, [searchVal, statusVal, instituicaoVal, unidadeVal, cursoVal, turmaVal, anoLetivoVal]);
+  }, [debouncedSearchVal, statusVal, instituicaoVal, unidadeVal, cursoVal, turmaVal, anoLetivoVal]);
 
   // Fechar menu de ações ao trocar de página
   useEffect(() => {
     setMenuAcoesData(null);
   }, [paginaAtual]);
 
-  useEffect(() => {
-    carregarAlunos();
-    carregarOpcoesFiltros();
-  }, []);
+  const loadRequestIdRef = useRef(0);
 
-  const carregarAlunos = async () => {
+  const carregarAlunos = useCallback(async () => {
+    const currentRequestId = ++loadRequestIdRef.current;
     try {
       setLoading(true);
       setErrorMsg(null);
       const response = await fetch('/api/alunos');
       const data = await response.json().catch(() => null);
+
+      if (currentRequestId !== loadRequestIdRef.current) {
+        return;
+      }
 
       if (response.ok) {
         setAlunos(Array.isArray(data) ? data : []);
@@ -83,13 +94,21 @@ export default function ListagemAlunos() {
         setAlunos([]);
       }
     } catch (error) {
+      if (currentRequestId !== loadRequestIdRef.current) return;
       console.error('❌ Erro de conexão ao carregar alunos:', error);
       setErrorMsg(error.message || 'Falha de comunicação com o servidor.');
       setAlunos([]);
     } finally {
-      setLoading(false);
+      if (currentRequestId === loadRequestIdRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    carregarAlunos();
+    carregarOpcoesFiltros();
+  }, [carregarAlunos]);
 
   const carregarOpcoesFiltros = async () => {
     try {
@@ -138,148 +157,72 @@ export default function ListagemAlunos() {
 
   // Unidades filtradas pela instituição selecionada
   const unidadesFiltradasOpcoes = useMemo(() => {
-    let list = unidades;
-    if (instituicaoVal) {
-      list = list.filter(u => {
-        const uInstId = String(u.instituicao_id || u.instituicaoid || u.instituicaoId || '');
-        return uInstId === String(instituicaoVal);
-      });
-    }
-    return list;
+    if (!instituicaoVal) return [];
+    return unidades.filter(u => {
+      const uInstId = String(u.instituicao_id || u.instituicaoid || u.instituicaoId || '');
+      return uInstId === String(instituicaoVal);
+    });
   }, [unidades, instituicaoVal]);
 
   // Cursos filtrados pela instituição e pela unidade selecionadas
   const cursosFiltradosOpcoes = useMemo(() => {
-    let list = cursos;
-    if (instituicaoVal) {
-      list = list.filter(c => {
-        const cInstId = String(c.instituicaoId || c.instituicaoid || c.instituicao_id || '');
-        return !cInstId || cInstId === String(instituicaoVal);
-      });
-    }
-    if (unidadeVal) {
-      list = list.filter(c => {
-        if (Array.isArray(c.unidadeIds) && c.unidadeIds.length > 0) {
-          return c.unidadeIds.some(uid => String(uid) === String(unidadeVal));
-        }
-        if (Array.isArray(c.unidade_ids) && c.unidade_ids.length > 0) {
-          return c.unidade_ids.some(uid => String(uid) === String(unidadeVal));
-        }
-        return true;
-      });
-    }
+    if (!instituicaoVal || !unidadeVal) return [];
+    let list = cursos.filter(c => {
+      const cInstId = String(c.instituicaoId || c.instituicaoid || c.instituicao_id || '');
+      return !cInstId || cInstId === String(instituicaoVal);
+    });
+
+    list = list.filter(c => {
+      if (Array.isArray(c.unidadeIds) && c.unidadeIds.length > 0) {
+        return c.unidadeIds.some(uid => String(uid) === String(unidadeVal));
+      }
+      if (Array.isArray(c.unidade_ids) && c.unidade_ids.length > 0) {
+        return c.unidade_ids.some(uid => String(uid) === String(unidadeVal));
+      }
+      return true;
+    });
+
     return list;
   }, [cursos, instituicaoVal, unidadeVal]);
 
   // Filtragem dinâmica de turmas baseada em instituição / unidade / curso selecionados
   const turmasFiltradasOpcoes = useMemo(() => {
-    let list = turmas;
-    if (instituicaoVal) {
-      list = list.filter(t => {
-        const tInstId = String(t.instituicaoId || t.instituicaoid || t.instituicao_id || '');
-        return !tInstId || tInstId === String(instituicaoVal);
-      });
-    }
-    if (unidadeVal) {
-      list = list.filter(t => String(t.unidadeId || t.unidadeid || t.unidade_id) === String(unidadeVal));
-    }
-    if (cursoVal) {
-      list = list.filter(t => String(t.cursoId || t.cursoid || t.curso_id) === String(cursoVal));
-    }
-    return list;
+    if (!instituicaoVal || !unidadeVal || !cursoVal) return [];
+    return turmas.filter(t => {
+      const tInstId = String(t.instituicaoId || t.instituicaoid || t.instituicao_id || '');
+      if (tInstId && tInstId !== String(instituicaoVal)) return false;
+      const tUnidId = String(t.unidadeId || t.unidadeid || t.unidade_id || '');
+      if (tUnidId !== String(unidadeVal)) return false;
+      const tCursoId = String(t.cursoId || t.cursoid || t.curso_id || '');
+      if (tCursoId !== String(cursoVal)) return false;
+      return true;
+    });
   }, [turmas, instituicaoVal, unidadeVal, cursoVal]);
 
   // Mudança em cascata de Instituição com limpeza de dependentes incompatíveis
   const handleInstituicaoChange = (novaInstId) => {
     setInstituicaoVal(novaInstId);
-    if (!novaInstId) return;
-
-    if (unidadeVal) {
-      const unidValida = unidades.some(u => {
-        const uInstId = String(u.instituicao_id || u.instituicaoid || u.instituicaoId || '');
-        return String(u.id) === String(unidadeVal) && uInstId === String(novaInstId);
-      });
-      if (!unidValida) {
-        setUnidadeVal('');
-        setCursoVal('');
-        setTurmaVal('');
-        return;
-      }
-    }
-
-    if (cursoVal) {
-      const cursoValido = cursos.some(c => {
-        const cInstId = String(c.instituicaoId || c.instituicaoid || c.instituicao_id || '');
-        return String(c.id) === String(cursoVal) && (!cInstId || cInstId === String(novaInstId));
-      });
-      if (!cursoValido) {
-        setCursoVal('');
-        setTurmaVal('');
-        return;
-      }
-    }
-
-    if (turmaVal) {
-      const turmaValida = turmas.some(t => {
-        const tInstId = String(t.instituicaoId || t.instituicaoid || t.instituicao_id || '');
-        return String(t.id) === String(turmaVal) && (!tInstId || tInstId === String(novaInstId));
-      });
-      if (!turmaValida) {
-        setTurmaVal('');
-      }
-    }
+    setUnidadeVal('');
+    setCursoVal('');
+    setTurmaVal('');
   };
 
   // Mudança em cascata de Unidade
   const handleUnidadeChange = (novaUnidadeId) => {
     setUnidadeVal(novaUnidadeId);
-    if (!novaUnidadeId) return;
-
-    if (cursoVal) {
-      const cursoValido = cursos.some(c => {
-        if (String(c.id) !== String(cursoVal)) return false;
-        const uids = c.unidadeIds || c.unidade_ids;
-        if (Array.isArray(uids) && uids.length > 0) {
-          return uids.some(uid => String(uid) === String(novaUnidadeId));
-        }
-        return true;
-      });
-      if (!cursoValido) {
-        setCursoVal('');
-        setTurmaVal('');
-        return;
-      }
-    }
-
-    if (turmaVal) {
-      const turmaValida = turmas.some(t => {
-        const tUnidId = String(t.unidadeId || t.unidadeid || t.unidade_id || '');
-        return String(t.id) === String(turmaVal) && tUnidId === String(novaUnidadeId);
-      });
-      if (!turmaValida) {
-        setTurmaVal('');
-      }
-    }
+    setCursoVal('');
+    setTurmaVal('');
   };
 
   // Mudança em cascata de Curso
   const handleCursoChange = (novoCursoId) => {
     setCursoVal(novoCursoId);
-    if (!novoCursoId) return;
-
-    if (turmaVal) {
-      const turmaValida = turmas.some(t => {
-        const tCursoId = String(t.cursoId || t.cursoid || t.curso_id || '');
-        return String(t.id) === String(turmaVal) && tCursoId === String(novoCursoId);
-      });
-      if (!turmaValida) {
-        setTurmaVal('');
-      }
-    }
+    setTurmaVal('');
   };
 
   const limparFiltros = () => {
     setSearchVal('');
+    setDebouncedSearchVal('');
     setStatusVal('');
     setInstituicaoVal('');
     setUnidadeVal('');
@@ -292,8 +235,8 @@ export default function ListagemAlunos() {
   const filteredAlunos = useMemo(() => {
     return alunos.filter((aluno) => {
       // 1. Busca por Texto: Nome, Matrícula, CPF, Responsável
-      if (searchVal && searchVal.trim()) {
-        const term = searchVal.trim().toLowerCase();
+      if (debouncedSearchVal && debouncedSearchVal.trim()) {
+        const term = debouncedSearchVal.trim().toLowerCase();
         const nome = String(aluno.nome || '').toLowerCase();
         const cpf = String(aluno.cpf || '').replace(/\D/g, '');
         const matNum = String(aluno.numero_id || aluno.matricula_codigo || aluno.matricula || '').toLowerCase();
@@ -814,41 +757,23 @@ export default function ListagemAlunos() {
 
             {/* ── 4. FILTROS DA DASHBOARD ────────────────────────────────────── */}
             <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3.5">
-              {/* Linha 1: Busca → Status → Instituição → Unidade → Curso → Turma */}
+              {/* Linha 1: Busca ampliada (2 cols) → Instituição → Unidade → Curso → Turma */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-center">
-                {/* 1. Busca */}
-                <div className="relative">
+                {/* 1. Busca Ampliada */}
+                <div className="relative sm:col-span-2">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-sm">
                     🔍
                   </span>
                   <input
                     type="text"
-                    placeholder="Aluno, Matrícula, CPF..."
+                    placeholder="Buscar por aluno, matrícula, CPF ou responsável..."
                     value={searchVal}
                     onChange={(e) => setSearchVal(e.target.value)}
                     className="w-full h-10 pl-10 pr-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-slate-50/50 hover:bg-white transition-colors text-slate-700"
                   />
                 </div>
 
-                {/* 2. Status */}
-                <select
-                  value={statusVal}
-                  onChange={(e) => setStatusVal(e.target.value)}
-                  className="w-full h-10 px-3 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer truncate"
-                >
-                  <option value="">Todos os Status</option>
-                  <option value="ATIVO">Ativo</option>
-                  <option value="PRE_CADASTRO">Pré-Cadastro</option>
-                  <option value="AGUARDANDO_PAGAMENTO">Aguardando Pagamento</option>
-                  <option value="AGUARDANDO_TURMA">Aguardando Turma</option>
-                  <option value="TRANCADO">Trancado</option>
-                  <option value="CANCELADO">Cancelado</option>
-                  <option value="DESISTENTE">Desistente</option>
-                  <option value="CONCLUIDO">Concluído</option>
-                  <option value="INATIVO">Inativo</option>
-                </select>
-
-                {/* 3. Instituição */}
+                {/* 2. Instituição */}
                 <select
                   value={instituicaoVal}
                   onChange={(e) => handleInstituicaoChange(e.target.value)}
@@ -862,46 +787,74 @@ export default function ListagemAlunos() {
                   ))}
                 </select>
 
-                {/* 4. Unidade */}
+                {/* 3. Unidade (Desabilitada até selecionar Instituição) */}
                 <select
                   value={unidadeVal}
+                  disabled={!instituicaoVal}
                   onChange={(e) => handleUnidadeChange(e.target.value)}
-                  className="w-full h-10 px-3 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer truncate"
+                  className="w-full h-10 px-3 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer truncate disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                 >
-                  <option value="">Todas as Unidades</option>
+                  <option value="">
+                    {!instituicaoVal ? 'Selecione a Instituição' : 'Todas as Unidades'}
+                  </option>
                   {unidadesFiltradasOpcoes.map((u) => (
                     <option key={u.id} value={String(u.id)}>{u.nome}</option>
                   ))}
                 </select>
 
-                {/* 5. Curso */}
+                {/* 4. Curso (Desabilitado até selecionar Unidade) */}
                 <select
                   value={cursoVal}
+                  disabled={!unidadeVal}
                   onChange={(e) => handleCursoChange(e.target.value)}
-                  className="w-full h-10 px-3 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer truncate"
+                  className="w-full h-10 px-3 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer truncate disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                 >
-                  <option value="">Todos os Cursos</option>
+                  <option value="">
+                    {!unidadeVal ? 'Selecione a Unidade' : 'Todos os Cursos'}
+                  </option>
                   {cursosFiltradosOpcoes.map((c) => (
                     <option key={c.id} value={String(c.id)}>{c.nome}</option>
                   ))}
                 </select>
 
-                {/* 6. Turma */}
+                {/* 5. Turma (Desabilitada até selecionar Curso) */}
                 <select
                   value={turmaVal}
+                  disabled={!cursoVal}
                   onChange={(e) => setTurmaVal(e.target.value)}
-                  className="w-full h-10 px-3 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer truncate"
+                  className="w-full h-10 px-3 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer truncate disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                 >
-                  <option value="">Todas as Turmas</option>
+                  <option value="">
+                    {!cursoVal ? 'Selecione o Curso' : 'Todas as Turmas'}
+                  </option>
                   {turmasFiltradasOpcoes.map((t) => (
                     <option key={t.id} value={String(t.id)}>{t.nome}</option>
                   ))}
                 </select>
               </div>
 
-              {/* Linha 2: Ano Letivo e botões Limpar Filtros / Aplicar Filtros */}
+              {/* Linha 2: Status → Ano Letivo e botões Limpar Filtros / Aplicar Filtros */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2.5 border-t border-slate-100">
-                <div className="w-full sm:w-64">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full sm:w-[480px]">
+                  {/* Status posicionado imediatamente antes de Ano Letivo */}
+                  <select
+                    value={statusVal}
+                    onChange={(e) => setStatusVal(e.target.value)}
+                    className="w-full h-10 px-3 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer truncate"
+                  >
+                    <option value="">Todos os Status</option>
+                    <option value="ATIVO">Ativo</option>
+                    <option value="PRE_CADASTRO">Pré-Cadastro</option>
+                    <option value="AGUARDANDO_PAGAMENTO">Aguardando Pagamento</option>
+                    <option value="AGUARDANDO_TURMA">Aguardando Turma</option>
+                    <option value="TRANCADO">Trancado</option>
+                    <option value="CANCELADO">Cancelado</option>
+                    <option value="DESISTENTE">Desistente</option>
+                    <option value="CONCLUIDO">Concluído</option>
+                    <option value="INATIVO">Inativo</option>
+                  </select>
+
+                  {/* Ano Letivo */}
                   <select
                     value={anoLetivoVal}
                     onChange={(e) => setAnoLetivoVal(e.target.value)}
@@ -916,6 +869,7 @@ export default function ListagemAlunos() {
 
                 <div className="flex items-center gap-2.5 self-end sm:self-center">
                   <button
+                    type="button"
                     onClick={limparFiltros}
                     className="h-10 px-4 border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5"
                   >
@@ -924,6 +878,7 @@ export default function ListagemAlunos() {
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => setPaginaAtual(1)}
                     className="h-10 px-5 bg-[#009688] hover:bg-[#00796B] active:bg-[#00695C] text-white font-semibold text-xs rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5"
                   >
@@ -952,6 +907,12 @@ export default function ListagemAlunos() {
                 </div>
 
                 <div className="flex items-center gap-3">
+                  {loading && (
+                    <span className="inline-flex items-center gap-1.5 text-xs text-teal-700 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200/80 animate-pulse font-medium">
+                      <span className="inline-block w-2 h-2 rounded-full bg-teal-600"></span>
+                      Atualizando...
+                    </span>
+                  )}
                   <button
                     onClick={exportarCSV}
                     className="px-3 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
@@ -965,11 +926,11 @@ export default function ListagemAlunos() {
                 </div>
               </div>
 
-              {loading ? (
+              {loading && alunos.length === 0 ? (
                 <div className="p-16 text-center text-slate-500 font-medium animate-pulse">
                   Carregando alunos e matrículas...
                 </div>
-              ) : errorMsg ? (
+              ) : errorMsg && alunos.length === 0 ? (
                 <div className="p-16 text-center space-y-3">
                   <div className="text-rose-500 text-4xl">⚠️</div>
                   <div className="text-slate-800 font-bold text-sm">{errorMsg}</div>
@@ -986,7 +947,10 @@ export default function ListagemAlunos() {
                 </div>
               ) : (
                 <>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto relative">
+                    {loading && (
+                      <div className="absolute inset-0 bg-white/40 backdrop-blur-[1px] pointer-events-none z-10 transition-opacity" />
+                    )}
                     <table className="w-full border-collapse text-left">
                       <thead>
                         <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
