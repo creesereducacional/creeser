@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import AdminFinanceiroLayout from '@/components/AdminFinanceiro/Layout';
 import BarraFiltros from '@/components/AdminFinanceiro/BarraFiltros';
@@ -2246,6 +2246,7 @@ export default function AlunosFinanceiroPage() {
   const [loading, setLoading] = useState(true);
 
   const [filtroNome, setFiltroNome] = useState('');
+  const [debouncedFiltroNome, setDebouncedFiltroNome] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('');
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [filtroInstituicao, setFiltroInstituicao] = useState('');
@@ -2258,6 +2259,14 @@ export default function AlunosFinanceiroPage() {
   const [todosCursos, setTodosCursos] = useState([]);
   const [todasTurmas, setTodasTurmas] = useState([]);
   const [carregouOpcoes, setCarregouOpcoes] = useState(false);
+
+  // Debounce para busca textual (300ms)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedFiltroNome(filtroNome);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [filtroNome]);
 
   const [modalFinanceiro, setModalFinanceiro] = useState(null);
   const [modalOrdem, setModalOrdem] = useState(null);
@@ -2562,7 +2571,10 @@ export default function AlunosFinanceiroPage() {
     } catch (e) { console.error(e); } finally { setDeletandoLote(false); }
   };
 
-  const carregarDados = async () => {
+  const loadRequestIdRef = useRef(0);
+
+  const carregarDados = useCallback(async () => {
+    const currentRequestId = ++loadRequestIdRef.current;
     try {
       setLoading(true);
       const query = new URLSearchParams();
@@ -2572,11 +2584,14 @@ export default function AlunosFinanceiroPage() {
       if (filtroCurso) query.set('cursoId', filtroCurso);
       if (filtroTurma) query.set('turmaId', filtroTurma);
       if (filtroAnoLetivo) query.set('anoLetivo', filtroAnoLetivo);
-      if (filtroNome) query.set('search', filtroNome);
+      if (debouncedFiltroNome) query.set('search', debouncedFiltroNome);
 
       const res = await fetch(`/api/admin-financeiro/alunos?${query.toString()}`);
+      if (currentRequestId !== loadRequestIdRef.current) return;
+
       if (res.ok) {
         const data = await res.json();
+        if (currentRequestId !== loadRequestIdRef.current) return;
         const listaAlunos = Array.isArray(data.alunos) ? data.alunos : [];
         setAlunos(listaAlunos);
         setTotalGeral(typeof data.totalGeral === 'number' ? data.totalGeral : listaAlunos.length);
@@ -2592,6 +2607,7 @@ export default function AlunosFinanceiroPage() {
           fetch('/api/instituicoes'),
           fetch('/api/cursos')
         ]);
+        if (currentRequestId !== loadRequestIdRef.current) return;
 
         let instList = [];
         if (resOpcoes.ok) {
@@ -2628,23 +2644,38 @@ export default function AlunosFinanceiroPage() {
         }
         setCarregouOpcoes(true);
       }
-    } catch (e) { console.error(e); } finally { setLoading(false); }
-  };
+    } catch (e) {
+      if (currentRequestId !== loadRequestIdRef.current) return;
+      console.error(e);
+    } finally {
+      if (currentRequestId === loadRequestIdRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [
+    filtroStatus,
+    filtroInstituicao,
+    filtroUnidade,
+    filtroCurso,
+    filtroTurma,
+    filtroAnoLetivo,
+    debouncedFiltroNome,
+    carregouOpcoes
+  ]);
 
-  // Disparar busca ao mudar os filtros
+  // Disparar busca e resetar página ao mudar qualquer filtro
   useEffect(() => {
     setPaginaAtual(1);
     carregarDados();
-  }, [filtroStatus, filtroInstituicao, filtroUnidade, filtroCurso, filtroTurma, filtroAnoLetivo]);
-
-  // Debounce para busca por texto
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      setPaginaAtual(1);
-      carregarDados();
-    }, 400);
-    return () => clearTimeout(delayDebounceFn);
-  }, [filtroNome]);
+  }, [
+    filtroStatus,
+    filtroInstituicao,
+    filtroUnidade,
+    filtroCurso,
+    filtroTurma,
+    filtroAnoLetivo,
+    debouncedFiltroNome
+  ]);
 
   // Handlers hierárquicos: ao mudar um filtro superior, limpa os inferiores incompatíveis
   const handleInstituicaoChange = (val) => {
@@ -2671,6 +2702,7 @@ export default function AlunosFinanceiroPage() {
   const limparFiltros = () => {
     setPaginaAtual(1);
     setFiltroNome('');
+    setDebouncedFiltroNome('');
     setFiltroStatus('');
     setFiltroInstituicao('');
     setFiltroUnidade('');
@@ -2681,41 +2713,42 @@ export default function AlunosFinanceiroPage() {
 
   // Unidades filtradas pela instituição selecionada
   const unidadesFiltradasOpcoes = useMemo(() => {
-    let list = todasUnidades;
-    if (filtroInstituicao) {
-      list = list.filter(u => String(u.instituicao_id || u.instituicaoId) === String(filtroInstituicao));
-    }
-    return list;
+    if (!filtroInstituicao) return [];
+    return todasUnidades.filter(u => String(u.instituicao_id || u.instituicaoid || u.instituicaoId) === String(filtroInstituicao));
   }, [todasUnidades, filtroInstituicao]);
 
   // Cursos filtrados pela instituição e pela unidade selecionadas
   const cursosFiltradosOpcoes = useMemo(() => {
-    let list = todosCursos.length > 0 ? todosCursos : cursos;
-    if (filtroInstituicao) {
-      list = list.filter(c => !c.instituicaoId || String(c.instituicaoId || c.instituicao_id) === String(filtroInstituicao));
-    }
-    if (filtroUnidade) {
-      list = list.filter(c => {
-        if (!c.unidadeIds || c.unidadeIds.length === 0) return true;
+    if (!filtroInstituicao || !filtroUnidade) return [];
+    let list = (todosCursos.length > 0 ? todosCursos : cursos).filter(c => {
+      const cInstId = String(c.instituicaoId || c.instituicaoid || c.instituicao_id || '');
+      return !cInstId || cInstId === String(filtroInstituicao);
+    });
+
+    list = list.filter(c => {
+      if (Array.isArray(c.unidadeIds) && c.unidadeIds.length > 0) {
         return c.unidadeIds.some(uid => String(uid) === String(filtroUnidade));
-      });
-    }
+      }
+      if (Array.isArray(c.unidade_ids) && c.unidade_ids.length > 0) {
+        return c.unidade_ids.some(uid => String(uid) === String(filtroUnidade));
+      }
+      return true;
+    });
     return list;
   }, [todosCursos, cursos, filtroInstituicao, filtroUnidade]);
 
   // Turmas filtradas conforme o curso selecionado (e unidade/instituição)
   const turmasFiltradasOpcoes = useMemo(() => {
-    let list = todasTurmas;
-    if (filtroInstituicao) {
-      list = list.filter(t => !t.instituicaoId || String(t.instituicaoId || t.instituicao_id) === String(filtroInstituicao));
-    }
-    if (filtroUnidade) {
-      list = list.filter(t => String(t.unidadeId || t.unidade_id) === String(filtroUnidade));
-    }
-    if (filtroCurso) {
-      list = list.filter(t => String(t.cursoId || t.curso_id) === String(filtroCurso));
-    }
-    return list;
+    if (!filtroInstituicao || !filtroUnidade || !filtroCurso) return [];
+    return todasTurmas.filter(t => {
+      const tInstId = String(t.instituicaoId || t.instituicaoid || t.instituicao_id || '');
+      if (tInstId && tInstId !== String(filtroInstituicao)) return false;
+      const tUnidId = String(t.unidadeId || t.unidadeid || t.unidade_id || '');
+      if (tUnidId !== String(filtroUnidade)) return false;
+      const tCursoId = String(t.cursoId || t.cursoid || t.curso_id || '');
+      if (tCursoId !== String(filtroCurso)) return false;
+      return true;
+    });
   }, [todasTurmas, filtroInstituicao, filtroUnidade, filtroCurso]);
 
   const anosLetivosOpcoes = useMemo(() => {
@@ -2800,14 +2833,6 @@ export default function AlunosFinanceiroPage() {
     return <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${cores[status] || 'bg-gray-100 text-gray-800'}`}>{labels[status] || status}</span>;
   };
 
-  if (loading) return (
-    <AdminFinanceiroLayout>
-      <div className="flex items-center justify-center h-96">
-        <p className="text-lg text-gray-600">Carregando alunos...</p>
-      </div>
-    </AdminFinanceiroLayout>
-  );
-
   return (
     <AdminFinanceiroLayout>
       <div className="space-y-6">
@@ -2858,48 +2883,164 @@ export default function AlunosFinanceiroPage() {
           </div>
         </div>
 
-        <BarraFiltros
-          searchPlaceholder="🔍 Aluno, Matrícula, CPF ou Responsável..."
-          searchValue={filtroNome}
-          onSearchChange={setFiltroNome}
-          statusValue={filtroStatus}
-          onStatusChange={setFiltroStatus}
-          statusOptions={[
-            { value: "ATIVO", label: "Ativo" },
-            { value: "PRE_CADASTRO", label: "Pré-Cadastro" },
-            { value: "AGUARDANDO_PAGAMENTO_MATRICULA", label: "Ag. Pagamento Matrícula" },
-            { value: "AGUARDANDO_FORMACAO_TURMA", label: "Ag. Formação de Turma" },
-            { value: "TRANCADO", label: "Trancado" },
-            { value: "TRANCADO_COM_DEBITO", label: "Trancado c/ Débito" },
-            { value: "DESISTENTE", label: "Desistente" },
-            { value: "CANCELADO", label: "Cancelado" },
-            { value: "INATIVO", label: "Inativo" }
-          ]}
-          instituicaoValue={filtroInstituicao}
-          onInstituicaoChange={handleInstituicaoChange}
-          instituicoes={instituicoes}
-          unidadeValue={filtroUnidade}
-          onUnidadeChange={handleUnidadeChange}
-          unidades={unidadesFiltradasOpcoes}
-          cursoValue={filtroCurso}
-          onCursoChange={handleCursoChange}
-          cursos={cursosFiltradosOpcoes}
-          turmaValue={filtroTurma}
-          onTurmaChange={setFiltroTurma}
-          turmas={turmasFiltradasOpcoes}
-          anoLetivoValue={filtroAnoLetivo}
-          onAnoLetivoChange={setFiltroAnoLetivo}
-          anosLetivos={anosLetivosOpcoes}
-          onClear={limparFiltros}
-        />
+        {/* ── FILTROS DA LISTAGEM ─────────────────────────────────────────── */}
+        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs space-y-3.5">
+          {/* Linha 1: Busca ampliada (2 cols) → Instituição → Unidade → Curso → Turma */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 items-center">
+            {/* 1. Busca Ampliada */}
+            <div className="relative sm:col-span-2">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-sm">
+                🔍
+              </span>
+              <input
+                type="text"
+                placeholder="Buscar por aluno, matrícula, CPF ou responsável..."
+                value={filtroNome}
+                onChange={(e) => setFiltroNome(e.target.value)}
+                className="w-full h-10 pl-10 pr-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-slate-50/50 hover:bg-white transition-colors text-slate-700"
+              />
+            </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-          {alunosFiltrados.length === 0 ? (
+            {/* 2. Instituição */}
+            <select
+              value={filtroInstituicao}
+              onChange={(e) => handleInstituicaoChange(e.target.value)}
+              className="w-full h-10 px-3 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer truncate"
+            >
+              <option value="">Todas as Instituições</option>
+              {instituicoes.map((inst) => (
+                <option key={inst.id} value={String(inst.id)}>
+                  {inst.nome}
+                </option>
+              ))}
+            </select>
+
+            {/* 3. Unidade (Desabilitada até selecionar Instituição) */}
+            <select
+              value={filtroUnidade}
+              disabled={!filtroInstituicao}
+              onChange={(e) => handleUnidadeChange(e.target.value)}
+              className="w-full h-10 px-3 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer truncate disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+            >
+              <option value="">
+                {!filtroInstituicao ? 'Selecione a Instituição' : 'Todas as Unidades'}
+              </option>
+              {unidadesFiltradasOpcoes.map((u) => (
+                <option key={u.id} value={String(u.id)}>{u.nome}</option>
+              ))}
+            </select>
+
+            {/* 4. Curso (Desabilitado até selecionar Unidade) */}
+            <select
+              value={filtroCurso}
+              disabled={!filtroUnidade}
+              onChange={(e) => handleCursoChange(e.target.value)}
+              className="w-full h-10 px-3 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer truncate disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+            >
+              <option value="">
+                {!filtroUnidade ? 'Selecione a Unidade' : 'Todos os Cursos'}
+              </option>
+              {cursosFiltradosOpcoes.map((c) => (
+                <option key={c.id} value={String(c.id)}>{c.nome}</option>
+              ))}
+            </select>
+
+            {/* 5. Turma (Desabilitada até selecionar Curso) */}
+            <select
+              value={filtroTurma}
+              disabled={!filtroCurso}
+              onChange={(e) => setFiltroTurma(e.target.value)}
+              className="w-full h-10 px-3 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer truncate disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+            >
+              <option value="">
+                {!filtroCurso ? 'Selecione o Curso' : 'Todas as Turmas'}
+              </option>
+              {turmasFiltradasOpcoes.map((t) => (
+                <option key={t.id} value={String(t.id)}>{t.nome}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Linha 2: Status → Ano Letivo e botões Limpar Filtros / Aplicar Filtros */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2.5 border-t border-slate-100">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full sm:w-[480px]">
+              {/* Status posicionado imediatamente antes de Ano Letivo */}
+              <select
+                value={filtroStatus}
+                onChange={(e) => setFiltroStatus(e.target.value)}
+                className="w-full h-10 px-3 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer truncate"
+              >
+                <option value="">Todos os Status</option>
+                <option value="ATIVO">Ativo</option>
+                <option value="PRE_CADASTRO">Pré-Cadastro</option>
+                <option value="AGUARDANDO_PAGAMENTO_MATRICULA">Ag. Pagamento Matrícula</option>
+                <option value="AGUARDANDO_FORMACAO_TURMA">Ag. Formação de Turma</option>
+                <option value="TRANCADO">Trancado</option>
+                <option value="TRANCADO_COM_DEBITO">Trancado c/ Débito</option>
+                <option value="DESISTENTE">Desistente</option>
+                <option value="CANCELADO">Cancelado</option>
+                <option value="INATIVO">Inativo</option>
+              </select>
+
+              {/* Ano Letivo */}
+              <select
+                value={filtroAnoLetivo}
+                onChange={(e) => setFiltroAnoLetivo(e.target.value)}
+                className="w-full h-10 px-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-[#009688] focus:ring-1 focus:ring-[#009688] bg-white text-slate-700 cursor-pointer"
+              >
+                <option value="">Todos os Anos Letivos</option>
+                {anosLetivosOpcoes.map((ano) => (
+                  <option key={ano} value={ano}>{ano}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2.5 self-end sm:self-center">
+              <button
+                type="button"
+                onClick={limparFiltros}
+                className="h-10 px-4 border border-slate-200 hover:bg-slate-50 text-slate-600 font-semibold text-xs rounded-xl transition cursor-pointer flex items-center gap-1.5"
+              >
+                <span>🧹</span>
+                <span>Limpar Filtros</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPaginaAtual(1)}
+                className="h-10 px-5 bg-[#009688] hover:bg-[#00796B] active:bg-[#00695C] text-white font-semibold text-xs rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5"
+              >
+                <span>🔍</span>
+                <span>Aplicar Filtros</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm relative">
+          {/* Indicador discreto de carregamento no topo */}
+          {loading && (
+            <div className="absolute top-3 right-4 z-20">
+              <span className="inline-flex items-center gap-1.5 text-xs text-teal-700 bg-teal-50 px-2.5 py-1 rounded-lg border border-teal-200/80 animate-pulse font-medium shadow-xs">
+                <span className="inline-block w-2 h-2 rounded-full bg-teal-600"></span>
+                Atualizando...
+              </span>
+            </div>
+          )}
+
+          {loading && alunosFiltrados.length === 0 ? (
+            <div className="p-16 text-center text-slate-500 font-medium animate-pulse">
+              Carregando alunos e faturas...
+            </div>
+          ) : alunosFiltrados.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
               <p className="text-lg">Nenhum aluno encontrado com os filtros selecionados</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto relative">
+              {loading && (
+                <div className="absolute inset-0 bg-white/40 backdrop-blur-[1px] pointer-events-none z-10 transition-opacity" />
+              )}
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
